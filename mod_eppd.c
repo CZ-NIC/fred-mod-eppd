@@ -42,7 +42,7 @@ typedef struct {
  * @param c Connection
  * @ret Status
  */
-static char *epp_read_request(conn_rec *c)
+static char *epp_read_request(apr_pool_t *p, conn_rec *c)
 {
 		char *buf; /* buffer for user request */
 		uint32_t	hbo_size; /* size of request in host byte order */
@@ -51,7 +51,7 @@ static char *epp_read_request(conn_rec *c)
 		apr_status_t	status;
 		apr_size_t	len;
 
-		bb = apr_brigade_create(c->pool, c->bucket_alloc);
+		bb = apr_brigade_create(p, c->bucket_alloc);
 
 		/* blocking read of first 4 bytes (message size) */
 		status = ap_get_brigade(c->input_filters, bb, AP_MODE_READBYTES,
@@ -68,7 +68,7 @@ static char *epp_read_request(conn_rec *c)
 		 * could be read directly. But we will do it more generally in case.
 		 */
 		len = EPP_HEADER_LENGTH;
-		status = apr_brigade_pflatten(bb, &buf, &len, c->pool);
+		status = apr_brigade_pflatten(bb, &buf, &len, p);
 		if (status != APR_SUCCESS) {
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"Could not flatten apr_brigade!");
@@ -120,7 +120,7 @@ static char *epp_read_request(conn_rec *c)
 		}
 
 		/* convert bucket brigade to string */
-		status = apr_brigade_pflatten(bb, &buf, &len, c->pool);
+		status = apr_brigade_pflatten(bb, &buf, &len, p);
 		if (status != APR_SUCCESS) {
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"Could not flatten apr_brigade!");
@@ -157,7 +157,6 @@ static int epp_process_connection(conn_rec *c)
 	apr_bucket_brigade	*bb;
 	apr_size_t	len;
 	apr_status_t	status;
-	epp_status_t	epp_status;
 	server_rec	*s = c->base_server;
 	eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(s->module_config, &eppd_module);
@@ -200,42 +199,64 @@ static int epp_process_connection(conn_rec *c)
 	}
 
 	/* create and initialize epp connetion context */
-	ctx = epp_parser_init();
-
-	/* loop processing requests */
-	while (epp_status != EPP_CLOSE_CONN) {
-		char *request;
-		char *response;
-
-		/* read request */
-		request = epp_read_request(c);
-		if (request == NULL) return HTTP_INTERNAL_SERVER_ERROR;
-
-		/* deliver request to XML parser */
-		epp_status = epp_parser_process_request(ctx, request, &response);
-		ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
-				"epp request processed");
-		if (response == NULL) continue;
-
-		/* send response back to client */
-		apr_brigade_puts(bb, NULL, NULL, response);
-
-		status = ap_fflush(c->output_filters, bb);
-		if (status != APR_SUCCESS) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-			"Error when sending response to client");
-			return HTTP_INTERNAL_SERVER_ERROR;
-		}
-
-		status = apr_brigade_cleanup(bb);
-		if (status != APR_SUCCESS) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-			"Could not cleanup bucket brigade used for response");
-			return HTTP_INTERNAL_SERVER_ERROR;
-		}
+	if ((ctx = epp_parser_init()) == NULL) {
+		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+		"Could allocate epp_connection_ctx struct");
+		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	epp_parser_cleanup(ctx);
+	/*
+	 * process requests loop
+	 * termination conditions are embedded inside the loop
+	 */
+	while (1) {
+		char *request;
+		epp_parser_parms_out *parser_out;
+		apr_pool_t	*rpool;
+
+		/* allocate new pool for request */
+		apr_pool_create(&rpool, c->pool);
+		apr_pool_tag(rpool, "EPP_request");
+
+		/* read request */
+		request = epp_read_request(rpool, c);
+		if (request == NULL) return HTTP_INTERNAL_SERVER_ERROR;
+
+		/* allocate structure for return values from parser */
+		parser_out = apr_pcalloc(rpool, sizeof (*parser_out));
+
+		/* deliver request to XML parser */
+		epp_parser_process_request(ctx, request, parser_out);
+
+		/* analyze parser's answer */
+		if (parser_out->err) {
+			ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
+					"epp parser: %s", parser_out->err);
+		}
+		if (parser_out->response != NULL) {
+			/* send response back to client */
+			apr_brigade_puts(bb, NULL, NULL, parser_out->response);
+
+			status = ap_fflush(c->output_filters, bb);
+			if (status != APR_SUCCESS) {
+				ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+				"Error when sending response to client");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+
+			status = apr_brigade_cleanup(bb);
+			if (status != APR_SUCCESS) {
+				ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+				"Could not cleanup bucket brigade used for response");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+		}
+
+		epp_parser_cleanup_parms_out(parser_out);
+		apr_pool_destroy(rpool);
+	}
+
+	epp_parser_cleanup_ctx(ctx);
 	return OK;
 }
 
