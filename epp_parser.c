@@ -6,6 +6,10 @@
 #include <string.h>
 #include <assert.h>
 
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+#include <libxml/xmlmemory.h>
+
 #include "epp_parser.h"
 
 /**
@@ -20,13 +24,17 @@ void *epp_parser_init(void)
 {
 	epp_connection_ctx *ctx;
 
+	xmlInitParser();
+
 	if ((ctx = malloc(sizeof (*ctx))) == NULL) return NULL;
 	ctx->user = NULL;
 	return (void *) ctx;
 }
 
-void epp_parser_cleanup_ctx(void *conn_ctx)
+void epp_parser_cleanup(void *conn_ctx)
 {
+	xmlCleanupParser();
+
 	epp_connection_ctx *ctx = (epp_connection_ctx *) conn_ctx;
 
 	free(ctx);
@@ -39,22 +47,49 @@ void epp_parser_cleanup_parms_out(epp_parser_parms_out *parms_out)
 	if (parms_out->info) free(parms_out->info);
 }
 
-void epp_parser_process_request(
-		void *conn_ctx,
-		char *request,
+static void log(epp_parser_parms_out *parms, epp_parser_loglevel severity,
+		const char *msg)
+{
+	epp_parser_log *temp;
+
+	/* is it first log in chain? */
+	if (parms->head == NULL) {
+		parms->head = malloc(sizeof *(parms->head));
+		if (parms->head == NULL) return;
+		parms->head->next = NULL;
+		parms->head->severity = severity;
+		parms->head->msg = strndup(msg, 300);
+		parms->last = parms->head;
+		return;
+	}
+
+	assert(last->next == NULL);
+
+	temp = parms->last;
+	parms->last = malloc(sizeof *(parms->last));
+	if (parms->last == NULL) return;
+	parms->last->next = NULL;
+	parms->last->severity = severity;
+	parms->last->msg = strndup(msg, 300);
+	parms->temp->next = parms->last;
+}
+
+void epp_parser_process_request(void *conn_ctx, char *request,
 		epp_parser_parms_out *parms_out)
 {
+	/* XML stuff */
+	xmlDocPtr	doc;
+	/* session stuff */
 	epp_connection_ctx *ctx = (epp_connection_ctx *) conn_ctx;
-	parms_out->response = NULL;
-	parms_out->err = NULL;
-	parms_out->status = EPP_DEFAULT_STAT;
-
 
 	assert(request != NULL);
 
-	parms_out->err = strdup("Request is empty, nothing to be done");
-
 	/* parse request */
+	doc = xmlParseMemory(request, strlen(request));
+	if (doc == NULL) {
+		log(parms_out, EPP_LOG_ERROR, "Request is not valid XML");
+		return;
+	}
 
 	/* return errors from parser if any */
 
@@ -64,6 +99,8 @@ void epp_parser_process_request(
 
 	/* select and invoke command handler */
 
-	/* return struct parms_out as it is to mod_eppd */
+	xmlFreeDoc(doc);
+	xmlMemoryDump();
 
+	/* pass struct parms_out as it is to mod_eppd */
 }

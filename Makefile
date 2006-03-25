@@ -5,6 +5,8 @@ CFLAGS=-g -O0
 
 .PHONY: clean build install
 
+all: test_parser
+
 build: mod_eppd.c epp_parser.h epp_parser.o
 	$(APXS) -c mod_eppd.c epp_parser.o
 
@@ -12,10 +14,10 @@ install: mod_eppd.c epp_parser.h epp_parser.o
 	$(APXS) -c -i mod_eppd.c epp_parser.o
 
 test_parser: test_parser.c epp_parser.h epp_parser.o
-	${CC} ${CFLAGS} -o test_parser test_parser.c epp_parser.o
+	${CC} ${CFLAGS} `xml2-config --libs` -o test_parser test_parser.c epp_parser.o
 
 epp_parser.o: epp_parser.c epp_parser.h
-	${CC} ${CFLAGS} -c epp_parser.c
+	${CC} ${CFLAGS} `xml2-config --cflags` -c epp_parser.c
 
 clean:
 	rm -f mod_eppd.loT

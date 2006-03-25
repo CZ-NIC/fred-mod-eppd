@@ -17,14 +17,36 @@ typedef enum {
 } epp_status_t;
 
 /**
+ * Log levels of messages from the parser. Mapping of epp log levels
+ * to apache log levels is task of mod_eppd.
+ */
+typedef enum {
+	EPP_LOG_INFO,
+	EPP_LOG_WARNING,
+	EPP_LOG_ERROR
+} epp_parser_loglevel;
+
+/**
+ * Every log message has log level and pointer to next message.
+ */
+typedef struct {
+	epp_parser_log *next;
+	epp_parser_loglevel *severity;
+	char *msg;
+} epp_parser_log;
+
+/**
  * This structure gathers output parameters of epp_parser_process_request.
  * eppd_mod takes case of structure as such and parser takes manages the items
- * inside the struct
+ * inside the struct.
+ *
+ * The pointer last is there for efficient message inserting to the end of
+ * log chain.
  */
 typedef struct {
 	char *response;
-	char *err;
-	char *info;
+	epp_parser_log *head;
+	epp_parser_log *last;
 	epp_status_t status;
 } epp_parser_parms_out;
 
@@ -53,7 +75,7 @@ void epp_parser_process_request(
  * at the end of connection is called this routine, to do necessary cleanup.
  * @par Connection context
  */
-void epp_parser_cleanup_ctx(void *conn_ctx);
+void epp_parser_cleanup(void *conn_ctx);
 
 /**
  * epp_parser_parms_out is allocated by mod_eppd but management of items inside

@@ -8,6 +8,7 @@
 typedef enum {
 	CMD_UNKNOWN,
 	CMD_CUSTOM,
+	CMD_FILE,
 	CMD_EXIT
 } cmd_t;
 
@@ -27,6 +28,7 @@ cmd_t getcmd(void)
 	cmd[i] = 0;
 
 	if (!strncmp("custom", cmd, 30)) return CMD_CUSTOM;
+	if (!strncmp("file", cmd, 30)) return CMD_FILE;
 	if (!strncmp("exit", cmd, 30)) return CMD_EXIT;
 	return CMD_UNKNOWN;
 }
@@ -55,6 +57,7 @@ int main(int argc, char *argv[])
 	cmd_t cmd;
 	epp_parser_parms_out parser_out;
 	epp_status_t status;
+	epp_parser_log *log_iter;
 
 	ctx = epp_parser_init();
 	while (1) {
@@ -72,20 +75,24 @@ int main(int argc, char *argv[])
 		}
 		if (quit) break;
 
+		bzero(&parser_out, sizeof parser_out);
 		epp_parser_process_request(ctx, text, &parser_out);
 
 		/* print result */
 		puts("\nResults are:");
-		if (parser_out.err)
-			printf("Status val is %d\n", parser_out.status);
-		if (parser_out.response)
-			printf("Response from parser is:\n%s\n", parser_out.response);
-		if (parser_out.err)
-			printf("Error from parser is:\n%s\n", parser_out.err);
+		printf("Status val is %d\n", parser_out.status);
+
+		log_iter = parser_out.head;
+		puts("parser log:\n");
+		while (log_iter) {
+			printf("severity: %d\n", log_iter->severiry);
+			printf("content: %s\n", log_iter->msg);
+			log_iter = log_iter->next;
+		}
 
 		epp_parser_cleanup_parms_out(&parser_out);
 	}
-	epp_parser_cleanup_ctx(ctx);
+	epp_parser_cleanup(ctx);
 
 	return 0;
 }
