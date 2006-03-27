@@ -29,11 +29,12 @@ typedef enum {
 /**
  * Every log message has log level and pointer to next message.
  */
-typedef struct {
+typedef struct Epp_parser_log epp_parser_log;
+struct Epp_parser_log {
 	epp_parser_log *next;
-	epp_parser_loglevel *severity;
+	epp_parser_loglevel severity;
 	char *msg;
-} epp_parser_log;
+};
 
 /**
  * This structure gathers output parameters of epp_parser_process_request.
@@ -48,14 +49,65 @@ typedef struct {
 	epp_parser_log *head;
 	epp_parser_log *last;
 	epp_status_t status;
-} epp_parser_parms_out;
+} epp_command_parms_out;
+
+/**
+ * This structure gathers output parameters for epp_parser_get_greeting.
+ */
+typedef struct {
+	char *greeting;
+	char *error_msg;
+} epp_greeting_parms_out;
+
+/**
+ * This routine should be called in postconfig phase to check that libxml
+ * is installed and version is correct. In case of an error, error message
+ * is written to standard output and program aborted - this is certainly
+ * not the best behaviour .. but still better than to ommit the test.
+ * This routine also loads and checks validity of epp scheme.
+ * Preprocessed schemes are returned for later use in epp request handler.
+ *
+ * @par url_schema URL of schema
+ * @ret Structure holding preprocessed schemes, NULL if unsuccessful
+ */
+void *epp_parser_init(const char *url_schema);
+
+/**
+ * This will clean up preprocessed epp schema.
+ * @par ctx Preprocessed schemas
+ */
+void epp_parser_init_cleanup(void *parser_ctx);
 
 /**
  * This creates and returns context of epp connection, which is used
  * when handling subsequent requests.
  * @ret Connection context
  */
-void *epp_parser_init(void);
+void *epp_parser_connection(void);
+
+/**
+ * Since mod_eppd doesn't know anything about connection context structure,
+ * at the end of connection is called this routine, to do necessary cleanup.
+ * @par Connection context to be cleaned up
+ */
+void epp_parser_connection_cleanup(void *conn_ctx);
+
+/**
+ * Routine makes up epp greeting frame. It is assumed that Output parameters
+ * struct is filled by zeros upon function entry.
+ *
+ * @par svid EPP server ID
+ * @par svdate When the greeting was generated
+ * @par parms Output parameters
+ */
+void epp_parser_greeting(const char *svid, const char *svdate,
+		epp_greeting_parms_out *parms);
+
+/**
+ * Let the parser take care of allocated output parameters.
+ * @par parms Output parameters to be cleaned up
+ */
+void epp_parser_greeting_cleanup(epp_greeting_parms_out *parms);
 
 /**
  * Parses request and gets response.
@@ -65,25 +117,18 @@ void *epp_parser_init(void);
  * @par Error message to be written in apache log
  * @ret Status
  */
-void epp_parser_process_request(
+void epp_parser_command(
 		void *conn_ctx,
-		char *request,
-		epp_parser_parms_out *parms_out);
-
-/**
- * Since mod_eppd doesn't know anything about connection context structure,
- * at the end of connection is called this routine, to do necessary cleanup.
- * @par Connection context
- */
-void epp_parser_cleanup(void *conn_ctx);
+		void *parser_ctx,
+		const char *request,
+		epp_command_parms_out *parms);
 
 /**
  * epp_parser_parms_out is allocated by mod_eppd but management of items inside
  * the structure is task of parser. This routine cleans up the struct.
+ * Routine assumes that parms_out is filled by zeros when called.
  * @par retval Structure to clean up
  */
-void epp_parser_cleanup_parms_out(epp_parser_parms_out *parms_out);
+void epp_parser_command_cleanup(epp_command_parms_out *parms);
 
 #endif /* EPP_PARSER_H */
-
-/* vi:set ts=4 sw=4: */
