@@ -2,6 +2,13 @@
 #ifndef EPP_DATA_H
 #define EPP_DATA_H
 
+/* Session commands */
+typedef struct {
+	char *clID;
+	char *pw;
+	char *newPW;
+} epp_data_login;
+
 /* Query Commands */
 typedef struct {
 	int dummy;

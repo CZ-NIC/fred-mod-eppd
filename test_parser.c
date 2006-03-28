@@ -67,8 +67,8 @@ int readfile(char *text)
 		return 0;
 	}
 	for (i = 0; (c = fgetc(f)) != EOF && i < MAX_LENGTH - 1; i++) {
-		text[i++] = c;
-		putchar(c);
+		text[i] = c;
+		//putchar(c);
 	}
 	if (i == MAX_LENGTH - 1) {
 		fprintf(stderr, "Maximal allowed text lenght exceeded\n");
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
 	conn_ctx = epp_parser_connection();
 
 	while (1) {
-		puts("Command: ");
+		fputs("Command: ", stdout);
 		switch (cmd = getcmd()) {
 			case CMD_CUSTOM:
 				readinput(text);

@@ -12,10 +12,10 @@
 	    schemaLocation="eppcom-1.0.xsd"/>
     <import namespace="urn:ietf:params:xml:ns:epp-1.0"
 	    schemaLocation="epp-1.0.xsd"/>
-    <import namespace="urn:ietf:params:xml:ns:domain-1.0"
-	    schemaLocation="domain-1.0.xsd"/>
     <import namespace="urn:ietf:params:xml:ns:contact-1.0"
 	    schemaLocation="contact-1.0.xsd"/>
+    <import namespace="urn:ietf:params:xml:ns:domain-1.0"
+	    schemaLocation="domain-1.0.xsd"/>
 
     <annotation>
       <documentation>

@@ -5,8 +5,15 @@
      epp-1.0.xsd">
 <command>
 	<login>
-		<clID>test</clID>
-		<pw>test</pw>
+		<clID>clientA</clID>
+		<pw>hloupe-heslo</pw>
+		<options>
+			<version>1.0</version>
+			<lang>en</lang>
+		</options>
+		<svcs>
+			<objURI>urn:ietf:params:xml:ns:obj1</objURI>
+		</svcs>
 	</login>
 	<clTRID>sample1trid</clTRID>
 </command>
