@@ -14,10 +14,10 @@ install: mod_eppd.c epp_parser.h epp_parser.o
 	$(APXS) -c -i mod_eppd.c epp_parser.o
 
 test_parser: test_parser.c epp_parser.h epp_parser.o
-	${CC} ${CFLAGS} `xml2-config --libs` -o test_parser test_parser.c epp_parser.o
+	${CC} ${CFLAGS} `pkg-config --libs libxml-2.0` -o test_parser test_parser.c epp_parser.o
 
 epp_parser.o: epp_parser.c epp_parser.h
-	${CC} ${CFLAGS} `xml2-config --cflags` -c epp_parser.c
+	${CC} ${CFLAGS} `pkg-config --cflags libxml-2.0` -c epp_parser.c
 
 clean:
 	rm -f mod_eppd.loT
