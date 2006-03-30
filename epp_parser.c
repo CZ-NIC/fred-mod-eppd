@@ -12,12 +12,14 @@
 #include <libxml/xmlschemas.h>
 #include <libxml/xmlwriter.h>
 #include <libxml/xpath.h>
+#include <libxml/xpathInternals.h>
 
 #include "epp_parser.h"
 #include "epp_data.h"
 
 #define XSI	"http://www.w3.org/2001/XMLSchema-instance"
 #define NS_EPP	"urn:ietf:params:xml:ns:epp-1.0"
+#define NS_EPPCOM	"urn:ietf:params:xml:ns:eppcom-1.0"
 #define LOC_EPP	NS_EPP " epp-1.0.xsd"
 
 /**
@@ -317,20 +319,21 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	/* check if the user has not already logged in */
 	if (conn_ctx->user != NULL) {
 		parser_log(parms, EPP_LOG_WARNING,
-				"User trying to log in but is already logged in");
+			"User trying to log in but is already logged in");
 		return;
 	}
 
 	/* check if language matches */
 	xpathObj = xmlXPathEvalExpression(
-			BAD_CAST "/epp/command/login/options/lang",
-			xpathCtx);
+		BAD_CAST "/epp:epp/epp:command/epp:login/epp:options/epp:lang",
+		xpathCtx);
 	nodeset = xpathObj->nodesetval;
 	assert(nodeset->nodeNr == 1);
 	node = nodeset->nodeTab[0];
 	str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
 	if (!xmlStrEqual(str, "en")) {
-		parser_log(parms, EPP_LOG_WARNING, "Selected language not supported");
+		parser_log(parms, EPP_LOG_WARNING,
+				"Selected language not supported");
 		xmlFree(str);
 		xmlXPathFreeObject(xpathObj);
 		return;
@@ -339,15 +342,16 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	xmlXPathFreeObject(xpathObj);
 
 	/* check if EPP version matches */
-	xpathObj = xmlXPathEvalExpression(
-			BAD_CAST "/epp/command/login/options/version",
-			xpathCtx);
+	xpathObj = xmlXPathEvalExpression(BAD_CAST
+		"/epp:epp/epp:command/epp:login/epp:options/epp:version",
+		xpathCtx);
 	nodeset = xpathObj->nodesetval;
 	assert(nodeset->nodeNr == 1);
 	node = nodeset->nodeTab[0];
 	str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
 	if (!xmlStrEqual(str, "1.0")) {
-		parser_log(parms, EPP_LOG_WARNING, "Selected EPP version not supported");
+		parser_log(parms, EPP_LOG_WARNING,
+				"Selected EPP version not supported");
 		xmlFree(str);
 		xmlXPathFreeObject(xpathObj);
 		return;
@@ -363,7 +367,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 
 	/* clID */
 	xpathObj = xmlXPathEvalExpression(
-			BAD_CAST "/epp/command/login/clID", xpathCtx);
+		BAD_CAST "/epp:epp/epp:command/epp:login/epp:clID", xpathCtx);
 	nodeset = xpathObj->nodesetval;
 	assert(nodeset->nodeNr == 1);
 	node = nodeset->nodeTab[0];
@@ -373,7 +377,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 
 	/* pw */
 	xpathObj = xmlXPathEvalExpression(
-			BAD_CAST "/epp/command/login/pw", xpathCtx);
+		BAD_CAST "/epp:epp/epp:command/epp:login/epp:pw", xpathCtx);
 	nodeset = xpathObj->nodesetval;
 	assert(nodeset->nodeNr == 1);
 	node = nodeset->nodeTab[0];
@@ -381,14 +385,15 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 			xmlNodeListGetString(doc, node->xmlChildrenNode, 1));
 	xmlXPathFreeObject(xpathObj);
 
-	/* newPW */
+	/* newPW (optional) */
 	xpathObj = xmlXPathEvalExpression(
-			BAD_CAST "/epp/command/login/newPW", xpathCtx);
+		BAD_CAST "/epp:epp/epp:command/epp:login/epp:newPW", xpathCtx);
 	nodeset = xpathObj->nodesetval;
-	assert(nodeset->nodeNr == 1);
-	node = nodeset->nodeTab[0];
-	login_data.newPW = (char *) xmlCharStrdup(
+	if (nodeset->nodeNr) {
+		node = nodeset->nodeTab[0];
+		login_data.newPW = (char *) xmlCharStrdup(
 			xmlNodeListGetString(doc, node->xmlChildrenNode, 1));
+	}
 	xmlXPathFreeObject(xpathObj);
 
 	/* XXX CORBA function call */
@@ -457,28 +462,36 @@ void epp_parser_command(void *conn_ctx_par, void *parser_ctx_par,
 	if (xpathCtx == NULL) {
 		parser_log(parms, EPP_LOG_ERROR,
 				"Error when initializing XPath context");
-		return;
-	}
-
-	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp/command", xpathCtx);
-	nodeset = xpathObj->nodesetval;
-	if (nodeset->nodeNr == 1) {
-		xmlNode	*node;
-		xmlChar	*str;
-
-		node = nodeset->nodeTab[0];
-		str = xmlCharStrdup(xmlNodeListGetString(doc, node->xmlChildrenNode, 1));
-
-		/* select and invoke command handler */
-		if (xmlStrEqual(str, BAD_CAST "login")) {
-			epp_login_cmd(doc, xpathCtx, conn_ctx, parms);
-		}
-		xmlFree(str);
-	}
-	else {
-		parser_log(parms, EPP_LOG_ERROR, "EPP frame is not a command");
 		xmlFreeDoc(doc);
 		return;
+	}
+	/* register namespaces and their prefixes */
+	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "epp", BAD_CAST NS_EPP)) {
+		parser_log(parms, EPP_LOG_ERROR,
+				"Could not register epp namespace");
+		xmlXPathFreeContext(xpathCtx);
+		xmlFreeDoc(doc);
+		return;
+	}
+	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "eppcom", BAD_CAST NS_EPPCOM)) {
+		parser_log(parms, EPP_LOG_ERROR,
+				"Could not register eppcom namespace");
+		xmlXPathFreeContext(xpathCtx);
+		xmlFreeDoc(doc);
+		return;
+	}
+
+	/* check directly for individual commands (XXX could be optimized) */
+	xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:login",
+			xpathCtx);
+	nodeset = xpathObj->nodesetval;
+	if (nodeset->nodeNr)
+		epp_login_cmd(doc, xpathCtx, conn_ctx, parms);
+
+	else {
+		parser_log(parms, EPP_LOG_ERROR,
+			"EPP frame is not a command or is unknown command");
 	}
 
 	xmlXPathFreeObject(xpathObj);

@@ -1,7 +1,7 @@
 APXS=/home/loo/apache.org/chroot/bin/apxs
 INC=/home/loo/apache.org/chroot/include
 CC=gcc
-CFLAGS=-g -O0
+CFLAGS=-g -O0 -Wall
 
 .PHONY: clean build install
 
