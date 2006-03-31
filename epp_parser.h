@@ -68,15 +68,14 @@ typedef struct {
  * Preprocessed schemes are returned for later use in epp request handler.
  *
  * @par url_schema URL of schema
- * @ret Structure holding preprocessed schemes, NULL if unsuccessful
+ * @ret Zero in case of failure, one in case of success
  */
-void *epp_parser_init(const char *url_schema);
+int epp_parser_init(const char *url_schema);
 
 /**
- * This will clean up preprocessed epp schema.
- * @par ctx Preprocessed schemas
+ * This will clean up preprocessed epp schema and message hash table.
  */
-void epp_parser_init_cleanup(void *parser_ctx);
+void epp_parser_init_cleanup();
 
 /**
  * This creates and returns context of epp connection, which is used
@@ -113,13 +112,10 @@ void epp_parser_greeting_cleanup(epp_greeting_parms_out *parms);
  * Parses request and gets response.
  * @par	Connection context
  * @par Request to be processed
- * @par Response ready to be sent
- * @par Error message to be written in apache log
- * @ret Status
+ * @par Response containg xml, logs, status, ...
  */
 void epp_parser_command(
 		void *conn_ctx,
-		void *parser_ctx,
 		const char *request,
 		epp_command_parms_out *parms);
 

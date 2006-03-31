@@ -4,10 +4,18 @@
 
 /* Session commands */
 typedef struct {
+	/* input parameters */
 	char *clID;
 	char *pw;
 	char *newPW;
+	char *clTRID;
+	/* output parameters */
+	char *svTRID;
+	int	sessionID;
+	int	rc;
 } epp_data_login;
+
+int corba_login(epp_data_login *login_data);
 
 /* Query Commands */
 typedef struct {
