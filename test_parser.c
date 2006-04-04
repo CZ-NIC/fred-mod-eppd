@@ -21,7 +21,7 @@ cmd_t getcmd(void)
 	while ((c = getchar()) != '\n') {
 		cmd[i++] = (char) c;
 		if (i >= 29) {
-			fprintf(stderr, "Maximal allowed cmd lenght exceeded\n");
+			fputs("Maximal allowed cmd lenght exceeded", stderr);
 			break;
 		}
 	}
@@ -38,11 +38,11 @@ void readinput(char *text)
 	int c;
 	int i = 0;
 
-	printf("type text: ");
+	fputs("type text: ", stderr);
 	while ((c = getchar()) != EOF) {
 		text[i++] = (char) c;
 		if (i >= MAX_LENGTH - 1) {
-			fprintf(stderr, "Maximal allowed text lenght exceeded\n");
+			fputs("Maximal allowed text lenght exceeded", stderr);
 			break;
 		}
 	}
@@ -56,7 +56,7 @@ int readfile(char *text)
 	char filename[20];
 	FILE *f;
 
-	printf("type filename: ");
+	fputs("type filename: ", stderr);
 	for (i = 0; (c = getchar()) != '\n' && i < 19; i++) {
 		filename[i] = c;
 	}
@@ -68,10 +68,9 @@ int readfile(char *text)
 	}
 	for (i = 0; (c = fgetc(f)) != EOF && i < MAX_LENGTH - 1; i++) {
 		text[i] = c;
-		//putchar(c);
 	}
 	if (i == MAX_LENGTH - 1) {
-		fprintf(stderr, "Maximal allowed text lenght exceeded\n");
+		fputs("Maximal allowed text lenght exceeded", stderr);
 	}
 	text[i] = 0;
 	fclose(f);
@@ -87,25 +86,22 @@ int main(int argc, char *argv[])
 	epp_command_parms_out command_parms;
 	epp_greeting_parms_out greeting_parms;
 	void *conn_ctx;
-	void *parser_ctx;
-	epp_status_t status;
 	epp_parser_log *log_iter;
 
 	/* API: check libxml */
-	parser_ctx = epp_parser_init("schemas/all-1.0.xsd");
-	if (parser_ctx == NULL) {
-		printf("Error in parser initialization\n");
-		return;
+	if (!epp_parser_init("schemas/all-1.0.xsd")) {
+		fputs("Error in parser initialization\n", stderr);
+		return 1;
 	}
 
 	/* API: greeting */
 	bzero(&greeting_parms, sizeof greeting_parms);
 	epp_parser_greeting("Server ID", "curent:date", &greeting_parms);
 	if (greeting_parms.error_msg) {
-		printf("Greeting error: %s\n", greeting_parms.error_msg);
+		fprintf(stderr, "Greeting error: %s\n", greeting_parms.error_msg);
 	}
 	else {
-		printf("Greeting frame: %s\n", greeting_parms.greeting);
+		puts(greeting_parms.greeting);
 	}
 	/* API: free greeting data */
 	epp_parser_greeting_cleanup(&greeting_parms);
@@ -114,7 +110,7 @@ int main(int argc, char *argv[])
 	conn_ctx = epp_parser_connection();
 
 	while (1) {
-		fputs("Command: ", stdout);
+		fputs("Command: ", stderr);
 		switch (cmd = getcmd()) {
 			case CMD_CUSTOM:
 				readinput(text);
@@ -134,21 +130,21 @@ int main(int argc, char *argv[])
 
 		bzero(&command_parms, sizeof command_parms);
 		/* API: process command */
-		epp_parser_command(conn_ctx, parser_ctx, text, &command_parms);
+		epp_parser_command(conn_ctx, text, &command_parms);
 
-		puts("\nResults are:");
-		printf("Status val is %d\n", command_parms.status);
+		fputs("\nResults are:", stderr);
+		fprintf(stderr, "Status val is %d\n", command_parms.status);
 
 		log_iter = command_parms.head;
-		puts("parser log:");
+		fputs("parser log:", stderr);
 		while (log_iter) {
-			printf("severity: %d\n", log_iter->severity);
-			printf("content: %s\n", log_iter->msg);
+			fprintf(stderr, "severity: %d\n", log_iter->severity);
+			fprintf(stderr, "content: %s\n", log_iter->msg);
 			log_iter = log_iter->next;
 		}
 
 		if (command_parms.response != NULL)
-			printf("Response is %s\n", command_parms.response);
+			puts(command_parms.response);
 
 		/* API: clean up command data */
 		epp_parser_command_cleanup(&command_parms);
@@ -156,7 +152,7 @@ int main(int argc, char *argv[])
 
 	/* API: clean up connection data */
 	epp_parser_connection_cleanup(conn_ctx);
-	epp_parser_init_cleanup(parser_ctx);
+	epp_parser_init_cleanup();
 
 	return 0;
 }

@@ -25,7 +25,8 @@
 #define LOC_EPP	NS_EPP " epp-1.0.xsd"
 #define CONTACT_OBJ	1
 #define DOMAIN_OBJ	2
-#define HASH_SIZE	30
+/* should be less than 255 since hash value is unsigned char */
+#define HASH_SIZE	60
 
 /*
  * Following macros are shortcuts used for document creation. So that
@@ -85,7 +86,7 @@
 		}										\
 	}while(0)
 
-#define END_ELEMENT	(err_handler)	\
+#define END_ELEMENT(err_handler)	\
 	do {										\
 		if (xmlTextWriterEndElement(writer) < 0) {\
 			sprintf(err, "Could not end xml element in %s", __func__);\
@@ -100,8 +101,6 @@
  * with connection between subsequent calls to request parser.
  */
 typedef struct {
-	char *user;	 /* user id */
-	int	objects; /* objects an user is going to work with */
 	int sessionID;
 } epp_connection_ctx;
 
@@ -124,13 +123,13 @@ static hash_item	*hash_msg[HASH_SIZE];
  * @par rc input number to hash function
  * @ret hash value
  */
-static int get_rc_hash(int rc) {
+static unsigned char get_rc_hash(int rc) {
 	int	i;
-	int	hash = 0;
+	unsigned char	hash = 0;
 	char	*rc_bytes = (char *) &rc;
 
 	/* return code has 4 digits */
-	for (i = 0; i < 4; i++) hash ^= rc[i];
+	for (i = 0; i < 4; i++) hash ^= rc_bytes[i];
 	return hash % HASH_SIZE;
 }
 
@@ -138,11 +137,11 @@ static int get_rc_hash(int rc) {
  * Function inserts item in hash table.
  * @par key Input key for hash algorithm
  * @par msg Message associated with key
- * @ret Zero in case of failure, one in case of success
+ * @ret Zero in case of success, one in case of failure
  */
 static char msg_hash_insert(int key, const char *msg)
 {
-	hash_item	*hi, **tmp;
+	hash_item	*hi;
 	int	index;
 
 	assert(hash_msg != NULL);
@@ -152,13 +151,13 @@ static char msg_hash_insert(int key, const char *msg)
 	hi->rc = key;
 	if ((hi->msg = strdup(msg)) == NULL) {
 		free(hi);
-		return 0;
+		return 1;
 	}
 	index = get_rc_hash(key);
 	hi->next = hash_msg[index];
 	hash_msg[index] = hi;
 
-	return 1;
+	return 0;
 }
 
 /**
@@ -206,7 +205,6 @@ static void msg_hash_clean(void)
 int epp_parser_init(const char *url_schema)
 {
 	xmlSchemaParserCtxtPtr spctx;
-	int	i;
 	char rc;
 
 	/* test libxml version */
@@ -278,8 +276,6 @@ void *epp_parser_connection(void)
 	epp_connection_ctx *ctx;
 
 	if ((ctx = malloc(sizeof *ctx)) == NULL) return NULL;
-	ctx->user = NULL;
-	ctx->objects = 0;
 	ctx->sessionID = 0;
 
 	return (void *) ctx;
@@ -289,7 +285,6 @@ void epp_parser_connection_cleanup(void *conn_ctx)
 {
 	epp_connection_ctx *ctx = (epp_connection_ctx *) conn_ctx;
 
-	if (ctx->user) free(ctx->user);
 	free(ctx);
 }
 
@@ -367,29 +362,35 @@ void epp_parser_greeting(const char *svid, const char *svdate,
 	/* dcp part */
 	START_ELEMENT("dcp", greeting_end);
 	START_ELEMENT("access", greeting_end);
-	WRITE_ELEMENT("all", "", greeting_end);
+	START_ELEMENT("all", greeting_end);
+	END_ELEMENT(greeting_end);
 	END_ELEMENT(greeting_end);
 	START_ELEMENT("statement", greeting_end);
 	START_ELEMENT("purpose", greeting_end);
-	WRITE_ELEMENT("admin", "", greeting_end);
-	WRITE_ELEMENT("prov", "", greeting_end);
+	START_ELEMENT("admin", greeting_end);
+	END_ELEMENT(greeting_end);
+	START_ELEMENT("prov", greeting_end);
+	END_ELEMENT(greeting_end);
 	END_ELEMENT(greeting_end);
 	START_ELEMENT("recipient", greeting_end);
-	WRITE_ELEMENT("public", "", greeting_end);
+	START_ELEMENT("public", greeting_end);
+	END_ELEMENT(greeting_end);
 	END_ELEMENT(greeting_end);
 	START_ELEMENT("retention", greeting_end);
-	WRITE_ELEMENT("stated", "", greeting_end);
+	START_ELEMENT("stated", greeting_end);
+	END_ELEMENT(greeting_end);
 	END_ELEMENT(greeting_end);
 
 	END_DOCUMENT(greeting_end);
 
 greeting_end:
+	xmlFreeTextWriter(writer);
+
 	if (err_seen)
 		parms->error_msg = err;
 	else
 		parms->greeting = strdup((const char *) buf->content);
 
-	xmlFreeTextWriter(writer);
 	xmlBufferFree(buf);
 }
 
@@ -397,6 +398,72 @@ void epp_parser_greeting_cleanup(epp_greeting_parms_out *parms)
 {
 	if (parms->error_msg != NULL) free(parms->error_msg);
 	if (parms->greeting != NULL) free(parms->greeting);
+}
+
+/**
+ * Purpose of this function is to make things little bit easier
+ * when generating simple frames, containing only code and message.
+ * This is used mostly for generating error frames.
+ *
+ * @par code	Result code
+ * @par clTRID	Client transaction ID
+ * @par svTRID	Server transaction ID
+ * ret String containing response, which has to be freed by free()
+ */
+static char *simple_response(int code, const char *clTRID, const char *svTRID,
+		epp_command_parms_out *parms) {
+	xmlBufferPtr buf;
+	xmlTextWriterPtr writer;
+	char	*str;
+	char	*err;
+	char	res_code[5];
+	char	err_seen = 0;
+
+	/* make up response */
+	buf = xmlBufferCreate();
+	if (buf == NULL) {
+		parser_log(parms, EPP_LOG_ERROR, "Could not create buffer for writer");
+		return NULL;
+	}
+	writer = xmlNewTextWriterMemory(buf, 0);
+	if (writer == NULL) {
+		xmlBufferFree(buf);
+		parser_log(parms, EPP_LOG_ERROR, "Could not create xml writer");
+		return NULL;
+	}
+
+	START_DOCUMENT(simple_err);
+
+	/* epp header */
+	START_ELEMENT("epp", simple_err);
+	WRITE_ATTRIBUTE("xmlns", NS_EPP, simple_err);
+	WRITE_ATTRIBUTE("xmlns:xsi", XSI, simple_err);
+	WRITE_ATTRIBUTE("xsi:schemaLocation", LOC_EPP, simple_err);
+
+	/* epp response */
+	START_ELEMENT("response", simple_err);
+	START_ELEMENT("result", simple_err);
+	snprintf(res_code, 5, "%d", code);
+	str = msg_hash_lookup(code);
+	WRITE_ATTRIBUTE("code", res_code, simple_err);
+	WRITE_ELEMENT("msg", str, simple_err);
+	END_ELEMENT(simple_err);
+	START_ELEMENT("trID", simple_err);
+	if (clTRID) WRITE_ELEMENT("clTRID", clTRID, simple_err);
+	WRITE_ELEMENT("svTRID", svTRID, simple_err);
+	END_DOCUMENT(simple_err);
+
+simple_err:
+	xmlFreeTextWriter(writer);
+	if (err_seen) {
+		xmlBufferFree(buf);
+		parser_log(parms, EPP_LOG_ERROR, err);
+		return NULL;
+	}
+
+	str = strdup((const char *) buf->content);
+	xmlBufferFree(buf);
+	return str;
 }
 
 /**
@@ -412,20 +479,19 @@ void epp_parser_greeting_cleanup(epp_greeting_parms_out *parms)
  *   - managed objects (including extensions)
  */
 static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
-		epp_connection_ctx *conn_ctx, epp_command_parms_out *parms)
+		epp_connection_ctx *conn_ctx, xmlChar *clTRID,
+		epp_command_parms_out *parms)
 {
 	xmlXPathObjectPtr	xpathObj;
 	xmlNodeSetPtr	nodeset;
 	xmlNode	*node;
 	xmlChar	*str;
 	epp_data_login	login_data;
-	char	*err_msg;
-	char	*res_msg;
-	char	res_code[5];
-	char	err_seen = 0;
+	stringlist	*item;
+	int	i;
 
 	/* check if the user has not already logged in */
-	if (conn_ctx->user != NULL) {
+	if (conn_ctx->sessionID != 0) {
 		parser_log(parms, EPP_LOG_WARNING,
 			"User trying to log in but is already logged in");
 		return;
@@ -435,6 +501,10 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	xpathObj = xmlXPathEvalExpression(
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:options/epp:lang",
 		xpathCtx);
+	if (xpathObj == NULL) {
+		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		return;
+	}
 	nodeset = xpathObj->nodesetval;
 	assert(nodeset->nodeNr == 1);
 	node = nodeset->nodeTab[0];
@@ -453,6 +523,10 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	xpathObj = xmlXPathEvalExpression(BAD_CAST
 		"/epp:epp/epp:command/epp:login/epp:options/epp:version",
 		xpathCtx);
+	if (xpathObj == NULL) {
+		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		return;
+	}
 	nodeset = xpathObj->nodesetval;
 	assert(nodeset->nodeNr == 1);
 	node = nodeset->nodeTab[0];
@@ -467,45 +541,16 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	xmlFree(str);
 	xmlXPathFreeObject(xpathObj);
 
-	/* objects and extensions the client wants to work with */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST
-		"/epp:epp/epp:command/epp:login/epp:options/epp:svcs/epp:objURI",
-		xpathCtx);
-	nodeset = xpathObj->nodesetval;
-	for (i = 0; i < nodeset->nodeNr; i++) {
-		node = nodeset->nodeTab[i];
-		str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
-		/* set object flags */
-		if (xmlStrEqual(str, BAD_CAST NS_CONTACT))
-			conn_ctx->objects |= CONTACT_OBJ;
-		else if (xmlStrEqual(str, BAD_CAST NS_DOMAIN))
-			conn_ctx->objects |= DOMAIN_OBJ;
-		else
-			parser_log(parms, EPP_LOG_WARNING,
-					"Unknown object cannot be managed");
-		xmlFree(str);
-	}
-	xmlXPathFreeObject(xpathObj);
-	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:command/epp:login/epp:options/epp:svcs/epp:svcExtension/epp:extURI", xpathCtx);
-	nodeset = xpathObj->nodesetval;
-	for (i = 0; i < nodeset->nodeNr; i++) {
-		node = nodeset->nodeTab[i];
-		str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
-		/* set object flags */
-		if (xmlStrEqual(str, BAD_CAST "Nonexistent"))
-			conn_ctx->objects |= CONTACT_OBJ;
-		else
-			parser_log(parms, EPP_LOG_WARNING, "Unknown object extension");
-		xmlFree(str);
-	}
-	xmlXPathFreeObject(xpathObj);
-
 	/* fill in login data structure */
 	bzero(&login_data, sizeof login_data);
 
 	/* clID */
 	xpathObj = xmlXPathEvalExpression(
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:clID", xpathCtx);
+	if (xpathObj == NULL) {
+		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		return;
+	}
 	nodeset = xpathObj->nodesetval;
 	assert(nodeset->nodeNr == 1);
 	node = nodeset->nodeTab[0];
@@ -516,6 +561,10 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	/* pw */
 	xpathObj = xmlXPathEvalExpression(
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:pw", xpathCtx);
+	if (xpathObj == NULL) {
+		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		return;
+	}
 	nodeset = xpathObj->nodesetval;
 	assert(nodeset->nodeNr == 1);
 	node = nodeset->nodeTab[0];
@@ -526,77 +575,100 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	/* newPW (optional) */
 	xpathObj = xmlXPathEvalExpression(
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:newPW", xpathCtx);
+	if (xpathObj == NULL) {
+		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		return;
+	}
 	nodeset = xpathObj->nodesetval;
-	if (nodeset->nodeNr) {
+	if (nodeset && nodeset->nodeNr) {
 		node = nodeset->nodeTab[0];
 		login_data.newPW = (char *)
 			xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
 	}
 	xmlXPathFreeObject(xpathObj);
 
-	/* get clTRID */
+	/* objects the client wants to work with */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST
-			"/epp:epp/epp:command/epp:clTRID", xpathCtx);
+		"/epp:epp/epp:command/epp:login/epp:svcs/epp:objURI",
+		xpathCtx);
+	if (xpathObj == NULL) {
+		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		return;
+	}
 	nodeset = xpathObj->nodesetval;
-	assert(nodeset->nodeNr == 1);
-	node = nodeset->nodeTab[0];
-	str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
-	xmlFree(str);
+	if (nodeset != NULL) {
+		for (i = 0; i < nodeset->nodeNr; i++) {
+			if ((item = malloc(sizeof *item)) == NULL) {
+				parser_log(parms, EPP_LOG_ERROR, "alloc of stringlist failed");
+				return;
+			}
+			node = nodeset->nodeTab[i];
+			str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
+			/* enqueue objuri to list */
+			item->content = (char *) str;
+			item->next = login_data.objuri;
+			login_data.objuri = item;
+		}
+	}
 	xmlXPathFreeObject(xpathObj);
+
+	/* extensions the client wants to work with */
+	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:command/epp:login/epp:svcs/epp:svcExtension/epp:extURI", xpathCtx);
+	if (xpathObj == NULL) {
+		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		return;
+	}
+	nodeset = xpathObj->nodesetval;
+	if (nodeset != NULL) {
+		for (i = 0; i < nodeset->nodeNr; i++) {
+			if ((item = malloc(sizeof *item)) == NULL) {
+				parser_log(parms, EPP_LOG_ERROR, "alloc of stringlist failed");
+				return;
+			}
+			node = nodeset->nodeTab[i];
+			str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
+			/* enqueue exturi to list */
+			item->content = (char *) str;
+			item->next = login_data.exturi;
+			login_data.exturi = item;
+		}
+	}
+	xmlXPathFreeObject(xpathObj);
+
+	login_data.clTRID = (char *) clTRID;
 
 	/* XXX CORBA function call */
 	corba_login(&login_data);
 
-	/* make up response */
-	buf = xmlBufferCreate();
-	if (buf == NULL) {
-		parser_log(parms, EPP_LOG_ERROR, "Could not create buffer for writer");
-		err_seen = 3;
-		goto login_end;
-	}
-	writer = xmlNewTextWriterMemory(buf, 0);
-	if (writer == NULL) {
-		parser_log(parms, EPP_LOG_ERROR, "Could not create xml writer");
-		err_seen = 2;
-		goto login_end;
-	}
-
-	START_DOCUMENT(login_end);
-
-	/* epp header */
-	START_ELEMENT("epp", login_end);
-	WRITE_ATTRIBUTE("xmlns", NS_EPP, login_end);
-	WRITE_ATTRIBUTE("xmlns:xsi", XSI, login_end);
-	WRITE_ATTRIBUTE("xsi:schemaLocation", LOC_EPP, login_end);
-
-	/* epp response */
-	START_ELEMENT("response", login_end);
-	START_ELEMENT("result", login_end);
-	snprintf(res_code, 5, "%d", rc);
-	res_msg = msg_hash_lookup(login_data.rc);
-	WRITE_ATTRIBUTE("code", res_code, login_end);
-	WRITE_ELEMENT("msg", res_msg, login_end);
-	END_ELEMENT(login_end);
-	START_ELEMENT("trID", login_end);
-	WRITE_ELEMENT("clTRID", login_data.clTRID, login_end);
-	WRITE_ELEMENT("svTRID", login_data.svTRID, login_end);
-	END_DOCUMENT(login_end);
-
-login_end:
-	if (!err_seen) {
-		parms->response = strdup((const char *) buf->content);
+	parms->response = simple_response(login_data.rc, login_data.clTRID,
+			login_data.svTRID, parms);
+	/*
+	 * What should we do if we are not successful? We cannot send any
+	 * response, so we will behave as if we hadn't received any login -
+	 * this means, we will not update sessionID.
+	 */
+	if (parms->response && login_data.rc == 1000) {
 		conn_ctx->sessionID = login_data.sessionID;
 	}
-	if (err_seen < 2) {
-		xmlFreeTextWriter(writer);
-	}
-	if (err_seen < 3) {
-		xmlBufferFree(buf);
-	}
+	/* clean up login_data structure */
 	xmlFree(BAD_CAST login_data.clID);
 	xmlFree(BAD_CAST login_data.pw);
-	xmlFree(BAD_CAST login_data.clTRID);
 	if (login_data.newPW) xmlFree(BAD_CAST login_data.newPW);
+	xmlFree(BAD_CAST login_data.clTRID);
+	/* delete list of objuris */
+	while (login_data.objuri) {
+		item = login_data.objuri->next;
+		xmlFree(login_data.objuri->content);
+		free(login_data.objuri);
+		login_data.objuri = item;
+	}
+	/* delete list of exturis */
+	while (login_data.exturi) {
+		item = login_data.exturi->next;
+		xmlFree(login_data.exturi->content);
+		free(login_data.exturi);
+		login_data.exturi = item;
+	}
 	if (login_data.svTRID) xmlFree(BAD_CAST login_data.svTRID);
 }
 
@@ -604,15 +676,11 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 		epp_command_parms_out *parms)
 {
 	int	rc;
-	const xmlChar	*clTRID;
 	xmlDocPtr	doc;
-	xmlNode	*element;
 	xmlSchemaValidCtxtPtr	svctx;
 	xmlXPathContextPtr	xpathCtx;
 	xmlXPathObjectPtr	xpathObj;
-	xmlNodeSetPtr	nodeset;
 	epp_connection_ctx	*conn_ctx = (epp_connection_ctx *) conn_ctx_par;
-	epp_parser_ctx	*parser_ctx = (epp_parser_ctx *) parser_ctx_par;
 
 	assert(request != NULL);
 	assert(conn_ctx != NULL);
@@ -647,10 +715,6 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 	}
 	xmlSchemaFreeValidCtxt(svctx);
 
-	/*
-	 * check if it is a <command>, other elements are errors.
-	 * (XXX what about <hello>)
-	 */
 
 	/* create XPath context */
 	xpathCtx = xmlXPathNewContext(doc);
@@ -676,17 +740,62 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 		return;
 	}
 
-	/* check directly for individual commands (XXX could be optimized) */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST
-			"/epp:epp/epp:command/epp:login",
-			xpathCtx);
-	nodeset = xpathObj->nodesetval;
-	if (nodeset->nodeNr)
-		epp_login_cmd(doc, xpathCtx, conn_ctx, parms);
-
+	/*
+	 * is it command at all? We have to check this, so that we can decide
+	 * wether to answer at all
+	 */
+	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:command",
+				xpathCtx);
+	if (xpathObj == NULL) {
+		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		xmlXPathFreeContext(xpathCtx);
+		xmlFreeDoc(doc);
+		return;
+	}
+	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+		parser_log(parms, EPP_LOG_ERROR, "EPP frame is not a command");
+	}
 	else {
-		parser_log(parms, EPP_LOG_ERROR,
-			"EPP frame is not a command or is unknown command");
+		xmlChar	*clTRID;
+		xmlNodeSetPtr	nodeset;
+
+		/* it is a command, get clTRID if it is there */
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+				"/epp:epp/epp:command/epp:clTRID", xpathCtx);
+		if (xpathObj == NULL) {
+			parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+			xmlXPathFreeContext(xpathCtx);
+			xmlFreeDoc(doc);
+			return;
+		}
+		nodeset = xpathObj->nodesetval;
+		if (nodeset && nodeset->nodeNr)
+			clTRID = xmlNodeListGetString(doc,
+				nodeset->nodeTab[0]->xmlChildrenNode, 1);
+		else clTRID = NULL;
+		xmlXPathFreeObject(xpathObj);
+
+		/* look for individual commands (XXX might be optimized) */
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+						"/epp:epp/epp:command/epp:login",
+						xpathCtx);
+		if (xpathObj == NULL) {
+			parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+			xmlFree(clTRID);
+			xmlXPathFreeContext(xpathCtx);
+			xmlFreeDoc(doc);
+			return;
+		}
+		nodeset = xpathObj->nodesetval;
+		if (nodeset && nodeset->nodeNr) {
+			epp_login_cmd(doc, xpathCtx, conn_ctx, clTRID, parms);
+		}
+		else {
+			parser_log(parms, EPP_LOG_ERROR,
+				"EPP frame is not a command or is unknown command");
+			parms->response = simple_response(2000, clTRID, "", parms);
+		}
+		xmlFree(clTRID);
 	}
 
 	xmlXPathFreeObject(xpathObj);
@@ -704,7 +813,7 @@ void epp_parser_command_cleanup(epp_command_parms_out *parms_out)
 	if (parms_out->response) free(parms_out->response);
 
 	next = parms_out->head;
-	while (cur = next) {
+	while ((cur = next) != NULL) {
 		next = cur->next;
 		free(cur->msg);
 		free(cur);

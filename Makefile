@@ -20,7 +20,7 @@ epp_parser.o: epp_parser.c epp_parser.h
 	${CC} ${CFLAGS} `pkg-config --cflags libxml-2.0` -c epp_parser.c
 
 epp_corba.o:  epp_corba.c epp_corba.h
-	${CC} ${CFLAGS} epp_corba.c
+	${CC} ${CFLAGS} -c -o epp_corba.o epp_corba.c
 
 clean:
 	rm -f mod_eppd.loT

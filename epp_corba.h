@@ -2,6 +2,12 @@
 #ifndef EPP_DATA_H
 #define EPP_DATA_H
 
+typedef struct stringlist_t stringlist;
+struct stringlist_t {
+	stringlist	*next;
+	char	*content;
+};
+
 /* Session commands */
 typedef struct {
 	/* input parameters */
@@ -9,6 +15,8 @@ typedef struct {
 	char *pw;
 	char *newPW;
 	char *clTRID;
+	stringlist	*objuri;
+	stringlist	*exturi;
 	/* output parameters */
 	char *svTRID;
 	int	sessionID;
