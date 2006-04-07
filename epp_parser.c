@@ -70,7 +70,7 @@
 
 #define WRITE_ELEMENT(elem, str, err_handler)	\
 	do {										\
-		if (xmlTextWriterWriteFormatElement(writer, BAD_CAST elem, BAD_CAST str) < 0) {\
+		if (xmlTextWriterWriteElement(writer, BAD_CAST elem, BAD_CAST str) < 0) {\
 			sprintf(err, "Could not write xml element %s in %s", elem, __func__);\
 			err_seen = 1;						\
 			goto err_handler;					\
@@ -323,8 +323,8 @@ void epp_parser_greeting(const char *svid, const char *svdate,
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
-	char	err_seen;
-	char	*err;
+	char	*err = NULL;
+	char	err_seen = 0;
 
 	buf = xmlBufferCreate();
 	if (buf == NULL) {
@@ -378,8 +378,6 @@ void epp_parser_greeting(const char *svid, const char *svdate,
 	END_ELEMENT(greeting_end);
 	START_ELEMENT("retention", greeting_end);
 	START_ELEMENT("stated", greeting_end);
-	END_ELEMENT(greeting_end);
-	END_ELEMENT(greeting_end);
 
 	END_DOCUMENT(greeting_end);
 
@@ -410,8 +408,9 @@ void epp_parser_greeting_cleanup(epp_greeting_parms_out *parms)
  * @par svTRID	Server transaction ID
  * ret String containing response, which has to be freed by free()
  */
-static char *simple_response(int code, const char *clTRID, const char *svTRID,
-		epp_command_parms_out *parms) {
+static char *simple_response(int code, const xmlChar *clTRID,
+		const char *svTRID, epp_command_parms_out *parms) {
+
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
 	char	*str;
@@ -509,7 +508,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	assert(nodeset->nodeNr == 1);
 	node = nodeset->nodeTab[0];
 	str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
-	if (!xmlStrEqual(str, "en")) {
+	if (!xmlStrEqual(str, BAD_CAST "en")) {
 		parser_log(parms, EPP_LOG_WARNING,
 				"Selected language not supported");
 		xmlFree(str);
@@ -531,7 +530,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	assert(nodeset->nodeNr == 1);
 	node = nodeset->nodeTab[0];
 	str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
-	if (!xmlStrEqual(str, "1.0")) {
+	if (!xmlStrEqual(str, BAD_CAST "1.0")) {
 		parser_log(parms, EPP_LOG_WARNING,
 				"Selected EPP version not supported");
 		xmlFree(str);
@@ -640,7 +639,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	/* XXX CORBA function call */
 	corba_login(&login_data);
 
-	parms->response = simple_response(login_data.rc, login_data.clTRID,
+	parms->response = simple_response(login_data.rc, clTRID,
 			login_data.svTRID, parms);
 	/*
 	 * What should we do if we are not successful? We cannot send any
@@ -753,11 +752,15 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 		return;
 	}
 	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+		xmlXPathFreeObject(xpathObj);
 		parser_log(parms, EPP_LOG_ERROR, "EPP frame is not a command");
 	}
 	else {
 		xmlChar	*clTRID;
+		xmlChar	*command;
 		xmlNodeSetPtr	nodeset;
+
+		xmlXPathFreeObject(xpathObj);
 
 		/* it is a command, get clTRID if it is there */
 		xpathObj = xmlXPathEvalExpression(BAD_CAST
@@ -775,9 +778,8 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 		else clTRID = NULL;
 		xmlXPathFreeObject(xpathObj);
 
-		/* look for individual commands (XXX might be optimized) */
-		xpathObj = xmlXPathEvalExpression(BAD_CAST
-						"/epp:epp/epp:command/epp:login",
+		/* get command */
+		xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:command/*",
 						xpathCtx);
 		if (xpathObj == NULL) {
 			parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
@@ -787,7 +789,12 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 			return;
 		}
 		nodeset = xpathObj->nodesetval;
-		if (nodeset && nodeset->nodeNr) {
+		assert(nodeset && nodeset->nodeNr);
+		command = xmlStrdup(nodeset->nodeTab[0]->name);
+		xmlXPathFreeObject(xpathObj);
+
+		/* compare command step by step */
+		if (xmlStrEqual(command, BAD_CAST "login")) {
 			epp_login_cmd(doc, xpathCtx, conn_ctx, clTRID, parms);
 		}
 		else {
@@ -795,10 +802,10 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 				"EPP frame is not a command or is unknown command");
 			parms->response = simple_response(2000, clTRID, "", parms);
 		}
-		xmlFree(clTRID);
+		xmlFree(command);
+		if (clTRID != NULL) xmlFree(clTRID);
 	}
 
-	xmlXPathFreeObject(xpathObj);
 	xmlXPathFreeContext(xpathCtx);
 	xmlFreeDoc(doc);
 	xmlMemoryDump();
