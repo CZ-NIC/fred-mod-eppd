@@ -1,6 +1,6 @@
 
-#ifndef EPP_DATA_H
-#define EPP_DATA_H
+#ifndef EPP_CLIENT_H
+#define EPP_CLIENT_H
 
 typedef struct stringlist_t stringlist;
 struct stringlist_t {
@@ -24,6 +24,16 @@ typedef struct {
 } epp_data_login;
 
 int corba_login(epp_data_login *login_data);
+
+typedef struct {
+	/* input parameters */
+	char *clTRID;
+	/* output parameters */
+	char *svTRID;
+	int	rc;
+} epp_data_logout;
+
+int corba_logout(epp_data_logout *logout_data);
 
 /* Query Commands */
 typedef struct {
@@ -63,4 +73,4 @@ typedef struct {
 	int dummy;
 } epp_data_update;
 
-#endif /* EPP_DATA_H */
+#endif /* EPP_CLIENT_H */

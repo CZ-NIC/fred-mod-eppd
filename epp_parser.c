@@ -15,7 +15,7 @@
 #include <libxml/xpathInternals.h>
 
 #include "epp_parser.h"
-#include "epp_corba.h"
+#include "epp-client.h"
 
 #define XSI	"http://www.w3.org/2001/XMLSchema-instance"
 #define NS_EPP	"urn:ietf:params:xml:ns:epp-1.0"
@@ -414,9 +414,9 @@ static char *simple_response(int code, const xmlChar *clTRID,
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
 	char	*str;
-	char	*err;
 	char	res_code[5];
 	char	err_seen = 0;
+	char	*err = NULL;
 
 	/* make up response */
 	buf = xmlBufferCreate();
@@ -671,6 +671,70 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	if (login_data.svTRID) xmlFree(BAD_CAST login_data.svTRID);
 }
 
+/**
+ * Logout handler.
+ */
+static void epp_logout_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
+		epp_connection_ctx *conn_ctx, xmlChar *clTRID,
+		epp_command_parms_out *parms)
+{
+	xmlXPathObjectPtr	xpathObj;
+	epp_data_logout	logout_data;
+	stringlist	*item;
+	int	i;
+
+	/* fill in login data structure */
+	bzero(&logout_data, sizeof logout_data);
+	logout_data.clTRID = (char *) clTRID;
+
+	/* check if the user has not already logged in */
+	if (conn_ctx->sessionID == 0) {
+		/* *** CORBA function call *** */
+		corba_invalid(&logout_data);
+		parms->response = simple_response(2002, clTRID,
+				logout_data.svTRID, parms);
+		parser_log(parms, EPP_LOG_WARNING,
+				"User trying to logout and is not logged in");
+		return;
+	}
+	else {
+		/* *** CORBA function call *** */
+		corba_logout(&logout_data);
+
+		parms->response = simple_response(login_data.rc, clTRID,
+				login_data.svTRID, parms);
+	}
+
+	/*
+	 * What should we do if we are not successful? We cannot send any
+	 * response, so we will behave as if we hadn't received any login -
+	 * this means, we will not update sessionID.
+	 */
+	if (parms->response && login_data.rc == 1000) {
+		conn_ctx->sessionID = login_data.sessionID;
+	}
+	/* clean up login_data structure */
+	xmlFree(BAD_CAST login_data.clID);
+	xmlFree(BAD_CAST login_data.pw);
+	if (login_data.newPW) xmlFree(BAD_CAST login_data.newPW);
+	xmlFree(BAD_CAST login_data.clTRID);
+	/* delete list of objuris */
+	while (login_data.objuri) {
+		item = login_data.objuri->next;
+		xmlFree(login_data.objuri->content);
+		free(login_data.objuri);
+		login_data.objuri = item;
+	}
+	/* delete list of exturis */
+	while (login_data.exturi) {
+		item = login_data.exturi->next;
+		xmlFree(login_data.exturi->content);
+		free(login_data.exturi);
+		login_data.exturi = item;
+	}
+	if (login_data.svTRID) xmlFree(BAD_CAST login_data.svTRID);
+}
+
 void epp_parser_command(void *conn_ctx_par, const char *request,
 		epp_command_parms_out *parms)
 {
@@ -796,6 +860,9 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 		/* compare command step by step */
 		if (xmlStrEqual(command, BAD_CAST "login")) {
 			epp_login_cmd(doc, xpathCtx, conn_ctx, clTRID, parms);
+		}
+		if (xmlStrEqual(command, BAD_CAST "logout")) {
+			epp_logout_cmd(doc, xpathCtx, conn_ctx, clTRID, parms);
 		}
 		else {
 			parser_log(parms, EPP_LOG_ERROR,
