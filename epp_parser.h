@@ -38,11 +38,11 @@ struct Epp_parser_log {
 
 /**
  * This structure gathers output parameters of epp_parser_process_request.
- * eppd_mod takes case of structure as such and parser takes manages the items
+ * eppd_mod creates structure as such and parser manages the items
  * inside the struct.
  *
- * The pointer last is there for efficient message inserting to the end of
- * log chain.
+ * Head and last serve for log messages. The pointer "last" is there
+ * for efficient message inserting to the end of log chain.
  */
 typedef struct {
 	char *response;
@@ -66,6 +66,7 @@ typedef struct {
  * not the best behaviour .. but still better than to ommit the test.
  * This routine also loads and checks validity of epp scheme.
  * Preprocessed schemes are returned for later use in epp request handler.
+ * Corba subsystem is also initialized.
  *
  * @par url_schema URL of schema
  * @ret Zero in case of failure, one in case of success
@@ -74,6 +75,7 @@ int epp_parser_init(const char *url_schema);
 
 /**
  * This will clean up preprocessed epp schema and message hash table.
+ * Corba resources are released as well.
  */
 void epp_parser_init_cleanup();
 

@@ -95,6 +95,27 @@
 		}										\
 	}while(0)
 
+/**
+ * Corba dummy call is generated so often that it is beneficial to create
+ * macro for that.
+ */
+#define CORBA_DUMMY_CALL(_rc, _clTRID, _ctx, _parms)					\
+	do {										\
+		epp_data_dummy	dummy_data;				\
+		orb_rc_t	orb_rc;						\
+		bzero(&dummy_data, sizeof dummy_data);	\
+		dummy_data.clTRID = (_clTRID);			\
+		dummy_data.rc = (_rc);					\
+		orb_rc = corba_dummy((_ctx)->corba_service, &dummy_data);		\
+		if (orb_rc != ORB_OK) {					\
+			parser_log((_parms), EPP_LOG_ERROR, "Additionally corba dummy call failed");\
+			(_parms)->response = simple_response(2400, (_clTRID), "Non-existent-svTRID", (_parms));\
+		}										\
+		else {									\
+			(_parms)->response = simple_response((_rc), (_clTRID), dummy_data.svTRID, (_parms));\
+			free(dummy_data.svTRID);			\
+		}										\
+	}while(0)
 
 /**
  * epp connection context struct used to store information associated
@@ -102,6 +123,8 @@
  */
 typedef struct {
 	int sessionID;
+	void	*corba_service;
+	void	*corba;
 } epp_connection_ctx;
 
 /* item of hash table */
@@ -259,6 +282,7 @@ int epp_parser_init(const char *url_schema)
 	}
 
 	xmlInitParser();
+
 	return 1;
 }
 
@@ -275,8 +299,15 @@ void *epp_parser_connection(void)
 {
 	epp_connection_ctx *ctx;
 
+	/* allocate context structure */
 	if ((ctx = malloc(sizeof *ctx)) == NULL) return NULL;
 	ctx->sessionID = 0;
+
+	/* obtain corba service handle */
+	if (corba_init(&ctx->corba_service, &ctx->corba) != ORB_OK) {
+		free(ctx);
+		return NULL;
+	}
 
 	return (void *) ctx;
 }
@@ -285,6 +316,7 @@ void epp_parser_connection_cleanup(void *conn_ctx)
 {
 	epp_connection_ctx *ctx = (epp_connection_ctx *) conn_ctx;
 
+	corba_cleanup(ctx->corba_service, ctx->corba);
 	free(ctx);
 }
 
@@ -486,13 +518,13 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	xmlNode	*node;
 	xmlChar	*str;
 	epp_data_login	login_data;
-	stringlist	*item;
-	int	i;
+	orb_rc_t	orb_rc;
 
 	/* check if the user has not already logged in */
 	if (conn_ctx->sessionID != 0) {
 		parser_log(parms, EPP_LOG_WARNING,
-			"User trying to log in but is already logged in");
+				"User trying to log in but is already logged in");
+		CORBA_DUMMY_CALL(2002, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
 
@@ -502,6 +534,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -509,10 +542,10 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	node = nodeset->nodeTab[0];
 	str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
 	if (!xmlStrEqual(str, BAD_CAST "en")) {
-		parser_log(parms, EPP_LOG_WARNING,
-				"Selected language not supported");
+		parser_log(parms, EPP_LOG_WARNING, "Selected language not supported");
 		xmlFree(str);
 		xmlXPathFreeObject(xpathObj);
+		CORBA_DUMMY_CALL(2102, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
 	xmlFree(str);
@@ -524,6 +557,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -535,19 +569,22 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 				"Selected EPP version not supported");
 		xmlFree(str);
 		xmlXPathFreeObject(xpathObj);
+		CORBA_DUMMY_CALL(2100, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
 	xmlFree(str);
 	xmlXPathFreeObject(xpathObj);
 
-	/* fill in login data structure */
+	/* ok, checking done, start to fill login_data structure */
 	bzero(&login_data, sizeof login_data);
+	login_data.clTRID = clTRID;
 
 	/* clID */
 	xpathObj = xmlXPathEvalExpression(
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:clID", xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -562,6 +599,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:pw", xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -576,6 +614,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:newPW", xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -592,13 +631,18 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
 	if (nodeset != NULL) {
+		stringlist	*item;
+		int	i;
+
 		for (i = 0; i < nodeset->nodeNr; i++) {
 			if ((item = malloc(sizeof *item)) == NULL) {
 				parser_log(parms, EPP_LOG_ERROR, "alloc of stringlist failed");
+				CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
 				return;
 			}
 			node = nodeset->nodeTab[i];
@@ -615,13 +659,18 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:command/epp:login/epp:svcs/epp:svcExtension/epp:extURI", xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
+		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
 	if (nodeset != NULL) {
+		stringlist	*item;
+		int	i;
+
 		for (i = 0; i < nodeset->nodeNr; i++) {
 			if ((item = malloc(sizeof *item)) == NULL) {
 				parser_log(parms, EPP_LOG_ERROR, "alloc of stringlist failed");
+				CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
 				return;
 			}
 			node = nodeset->nodeTab[i];
@@ -634,41 +683,44 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	}
 	xmlXPathFreeObject(xpathObj);
 
-	login_data.clTRID = (char *) clTRID;
-
-	/* XXX CORBA function call */
-	corba_login(&login_data);
-
-	parms->response = simple_response(login_data.rc, clTRID,
-			login_data.svTRID, parms);
-	/*
-	 * What should we do if we are not successful? We cannot send any
-	 * response, so we will behave as if we hadn't received any login -
-	 * this means, we will not update sessionID.
-	 */
-	if (parms->response && login_data.rc == 1000) {
-		conn_ctx->sessionID = login_data.sessionID;
+	/* *** CORBA login function call *** */
+	orb_rc = corba_login(conn_ctx->corba_service, &login_data);
+	if (orb_rc != ORB_OK) {
+		parser_log(parms, EPP_LOG_ERROR, "corba login function call failed");
+		parms->response = simple_response(2400, clTRID, "Non-existent-svTRID",
+				parms);
+	}
+	else {
+		parms->response = simple_response(login_data.rc, clTRID,
+				login_data.svTRID, parms);
+		/*
+		 * What should we do if we were not successful? We cannot send any
+		 * response, so we will behave as if we hadn't received any login -
+		 * this means, we will not update sessionID.
+		 */
+		if (parms->response && login_data.rc == 1000) {
+			conn_ctx->sessionID = login_data.sessionID;
+		}
+		free(login_data.svTRID);
 	}
 	/* clean up login_data structure */
 	xmlFree(BAD_CAST login_data.clID);
 	xmlFree(BAD_CAST login_data.pw);
 	if (login_data.newPW) xmlFree(BAD_CAST login_data.newPW);
-	xmlFree(BAD_CAST login_data.clTRID);
 	/* delete list of objuris */
 	while (login_data.objuri) {
-		item = login_data.objuri->next;
+		stringlist	*item = login_data.objuri->next;
 		xmlFree(login_data.objuri->content);
 		free(login_data.objuri);
 		login_data.objuri = item;
 	}
 	/* delete list of exturis */
 	while (login_data.exturi) {
-		item = login_data.exturi->next;
+		stringlist	*item = login_data.exturi->next;
 		xmlFree(login_data.exturi->content);
 		free(login_data.exturi);
 		login_data.exturi = item;
 	}
-	if (login_data.svTRID) xmlFree(BAD_CAST login_data.svTRID);
 }
 
 /**
@@ -680,59 +732,36 @@ static void epp_logout_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 {
 	xmlXPathObjectPtr	xpathObj;
 	epp_data_logout	logout_data;
-	stringlist	*item;
-	int	i;
+	orb_rc_t	orb_rc;
 
-	/* fill in login data structure */
-	bzero(&logout_data, sizeof logout_data);
-	logout_data.clTRID = (char *) clTRID;
-
-	/* check if the user has not already logged in */
+	/* check if the user did not forget to log in */
 	if (conn_ctx->sessionID == 0) {
-		/* *** CORBA function call *** */
-		corba_invalid(&logout_data);
-		parms->response = simple_response(2002, clTRID,
-				logout_data.svTRID, parms);
 		parser_log(parms, EPP_LOG_WARNING,
 				"User trying to logout and is not logged in");
+		CORBA_DUMMY_CALL(2002, clTRID, conn_ctx->corba_service, parms);
 		return;
 	}
+
+	/* fill in logout data structure */
+	bzero(&logout_data, sizeof logout_data);
+	logout_data.clTRID = clTRID;
+
+	/* *** CORBA function call *** */
+	orb_rc = corba_logout(conn_ctx->corba_service, &logout_data);
+
+	if (orb_rc != ORB_OK) {
+		parser_log(parms, EPP_LOG_ERROR, "corba logout function call failed");
+		parms->response = simple_response(2400, clTRID, "Non-existent-svTRID",
+				parms);
+	}
 	else {
-		/* *** CORBA function call *** */
-		corba_logout(&logout_data);
-
-		parms->response = simple_response(login_data.rc, clTRID,
-				login_data.svTRID, parms);
+		parms->response = simple_response(logout_data.rc, clTRID,
+				logout_data.svTRID, parms);
+		if (parms->response && logout_data.rc == 1000) {
+			parms->status = EPP_CLOSE_CONN;
+		}
+		free(logout_data.svTRID);
 	}
-
-	/*
-	 * What should we do if we are not successful? We cannot send any
-	 * response, so we will behave as if we hadn't received any login -
-	 * this means, we will not update sessionID.
-	 */
-	if (parms->response && login_data.rc == 1000) {
-		conn_ctx->sessionID = login_data.sessionID;
-	}
-	/* clean up login_data structure */
-	xmlFree(BAD_CAST login_data.clID);
-	xmlFree(BAD_CAST login_data.pw);
-	if (login_data.newPW) xmlFree(BAD_CAST login_data.newPW);
-	xmlFree(BAD_CAST login_data.clTRID);
-	/* delete list of objuris */
-	while (login_data.objuri) {
-		item = login_data.objuri->next;
-		xmlFree(login_data.objuri->content);
-		free(login_data.objuri);
-		login_data.objuri = item;
-	}
-	/* delete list of exturis */
-	while (login_data.exturi) {
-		item = login_data.exturi->next;
-		xmlFree(login_data.exturi->content);
-		free(login_data.exturi);
-		login_data.exturi = item;
-	}
-	if (login_data.svTRID) xmlFree(BAD_CAST login_data.svTRID);
 }
 
 void epp_parser_command(void *conn_ctx_par, const char *request,

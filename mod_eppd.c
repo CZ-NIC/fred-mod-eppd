@@ -38,6 +38,15 @@ typedef struct {
 } eppd_server_conf;
 
 /**
+ * This is wrapper function for compatibility reason. Apache 2.0 does
+ * not have ap_log_cerror, instead we will use ap_log_error.
+ */
+#if AP_SERVER_MINORVERSION_NUMBER == 0
+#define ap_log_cerror(mark, level, status, c, ...) \
+	ap_log_error(mark, level, status, (c)->base_server, __VA_ARGS__)
+#endif
+
+/**
  * Reads epp request.
  * @param c Connection
  * @ret Status
@@ -154,9 +163,11 @@ static int epp_process_connection(conn_rec *c)
 	const char	*greeting;
 	char	close_conn;	/* used as boolean */
 	void	*ctx; /* connection context */
+	int	rc;
 	apr_bucket_brigade	*bb;
 	apr_size_t	len;
 	apr_status_t	status;
+	epp_greeting_parms_out greeting_parms;
 	server_rec	*s = c->base_server;
 	eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(s->module_config, &eppd_module);
@@ -178,30 +189,37 @@ static int epp_process_connection(conn_rec *c)
 	 * is enough).
 	 */
 	bb = apr_brigade_create(c->pool, c->bucket_alloc);
-	greeting = "ahoj, toto je greeting";
-	apr_brigade_puts(bb, NULL, NULL, greeting);
+	bzero(&greeting_parms, sizeof greeting_parms);
+	epp_parser_greeting("Server name (ID)", "nejaky datum", &greeting_parms);
+	if (greeting_parms.error_msg != NULL) {
+		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+			"Error when creating epp greeting: %s", greeting_parms.error_msg);
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+	apr_brigade_puts(bb, NULL, NULL, greeting_parms.greeting);
 
 	status = ap_fflush(c->output_filters, bb);
 	if (status != APR_SUCCESS) {
 		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-		"Error when sending greeting to client");
+			"Error when sending greeting to client");
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
+	epp_parser_greeting_cleanup(&greeting_parms);
 	ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
 			"epp greeting has been sent");
 
 	status = apr_brigade_cleanup(bb);
 	if (status != APR_SUCCESS) {
 		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-		"Could not cleanup bucket brigade used for greeting");
+				"Could not cleanup bucket brigade used for greeting");
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
 	/* create and initialize epp connetion context */
-	if ((ctx = epp_parser_init()) == NULL) {
+	if ((ctx = epp_parser_connection()) == NULL) {
 		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-		"Could allocate epp_connection_ctx struct");
+				"Could allocate epp_connection_ctx struct");
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
@@ -209,10 +227,12 @@ static int epp_process_connection(conn_rec *c)
 	 * process requests loop
 	 * termination conditions are embedded inside the loop
 	 */
+	rc = OK;
 	while (1) {
 		char *request;
-		epp_parser_parms_out *parser_out;
 		apr_pool_t	*rpool;
+		epp_parser_log	*log_iter;
+		epp_parser_parms_out parser_out;
 
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
@@ -220,44 +240,74 @@ static int epp_process_connection(conn_rec *c)
 
 		/* read request */
 		request = epp_read_request(rpool, c);
-		if (request == NULL) return HTTP_INTERNAL_SERVER_ERROR;
+		if (request == NULL) {
+			rc = HTTP_INTERNAL_SERVER_ERROR;
+			break;
+		}
 
-		/* allocate structure for return values from parser */
-		parser_out = apr_pcalloc(rpool, sizeof (*parser_out));
-
+		/* initialize structure for return values from parser */
+		bzero(&parser_out, sizeof parser_out);
 		/* deliver request to XML parser */
-		epp_parser_process_request(ctx, request, parser_out);
+		epp_parser_command(ctx, request, &parser_out);
 
 		/* analyze parser's answer */
-		if (parser_out->err) {
-			ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
-					"epp parser: %s", parser_out->err);
+		log_iter = parser_out.head;
+		while (log_iter) {
+			int log_level;
+
+			switch (log_iter->severity) {
+				case EPP_LOG_INFO:
+					log_level = APLOG_INFO;
+					break;
+				case EPP_LOG_WARNING:
+					log_level = APLOG_WARNING;
+					break;
+				case EPP_LOG_ERROR:
+					log_level = APLOG_ERR;
+					break;
+				default:
+					log_level = APLOG_DEBUG;
+					break;
+			}
+			ap_log_cerror(APLOG_MARK, log_level, status, c, "epp parser: %s",
+					log_iter->msg);
+			log_iter = log_iter->next;
 		}
-		if (parser_out->response != NULL) {
+		if (parser_out.response != NULL) {
 			/* send response back to client */
-			apr_brigade_puts(bb, NULL, NULL, parser_out->response);
+			apr_brigade_puts(bb, NULL, NULL, parser_out.response);
 
 			status = ap_fflush(c->output_filters, bb);
 			if (status != APR_SUCCESS) {
 				ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-				"Error when sending response to client");
-				return HTTP_INTERNAL_SERVER_ERROR;
+					"Error when sending response to client");
+				epp_parser_command_cleanup(&parser_out);
+				rc = HTTP_INTERNAL_SERVER_ERROR;
+				break;
 			}
 
 			status = apr_brigade_cleanup(bb);
 			if (status != APR_SUCCESS) {
 				ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-				"Could not cleanup bucket brigade used for response");
-				return HTTP_INTERNAL_SERVER_ERROR;
+					"Could not cleanup bucket brigade used for response");
+				epp_parser_command_cleanup(&parser_out);
+				rc = HTTP_INTERNAL_SERVER_ERROR;
+				break;
 			}
 		}
+		if (parser_out.status == EPP_CLOSE_CONN) {
+			ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
+					"Terminating epp session");
+			epp_parser_command_cleanup(&parser_out);
+			break;
+		}
 
-		epp_parser_cleanup_parms_out(parser_out);
+		epp_parser_command_cleanup(&parser_out);
 		apr_pool_destroy(rpool);
 	}
 
-	epp_parser_cleanup_ctx(ctx);
-	return OK;
+	epp_parser_connection_cleanup(ctx);
+	return rc;
 }
 
 /**
