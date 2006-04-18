@@ -69,15 +69,16 @@ typedef struct {
  * Corba subsystem is also initialized.
  *
  * @par url_schema URL of schema
- * @ret Zero in case of failure, one in case of success
+ * @ret Opaque server context
  */
-int epp_parser_init(const char *url_schema);
+void *epp_parser_init(const char *url_schema);
 
 /**
  * This will clean up preprocessed epp schema and message hash table.
  * Corba resources are released as well.
+ * @par par Opaque server context
  */
-void epp_parser_init_cleanup();
+void epp_parser_init_cleanup(void *par);
 
 /**
  * This creates and returns context of epp connection, which is used
@@ -112,13 +113,16 @@ void epp_parser_greeting_cleanup(epp_greeting_parms_out *parms);
 
 /**
  * Parses request and gets response.
+ * @par	Server context
  * @par	Connection context
  * @par Request to be processed
  * @par Response containg xml, logs, status, ...
  */
 void epp_parser_command(
+		void *serv_ctx,
 		void *conn_ctx,
 		const char *request,
+		unsigned bytes,
 		epp_command_parms_out *parms);
 
 /**

@@ -40,7 +40,7 @@ typedef struct {
 	char *svTRID;
 } epp_data_dummy;
 
-orb_rc_t corba_dummy(void *service, epp_data_dummy *dummy_data);
+orb_rc_t corba_dummy(void *service, int sessionID, epp_data_dummy *dummy_data);
 
 /* Session commands */
 typedef struct {
@@ -49,15 +49,14 @@ typedef struct {
 	char *pw;
 	char *newPW;
 	char *clTRID;
-	stringlist	*objuri;
-	stringlist	*exturi;
+	stringlist	*objuri; // not used
+	stringlist	*exturi; // not used
 	/* output parameters */
 	char *svTRID;
-	int	sessionID;
 	int	rc;
 } epp_data_login;
 
-orb_rc_t corba_login(void *service, epp_data_login *login_data);
+orb_rc_t corba_login(void *service, int *sessionID, epp_data_login *login_data);
 
 typedef struct {
 	/* input parameters */

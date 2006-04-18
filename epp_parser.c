@@ -99,23 +99,24 @@
  * Corba dummy call is generated so often that it is beneficial to create
  * macro for that.
  */
-#define CORBA_DUMMY_CALL(_rc, _clTRID, _ctx, _parms)					\
+#define CORBA_DUMMY_CALL(_server_ctx, _rc, _clTRID, _ctx, _parms)	\
 	do {										\
 		epp_data_dummy	dummy_data;				\
 		orb_rc_t	orb_rc;						\
 		bzero(&dummy_data, sizeof dummy_data);	\
 		dummy_data.clTRID = (_clTRID);			\
 		dummy_data.rc = (_rc);					\
-		orb_rc = corba_dummy((_ctx)->corba_service, &dummy_data);		\
+		orb_rc = corba_dummy((_ctx)->corba_service, (_ctx)->sessionID, &dummy_data);		\
 		if (orb_rc != ORB_OK) {					\
 			parser_log((_parms), EPP_LOG_ERROR, "Additionally corba dummy call failed");\
-			(_parms)->response = simple_response(2400, (_clTRID), "Non-existent-svTRID", (_parms));\
+			(_parms)->response = simple_response(_server_ctx, 2400, (_clTRID), "Non-existent-svTRID", (_parms));\
 		}										\
 		else {									\
-			(_parms)->response = simple_response((_rc), (_clTRID), dummy_data.svTRID, (_parms));\
+			(_parms)->response = simple_response(_server_ctx, (_rc), (_clTRID), dummy_data.svTRID, (_parms));\
 			free(dummy_data.svTRID);			\
 		}										\
 	}while(0)
+
 
 /**
  * epp connection context struct used to store information associated
@@ -135,11 +136,17 @@ struct hash_item_t {
 	char	*msg;	/* message for the rc */
 };
 
+/**
+ * Structure holds items which are valid for whole server. This are
+ * initialized during apache startup and then are only readable.
+ */
+typedef struct {
+	xmlSchemaPtr schema; /* schema against which are validated requests */
+	/* hash table for mapping return codes to textual messages */
+	hash_item	*hash_msg[HASH_SIZE];
+} epp_server_ctx;
 
-/* schema against which are validated requests */
-static xmlSchemaPtr schema;
-/* hash table for mapping return codes to textual messages */
-static hash_item	*hash_msg[HASH_SIZE];
+
 
 /**
  * Function counts simple hash value from given 4 bytes.
@@ -162,7 +169,7 @@ static unsigned char get_rc_hash(int rc) {
  * @par msg Message associated with key
  * @ret Zero in case of success, one in case of failure
  */
-static char msg_hash_insert(int key, const char *msg)
+static char msg_hash_insert(hash_item *hash_msg[], int key, const char *msg)
 {
 	hash_item	*hi;
 	int	index;
@@ -188,7 +195,7 @@ static char msg_hash_insert(int key, const char *msg)
  * @par rc Result code (key) which is going to be translated
  * @ret Appropriate message (value)
  */
-static char *msg_hash_lookup(int rc)
+static char *msg_hash_lookup(hash_item *hash_msg[], int rc)
 {
 	hash_item	*hi;
 
@@ -208,7 +215,7 @@ static char *msg_hash_lookup(int rc)
 /**
  * Function frees all items in hash table.
  */
-static void msg_hash_clean(void)
+static void msg_hash_clean(hash_item *hash_msg[])
 {
 	hash_item	*tmp;
 	int	i;
@@ -225,73 +232,116 @@ static void msg_hash_clean(void)
 	}
 }
 
-int epp_parser_init(const char *url_schema)
+void *epp_parser_init(const char *url_schema)
 {
 	xmlSchemaParserCtxtPtr spctx;
+	epp_server_ctx	*server_ctx;
 	char rc;
 
 	/* test libxml version */
 	LIBXML_TEST_VERSION
 
+	/* allocate and initialize server context structure */
+	server_ctx = calloc(1, sizeof *server_ctx);
+	if (server_ctx == NULL) return NULL;
+
 	/* parse epp schema */
 	spctx = xmlSchemaNewParserCtxt(url_schema);
-	if (spctx == NULL) return 0;
-	schema = xmlSchemaParse(spctx);
+	if (spctx == NULL) return NULL;
+	server_ctx->schema = xmlSchemaParse(spctx);
 	xmlSchemaFreeParserCtxt(spctx);
 
 	rc = 0;
-	rc |= msg_hash_insert(1000, "Command completed successfully");
-	rc |= msg_hash_insert(1001, "Command completed successfully; action pending");
-	rc |= msg_hash_insert(1300, "Command completed successfully; no messages");
-	rc |= msg_hash_insert(1301, "Command completed successfully; ack to dequeue");
-	rc |= msg_hash_insert(1500, "Command completed successfully; ending session");
-	rc |= msg_hash_insert(2000, "Unknown command");
-	rc |= msg_hash_insert(2001, "Command syntax error");
-	rc |= msg_hash_insert(2002, "Command use error");
-	rc |= msg_hash_insert(2003, "Required parameter missing");
-	rc |= msg_hash_insert(2004, "Parameter value range error");
-	rc |= msg_hash_insert(2005, "Parameter value syntax error");
-	rc |= msg_hash_insert(2100, "Unimplemented protocol version");
-	rc |= msg_hash_insert(2101, "Unimplemented command");
-	rc |= msg_hash_insert(2102, "Unimplemented option");
-	rc |= msg_hash_insert(2103, "Unimplemented extension");
-	rc |= msg_hash_insert(2104, "Billing failure");
-	rc |= msg_hash_insert(2105, "Object is not eligible for renewal");
-	rc |= msg_hash_insert(2106, "Object is not eligible for transfer");
-	rc |= msg_hash_insert(2200, "Authentication error");
-	rc |= msg_hash_insert(2201, "Authorization error");
-	rc |= msg_hash_insert(2202, "Invalid authorization information");
-	rc |= msg_hash_insert(2300, "Object pending transfer");
-	rc |= msg_hash_insert(2301, "Object not pending transfer");
-	rc |= msg_hash_insert(2302, "Object exists");
-	rc |= msg_hash_insert(2303, "Object does not exist");
-	rc |= msg_hash_insert(2304, "Object status prohibits operation");
-	rc |= msg_hash_insert(2305, "Object association prohibits operation");
-	rc |= msg_hash_insert(2306, "Parameter value policy error");
-	rc |= msg_hash_insert(2307, "Unimplemented object service");
-	rc |= msg_hash_insert(2308, "Data management policy violation");
-	rc |= msg_hash_insert(2400, "Command failed");
-	rc |= msg_hash_insert(2500, "Command failed; server closing connection");
-	rc |= msg_hash_insert(2501, "Authentication error; server closing connection");
-	rc |= msg_hash_insert(2502, "Session limit exceeded; server closing connection");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 1000,
+			"Command completed successfully");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 1001,
+			"Command completed successfully; action pending");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 1300,
+			"Command completed successfully; no messages");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 1301,
+			"Command completed successfully; ack to dequeue");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 1500,
+			"Command completed successfully; ending session");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2000,
+			"Unknown command");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2001,
+			"Command syntax error");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2002,
+			"Command use error");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2003,
+			"Required parameter missing");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2004,
+			"Parameter value range error");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2005,
+			"Parameter value syntax error");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2100,
+			"Unimplemented protocol version");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2101,
+			"Unimplemented command");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2102,
+			"Unimplemented option");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2103,
+			"Unimplemented extension");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2104,
+			"Billing failure");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2105,
+			"Object is not eligible for renewal");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2106,
+			"Object is not eligible for transfer");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2200,
+			"Authentication error");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2201,
+			"Authorization error");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2202,
+			"Invalid authorization information");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2300,
+			"Object pending transfer");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2301,
+			"Object not pending transfer");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2302,
+			"Object exists");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2303,
+			"Object does not exist");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2304,
+			"Object status prohibits operation");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2305,
+			"Object association prohibits operation");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2306,
+			"Parameter value policy error");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2307,
+			"Unimplemented object service");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2308,
+			"Data management policy violation");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2400,
+			"Command failed");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2500,
+			"Command failed; server closing connection");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2501,
+			"Authentication error; server closing connection");
+	rc |= msg_hash_insert(server_ctx->hash_msg, 2502,
+			"Session limit exceeded; server closing connection");
 
 	if (rc) {
 		/* error has been spotted */
-		msg_hash_clean();
-		return 0;
+		msg_hash_clean(server_ctx->hash_msg);
+		return NULL;
 	}
 
 	xmlInitParser();
 
-	return 1;
+	return (void *) server_ctx;
 }
 
-void epp_parser_init_cleanup(void)
+void epp_parser_init_cleanup(void *par)
 {
-	assert(schema != NULL);
+	epp_server_ctx	*server_ctx = par;
 
-	xmlSchemaFree(schema);
-	msg_hash_clean();
+	assert(server_ctx != NULL);
+	assert(server_ctx->schema != NULL);
+	assert(server_ctx->hash_msg != NULL);
+
+	xmlSchemaFree(server_ctx->schema);
+	msg_hash_clean(server_ctx->hash_msg);
 	xmlCleanupParser();
 }
 
@@ -440,8 +490,10 @@ void epp_parser_greeting_cleanup(epp_greeting_parms_out *parms)
  * @par svTRID	Server transaction ID
  * ret String containing response, which has to be freed by free()
  */
-static char *simple_response(int code, const xmlChar *clTRID,
-		const char *svTRID, epp_command_parms_out *parms) {
+static char *simple_response(epp_server_ctx *server_ctx, int code,
+		const xmlChar *clTRID,
+		const char *svTRID,
+		epp_command_parms_out *parms) {
 
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -475,7 +527,7 @@ static char *simple_response(int code, const xmlChar *clTRID,
 	START_ELEMENT("response", simple_err);
 	START_ELEMENT("result", simple_err);
 	snprintf(res_code, 5, "%d", code);
-	str = msg_hash_lookup(code);
+	str = msg_hash_lookup(server_ctx->hash_msg, code);
 	WRITE_ATTRIBUTE("code", res_code, simple_err);
 	WRITE_ELEMENT("msg", str, simple_err);
 	END_ELEMENT(simple_err);
@@ -510,8 +562,8 @@ simple_err:
  *   - managed objects (including extensions)
  */
 static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
-		epp_connection_ctx *conn_ctx, xmlChar *clTRID,
-		epp_command_parms_out *parms)
+		epp_server_ctx *server_ctx, epp_connection_ctx *conn_ctx,
+		xmlChar *clTRID, epp_command_parms_out *parms)
 {
 	xmlXPathObjectPtr	xpathObj;
 	xmlNodeSetPtr	nodeset;
@@ -524,7 +576,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	if (conn_ctx->sessionID != 0) {
 		parser_log(parms, EPP_LOG_WARNING,
 				"User trying to log in but is already logged in");
-		CORBA_DUMMY_CALL(2002, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2002, clTRID, conn_ctx, parms);
 		return;
 	}
 
@@ -534,7 +586,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
-		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2400, clTRID, conn_ctx, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -545,7 +597,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		parser_log(parms, EPP_LOG_WARNING, "Selected language not supported");
 		xmlFree(str);
 		xmlXPathFreeObject(xpathObj);
-		CORBA_DUMMY_CALL(2102, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2102, clTRID, conn_ctx, parms);
 		return;
 	}
 	xmlFree(str);
@@ -557,7 +609,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
-		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2400, clTRID, conn_ctx, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -569,7 +621,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 				"Selected EPP version not supported");
 		xmlFree(str);
 		xmlXPathFreeObject(xpathObj);
-		CORBA_DUMMY_CALL(2100, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2100, clTRID, conn_ctx, parms);
 		return;
 	}
 	xmlFree(str);
@@ -584,7 +636,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:clID", xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
-		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2400, clTRID, conn_ctx, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -599,7 +651,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:pw", xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
-		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2400, clTRID, conn_ctx, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -614,7 +666,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:newPW", xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
-		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2400, clTRID, conn_ctx, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -631,7 +683,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
-		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2400, clTRID, conn_ctx, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -642,7 +694,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		for (i = 0; i < nodeset->nodeNr; i++) {
 			if ((item = malloc(sizeof *item)) == NULL) {
 				parser_log(parms, EPP_LOG_ERROR, "alloc of stringlist failed");
-				CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
+				CORBA_DUMMY_CALL(server_ctx, 2400, clTRID, conn_ctx, parms);
 				return;
 			}
 			node = nodeset->nodeTab[i];
@@ -659,7 +711,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:command/epp:login/epp:svcs/epp:svcExtension/epp:extURI", xpathCtx);
 	if (xpathObj == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "XPath evaluation failed");
-		CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2400, clTRID, conn_ctx, parms);
 		return;
 	}
 	nodeset = xpathObj->nodesetval;
@@ -670,7 +722,7 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 		for (i = 0; i < nodeset->nodeNr; i++) {
 			if ((item = malloc(sizeof *item)) == NULL) {
 				parser_log(parms, EPP_LOG_ERROR, "alloc of stringlist failed");
-				CORBA_DUMMY_CALL(2400, clTRID, conn_ctx->corba_service, parms);
+				CORBA_DUMMY_CALL(server_ctx, 2400, clTRID, conn_ctx, parms);
 				return;
 			}
 			node = nodeset->nodeTab[i];
@@ -684,23 +736,15 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	xmlXPathFreeObject(xpathObj);
 
 	/* *** CORBA login function call *** */
-	orb_rc = corba_login(conn_ctx->corba_service, &login_data);
+	orb_rc = corba_login(conn_ctx, &conn_ctx->sessionID, &login_data);
 	if (orb_rc != ORB_OK) {
 		parser_log(parms, EPP_LOG_ERROR, "corba login function call failed");
-		parms->response = simple_response(2400, clTRID, "Non-existent-svTRID",
+		parms->response = simple_response(server_ctx, 2400, clTRID, "Non-existent-svTRID",
 				parms);
 	}
 	else {
-		parms->response = simple_response(login_data.rc, clTRID,
+		parms->response = simple_response(server_ctx, login_data.rc, clTRID,
 				login_data.svTRID, parms);
-		/*
-		 * What should we do if we were not successful? We cannot send any
-		 * response, so we will behave as if we hadn't received any login -
-		 * this means, we will not update sessionID.
-		 */
-		if (parms->response && login_data.rc == 1000) {
-			conn_ctx->sessionID = login_data.sessionID;
-		}
 		free(login_data.svTRID);
 	}
 	/* clean up login_data structure */
@@ -727,10 +771,9 @@ static void epp_login_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
  * Logout handler.
  */
 static void epp_logout_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
-		epp_connection_ctx *conn_ctx, xmlChar *clTRID,
-		epp_command_parms_out *parms)
+		epp_server_ctx *server_ctx, epp_connection_ctx *conn_ctx,
+		xmlChar *clTRID, epp_command_parms_out *parms)
 {
-	xmlXPathObjectPtr	xpathObj;
 	epp_data_logout	logout_data;
 	orb_rc_t	orb_rc;
 
@@ -738,7 +781,7 @@ static void epp_logout_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	if (conn_ctx->sessionID == 0) {
 		parser_log(parms, EPP_LOG_WARNING,
 				"User trying to logout and is not logged in");
-		CORBA_DUMMY_CALL(2002, clTRID, conn_ctx->corba_service, parms);
+		CORBA_DUMMY_CALL(server_ctx, 2002, clTRID, conn_ctx, parms);
 		return;
 	}
 
@@ -747,15 +790,16 @@ static void epp_logout_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	logout_data.clTRID = clTRID;
 
 	/* *** CORBA function call *** */
-	orb_rc = corba_logout(conn_ctx->corba_service, &logout_data);
+	orb_rc = corba_logout(conn_ctx->corba_service, conn_ctx->sessionID,
+			&logout_data);
 
 	if (orb_rc != ORB_OK) {
 		parser_log(parms, EPP_LOG_ERROR, "corba logout function call failed");
-		parms->response = simple_response(2400, clTRID, "Non-existent-svTRID",
-				parms);
+		parms->response = simple_response(server_ctx, 2400, clTRID,
+				"Non-existent-svTRID", parms);
 	}
 	else {
-		parms->response = simple_response(logout_data.rc, clTRID,
+		parms->response = simple_response(server_ctx, logout_data.rc, clTRID,
 				logout_data.svTRID, parms);
 		if (parms->response && logout_data.rc == 1000) {
 			parms->status = EPP_CLOSE_CONN;
@@ -764,29 +808,32 @@ static void epp_logout_cmd(xmlDocPtr doc, xmlXPathContextPtr xpathCtx,
 	}
 }
 
-void epp_parser_command(void *conn_ctx_par, const char *request,
-		epp_command_parms_out *parms)
+void epp_parser_command(void *server_ctx_par, void *conn_ctx_par,
+		const char *request, unsigned bytes, epp_command_parms_out *parms)
 {
 	int	rc;
 	xmlDocPtr	doc;
 	xmlSchemaValidCtxtPtr	svctx;
 	xmlXPathContextPtr	xpathCtx;
 	xmlXPathObjectPtr	xpathObj;
+	epp_server_ctx	*server_ctx = (epp_server_ctx *) server_ctx_par;
 	epp_connection_ctx	*conn_ctx = (epp_connection_ctx *) conn_ctx_par;
 
-	assert(request != NULL);
+	assert(server_ctx != NULL);
 	assert(conn_ctx != NULL);
+	assert(request != NULL);
 	assert(parms != NULL);
 
 	/* parse request */
-	doc = xmlParseMemory(request, strlen(request)); /* TODO optimize */
+	doc = xmlParseMemory(request, bytes);
 	if (doc == NULL) {
 		parser_log(parms, EPP_LOG_ERROR, "Request is not XML");
+		parms->status = EPP_CLOSE_CONN;
 		return;
 	}
 
 	/* validate request against schema */
-	svctx = xmlSchemaNewValidCtxt(schema);
+	svctx = xmlSchemaNewValidCtxt(server_ctx->schema);
 	if (svctx == NULL) {
 		parser_log(parms, EPP_LOG_ERROR,
 				"Validation context could not be created");
@@ -803,6 +850,7 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 		parser_log(parms, EPP_LOG_ERROR, "Request doesn't validate");
 		xmlSchemaFreeValidCtxt(svctx);
 		xmlFreeDoc(doc);
+		parms->status = EPP_CLOSE_CONN;
 		return;
 	}
 	xmlSchemaFreeValidCtxt(svctx);
@@ -847,6 +895,7 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
 		xmlXPathFreeObject(xpathObj);
 		parser_log(parms, EPP_LOG_ERROR, "EPP frame is not a command");
+		parms->status = EPP_CLOSE_CONN;
 	}
 	else {
 		xmlChar	*clTRID;
@@ -888,15 +937,16 @@ void epp_parser_command(void *conn_ctx_par, const char *request,
 
 		/* compare command step by step */
 		if (xmlStrEqual(command, BAD_CAST "login")) {
-			epp_login_cmd(doc, xpathCtx, conn_ctx, clTRID, parms);
+			epp_login_cmd(doc, xpathCtx, server_ctx, conn_ctx, clTRID, parms);
 		}
-		if (xmlStrEqual(command, BAD_CAST "logout")) {
-			epp_logout_cmd(doc, xpathCtx, conn_ctx, clTRID, parms);
+		else if (xmlStrEqual(command, BAD_CAST "logout")) {
+			epp_logout_cmd(doc, xpathCtx, server_ctx, conn_ctx, clTRID, parms);
 		}
 		else {
 			parser_log(parms, EPP_LOG_ERROR,
-				"EPP frame is not a command or is unknown command");
-			parms->response = simple_response(2000, clTRID, "", parms);
+					"EPP frame is not a command or is unknown command");
+			parms->response = simple_response(server_ctx, 2000, clTRID,
+					"Non-existent-svTRID", parms);
 		}
 		xmlFree(command);
 		if (clTRID != NULL) xmlFree(clTRID);

@@ -2,6 +2,7 @@
  * Copyright statement ;)
  */
 
+#include <stdio.h>
 #include <string.h>
 #include <orbit/orbit.h>
 
@@ -56,14 +57,14 @@ static CORBA_Object
 import_object_from_file (CORBA_ORB orb, CORBA_char *filename,
 			      CORBA_Environment *ev)
 {
-        FILE         *file;
+	FILE         *file;
 	gchar        *objref;
-        CORBA_Object  obj = CORBA_OBJECT_NIL;
-  
-        if ((file = fopen(filename, "r")) == NULL) {
+	CORBA_Object  obj = CORBA_OBJECT_NIL;
+
+	if ((file = fopen(filename, "r")) == NULL) {
 		ev->_major = CORBA_SYSTEM_EXCEPTION;
 		return CORBA_OBJECT_NIL;		
-     	}
+	}
 	objref = read_string_from_stream(file);
 
 	if (!objref || strlen(objref) == 0) {
@@ -74,7 +75,7 @@ import_object_from_file (CORBA_ORB orb, CORBA_char *filename,
 	}
 
 	obj = (CORBA_Object) CORBA_ORB_string_to_object(orb, objref, ev);
-	free (objref);
+	g_free (objref);
 
 	fclose (file);
 	return obj;
@@ -95,8 +96,7 @@ corba_init(void **service, void **orb)
 		return ORB_EINIT;
 	}
 
-	e_service = (ccReg_EPP)
-		import_object_from_file(global_orb, filename, ev);
+	e_service = (ccReg_EPP) import_object_from_file(global_orb, filename, ev);
 	if (raised_exception(ev)) {
 		/* releasing managed object */
 		CORBA_Object_release(e_service, ev);
@@ -120,22 +120,27 @@ corba_cleanup(void *service, void *orb)
 	/* releasing managed object */
 	CORBA_Object_release((ccReg_EPP) service, ev);
 	/* tear down the ORB */
-	CORBA_ORB_destroy((CORBA_ORB) global_orb, ev);
+	CORBA_ORB_destroy((CORBA_ORB) orb, ev);
 }
 
 orb_rc_t
-corba_login(void *par_service, epp_login_data *login_data)
+corba_login(void *service, int *sessionID, epp_data_login *login_data)
 {
+	CORBA_Environment ev[1];
 	ccReg_Response *response;
-	ccReg_EPP service = (ccReg_EPP) par_service;
+	CORBA_exception_init(ev);
+	CORBA_long	num = 5;
 
-	response = ccReg_EPP_ClientLogin(service , ...);
+	//response = ccReg_EPP_ClientLogin((ccReg_EPP) service , login_data->clID,
+	//		login_data->clTRID, login_data->pw, login_data->newPW,
+	//		sessionID, ev);
+	response = ccReg_EPP_ClientLogin((ccReg_EPP) service , "hahaha",
+			"nejakepol", "nejakepol", "nejakepol", &num, ev);
 	if (raised_exception(ev)) {
-		/* do NOT try to free dm even if not NULL -> segfault */
+		/* do NOT try to free response even if not NULL -> segfault */
 		return ORB_ESERVICE;
 	}
 
-	login_data->sessionID = response->clientID;
 	login_data->svTRID = strdup(response->svTRID);
 	login_data->rc = response->errCode;
 
@@ -144,14 +149,16 @@ corba_login(void *par_service, epp_login_data *login_data)
 }
 
 orb_rc_t
-corba_logout(void *par_service, int sessionID, epp_logout_data *logout_data)
+corba_logout(void *service, int sessionID, epp_data_logout *logout_data)
 {
+	CORBA_Environment ev[1];
 	ccReg_Response *response;
-	ccReg_EPP service = (ccReg_EPP) par_service;
+	CORBA_exception_init(ev);
 
-	response = ccReg_EPP_ClientLogout(service , sessionID, logout_data->clTRID);
+	response = ccReg_EPP_ClientLogout((ccReg_EPP) service , sessionID,
+			logout_data->clTRID, ev);
 	if (raised_exception(ev)) {
-		/* do NOT try to free dm even if not NULL -> segfault */
+		/* do NOT try to free response even if not NULL -> segfault */
 		return ORB_ESERVICE;
 	}
 
@@ -162,3 +169,22 @@ corba_logout(void *par_service, int sessionID, epp_logout_data *logout_data)
 	return ORB_OK;
 }
 
+orb_rc_t
+corba_dummy(void *service, int sessionID, epp_data_dummy *dummy_data)
+{
+	CORBA_Environment ev[1];
+	ccReg_Response *response;
+	CORBA_exception_init(ev);
+
+	response = ccReg_EPP_GetTransaction((ccReg_EPP) service , sessionID,
+			dummy_data->clTRID, dummy_data->rc, ev);
+	if (raised_exception(ev)) {
+		/* do NOT try to free response even if not NULL -> segfault */
+		return ORB_ESERVICE;
+	}
+
+	dummy_data->svTRID = strdup(response->svTRID);
+
+	CORBA_free(response);
+	return ORB_OK;
+}

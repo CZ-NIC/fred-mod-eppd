@@ -27,7 +27,7 @@ AP_LIBS	+=$(shell $(APR-CONFIG) --libs)
 
 AP_INSTALLDIR	= $(shell $(APXS) -q LIBEXECDIR)
 
-CFLAGS	= -g -O -fPIC -Wall
+CFLAGS	= -g -O0 -fPIC -Wall
 LDFLAGS	= -rpath $(AP_INSTALLDIR) -Bshareable
 
 build: mod_eppd.so
@@ -47,19 +47,19 @@ epp_parser.o: epp_parser.c epp_parser.h epp-client.h
 epp-client.o: epp-client.c epp-client.h ccReg.h
 	gcc $(CFLAGS) $(ORB_CFLAGS) -c epp-client.c
 
-ccReg-common.o: ccReg-common.c
+ccReg-common.o: ccReg-common.c ccReg.h
 	gcc $(CFLAGS) $(ORB_CFLAGS) -c ccReg-common.c
 
-ccReg-stubs.o: ccReg-stubs.c
+ccReg-stubs.o: ccReg-stubs.c ccReg.h
 	gcc $(CFLAGS) $(ORB_CFLAGS) -c ccReg-stubs.c
 
-test_parser: test_parser.o epp_parser.o epp-client.o
-	gcc -o test_parser $(AP_LDFLAGS) $(ORB_LDFLAGS) test_parser.o epp_parser.o epp-client.o $(XML_LIBS)
+test_parser: test_parser.o epp_parser.o epp-client.o ccReg-common.o ccReg-stubs.o
+	gcc -o test_parser $(AP_LDFLAGS) $(ORB_LDFLAGS) test_parser.o epp_parser.o epp-client.o ccReg-common.o ccReg-stubs.o $(XML_LIBS)
 
-test_parser.o: test_parser.c
+test_parser.o: test_parser.c epp_parser.h
 	gcc -c -g -O0 -Wall -c test_parser.c
 
-$(IDLOUT):
+$(IDLOUT): $(IDL)
 	$(ORBIT-IDL-2) --noskels $(IDL)
 
 clean:

@@ -35,6 +35,7 @@ module AP_MODULE_DECLARE_DATA eppd_module;
  */
 typedef struct {
 	int	epp_enabled;
+	void	*parser_server_ctx;
 } eppd_server_conf;
 
 /**
@@ -48,10 +49,14 @@ typedef struct {
 
 /**
  * Reads epp request.
- * @param c Connection
- * @ret Status
+ * @par c Connection
+ * @par p Pool from which to allocate memory
+ * @par content The resulting message
+ * @par bytes Number of bytes in message
+ * @ret Status (1 = success, 0 = failure)
  */
-static char *epp_read_request(apr_pool_t *p, conn_rec *c)
+static int
+epp_read_request(apr_pool_t *p, conn_rec *c, char **content, int *bytes)
 {
 		char *buf; /* buffer for user request */
 		uint32_t	hbo_size; /* size of request in host byte order */
@@ -68,7 +73,7 @@ static char *epp_read_request(apr_pool_t *p, conn_rec *c)
 		if (status != APR_SUCCESS) {
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"Error when reading epp header");
-			return NULL;
+			return 0;
 		}
 
 		/*
@@ -82,13 +87,13 @@ static char *epp_read_request(apr_pool_t *p, conn_rec *c)
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"Could not flatten apr_brigade!");
 			apr_brigade_destroy(bb);
-			return NULL;
+			return 0;
 		}
 		if (len != EPP_HEADER_LENGTH) {
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"Weird EPP header size! (%d bytes)", len);
 			apr_brigade_destroy(bb);
-			return NULL;
+			return 0;
 		}
 
 		/* beware of alignment issues - this should be safe */
@@ -101,7 +106,7 @@ static char *epp_read_request(apr_pool_t *p, conn_rec *c)
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"Could not cleanup brigade!");
 			apr_brigade_destroy(bb);
-			return NULL;
+			return 0;
 		}
 
 		/* exclude header length */
@@ -113,9 +118,9 @@ static char *epp_read_request(apr_pool_t *p, conn_rec *c)
 		 */
 		if (hbo_size < 1 || hbo_size > MAX_FRAME_LENGTH) {
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-					"Invalid epp frame length (%ld bytes)", hbo_size);
+					"Invalid epp frame length (%u bytes)", hbo_size);
 			apr_brigade_destroy(bb);
-			return NULL;
+			return 0;
 		}
 		/* blocking read of request's body */
 		len = hbo_size;
@@ -125,31 +130,31 @@ static char *epp_read_request(apr_pool_t *p, conn_rec *c)
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"Error when reading epp request's body");
 			apr_brigade_destroy(bb);
-			return NULL;
+			return 0;
 		}
 
 		/* convert bucket brigade to string */
-		status = apr_brigade_pflatten(bb, &buf, &len, p);
+		status = apr_brigade_pflatten(bb, content, bytes, p);
 		if (status != APR_SUCCESS) {
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"Could not flatten apr_brigade!");
 			apr_brigade_destroy(bb);
-			return NULL;
+			return 0;
 		}
-		if (len != hbo_size) {
+		if (*bytes != hbo_size) {
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"EPP request's body size is other than claimed one:\n"
 					"\treal size is %4d bytes\n\tclaimed size is %4d bytes",
-					len, hbo_size);
+					*bytes, hbo_size);
 			apr_brigade_destroy(bb);
-			return NULL;
+			return 0;
 		}
 
 		ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
-				"epp request received (length %ld bytes)", hbo_size);
+				"epp request received (length %u bytes)", hbo_size);
 
 		apr_brigade_destroy(bb);
-		return buf;
+		return 1;
 }
 
 /**
@@ -160,12 +165,10 @@ static char *epp_read_request(apr_pool_t *p, conn_rec *c)
  */
 static int epp_process_connection(conn_rec *c)
 {
-	const char	*greeting;
-	char	close_conn;	/* used as boolean */
 	void	*ctx; /* connection context */
+	void	*server_ctx;
 	int	rc;
 	apr_bucket_brigade	*bb;
-	apr_size_t	len;
 	apr_status_t	status;
 	epp_greeting_parms_out greeting_parms;
 	server_rec	*s = c->base_server;
@@ -216,6 +219,9 @@ static int epp_process_connection(conn_rec *c)
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
+	/* get server context */
+	server_ctx = sc->parser_server_ctx;
+
 	/* create and initialize epp connetion context */
 	if ((ctx = epp_parser_connection()) == NULL) {
 		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
@@ -230,17 +236,17 @@ static int epp_process_connection(conn_rec *c)
 	rc = OK;
 	while (1) {
 		char *request;
+		unsigned	bytes;
 		apr_pool_t	*rpool;
 		epp_parser_log	*log_iter;
-		epp_parser_parms_out parser_out;
+		epp_command_parms_out parser_out;
 
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
 		apr_pool_tag(rpool, "EPP_request");
 
 		/* read request */
-		request = epp_read_request(rpool, c);
-		if (request == NULL) {
+		if (!epp_read_request(rpool, c, &request, &bytes)) {
 			rc = HTTP_INTERNAL_SERVER_ERROR;
 			break;
 		}
@@ -248,7 +254,7 @@ static int epp_process_connection(conn_rec *c)
 		/* initialize structure for return values from parser */
 		bzero(&parser_out, sizeof parser_out);
 		/* deliver request to XML parser */
-		epp_parser_command(ctx, request, &parser_out);
+		epp_parser_command(server_ctx, ctx, request, bytes, &parser_out);
 
 		/* analyze parser's answer */
 		log_iter = parser_out.head;
@@ -307,6 +313,9 @@ static int epp_process_connection(conn_rec *c)
 	}
 
 	epp_parser_connection_cleanup(ctx);
+	/* XXX temporary */
+	epp_parser_init_cleanup(server_ctx);
+
 	return rc;
 }
 
@@ -340,18 +349,25 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
 
 	if (len > 0)
 		ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, f->c,
-				"epp frame transmitted (length %ld bytes)", len);
+				"epp frame transmitted (length %u bytes)", len);
 
 	return ap_pass_brigade(f->next, bb);
 }
 
-static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp,
-																server_rec *s)
+static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
+		apr_pool_t *ptemp, server_rec *s)
 {
-	char	buf[101];
-	char	*res;
 	eppd_server_conf *sc;
-	int	err_seen = 0;
+	char	err_seen = 0;
+	char	at_least_one = 0;
+	void	*parser_ctx;
+
+	/*
+	 * do checking and initialization of libxml
+	 */
+	parser_ctx = epp_parser_init("schemas/all-1.0.xsd");
+	if (parser_ctx == NULL)
+		return HTTP_INTERNAL_SERVER_ERROR;
 
 	/*
 	 * Iterate through available servers and if eppd is enabled
@@ -362,11 +378,21 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptem
 				&eppd_module);
 
 		if (sc->epp_enabled) {
+			sc->parser_server_ctx = parser_ctx;
+			at_least_one = 1;
 		}
 		s = s->next;
 	}
 
-	return (err_seen) ? HTTP_INTERNAL_SERVER_ERROR : OK;
+	if (err_seen) return HTTP_INTERNAL_SERVER_ERROR;
+
+	/*
+	 * If parser server context has been used at least once - keep it.
+	 * Otherwise free it.
+	 */
+	if (!at_least_one) epp_parser_init_cleanup(parser_ctx);
+
+	return OK;
 }
 
 static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)

@@ -86,10 +86,11 @@ int main(int argc, char *argv[])
 	epp_command_parms_out command_parms;
 	epp_greeting_parms_out greeting_parms;
 	void *conn_ctx;
+	void *server_ctx;
 	epp_parser_log *log_iter;
 
 	/* API: check libxml */
-	if (!epp_parser_init("schemas/all-1.0.xsd")) {
+	if ((server_ctx = epp_parser_init("schemas/all-1.0.xsd")) == NULL) {
 		fputs("Error in parser initialization\n", stderr);
 		return 1;
 	}
@@ -108,6 +109,10 @@ int main(int argc, char *argv[])
 
 	/* API: get connection context */
 	conn_ctx = epp_parser_connection();
+	if (conn_ctx == NULL) {
+		fputs("Error in connection initialization\n", stderr);
+		return 1;
+	}
 
 	while (1) {
 		fputs("Command: ", stderr);
@@ -130,7 +135,8 @@ int main(int argc, char *argv[])
 
 		bzero(&command_parms, sizeof command_parms);
 		/* API: process command */
-		epp_parser_command(conn_ctx, text, &command_parms);
+		epp_parser_command(server_ctx, conn_ctx, text, strlen(text),
+				&command_parms);
 
 		fputs("\nResults are:", stderr);
 		fprintf(stderr, "Status val is %d\n", command_parms.status);
@@ -152,7 +158,7 @@ int main(int argc, char *argv[])
 
 	/* API: clean up connection data */
 	epp_parser_connection_cleanup(conn_ctx);
-	epp_parser_init_cleanup();
+	epp_parser_init_cleanup(server_ctx);
 
 	return 0;
 }

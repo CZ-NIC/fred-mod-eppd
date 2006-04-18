@@ -7,6 +7,7 @@
 	<login>
 		<clID>clientA</clID>
 		<pw>hloupe-heslo</pw>
+		<newPW>nove-hl-heslo</newPW>
 		<options>
 			<version>1.0</version>
 			<lang>en</lang>
