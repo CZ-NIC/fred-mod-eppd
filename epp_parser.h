@@ -9,47 +9,100 @@
 #define EPP_PARSER_H
 
 /**
- * EPP status values (part of mod_eppd - xml_epp interface).
+ * EPP parser status values (part of mod_eppd - epp_parser interface).
  */
 typedef enum {
-	EPP_DEFAULT_STAT,
-	EPP_CLOSE_CONN
-} epp_status_t;
+	PARSER_OK,
+	/*
+	 * when following status values are returned, connection is closed
+	 */
+	/* request is not valid xml */
+	PARSER_NOT_XML,
+	/* request does not validate */
+	PARSER_NOT_VALID,
+	/* request is not a command */
+	PARSER_NOT_COMMAND,
+	/*
+	 * internal parser error (e.g. malloc failed). This error is
+	 * esspecialy serious, therefor its log severity SHOULD be higher
+	 * than of the others.
+	 */
+	PARSER_EINTERNAL
+} parser_status;
 
 /**
- * Log levels of messages from the parser. Mapping of epp log levels
- * to apache log levels is task of mod_eppd.
+ * Enumeration of all commands this software is able to handle.
  */
 typedef enum {
-	EPP_LOG_INFO,
-	EPP_LOG_WARNING,
-	EPP_LOG_ERROR
-} epp_parser_loglevel;
+	EPP_UNKNOWN_CMD,
+	/*
+	 * 'dummy' is not a command from point of view of epp client, but is
+	 * command from central repozitory's point of view
+	 */
+	EPP_DUMMY,
+	EPP_LOGIN,
+	EPP_LOGOUT
+} epp_command_type;
 
 /**
- * Every log message has log level and pointer to next message.
+ * circular string list
+ * sentinel has content == NULL
  */
-typedef struct Epp_parser_log epp_parser_log;
-struct Epp_parser_log {
-	epp_parser_log *next;
-	epp_parser_loglevel severity;
-	char *msg;
+struct stringlist {
+	char	*next;
+	char	*content;
 };
 
+/*
+ * macros for manipulation with stringlist
+ */
+#define SL_NEW(sl)	\
+	do {				\
+		(sl)->next = (sl);	\
+		(sl)->content = NULL;	\
+	} while(0)
+
+#define SL_ADD(sl, newsl)	\
+	do { 				\
+		(newsl)->next = (sl)->next;	\
+		(sl)->next = (newsl);		\
+	} while(0)
+
+#define FOR_EACH_SL(sl)	\
+	for ((sl) = (sl)->next; (sl)->content != NULL; (sl) = (sl)->next)
+
+#define PURGE_SL(sl)	\
+	do {				\
+		struct stringlist sl_temp;	\
+		for ((sl) = (sl)->next; (sl)->content != NULL;) {	\
+			sl_temp = (sl)->next;	\
+			free(sl->content);		\
+			free(sl);				\
+			(sl) = (sl_temp);		\
+		}				\
+	} while(0)
+
 /**
- * This structure gathers output parameters of epp_parser_process_request.
- * eppd_mod creates structure as such and parser manages the items
- * inside the struct.
- *
- * Head and last serve for log messages. The pointer "last" is there
- * for efficient message inserting to the end of log chain.
+ * This structure gathers outputs of parsing stage and serves as input
+ * for corba function call stage and then as input for response generation
+ * stage. Structure fits for all kinds of commands. And is self-identifing.
  */
 typedef struct {
-	char *response;
-	epp_parser_log *head;
-	epp_parser_log *last;
-	epp_status_t status;
-} epp_command_parms_out;
+	char	*clTRID;	/* client TRID - may be null */
+	char	*svTRID;	/* server TRID, must not be null */
+	int	rc;	/* epp return code */
+
+	epp_command_type type;
+	union {
+		/* additional login parameters */
+		struct {
+			char *clID;
+			char *pw;
+			char *newPW;
+			struct stringlist	*objuri; // currently not used
+			struct stringlist	*exturi; // currently not used
+		} login;
+} epp_command_data;
 
 /**
  * This structure gathers output parameters for epp_parser_get_greeting.
@@ -81,20 +134,6 @@ void *epp_parser_init(const char *url_schema);
 void epp_parser_init_cleanup(void *par);
 
 /**
- * This creates and returns context of epp connection, which is used
- * when handling subsequent requests.
- * @ret Connection context
- */
-void *epp_parser_connection(void);
-
-/**
- * Since mod_eppd doesn't know anything about connection context structure,
- * at the end of connection is called this routine, to do necessary cleanup.
- * @par Connection context to be cleaned up
- */
-void epp_parser_connection_cleanup(void *conn_ctx);
-
-/**
  * Routine makes up epp greeting frame. It is assumed that Output parameters
  * struct is filled by zeros upon function entry.
  *
@@ -112,18 +151,21 @@ void epp_parser_greeting(const char *svid, const char *svdate,
 void epp_parser_greeting_cleanup(epp_greeting_parms_out *parms);
 
 /**
- * Parses request and gets response.
- * @par	Server context
- * @par	Connection context
- * @par Request to be processed
- * @par Response containg xml, logs, status, ...
+ * Parses request and gets structured data.
+ * @par	session	Session ID
+ * @par	globs	Server context
+ * @par request	Request to be processed
+ * @par bytes	Length of request
+ * @par cdata 	Output of parsing
+ * @ret	Status of parsing
  */
-void epp_parser_command(
-		void *serv_ctx,
-		void *conn_ctx,
+parser_status
+epp_get_command(
+		int session,
+		epp_parser_globs globs,
 		const char *request,
 		unsigned bytes,
-		epp_command_parms_out *parms);
+		epp_command_data *cdata);
 
 /**
  * epp_parser_parms_out is allocated by mod_eppd but management of items inside
@@ -131,6 +173,6 @@ void epp_parser_command(
  * Routine assumes that parms_out is filled by zeros when called.
  * @par retval Structure to clean up
  */
-void epp_parser_command_cleanup(epp_command_parms_out *parms);
+void epp_command_data_cleanup(epp_command_data *cdata);
 
 #endif /* EPP_PARSER_H */
