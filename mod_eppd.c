@@ -13,6 +13,10 @@
 #include "apr_want.h"
 #include "apr_buckets.h"
 #include "apr_file_io.h"
+#ifndef APR_FOPEN_READ
+#define APR_FOPEN_READ	APR_READ
+#endif
+
 #include "apr_general.h"
 #include "apr_lib.h"	/* apr_isdigit() */
 #include "apr_pools.h"
@@ -22,7 +26,12 @@
 #include "scoreboard.h"
 #include "util_filter.h"
 
-#include "epp_parser.h"
+/*
+ * our header files
+ */
+#include "epp_common.h"
+#include "epp_xml.h"
+#include "epp-client.h"
 
 #define EPPD_VERSION	"testing"
 #define MAX_FRAME_LENGTH	16000
@@ -35,8 +44,11 @@ module AP_MODULE_DECLARE_DATA eppd_module;
  */
 typedef struct {
 	int	epp_enabled;
-	void	*parser_server_ctx;
-} eppd_server_conf;
+	char	*iorfile;
+	char	*ior;
+	void	*xml_globs;
+	void	*corba_globs;
+}eppd_server_conf;
 
 /**
  * This is wrapper function for compatibility reason. Apache 2.0 does
@@ -165,12 +177,19 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, int *bytes)
  */
 static int epp_process_connection(conn_rec *c)
 {
-	void	*ctx; /* connection context */
-	void	*server_ctx;
+	char	*greeting;
+	char	*genstring;
+	int	session;
 	int	rc;
+	int	logout;
+	parser_status	pstat;
+	corba_status	cstat;
+	gen_status	gstat;
+	epp_command_data	cdata;
+	char date[40]; /* should be enough for rfc822 date */
+
 	apr_bucket_brigade	*bb;
 	apr_status_t	status;
-	epp_greeting_parms_out greeting_parms;
 	server_rec	*s = c->base_server;
 	eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(s->module_config, &eppd_module);
@@ -191,15 +210,20 @@ static int epp_process_connection(conn_rec *c)
 	 * message since epp-tcp mapping does not mention it (opening connection
 	 * is enough).
 	 */
+	status = apr_rfc822_date(date, apr_time_now());
+	if (status != APR_SUCCESS) {
+		ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, c,
+				"Error when getting current date");
+		date[0] = 0;
+	}
 	bb = apr_brigade_create(c->pool, c->bucket_alloc);
-	bzero(&greeting_parms, sizeof greeting_parms);
-	epp_parser_greeting("Server name (ID)", "nejaky datum", &greeting_parms);
-	if (greeting_parms.error_msg != NULL) {
+	gstat = epp_gen_greeting("Server name (ID)", date, &greeting);
+	if (gstat != GEN_OK) {
 		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-			"Error when creating epp greeting: %s", greeting_parms.error_msg);
+			"Error when creating epp greeting");
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
-	apr_brigade_puts(bb, NULL, NULL, greeting_parms.greeting);
+	apr_brigade_puts(bb, NULL, NULL, greeting);
 
 	status = ap_fflush(c->output_filters, bb);
 	if (status != APR_SUCCESS) {
@@ -208,7 +232,7 @@ static int epp_process_connection(conn_rec *c)
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	epp_parser_greeting_cleanup(&greeting_parms);
+	epp_free_greeting(greeting);
 	ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
 			"epp greeting has been sent");
 
@@ -219,27 +243,19 @@ static int epp_process_connection(conn_rec *c)
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	/* get server context */
-	server_ctx = sc->parser_server_ctx;
-
-	/* create and initialize epp connetion context */
-	if ((ctx = epp_parser_connection()) == NULL) {
-		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-				"Could allocate epp_connection_ctx struct");
-		return HTTP_INTERNAL_SERVER_ERROR;
-	}
+	/* session value 0 means that the user is not logged in yet */
+	session = 0;
 
 	/*
 	 * process requests loop
 	 * termination conditions are embedded inside the loop
 	 */
 	rc = OK;
-	while (1) {
+	logout = 0;
+	while (!logout) {
 		char *request;
 		unsigned	bytes;
 		apr_pool_t	*rpool;
-		epp_parser_log	*log_iter;
-		epp_command_parms_out parser_out;
 
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
@@ -251,72 +267,95 @@ static int epp_process_connection(conn_rec *c)
 			break;
 		}
 
-		/* initialize structure for return values from parser */
-		bzero(&parser_out, sizeof parser_out);
+		/* initialize cdata structure */
+		bzero(&cdata, sizeof cdata);
 		/* deliver request to XML parser */
-		epp_parser_command(server_ctx, ctx, request, bytes, &parser_out);
+		pstat = epp_parse_command(session, sc->xml_globs, request,bytes, &cdata);
 
-		/* analyze parser's answer */
-		log_iter = parser_out.head;
-		while (log_iter) {
-			int log_level;
-
-			switch (log_iter->severity) {
-				case EPP_LOG_INFO:
-					log_level = APLOG_INFO;
+		/* analyze what happened */
+		if (pstat != PARSER_OK) {
+			switch (pstat) {
+				case PARSER_NOT_XML:
+					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
+							"Request is not XML");
+					rc = HTTP_BAD_REQUEST;
 					break;
-				case EPP_LOG_WARNING:
-					log_level = APLOG_WARNING;
+				case PARSER_NOT_VALID:
+					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
+							"Request doest not validate");
+					rc = HTTP_BAD_REQUEST;
 					break;
-				case EPP_LOG_ERROR:
-					log_level = APLOG_ERR;
+				case PARSER_NOT_COMMAND:
+					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
+							"Request is not a command");
+					rc = HTTP_BAD_REQUEST;
+					break;
+				case PARSER_EINTERNAL:
+					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+						"Internal parser error occured when processing request");
+					rc = HTTP_INTERNAL_SERVER_ERROR;
 					break;
 				default:
-					log_level = APLOG_DEBUG;
+					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+							"Unknown error occured during parsing stage");
+					rc = HTTP_BAD_REQUEST;
 					break;
 			}
-			ap_log_cerror(APLOG_MARK, log_level, status, c, "epp parser: %s",
-					log_iter->msg);
-			log_iter = log_iter->next;
+			return rc;
 		}
-		if (parser_out.response != NULL) {
-			/* send response back to client */
-			apr_brigade_puts(bb, NULL, NULL, parser_out.response);
 
-			status = ap_fflush(c->output_filters, bb);
-			if (status != APR_SUCCESS) {
-				ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-					"Error when sending response to client");
-				epp_parser_command_cleanup(&parser_out);
-				rc = HTTP_INTERNAL_SERVER_ERROR;
+		/* go ahead to corba function call */
+		switch (cdata.type) {
+			case EPP_LOGIN:
+				cstat = epp_call_login(sc->corba_globs, &session, &cdata);
+				if (cstat == CORBA_OK) {
+					gstat = epp_gen_login(sc->xml_globs, &cdata, &genstring);
+					if (gstat != GEN_OK) {
+						ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+								"XML Generator failed - terminating session");
+						epp_command_data_cleanup(&cdata);
+						return HTTP_INTERNAL_SERVER_ERROR;
+					}
+				}
+				/* corba failed */
+				else {
+					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+							"Corba call failed - terminating session");
+					epp_command_data_cleanup(&cdata);
+					return HTTP_INTERNAL_SERVER_ERROR;
+				}
 				break;
-			}
-
-			status = apr_brigade_cleanup(bb);
-			if (status != APR_SUCCESS) {
-				ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-					"Could not cleanup bucket brigade used for response");
-				epp_parser_command_cleanup(&parser_out);
-				rc = HTTP_INTERNAL_SERVER_ERROR;
-				break;
-			}
-		}
-		if (parser_out.status == EPP_CLOSE_CONN) {
-			ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
-					"Terminating epp session");
-			epp_parser_command_cleanup(&parser_out);
-			break;
+			default:
+				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+						"Unknown epp frame type - terminating session");
+				epp_command_data_cleanup(&cdata);
+				return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
-		epp_parser_command_cleanup(&parser_out);
+		epp_command_data_cleanup(&cdata);
+
+		/* send response back to client */
+		apr_brigade_puts(bb, NULL, NULL, genstring);
+		status = ap_fflush(c->output_filters, bb);
+		if (status != APR_SUCCESS) {
+			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+				"Error when sending response to client");
+			epp_free_genstring(genstring);
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+		epp_free_genstring(genstring);
+
+		status = apr_brigade_cleanup(bb);
+		if (status != APR_SUCCESS) {
+			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+				"Could not cleanup bucket brigade used for response");
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+
 		apr_pool_destroy(rpool);
 	}
 
-	epp_parser_connection_cleanup(ctx);
-	/* XXX temporary */
-	epp_parser_init_cleanup(server_ctx);
-
-	return rc;
+	return HTTP_OK;
 }
 
 /**
@@ -358,16 +397,9 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 		apr_pool_t *ptemp, server_rec *s)
 {
 	eppd_server_conf *sc;
+	void	*xml_globs;
+	void	*corba_globs;
 	char	err_seen = 0;
-	char	at_least_one = 0;
-	void	*parser_ctx;
-
-	/*
-	 * do checking and initialization of libxml
-	 */
-	parser_ctx = epp_parser_init("schemas/all-1.0.xsd");
-	if (parser_ctx == NULL)
-		return HTTP_INTERNAL_SERVER_ERROR;
 
 	/*
 	 * Iterate through available servers and if eppd is enabled
@@ -378,19 +410,39 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 				&eppd_module);
 
 		if (sc->epp_enabled) {
-			sc->parser_server_ctx = parser_ctx;
-			at_least_one = 1;
+			if (sc->iorfile == NULL) {
+				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, "EPPiorfile not configured");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+
+			/*
+			 * do initialization of xml
+			 */
+			xml_globs = epp_xml_init("schemas/all-1.0.xsd");
+			if (xml_globs == NULL) {
+				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+						"Could not initialize xml part");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+
+			/*
+			 * do initialization of corba
+			 */
+			corba_globs = epp_corba_init(sc->ior);
+			if (corba_globs == NULL) {
+				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+						"Corba initialization failed");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+
+
+			sc->xml_globs = xml_globs;
+			sc->corba_globs = corba_globs;
 		}
 		s = s->next;
 	}
 
 	if (err_seen) return HTTP_INTERNAL_SERVER_ERROR;
-
-	/*
-	 * If parser server context has been used at least once - keep it.
-	 * Otherwise free it.
-	 */
-	if (!at_least_one) epp_parser_init_cleanup(parser_ctx);
 
 	return OK;
 }
@@ -401,7 +453,8 @@ static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
     eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(s->module_config, &eppd_module);
 
-	const char *err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
+	const char *err = ap_check_cmd_context(cmd,
+			NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err) {
         return err;
     }
@@ -410,9 +463,62 @@ static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
     return NULL;
 }
 
+static const char *set_iorfile(cmd_parms *cmd, void *dummy,
+		const char *a1)
+{
+	const char *err;
+	char	buf[1001]; /* should be enough for ior */
+	apr_file_t	*f;
+	apr_size_t	nbytes;
+	apr_status_t	status;
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(s->module_config, &eppd_module);
+
+	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
+    if (err) return err;
+
+	/*
+	 * catch double definition of iorfile
+	 * that's not serious fault so we will just print message in log
+	 */
+	if (sc->iorfile != NULL) {
+		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+			"mod_eppd: more than one definition of iorfile. All but\
+			the first one will be ignored");
+		return NULL;
+	}
+
+	sc->iorfile = apr_pstrdup(cmd->pool, a1);
+
+	/* open file */
+	status = apr_file_open(&f, sc->iorfile, APR_FOPEN_READ,
+			APR_OS_DEFAULT, cmd->temp_pool);
+	if (status != APR_SUCCESS) {
+		return apr_psprintf(cmd->temp_pool,
+					"mod_eppd: could not open file %s (disclaimer)",
+					sc->iorfile);
+	}
+
+	/* read the file */
+	status = apr_file_read(f, (void *) buf, &nbytes);
+	buf[nbytes] = 0;
+	apr_file_close(f);
+	if (status != APR_EOF) {
+		return apr_psprintf(cmd->temp_pool,
+				"mod_eppd: error when reading file %s (disclaimer)",
+				sc->iorfile);
+	}
+	sc->ior = apr_pstrdup(cmd->pool, buf);
+
+    return NULL;
+}
+
 static const command_rec eppd_cmds[] = {
     AP_INIT_FLAG("EPPprotocol", set_epp_protocol, NULL, RSRC_CONF,
 			 "Whether this server is serving the epp protocol"),
+	AP_INIT_TAKE1("EPPiorfile", set_iorfile, NULL, RSRC_CONF,
+		 "File where is stored IOR of EPP service"),
     { NULL }
 };
 

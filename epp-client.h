@@ -2,74 +2,59 @@
 #define EPP_CLIENT_H
 
 /* possible return values from corba wrapper functions */
-typedef enum { ORB_OK, ORB_EINIT, ORB_EIMPORT, ORB_ESERVICE } orb_rc_t;
+typedef enum {
+	CORBA_OK,
+	CORBA_ERROR
+} corba_status;
 
 /*
- * corba service is initialized as part of connection context initialization.
- * Corba service handle which is opaque to xml parser
- * is used in subsequent corba function calls.
- * @par service Pointer for storing corba service
- * @par orb Pointer for storing global orb
- * @ret ORB_OK in case of success
+ * Corba global-like variables which is opaque to apache
+ * and are used in subsequent corba function calls are returned by this
+ * function.
+ * @par iorfile File where is stored service handle
+ * @ret corba_globs or NULL in case of failure
  */
-orb_rc_t corba_init(void **service, void **orb);
+void *epp_corba_init(const char *iorfile);
 
-/*
- * corba_cleanup releases service and global orb.
- * @par service Corba service
- * @par orb Global orb
+/**
+ * corba_init_cleanup releases global-like variables.
+ * @par corba_globs Corba global-like variables
  */
-void corba_cleanup(void *service, void *orb);
+void epp_corba_init_cleanup(void *corba_globs);
 
-/* from time to time we need to handle list of parameters */
-typedef struct stringlist_t stringlist;
-struct stringlist_t {
-	stringlist	*next;
-	char	*content;
-};
-
-/*
- * we need to obtain svTRID from central server for each reply,
- * even for error reporting replies. corba_dummy is used for it.
+/**
+ * Call corba login function. Note that session variable might be altered,
+ * this is not possible in other corba calls.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
  */
-typedef struct {
-	/* input parameters */
-	char *clTRID;
-	int	rc;
-	/* output parameters */
-	char *svTRID;
-} epp_data_dummy;
+corba_status
+epp_call_login(void *corba_globs, int *session, epp_command_data *cdata);
 
-orb_rc_t corba_dummy(void *service, int sessionID, epp_data_dummy *dummy_data);
+/**
+ * Call corba logout function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_logout(void *corba_globs, int session, epp_command_data *cdata);
 
-/* Session commands */
-typedef struct {
-	/* input parameters */
-	char *clID;
-	char *pw;
-	char *newPW;
-	char *clTRID;
-	stringlist	*objuri; // not used
-	stringlist	*exturi; // not used
-	/* output parameters */
-	char *svTRID;
-	int	rc;
-} epp_data_login;
+/**
+ * Call corba getsvTRID function. This is mostly used for generating error
+ * messages.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_dummy(void *corba_globs, int session, epp_command_data *cdata);
 
-orb_rc_t corba_login(void *service, int *sessionID, epp_data_login *login_data);
-
-typedef struct {
-	/* input parameters */
-	char *clTRID;
-	/* output parameters */
-	char *svTRID;
-	int	rc;
-} epp_data_logout;
-
-orb_rc_t
-corba_logout(void *service, int sessionID, epp_data_logout *logout_data);
-
-/* Query Commands */
+/* Query Commands
 typedef struct {
 	int dummy;
 } epp_data_check;
@@ -85,8 +70,9 @@ typedef struct {
 typedef struct {
 	int dummy;
 } epp_data_transfer_query;
+*/
 
-/* Tranfer Commands */
+/* Tranfer Commands
 typedef struct {
 	int dummy;
 } epp_data_create;
@@ -106,5 +92,6 @@ typedef struct {
 typedef struct {
 	int dummy;
 } epp_data_update;
+*/
 
 #endif /* EPP_CLIENT_H */

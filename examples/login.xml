@@ -5,9 +5,8 @@
      epp-1.0.xsd">
 <command>
 	<login>
-		<clID>clientA</clID>
-		<pw>hloupe-heslo</pw>
-		<newPW>nove-hl-heslo</newPW>
+		<clID>REG-LRR</clID>
+		<pw>123456789</pw>
 		<options>
 			<version>1.0</version>
 			<lang>en</lang>

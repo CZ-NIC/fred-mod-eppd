@@ -5,7 +5,7 @@ ORBIT-IDL-2	= orbit-idl-2
 PKG-CONFIG	= pkg-config
 
 IDLOUT	= ccReg.h ccReg-common.c ccReg-stubs.c
-OBJS	= mod_eppd.o epp_parser.o epp-client.o ccReg-common.o ccReg-stubs.o
+OBJS	= mod_eppd.o epp_xml.o epp-client.o ccReg-common.o ccReg-stubs.o
 IDL	= ../cr/idl/ccReg.idl
 
 ORB_LDFLAGS	= $(shell $(ORBIT2-CONFIG) --libs | sed -e s/-Wl,//g -e s/-pthread/-lpthread/g)
@@ -27,7 +27,7 @@ AP_LIBS	+=$(shell $(APR-CONFIG) --libs)
 
 AP_INSTALLDIR	= $(shell $(APXS) -q LIBEXECDIR)
 
-CFLAGS	= -g -O0 -fPIC -Wall
+CFLAGS	= -DNDEBUG -g -O0 -fPIC -Wall
 LDFLAGS	= -rpath $(AP_INSTALLDIR) -Bshareable
 
 build: mod_eppd.so
@@ -38,13 +38,13 @@ install: mod_eppd.so
 mod_eppd.so: $(OBJS)
 	ld -o mod_eppd.so $(LDFLAGS) $(AP_LDFLAGS) $(ORB_LDFLAGS) $(OBJS) $(AP_LIBS) $(XML_LIBS)
 
-mod_eppd.o:	mod_eppd.c epp_parser.h
+mod_eppd.o:	mod_eppd.c epp_xml.h epp_common.h epp-client.h
 	gcc $(CFLAGS) $(AP_CFLAGS) $(AP_INCLUDE) -c mod_eppd.c
 
-epp_parser.o: epp_parser.c epp_parser.h epp-client.h
-	gcc $(CFLAGS) $(XML_CFLAGS) -c epp_parser.c
+epp_xml.o: epp_xml.c epp_xml.h epp_common.h
+	gcc $(CFLAGS) $(XML_CFLAGS) -c epp_xml.c
 
-epp-client.o: epp-client.c epp-client.h ccReg.h
+epp-client.o: epp-client.c epp-client.h epp_common.h ccReg.h
 	gcc $(CFLAGS) $(ORB_CFLAGS) -c epp-client.c
 
 ccReg-common.o: ccReg-common.c ccReg.h
@@ -53,11 +53,11 @@ ccReg-common.o: ccReg-common.c ccReg.h
 ccReg-stubs.o: ccReg-stubs.c ccReg.h
 	gcc $(CFLAGS) $(ORB_CFLAGS) -c ccReg-stubs.c
 
-test_parser: test_parser.o epp_parser.o epp-client.o ccReg-common.o ccReg-stubs.o
-	gcc -o test_parser $(AP_LDFLAGS) $(ORB_LDFLAGS) test_parser.o epp_parser.o epp-client.o ccReg-common.o ccReg-stubs.o $(XML_LIBS)
+test: test.o epp_xml.o epp-client.o ccReg-common.o ccReg-stubs.o
+	gcc -o test -g -Wall $(ORB_LDFLAGS) test.o epp_xml.o epp-client.o ccReg-common.o ccReg-stubs.o $(XML_LIBS)
 
-test_parser.o: test_parser.c epp_parser.h
-	gcc -c -g -O0 -Wall -c test_parser.c
+test.o: test.c epp_common.h epp_xml.h epp-client.h
+	gcc -c -g -O0 -Wall -c test.c
 
 $(IDLOUT): $(IDL)
 	$(ORBIT-IDL-2) --noskels $(IDL)
@@ -65,7 +65,7 @@ $(IDLOUT): $(IDL)
 clean:
 	-rm -f $(OBJS)
 	-rm -f $(IDLOUT)
-	-rm -f test_parser test_parser.o
+	-rm -f test test.o
 	-rm -f 
 
 distclean: clean

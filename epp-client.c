@@ -2,16 +2,23 @@
  * Copyright statement ;)
  */
 
+#include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <orbit/orbit.h>
 
-/* This header file was generated from the idl */
-#include "ccReg.h"
+#include "epp_common.h"
 #include "epp-client.h"
+#include "ccReg.h"
 
 #define raised_exception(ev)	((ev)->_major != CORBA_NO_EXCEPTION)
 
+
+typedef struct {
+	CORBA_ORB	corba;
+	ccReg_EPP	service;
+}epp_corba_globs;
 
 /**
  * Read string from stream.
@@ -50,141 +57,133 @@ read_string_from_stream(FILE *stream)
 }
 
 
-/**
- * Import object from file.
- */
-static CORBA_Object
-import_object_from_file (CORBA_ORB orb, CORBA_char *filename,
-			      CORBA_Environment *ev)
-{
-	FILE         *file;
-	gchar        *objref;
-	CORBA_Object  obj = CORBA_OBJECT_NIL;
-
-	if ((file = fopen(filename, "r")) == NULL) {
-		ev->_major = CORBA_SYSTEM_EXCEPTION;
-		return CORBA_OBJECT_NIL;		
-	}
-	objref = read_string_from_stream(file);
-
-	if (!objref || strlen(objref) == 0) {
-		if (objref) g_free (objref);
-		ev->_major = CORBA_SYSTEM_EXCEPTION;
-		fclose (file);
-		return CORBA_OBJECT_NIL;		
-	}
-
-	obj = (CORBA_Object) CORBA_ORB_string_to_object(orb, objref, ev);
-	g_free (objref);
-
-	fclose (file);
-	return obj;
-}
- 
-orb_rc_t
-corba_init(void **service, void **orb)
+void *
+epp_corba_init(const char *ior)
 {
 	CORBA_ORB  global_orb = CORBA_OBJECT_NIL; /* global orb */
 	ccReg_EPP e_service = CORBA_OBJECT_NIL;
+	epp_corba_globs	*globs;
 	CORBA_Environment ev[1];
 	CORBA_exception_init(ev);
-	CORBA_char filename[] = "/tmp/ccReg.ref";
  
 	global_orb = CORBA_ORB_init(0, NULL, "orbit-local-orb", ev);
 	if (raised_exception(ev)) {
 		if (global_orb != CORBA_OBJECT_NIL) CORBA_ORB_destroy(global_orb, ev);
-		return ORB_EINIT;
+		return NULL;
 	}
 
-	e_service = (ccReg_EPP) import_object_from_file(global_orb, filename, ev);
+	e_service = (ccReg_EPP) CORBA_ORB_string_to_object(global_orb, ior, ev);
 	if (raised_exception(ev)) {
+		/* releasing managed object */
+		CORBA_Object_release(e_service, ev);
+		/* tear down the ORB */
+		if (global_orb != CORBA_OBJECT_NIL) CORBA_ORB_destroy(global_orb, ev);
+		return NULL;
+	}
+
+	if ((globs = malloc(sizeof *globs)) == NULL) {
 		/* releasing managed object */
 		CORBA_Object_release(e_service, ev);
 		/* tear down the ORB */
 		if (global_orb != CORBA_OBJECT_NIL)
 			CORBA_ORB_destroy(global_orb, ev);
-		return ORB_EIMPORT;
+		return NULL;
 	}
 
-	*orb = (void *) global_orb;
-	*service = (void *) e_service;
-	return ORB_OK;
+	globs->corba = global_orb;
+	globs->service = e_service;
+	return (void *) globs;
 }
 
 void
-corba_cleanup(void *service, void *orb)
+epp_corba_init_cleanup(void *corba_globs)
 {
 	CORBA_Environment ev[1];
+	epp_corba_globs	*globs = (epp_corba_globs *) corba_globs;
 	CORBA_exception_init(ev);
 
 	/* releasing managed object */
-	CORBA_Object_release((ccReg_EPP) service, ev);
+	CORBA_Object_release(globs->service, ev);
 	/* tear down the ORB */
-	CORBA_ORB_destroy((CORBA_ORB) orb, ev);
+	CORBA_ORB_destroy(globs->corba, ev);
+
+	free(globs);
 }
 
-orb_rc_t
-corba_login(void *service, int *sessionID, epp_data_login *login_data)
-{
-	CORBA_Environment ev[1];
-	ccReg_Response *response;
-	CORBA_exception_init(ev);
-	CORBA_long	num = 5;
-
-	//response = ccReg_EPP_ClientLogin((ccReg_EPP) service , login_data->clID,
-	//		login_data->clTRID, login_data->pw, login_data->newPW,
-	//		sessionID, ev);
-	response = ccReg_EPP_ClientLogin((ccReg_EPP) service , "hahaha",
-			"nejakepol", "nejakepol", "nejakepol", &num, ev);
-	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
-		return ORB_ESERVICE;
-	}
-
-	login_data->svTRID = strdup(response->svTRID);
-	login_data->rc = response->errCode;
-
-	CORBA_free(response);
-	return ORB_OK;
-}
-
-orb_rc_t
-corba_logout(void *service, int sessionID, epp_data_logout *logout_data)
+corba_status
+epp_call_login(void *globs, int *session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
 	CORBA_exception_init(ev);
 
-	response = ccReg_EPP_ClientLogout((ccReg_EPP) service , sessionID,
-			logout_data->clTRID, ev);
+	response = ccReg_EPP_ClientLogin(((epp_corba_globs *) globs)->service,
+			cdata->un.login.clID,
+			cdata->clTRID,
+			cdata->un.login.pw,
+			cdata->un.login.newPW,
+			session,
+			ev);
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
-		return ORB_ESERVICE;
+		return CORBA_ERROR;
 	}
 
-	logout_data->svTRID = strdup(response->svTRID);
-	logout_data->rc = response->errCode;
+	assert(cdata->svTRID);
+
+	cdata->svTRID = strdup(response->svTRID);
+	cdata->rc = response->errCode;
 
 	CORBA_free(response);
-	return ORB_OK;
+	return CORBA_OK;
 }
 
-orb_rc_t
-corba_dummy(void *service, int sessionID, epp_data_dummy *dummy_data)
+corba_status
+epp_call_logout(void *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
 	CORBA_exception_init(ev);
 
-	response = ccReg_EPP_GetTransaction((ccReg_EPP) service , sessionID,
-			dummy_data->clTRID, dummy_data->rc, ev);
+	response = ccReg_EPP_ClientLogout(((epp_corba_globs *) globs)->service,
+			session,
+			cdata->clTRID,
+			ev);
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
-		return ORB_ESERVICE;
+		return CORBA_ERROR;
 	}
 
-	dummy_data->svTRID = strdup(response->svTRID);
+	assert(cdata->svTRID);
+
+	cdata->svTRID = strdup(response->svTRID);
+	cdata->rc = response->errCode;
 
 	CORBA_free(response);
-	return ORB_OK;
+	return CORBA_OK;
+}
+
+corba_status
+epp_call_dummy(void *globs, int session, epp_command_data *cdata)
+{
+	CORBA_Environment ev[1];
+	ccReg_Response *response;
+	CORBA_exception_init(ev);
+
+	response = ccReg_EPP_GetTransaction(((epp_corba_globs *) globs)->service,
+			session,
+			cdata->clTRID,
+			cdata->rc,
+			ev);
+	if (raised_exception(ev)) {
+		/* do NOT try to free response even if not NULL -> segfault */
+		return CORBA_ERROR;
+	}
+
+	assert(cdata->svTRID);
+
+	cdata->svTRID = strdup(response->svTRID);
+
+	CORBA_free(response);
+	return CORBA_OK;
 }
