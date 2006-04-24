@@ -44,10 +44,11 @@ module AP_MODULE_DECLARE_DATA eppd_module;
  */
 typedef struct {
 	int	epp_enabled;
-	char	*iorfile;
-	char	*ior;
-	void	*xml_globs;
-	void	*corba_globs;
+	char	*iorfile;	/* file with corba object ref */
+	char	*ior;	/* object reference */
+	char	*schema;	/* URL of EPP schema */
+	void	*xml_globs;	/* variables needed for xml parser and generator */
+	void	*corba_globs;	/* variables needed for corba part */
 }eppd_server_conf;
 
 /**
@@ -306,23 +307,23 @@ static int epp_process_connection(conn_rec *c)
 
 		/* go ahead to corba function call */
 		switch (cdata.type) {
+			case EPP_DUMMY:
+				cstat = epp_call_dummy(sc->corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					gstat = epp_gen_dummy(sc->xml_globs, &cdata, &genstring);
+				}
+				break;
 			case EPP_LOGIN:
 				cstat = epp_call_login(sc->corba_globs, &session, &cdata);
 				if (cstat == CORBA_OK) {
 					gstat = epp_gen_login(sc->xml_globs, &cdata, &genstring);
-					if (gstat != GEN_OK) {
-						ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-								"XML Generator failed - terminating session");
-						epp_command_data_cleanup(&cdata);
-						return HTTP_INTERNAL_SERVER_ERROR;
-					}
 				}
-				/* corba failed */
-				else {
-					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-							"Corba call failed - terminating session");
-					epp_command_data_cleanup(&cdata);
-					return HTTP_INTERNAL_SERVER_ERROR;
+				break;
+			case EPP_LOGOUT:
+				cstat = epp_call_logout(sc->corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					if (cdata.rc == 1500) logout = 1;
+					gstat = epp_gen_logout(sc->xml_globs, &cdata, &genstring);
 				}
 				break;
 			default:
@@ -333,6 +334,24 @@ static int epp_process_connection(conn_rec *c)
 		}
 
 		epp_command_data_cleanup(&cdata);
+
+		/* catch corba failures */
+		if (cstat != CORBA_OK) {
+			if (cstat == CORBA_ERROR)
+				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+						"Corba call failed - terminating session");
+			else if (cstat == CORBA_ERROR)
+				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+						"Unqualified answer from server - terminating session");
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+
+		/* catch xml generator failures */
+		if (gstat != GEN_OK) {
+			ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+					"XML Generator failed - terminating session");
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
 
 		/* send response back to client */
 		apr_brigade_puts(bb, NULL, NULL, genstring);
@@ -418,7 +437,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 			/*
 			 * do initialization of xml
 			 */
-			xml_globs = epp_xml_init("schemas/all-1.0.xsd");
+			xml_globs = epp_xml_init(sc->schema);
 			if (xml_globs == NULL) {
 				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
 						"Could not initialize xml part");
@@ -496,20 +515,48 @@ static const char *set_iorfile(cmd_parms *cmd, void *dummy,
 			APR_OS_DEFAULT, cmd->temp_pool);
 	if (status != APR_SUCCESS) {
 		return apr_psprintf(cmd->temp_pool,
-					"mod_eppd: could not open file %s (disclaimer)",
+					"mod_eppd: could not open file %s (IOR)",
 					sc->iorfile);
 	}
 
 	/* read the file */
+	nbytes = 1000;
 	status = apr_file_read(f, (void *) buf, &nbytes);
 	buf[nbytes] = 0;
 	apr_file_close(f);
-	if (status != APR_EOF) {
+	if ((status != APR_SUCCESS) && (status != APR_EOF)) {
 		return apr_psprintf(cmd->temp_pool,
-				"mod_eppd: error when reading file %s (disclaimer)",
+				"mod_eppd: error when reading file %s (IOR)",
 				sc->iorfile);
 	}
 	sc->ior = apr_pstrdup(cmd->pool, buf);
+
+    return NULL;
+}
+
+static const char *set_schema(cmd_parms *cmd, void *dummy,
+		const char *a1)
+{
+	const char *err;
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(s->module_config, &eppd_module);
+
+	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
+    if (err) return err;
+
+	/*
+	 * catch double definition of iorfile
+	 * that's not serious fault so we will just print message in log
+	 */
+	if (sc->schema != NULL) {
+		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+			"mod_eppd: more than one definition of schema URL. All but\
+			the first one will be ignored");
+		return NULL;
+	}
+
+	sc->schema = apr_pstrdup(cmd->pool, a1);
 
     return NULL;
 }
@@ -519,6 +566,8 @@ static const command_rec eppd_cmds[] = {
 			 "Whether this server is serving the epp protocol"),
 	AP_INIT_TAKE1("EPPiorfile", set_iorfile, NULL, RSRC_CONF,
 		 "File where is stored IOR of EPP service"),
+	AP_INIT_TAKE1("EPPschema", set_schema, NULL, RSRC_CONF,
+		 "URL of XML schema of EPP protocol"),
     { NULL }
 };
 

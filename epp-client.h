@@ -4,7 +4,12 @@
 /* possible return values from corba wrapper functions */
 typedef enum {
 	CORBA_OK,
-	CORBA_ERROR
+	/* corba function call failed (e.g. server is not available) */
+	CORBA_ERROR,
+	/*
+	 * epp server is ok but cannot send qualified response because of an error
+	 */
+	CORBA_REMOTE_ERROR
 } corba_status;
 
 /*

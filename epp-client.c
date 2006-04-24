@@ -129,7 +129,14 @@ epp_call_login(void *globs, int *session, epp_command_data *cdata)
 		return CORBA_ERROR;
 	}
 
-	assert(cdata->svTRID);
+	/*
+	 * in case of an error of EPP server (CR) the svTRID field is
+	 * empty string
+	 */
+	if (*response->svTRID == '\0') {
+		CORBA_free(response);
+		return CORBA_REMOTE_ERROR;
+	}
 
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->rc = response->errCode;
@@ -154,7 +161,14 @@ epp_call_logout(void *globs, int session, epp_command_data *cdata)
 		return CORBA_ERROR;
 	}
 
-	assert(cdata->svTRID);
+	/*
+	 * in case of an error of EPP server (CR) the svTRID field is
+	 * empty string
+	 */
+	if (*response->svTRID == '\0') {
+		CORBA_free(response);
+		return CORBA_REMOTE_ERROR;
+	}
 
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->rc = response->errCode;
@@ -180,7 +194,14 @@ epp_call_dummy(void *globs, int session, epp_command_data *cdata)
 		return CORBA_ERROR;
 	}
 
-	assert(cdata->svTRID);
+	/*
+	 * in case of an error of EPP server (CR) the svTRID field is
+	 * empty string
+	 */
+	if (*response->svTRID == '\0') {
+		CORBA_free(response);
+		return CORBA_REMOTE_ERROR;
+	}
 
 	cdata->svTRID = strdup(response->svTRID);
 

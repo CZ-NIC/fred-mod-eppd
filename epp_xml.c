@@ -23,8 +23,14 @@
 #define NS_CONTACT	"urn:ietf:params:xml:ns:contact-1.0"
 #define NS_DOMAIN	"urn:ietf:params:xml:ns:domain-1.0"
 #define LOC_EPP	NS_EPP " epp-1.0.xsd"
-/* should be less than 255 since hash value is unsigned char */
-#define HASH_SIZE	60
+#define LOC_CONTACT	NS_CONTACT " contact-1.0.xsd"
+#define LOC_DOMAIN	NS_DOMAIN " domain-1.0.xsd"
+/*
+ * should be less than 255 since hash value is unsigned char.
+ * applies to both hashes (message and command hash)
+ */
+#define HASH_SIZE_MSG	60
+#define HASH_SIZE_CMD	30
 
 /*
  * Following macros are shortcuts used for document creation. So that
@@ -65,29 +71,48 @@
 		if (xmlTextWriterEndElement(writer) < 0) goto err_handler; \
 	}while(0)
 
+
 /**
- * Corba dummy call is generated so often that it is beneficial to create
- * macro for that.
- *
-#define COMMAND_DUMMY(_rc, _clTRID, _ctx, _parms)	\
-	do {										\
-		epp_data_dummy	dummy_data;				\
-		bzero(&dummy_data, sizeof dummy_data);	\
-		dummy_data.clTRID = (_clTRID);			\
-		dummy_data.rc = (_rc);					\
-
-			(_parms)->response = simple_response((_ctx)->server_ctx, (_rc), (_clTRID), dummy_data.svTRID, (_parms));\
-			free(dummy_data.svTRID);			\
-		}										\
-	}while(0)
+ * Enumeration of all implemented EPP commands as defined in rfc.
+ * This is REDuced form - without object suffix.
  */
+typedef enum {
+	EPP_RED_UNKNOWN_CMD,
+	EPP_RED_LOGIN,
+	EPP_RED_LOGOUT,
+	EPP_RED_CHECK,
+	EPP_RED_INFO,
+	EPP_RED_POLL,
+	EPP_RED_TRANSFER,
+	EPP_RED_CREATE,
+	EPP_RED_DELETE,
+	EPP_RED_RENEW,
+	EPP_RED_UPDATE
+}epp_red_command_type;
 
-/* item of hash table */
-typedef struct hash_item_t hash_item;
-struct hash_item_t {
-	hash_item	*next;
+/**
+ * Enumeration of obejcts this server operates on.
+ */
+typedef enum {
+	EPP_UNKNOWN_OBJ,
+	EPP_CONTACT,
+	EPP_DOMAIN
+}epp_object_type;
+
+/* item of message hash table */
+typedef struct msg_hash_item_t msg_hash_item;
+struct msg_hash_item_t {
+	msg_hash_item	*next;
 	int	rc;	/* hash key (return code) */
 	char	*msg;	/* message for the rc */
+};
+
+/* item of command hash table */
+typedef struct cmd_hash_item_t cmd_hash_item;
+struct cmd_hash_item_t {
+	cmd_hash_item	*next;
+	char	*key;	/* hash key (command name) */
+	epp_command_type	val;	/* hash value (command type) */
 };
 
 /**
@@ -99,7 +124,9 @@ struct hash_item_t {
 typedef struct {
 	xmlSchemaPtr schema; /* schema against which are validated requests */
 	/* hash table for mapping return codes to textual messages */
-	hash_item	*hash_msg[HASH_SIZE];
+	msg_hash_item	*hash_msg[HASH_SIZE_MSG];
+	/* hash table for quick command lookup */
+	cmd_hash_item	*hash_cmd[HASH_SIZE_CMD];
 }epp_xml_globs;
 
 
@@ -109,25 +136,44 @@ typedef struct {
  * @par rc input number to hash function
  * @ret hash value
  */
-static unsigned char get_rc_hash(int rc) {
+static unsigned char get_rc_hash(int rc)
+{
 	int	i;
 	unsigned char	hash = 0;
 	char	*rc_bytes = (char *) &rc;
 
 	/* return code has 4 digits */
 	for (i = 0; i < 4; i++) hash ^= rc_bytes[i];
-	return hash % HASH_SIZE;
+	return hash % HASH_SIZE_MSG;
 }
 
 /**
- * Function inserts item in hash table.
+ * Function makes xor of first 4 bytes of command name.
+ * We assume that command names are at least 4 bytes long and that there
+ * are no 2 command with the same first four letters - that's true for
+ * EPP commands.
+ * @par key Command name
+ * @ret Hash value
+ */
+static unsigned char get_cmd_hash(const char *key)
+{
+	int	i;
+	unsigned char	hash = 0;
+
+	/* return code has 4 digits */
+	for (i = 0; i < 4; i++) hash ^= key[i];
+	return hash % HASH_SIZE_CMD;
+}
+
+/**
+ * Function inserts item in message hash table.
  * @par key Input key for hash algorithm
  * @par msg Message associated with key
  * @ret Zero in case of success, one in case of failure
  */
-static char msg_hash_insert(hash_item *hash_msg[], int key, const char *msg)
+static char msg_hash_insert(msg_hash_item *hash_msg[], int key, const char *msg)
 {
-	hash_item	*hi;
+	msg_hash_item	*hi;
 	int	index;
 
 	assert(hash_msg != NULL);
@@ -147,13 +193,43 @@ static char msg_hash_insert(hash_item *hash_msg[], int key, const char *msg)
 }
 
 /**
- * This Routine does traditional hash lookup.
+ * Function inserts item in command hash table.
+ * @par key Input key for hash algorithm
+ * @par type Command type associated with given key
+ * @ret Zero in case of success, one in case of failure
+ */
+static char cmd_hash_insert(
+		cmd_hash_item *hash_cmd[],
+		const char *key,
+		epp_command_type type)
+{
+	cmd_hash_item	*hi;
+	int	index;
+
+	assert(hash_cmd != NULL);
+	assert(key != NULL);
+
+	if ((hi = malloc(sizeof *hi)) == NULL) return 0;
+	hi->val = type;
+	if ((hi->key = strdup(key)) == NULL) {
+		free(hi);
+		return 1;
+	}
+	index = get_cmd_hash(key);
+	hi->next = hash_cmd[index];
+	hash_cmd[index] = hi;
+
+	return 0;
+}
+
+/**
+ * This Routine does traditional hash lookup on message hash.
  * @par rc Result code (key) which is going to be translated
  * @ret Appropriate message (value)
  */
-static char *msg_hash_lookup(hash_item *hash_msg[], int rc)
+static char *msg_hash_lookup(msg_hash_item *hash_msg[], int rc)
 {
-	hash_item	*hi;
+	msg_hash_item	*hi;
 
 	assert(hash_msg != NULL);
 
@@ -169,22 +245,66 @@ static char *msg_hash_lookup(hash_item *hash_msg[], int rc)
 }
 
 /**
- * Function frees all items in hash table.
+ * This Routine does traditional hash lookup on command hash table.
+ * @par key Command name
+ * @ret Command type
+ */
+static epp_command_type
+cmd_hash_lookup(cmd_hash_item *hash_cmd[], const char *key)
+{
+	cmd_hash_item	*hi;
+
+	assert(hash_cmd != NULL);
+
+	/* iterate through hash chain */
+	for (hi = hash_cmd[get_cmd_hash(key)]; hi != NULL; hi = hi->next) {
+		if (!strncmp(hi->key, key, 4)) break;
+	}
+
+	/* did we find anything? */
+	if (hi) return hi->val;
+
+	return EPP_UNKNOWN_CMD;
+}
+
+/**
+ * Function frees all items in message hash table.
  */
 static void
-msg_hash_clean(hash_item *hash_msg[])
+msg_hash_clean(msg_hash_item *hash_msg[])
 {
-	hash_item	*tmp;
+	msg_hash_item	*tmp;
 	int	i;
 
 	assert(hash_msg != NULL);
 
-	for (i = 0; i < HASH_SIZE; i++) {
+	for (i = 0; i < HASH_SIZE_MSG; i++) {
 		while (hash_msg[i]) {
 			tmp = hash_msg[i]->next;
 			free(hash_msg[i]->msg);
 			free(hash_msg[i]);
 			hash_msg[i] = tmp;
+		}
+	}
+}
+
+/**
+ * Function frees all items in command hash table.
+ */
+static void
+cmd_hash_clean(cmd_hash_item *hash_cmd[])
+{
+	cmd_hash_item	*tmp;
+	int	i;
+
+	assert(hash_cmd != NULL);
+
+	for (i = 0; i < HASH_SIZE_CMD; i++) {
+		while (hash_cmd[i]) {
+			tmp = hash_cmd[i]->next;
+			free(hash_cmd[i]->key);
+			free(hash_cmd[i]);
+			hash_cmd[i] = tmp;
 		}
 	}
 }
@@ -205,6 +325,7 @@ void *epp_xml_init(const char *url_schema)
 	globs->schema = xmlSchemaParse(spctx);
 	xmlSchemaFreeParserCtxt(spctx);
 
+	/* initialize message hash table */
 	rc = 0;
 	rc |= msg_hash_insert(globs->hash_msg, 1000,
 			"Command completed successfully");
@@ -274,10 +395,28 @@ void *epp_xml_init(const char *url_schema)
 			"Authentication error; server closing connection");
 	rc |= msg_hash_insert(globs->hash_msg, 2502,
 			"Session limit exceeded; server closing connection");
-
 	if (rc) {
 		/* error has been spotted */
 		msg_hash_clean(globs->hash_msg);
+		return NULL;
+	}
+
+	/* initialize command hash table */
+	rc = 0;
+	rc |= cmd_hash_insert(globs->hash_cmd, "login", EPP_RED_LOGIN);
+	rc |= cmd_hash_insert(globs->hash_cmd, "logout", EPP_RED_LOGOUT);
+	rc |= cmd_hash_insert(globs->hash_cmd, "check", EPP_RED_CHECK);
+	rc |= cmd_hash_insert(globs->hash_cmd, "info", EPP_RED_INFO);
+	rc |= cmd_hash_insert(globs->hash_cmd, "poll", EPP_RED_POLL);
+	rc |= cmd_hash_insert(globs->hash_cmd, "transfer", EPP_RED_TRANSFER);
+	rc |= cmd_hash_insert(globs->hash_cmd, "create", EPP_RED_CREATE);
+	rc |= cmd_hash_insert(globs->hash_cmd, "delete", EPP_RED_DELETE);
+	rc |= cmd_hash_insert(globs->hash_cmd, "renew", EPP_RED_RENEW);
+	rc |= cmd_hash_insert(globs->hash_cmd, "update", EPP_RED_UPDATE);
+	if (rc) {
+		/* error has been spotted */
+		msg_hash_clean(globs->hash_msg);
+		cmd_hash_clean(globs->hash_cmd);
 		return NULL;
 	}
 
@@ -293,9 +432,11 @@ void epp_xml_init_cleanup(void *par)
 	assert(globs != NULL);
 	assert(globs->schema != NULL);
 	assert(globs->hash_msg != NULL);
+	assert(globs->hash_cmd != NULL);
 
 	xmlSchemaFree(globs->schema);
 	msg_hash_clean(globs->hash_msg);
+	cmd_hash_clean(globs->hash_cmd);
 	xmlCleanupParser();
 }
 
@@ -397,7 +538,7 @@ void epp_free_greeting(char *greeting)
  */
 static gen_status
 simple_response(
-		hash_item **hash_msg,
+		msg_hash_item **hash_msg,
 		int code,
 		const char *clTRID,
 		const char *svTRID,
@@ -593,7 +734,7 @@ parse_login(
 	}
 	nodeset = xpathObj->nodesetval;
 	if (nodeset != NULL) {
-		struct stringlist	*item;
+		struct circ_list	*item;
 		int	i;
 
 		if ((cdata->un.login.objuri = malloc(sizeof *item)) == NULL)
@@ -603,21 +744,23 @@ parse_login(
 			xmlXPathFreeObject(xpathObj);
 			return;
 		}
-		SL_NEW(cdata->un.login.objuri);
+		CL_NEW(cdata->un.login.objuri);
 		for (i = 0; i < nodeset->nodeNr; i++) {
 			/* allocate new item */
 			if ((item = malloc(sizeof *item)) == NULL) {
 				cdata->rc = 2400;
 				cdata->type = EPP_DUMMY;
 				xmlXPathFreeObject(xpathObj);
-				PURGE_SL(cdata->un.login.objuri);
+				CL_FOREACH(cdata->un.login.objuri)
+					free(cdata->un.login.objuri->content);
+				CL_PURGE(cdata->un.login.objuri);
 				return;
 			}
 			node = nodeset->nodeTab[i];
 			str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
 			/* enqueue objuri to list */
 			item->content = (char *) str;
-			SL_ADD(cdata->un.login.objuri, item);
+			CL_ADD(cdata->un.login.objuri, item);
 		}
 	}
 	xmlXPathFreeObject(xpathObj);
@@ -633,7 +776,7 @@ parse_login(
 	}
 	nodeset = xpathObj->nodesetval;
 	if (nodeset != NULL) {
-		struct stringlist	*item;
+		struct circ_list	*item;
 		int	i;
 
 		if ((cdata->un.login.exturi = malloc(sizeof *item)) == NULL) {
@@ -642,26 +785,103 @@ parse_login(
 			xmlXPathFreeObject(xpathObj);
 			return;
 		}
-		SL_NEW(cdata->un.login.exturi);
+		CL_NEW(cdata->un.login.exturi);
 		for (i = 0; i < nodeset->nodeNr; i++) {
 			/* allocate new item */
 			if ((item = malloc(sizeof *item)) == NULL) {
 				cdata->rc = 2400;
 				cdata->type = EPP_DUMMY;
 				xmlXPathFreeObject(xpathObj);
-				PURGE_SL(cdata->un.login.exturi);
+				CL_FOREACH(cdata->un.login.exturi)
+					free(cdata->un.login.exturi->content);
+				CL_PURGE(cdata->un.login.exturi);
 				return;
 			}
 			node = nodeset->nodeTab[i];
 			str = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
 			/* enqueue exturi to list */
 			item->content = (char *) str;
-			SL_ADD(cdata->un.login.exturi, item);
+			CL_ADD(cdata->un.login.exturi, item);
 		}
 	}
 	xmlXPathFreeObject(xpathObj);
 
 	cdata->type = EPP_LOGIN;
+	return;
+}
+
+/**
+ * Check contact parser.
+ * data in:
+ *   - names of objects to be checked
+ */
+static void
+parse_check_contact(
+		int session,
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+	xmlNodeSetPtr	nodeset;
+	xmlNode	*node;
+	stringbool	*strbool;
+	struct circ_list	*item;
+	int	i;
+
+	/* check if the user is logged in */
+	if (session == 0) {
+		cdata->type = EPP_DUMMY;
+		cdata->rc = 2002;
+		return;
+	}
+
+	xpathObj = xmlXPathEvalExpression(
+		BAD_CAST "/epp:epp/epp:command/epp:check/contact:check/contact:id",
+		xpathCtx);
+	if (xpathObj == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	nodeset = xpathObj->nodesetval;
+	assert(nodeset && nodeset->nodeNr > 0);
+
+	if ((cdata->un.check.idbools = malloc(sizeof *item)) == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		xmlXPathFreeObject(xpathObj);
+		return;
+	}
+	CL_NEW(cdata->un.check.idbools);
+	for (i = 0; i < nodeset->nodeNr; i++) {
+		/* allocate new string list item allocate new string-bool item */
+		if (((strbool = malloc(sizeof *strbool)) == NULL) ||
+			((item = malloc(sizeof *item)) == NULL))
+		{
+			if (item == NULL) free(strbool);
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			xmlXPathFreeObject(xpathObj);
+			/* free so far allocated items */
+			CL_FOREACH(cdata->un.check.idbools) {
+				free(((stringbool *)
+							cdata->un.check.idbools->content)->string);
+				free(cdata->un.check.idbools->content);
+			}
+			CL_PURGE(cdata->un.check.idbools);
+			return;
+		}
+		node = nodeset->nodeTab[i];
+		/* enqueue contact id to list */
+		strbool->string = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
+		strbool->boolean = 0;
+		item->content = (void *) strbool;
+		CL_ADD(cdata->un.check.idbools, item);
+	}
+	xmlXPathFreeObject(xpathObj);
+
+	cdata->type = EPP_CHECK_CONTACT;
 	return;
 }
 
@@ -692,10 +912,121 @@ epp_gen_dummy(void *globs, epp_command_data *cdata, char **result)
 			cdata->rc, cdata->clTRID, cdata->svTRID, result);
 }
 
+gen_status
+epp_gen_check_contact(void *globs, epp_command_data *cdata, char **result)
+{
+	xmlBufferPtr buf;
+	xmlTextWriterPtr writer;
+	char	*str;
+	char	res_code[5];
+	stringbool	*strbool;
+	char	error_seen = 1;
+	const char	*no = "0";
+	const char	*yes = "1";
+
+	assert(globs != NULL);
+	assert(cdata != NULL);
+
+	// make up response
+	buf = xmlBufferCreate();
+	if (buf == NULL) {
+		return GEN_EBUFFER;
+	}
+	writer = xmlNewTextWriterMemory(buf, 0);
+	if (writer == NULL) {
+		xmlBufferFree(buf);
+		return GEN_EWRITER;
+	}
+
+	START_DOCUMENT(writer, simple_err);
+
+	// epp header
+	START_ELEMENT(writer, simple_err, "epp");
+	WRITE_ATTRIBUTE(writer, simple_err, "xmlns", NS_EPP);
+	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:xsi", XSI);
+	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EPP);
+
+	// epp traditional part of response
+	START_ELEMENT(writer, simple_err, "response");
+	START_ELEMENT(writer, simple_err, "result");
+	snprintf(res_code, 5, "%d", cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
+	WRITE_ATTRIBUTE(writer, simple_err, "code", res_code);
+	WRITE_ELEMENT(writer, simple_err, "msg", str);
+	END_ELEMENT(writer, simple_err);
+
+	// specific part of response
+	START_ELEMENT(writer, simple_err, "resData");
+	START_ELEMENT(writer, simple_err, "contact:chkData");
+	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
+	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
+	CL_RESET(cdata->un.check.idbools);
+	CL_FOREACH(cdata->un.check.idbools) {
+		strbool = (stringbool *) cdata->un.check.idbools->content;
+		START_ELEMENT(writer, simple_err, "contact:cd");
+		WRITE_ELEMENT(writer, simple_err, "contact:id", strbool->string);
+		WRITE_ATTRIBUTE(writer, simple_err, "avail",
+				(strbool->boolean) ? yes : no);
+		END_ELEMENT(writer, simple_err);
+	}
+	END_ELEMENT(writer, simple_err);
+	START_ELEMENT(writer, simple_err, "trID");
+	if (cdata->clTRID)
+		WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
+	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
+	END_DOCUMENT(writer, simple_err);
+
+	error_seen = 0;
+
+simple_err:
+	xmlFreeTextWriter(writer);
+	if (error_seen) {
+		xmlBufferFree(buf);
+		return GEN_EBUILD;
+	}
+
+	*result = strdup(buf->content);
+	xmlBufferFree(buf);
+	return GEN_OK;
+}
+
 void epp_free_genstring(char *genstring)
 {
 	assert(genstring != NULL);
 	free(genstring);
+}
+
+/**
+ * Returns object type. In case of xpath error, function returns unknown
+ * object type which not apropriate :(, but simple and should not occure
+ * very often.
+ */
+static epp_object_type
+get_obj_type(xmlXPathContextPtr xpathCtx)
+{
+	xmlXPathObjectPtr	xpathObj;
+
+	xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:*/contact:*",
+			xpathCtx);
+	if (xpathObj == NULL)
+		return EPP_UNKNOWN_OBJ;
+	if (xpathObj->nodesetval != NULL || xpathObj->nodesetval->nodeNr > 0) {
+		xmlXPathFreeObject(xpathObj);
+		return EPP_CONTACT;
+	}
+
+	xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:*/domain:*",
+			xpathCtx);
+	if (xpathObj == NULL)
+		return EPP_UNKNOWN_OBJ;
+	if (xpathObj->nodesetval != NULL || xpathObj->nodesetval->nodeNr > 0) {
+		xmlXPathFreeObject(xpathObj);
+		return EPP_DOMAIN;
+	}
+
+	return EPP_UNKNOWN_OBJ;
 }
 
 parser_status
@@ -711,8 +1042,8 @@ epp_parse_command(
 	xmlSchemaValidCtxtPtr	svctx;
 	xmlXPathContextPtr	xpathCtx;
 	xmlXPathObjectPtr	xpathObj;
-	xmlChar	*command;
 	xmlNodeSetPtr	nodeset;
+	epp_red_command_type	cmd;
 	epp_xml_globs	*globs = (epp_xml_globs *) par_globs;
 
 	/* check input parameters */
@@ -762,8 +1093,18 @@ epp_parse_command(
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
+	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "contact", BAD_CAST NS_CONTACT)) {
+		xmlXPathFreeContext(xpathCtx);
+		xmlFreeDoc(doc);
+		return PARSER_EINTERNAL;
+	}
+	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "domain", BAD_CAST NS_DOMAIN)) {
+		xmlXPathFreeContext(xpathCtx);
+		xmlFreeDoc(doc);
+		return PARSER_EINTERNAL;
+	}
 
-	/* is it command? This question must be answered first */
+	/* is it a command? This question must be answered first */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:command",
 				xpathCtx);
 	if (xpathObj == NULL) {
@@ -778,9 +1119,6 @@ epp_parse_command(
 	}
 	xmlXPathFreeObject(xpathObj);
 
-	/*
-	 * command recognition part
-	 */
 	/* it is a command, get clTRID if there is any */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST
 			"/epp:epp/epp:command/epp:clTRID", xpathCtx);
@@ -794,12 +1132,14 @@ epp_parse_command(
 		cdata->clTRID = xmlNodeListGetString(doc,
 				nodeset->nodeTab[0]->xmlChildrenNode, 1);
 	else {
-		/* we cannot leave clTRID NULL */
+		/* we cannot leave clTRID NULL because of corba */
 		cdata->clTRID = xmlStrdup("");
 	}
 	xmlXPathFreeObject(xpathObj);
 
-	/* get command name */
+	/*
+	 * command recognition part
+	 */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:command/*",
 					xpathCtx);
 	if (xpathObj == NULL) {
@@ -810,29 +1150,52 @@ epp_parse_command(
 	}
 	nodeset = xpathObj->nodesetval;
 	assert(nodeset && nodeset->nodeNr);
-	command = xmlStrdup(nodeset->nodeTab[0]->name);
+
+	/* command lookup through hash table .. huraaa :) */
+	cmd = cmd_hash_lookup(globs->hash_cmd, nodeset->nodeTab[0]->name);
 	xmlXPathFreeObject(xpathObj);
 
-	/* compare command step by step (TODO optimize) */
-	if (xmlStrEqual(command, BAD_CAST "login")) {
-		parse_login(session, doc, xpathCtx, cdata);
-	}
-	else if (xmlStrEqual(command, BAD_CAST "logout")) {
-		/* check if the user is logged in */
-		if (session == 0) {
-			cdata->rc = 2002;
+	switch (cmd) {
+		epp_object_type	obj;
+
+		case EPP_RED_LOGIN:
+			parse_login(session, doc, xpathCtx, cdata);
+			break;
+		case EPP_RED_LOGOUT:
+			/* check if the user is logged in */
+			if (session == 0) {
+				cdata->rc = 2002;
+				cdata->type = EPP_DUMMY;
+			}
+			else {
+				cdata->type = EPP_LOGOUT;
+			}
+			break;
+		case EPP_RED_CHECK:
+			obj = get_obj_type(xpathCtx);
+			if (obj == EPP_CONTACT)
+				parse_check_contact(session, doc, xpathCtx, cdata);
+			else if (obj == EPP_DOMAIN)
+				parse_check_domain(session, doc, xpathCtx, cdata);
+			else {
+				cdata->rc = 2000;
+				cdata->type = EPP_DUMMY;
+			}
+			break;
+		case EPP_RED_INFO:
+		case EPP_RED_POLL:
+		case EPP_RED_TRANSFER:
+		case EPP_RED_CREATE:
+		case EPP_RED_DELETE:
+		case EPP_RED_RENEW:
+		case EPP_RED_UPDATE:
+		case EPP_RED_UNKNOWN_CMD:
+		default:
+			cdata->rc = 2000;
 			cdata->type = EPP_DUMMY;
-		}
-		else {
-			cdata->type = EPP_LOGOUT;
-		}
-	}
-	else {
-		cdata->rc = 2000;
-		cdata->type = EPP_DUMMY;
+			break;
 	}
 
-	xmlFree(command);
 	xmlXPathFreeContext(xpathCtx);
 	xmlFreeDoc(doc);
 	xmlMemoryDump();
@@ -856,8 +1219,26 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			free(cdata->un.login.clID);
 			free(cdata->un.login.pw);
 			free(cdata->un.login.newPW);
-			PURGE_SL(cdata->un.login.objuri);
-			PURGE_SL(cdata->un.login.exturi);
+			/* destroy objuri list */
+			CL_RESET(cdata->un.login.objuri);
+			CL_FOREACH(cdata->un.login.objuri)
+				free(cdata->un.login.objuri->content);
+			CL_PURGE(cdata->un.login.objuri);
+			/* destroy exturi list */
+			CL_RESET(cdata->un.login.exturi);
+			CL_FOREACH(cdata->un.login.exturi)
+				free(cdata->un.login.exturi->content);
+			CL_PURGE(cdata->un.login.exturi);
+			break;
+		case EPP_CHECK_CONTACT:
+			/* destroy ids and bools */
+			CL_RESET(cdata->un.check.idbools);
+			CL_FOREACH(cdata->un.check.idbools) {
+				free(( (stringbool *)
+							cdata->un.check.idbools->content)->string);
+				free(cdata->un.check.idbools->content);
+			}
+			CL_PURGE(cdata->un.check.idbools);
 		case EPP_LOGOUT:
 		case EPP_DUMMY:
 		default:
