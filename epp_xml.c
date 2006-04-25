@@ -811,12 +811,12 @@ parse_login(
 }
 
 /**
- * Check contact parser.
+ * <check> parser for domain and contact object.
  * data in:
  *   - names of objects to be checked
  */
 static void
-parse_check_contact(
+parse_check(
 		int session,
 		xmlDocPtr doc,
 		xmlXPathContextPtr xpathCtx,
@@ -826,6 +826,7 @@ parse_check_contact(
 	xmlNodeSetPtr	nodeset;
 	xmlNode	*node;
 	stringbool	*strbool;
+	epp_object_type	obj_type;
 	struct circ_list	*item;
 	int	i;
 
@@ -836,9 +837,51 @@ parse_check_contact(
 		return;
 	}
 
-	xpathObj = xmlXPathEvalExpression(
-		BAD_CAST "/epp:epp/epp:command/epp:check/contact:check/contact:id",
-		xpathCtx);
+	/* get object type - contact or domain */
+	xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:check/contact:check",
+			xpathCtx);
+	if (xpathObj == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+		xmlXPathFreeObject(xpathObj);
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+				"/epp:epp/epp:command/epp:check/domain:check",
+				xpathCtx);
+		if (xpathObj == NULL) {
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+			/* unexpected object type */
+			xmlXPathFreeObject(xpathObj);
+			cdata->rc = 2000;
+			cdata->type = EPP_DUMMY;
+		}
+		/* object is domain */
+		else obj_type = EPP_DOMAIN;
+	}
+	/* object is contact */
+	else obj_type = EPP_CONTACT;
+	xmlXPathFreeObject(xpathObj);
+
+	/*  --- code length optimization ---
+	 *  since contact and domain <check> have the same structure and the
+	 *  only difference is in names of two xml tags, the code for passing
+	 *  is mostly shared
+	 */
+	if (obj_type == EPP_CONTACT)
+		xpathObj = xmlXPathEvalExpression(
+			BAD_CAST "/epp:epp/epp:command/epp:check/contact:check/contact:id",
+			xpathCtx);
+	else
+		xpathObj = xmlXPathEvalExpression(
+			BAD_CAST "/epp:epp/epp:command/epp:check/domain:check/domain:name",
+			xpathCtx);
 	if (xpathObj == NULL) {
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
@@ -881,7 +924,162 @@ parse_check_contact(
 	}
 	xmlXPathFreeObject(xpathObj);
 
-	cdata->type = EPP_CHECK_CONTACT;
+	if (obj_type == EPP_CONTACT) cdata->type = EPP_CHECK_CONTACT;
+	else cdata->type = EPP_CHECK_DOMAIN;
+	return;
+}
+
+/**
+ * <info> parser for domain and contact object.
+ * Ignores authinfo.
+ */
+static void
+parse_info(
+		int session,
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+	xmlNodeSetPtr	nodeset;
+	xmlNode	*node;
+	epp_object_type	obj_type;
+
+	/* check if the user is logged in */
+	if (session == 0) {
+		cdata->type = EPP_DUMMY;
+		cdata->rc = 2002;
+		return;
+	}
+
+	/* get object type - contact or domain */
+	xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:info/contact:info",
+			xpathCtx);
+	if (xpathObj == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+		xmlXPathFreeObject(xpathObj);
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+				"/epp:epp/epp:command/epp:info/domain:info",
+				xpathCtx);
+		if (xpathObj == NULL) {
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+			/* unexpected object type */
+			xmlXPathFreeObject(xpathObj);
+			cdata->rc = 2000;
+			cdata->type = EPP_DUMMY;
+		}
+		/* object is domain */
+		else obj_type = EPP_DOMAIN;
+	}
+	/* object is contact */
+	else obj_type = EPP_CONTACT;
+	xmlXPathFreeObject(xpathObj);
+
+	/*  --- code length optimization ---
+	 *  since contact and domain <info> have the same structure and the
+	 *  only difference is in names of two xml tags, the code for passing
+	 *  is mostly shared
+	 */
+	if (obj_type == EPP_CONTACT)
+		xpathObj = xmlXPathEvalExpression(
+			BAD_CAST "/epp:epp/epp:command/epp:info/contact:info/contact:id",
+			xpathCtx);
+	else
+		xpathObj = xmlXPathEvalExpression(
+			BAD_CAST "/epp:epp/epp:command/epp:info/domain:info/domain:name",
+			xpathCtx);
+	if (xpathObj == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	nodeset = xpathObj->nodesetval;
+	assert(nodeset && nodeset->nodeNr == 1);
+
+	node = nodeset->nodeTab[0];
+	if (obj_type == EPP_CONTACT)
+		cdata->un.info_contact.id =
+			xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
+	else
+		cdata->un.info_domain.name =
+			xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
+	xmlXPathFreeObject(xpathObj);
+
+	if (obj_type == EPP_CONTACT) cdata->type = EPP_INFO_CONTACT;
+	else cdata->type = EPP_INFO_DOMAIN;
+	return;
+}
+
+/**
+ * <poll> parser.
+ */
+static void
+parse_poll(
+		int session,
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+	xmlNodeSetPtr	nodeset;
+	xmlNode	*node;
+	stringbool	*strbool;
+	struct circ_list	*item;
+	int	i;
+
+	/* check if the user is logged in */
+	if (session == 0) {
+		cdata->type = EPP_DUMMY;
+		cdata->rc = 2002;
+		return;
+	}
+
+	/* get poll type - request or acknoledge */
+	xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:poll[@op='req']",
+			xpathCtx);
+	if (xpathObj == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+		xmlXPathFreeObject(xpathObj);
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+				"/epp:epp/epp:command/epp:poll[@op='ack']",
+				xpathCtx);
+		if (xpathObj == NULL) {
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+			/* unexpected attr value */
+			xmlXPathFreeObject(xpathObj);
+			cdata->rc = 2000;
+			cdata->type = EPP_DUMMY;
+		}
+		/* it is request */
+		else {
+			xmlXPathFreeObject(xpathObj);
+			cdata->type = EPP_POLL_REQ;
+			return;
+		}
+	}
+	/* it is acknoledge */
+
+	/* XXX get value of attr msgID */
+
+	xmlXPathFreeObject(xpathObj);
 	return;
 }
 
@@ -912,8 +1110,16 @@ epp_gen_dummy(void *globs, epp_command_data *cdata, char **result)
 			cdata->rc, cdata->clTRID, cdata->svTRID, result);
 }
 
-gen_status
-epp_gen_check_contact(void *globs, epp_command_data *cdata, char **result)
+/**
+ * This routine is same for contact and domain object. Except small
+ * peaces the code is same. The fourth parameter is object type.
+ */
+static gen_status
+epp_gen_check(
+		void *globs,
+		epp_command_data *cdata,
+		char **result,
+		epp_object_type obj_type)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -923,9 +1129,6 @@ epp_gen_check_contact(void *globs, epp_command_data *cdata, char **result)
 	char	error_seen = 1;
 	const char	*no = "0";
 	const char	*yes = "1";
-
-	assert(globs != NULL);
-	assert(cdata != NULL);
 
 	// make up response
 	buf = xmlBufferCreate();
@@ -957,19 +1160,34 @@ epp_gen_check_contact(void *globs, epp_command_data *cdata, char **result)
 
 	// specific part of response
 	START_ELEMENT(writer, simple_err, "resData");
-	START_ELEMENT(writer, simple_err, "contact:chkData");
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
-	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
+	if (obj_type == EPP_CONTACT) {
+		START_ELEMENT(writer, simple_err, "contact:chkData");
+		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
+		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
+	}
+	else {
+		START_ELEMENT(writer, simple_err, "domain:chkData");
+		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
+		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_DOMAIN);
+	}
 	CL_RESET(cdata->un.check.idbools);
 	CL_FOREACH(cdata->un.check.idbools) {
 		strbool = (stringbool *) cdata->un.check.idbools->content;
-		START_ELEMENT(writer, simple_err, "contact:cd");
-		WRITE_ELEMENT(writer, simple_err, "contact:id", strbool->string);
+		if (obj_type == EPP_CONTACT) {
+			START_ELEMENT(writer, simple_err, "contact:cd");
+			WRITE_ELEMENT(writer, simple_err, "contact:id", strbool->string);
+		}
+		else {
+			START_ELEMENT(writer, simple_err, "domain:cd");
+			WRITE_ELEMENT(writer, simple_err, "domain:name", strbool->string);
+		}
 		WRITE_ATTRIBUTE(writer, simple_err, "avail",
 				(strbool->boolean) ? yes : no);
 		END_ELEMENT(writer, simple_err);
 	}
 	END_ELEMENT(writer, simple_err);
+
+	// traditional end of response
 	START_ELEMENT(writer, simple_err, "trID");
 	if (cdata->clTRID)
 		WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
@@ -990,43 +1208,58 @@ simple_err:
 	return GEN_OK;
 }
 
+gen_status
+epp_gen_check_contact(void *globs, epp_command_data *cdata, char **result)
+{
+	assert(globs != NULL);
+	assert(cdata != NULL);
+	return epp_gen_check(globs, cdata, result, EPP_CONTACT);
+}
+
+gen_status
+epp_gen_check_domain(void *globs, epp_command_data *cdata, char **result)
+{
+	assert(globs != NULL);
+	assert(cdata != NULL);
+	return epp_gen_check(globs, cdata, result, EPP_DOMAIN);
+}
+
+gen_status
+epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result);
+{
+	assert(globs != NULL);
+	assert(cdata != NULL);
+	return GEN_OK;
+}
+
+gen_status
+epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result);
+{
+	assert(globs != NULL);
+	assert(cdata != NULL);
+	return GEN_OK;
+}
+
+gen_status
+epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result);
+{
+	assert(globs != NULL);
+	assert(cdata != NULL);
+	return GEN_OK;
+}
+
+gen_status
+epp_gen_poll_ack(void *xml_globs, epp_command_data *cdata, char **result);
+{
+	assert(globs != NULL);
+	assert(cdata != NULL);
+	return GEN_OK;
+}
+
 void epp_free_genstring(char *genstring)
 {
 	assert(genstring != NULL);
 	free(genstring);
-}
-
-/**
- * Returns object type. In case of xpath error, function returns unknown
- * object type which not apropriate :(, but simple and should not occure
- * very often.
- */
-static epp_object_type
-get_obj_type(xmlXPathContextPtr xpathCtx)
-{
-	xmlXPathObjectPtr	xpathObj;
-
-	xpathObj = xmlXPathEvalExpression(BAD_CAST
-			"/epp:epp/epp:command/epp:*/contact:*",
-			xpathCtx);
-	if (xpathObj == NULL)
-		return EPP_UNKNOWN_OBJ;
-	if (xpathObj->nodesetval != NULL || xpathObj->nodesetval->nodeNr > 0) {
-		xmlXPathFreeObject(xpathObj);
-		return EPP_CONTACT;
-	}
-
-	xpathObj = xmlXPathEvalExpression(BAD_CAST
-			"/epp:epp/epp:command/epp:*/domain:*",
-			xpathCtx);
-	if (xpathObj == NULL)
-		return EPP_UNKNOWN_OBJ;
-	if (xpathObj->nodesetval != NULL || xpathObj->nodesetval->nodeNr > 0) {
-		xmlXPathFreeObject(xpathObj);
-		return EPP_DOMAIN;
-	}
-
-	return EPP_UNKNOWN_OBJ;
 }
 
 parser_status
@@ -1156,13 +1389,13 @@ epp_parse_command(
 	xmlXPathFreeObject(xpathObj);
 
 	switch (cmd) {
-		epp_object_type	obj;
-
 		case EPP_RED_LOGIN:
 			parse_login(session, doc, xpathCtx, cdata);
 			break;
 		case EPP_RED_LOGOUT:
-			/* check if the user is logged in */
+			/*
+			 * logout is so simple that we don't use dedicated parsing function
+			 */
 			if (session == 0) {
 				cdata->rc = 2002;
 				cdata->type = EPP_DUMMY;
@@ -1172,18 +1405,14 @@ epp_parse_command(
 			}
 			break;
 		case EPP_RED_CHECK:
-			obj = get_obj_type(xpathCtx);
-			if (obj == EPP_CONTACT)
-				parse_check_contact(session, doc, xpathCtx, cdata);
-			else if (obj == EPP_DOMAIN)
-				parse_check_domain(session, doc, xpathCtx, cdata);
-			else {
-				cdata->rc = 2000;
-				cdata->type = EPP_DUMMY;
-			}
+			parse_check(session, doc, xpathCtx, cdata);
 			break;
 		case EPP_RED_INFO:
+			parse_info(session, doc, xpathCtx, cdata);
+			break;
 		case EPP_RED_POLL:
+			parse_poll(session, doc, xpathCtx, cdata);
+			break;
 		case EPP_RED_TRANSFER:
 		case EPP_RED_CREATE:
 		case EPP_RED_DELETE:
@@ -1231,6 +1460,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			CL_PURGE(cdata->un.login.exturi);
 			break;
 		case EPP_CHECK_CONTACT:
+		case EPP_CHECK_DOMAIN:
 			/* destroy ids and bools */
 			CL_RESET(cdata->un.check.idbools);
 			CL_FOREACH(cdata->un.check.idbools) {
@@ -1239,6 +1469,14 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(cdata->un.check.idbools->content);
 			}
 			CL_PURGE(cdata->un.check.idbools);
+		case EPP_INFO_CONTACT:
+			free(cdata->un.info_contact.id);
+			break;
+		case EPP_INFO_DOMAIN:
+			free(cdata->un.info_domain.name);
+			break;
+		case EPP_POLL_REQ:
+		case EPP_POLL_ACK:
 		case EPP_LOGOUT:
 		case EPP_DUMMY:
 		default:

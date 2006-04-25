@@ -1,0 +1,9 @@
+This document describes differences between epp standard as described in
+rfc 3730, 3731, 3732, 3733 and our implementation.
+
+	*) Objects, which the client is willing to work with, are send according
+	to standard as part of <login> frame. In our implementation, client
+	after authentication can access any object, no matter what did he/she
+	sent in <login> frame.
+
+	*) AuthInfo in <info> for all objects is ignored.

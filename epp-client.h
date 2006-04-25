@@ -28,6 +28,17 @@ void *epp_corba_init(const char *iorfile);
 void epp_corba_init_cleanup(void *corba_globs);
 
 /**
+ * Call corba getsvTRID function. This is mostly used for generating error
+ * messages.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_dummy(void *corba_globs, int session, epp_command_data *cdata);
+
+/**
  * Call corba login function. Note that session variable might be altered,
  * this is not possible in other corba calls.
  * @par corba_globs Corba global-like variables
@@ -49,33 +60,65 @@ corba_status
 epp_call_logout(void *corba_globs, int session, epp_command_data *cdata);
 
 /**
- * Call corba getsvTRID function. This is mostly used for generating error
- * messages.
+ * Call corba check contact function.
  * @par corba_globs Corba global-like variables
  * @par session Session identifier
  * @par cdata Necessary input data
  * @ret CORBA_OK if succesful
  */
 corba_status
-epp_call_dummy(void *corba_globs, int session, epp_command_data *cdata);
+epp_call_check_contact(void *corba_globs, int session, epp_command_data *cdata);
 
-/* Query Commands
-typedef struct {
-	int dummy;
-} epp_data_check;
+/**
+ * Call corba check domain function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_check_domain(void *corba_globs, int session, epp_command_data *cdata);
 
-typedef struct {
-	int dummy;
-} epp_data_info;
+/**
+ * Call corba info contact function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_info_contact(void *corba_globs, int session, epp_command_data *cdata);
 
-typedef struct {
-	int dummy;
-} epp_data_poll;
+/**
+ * Call corba info domain function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_info_domain(void *corba_globs, int session, epp_command_data *cdata);
 
-typedef struct {
-	int dummy;
-} epp_data_transfer_query;
-*/
+/**
+ * Call corba poll request function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_poll_req(void *corba_globs, int session, epp_command_data *cdata);
+
+/**
+ * Call corba poll acknoledge function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_poll_ack(void *corba_globs, int session, epp_command_data *cdata);
+
 
 /* Tranfer Commands
 typedef struct {

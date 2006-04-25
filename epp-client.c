@@ -111,6 +111,38 @@ epp_corba_init_cleanup(void *corba_globs)
 }
 
 corba_status
+epp_call_dummy(void *globs, int session, epp_command_data *cdata)
+{
+	CORBA_Environment ev[1];
+	ccReg_Response *response;
+	CORBA_exception_init(ev);
+
+	response = ccReg_EPP_GetTransaction(((epp_corba_globs *) globs)->service,
+			session,
+			cdata->clTRID,
+			cdata->rc,
+			ev);
+	if (raised_exception(ev)) {
+		/* do NOT try to free response even if not NULL -> segfault */
+		return CORBA_ERROR;
+	}
+
+	/*
+	 * in case of an error of EPP server (CR) the svTRID field is
+	 * empty string
+	 */
+	if (*response->svTRID == '\0') {
+		CORBA_free(response);
+		return CORBA_REMOTE_ERROR;
+	}
+
+	cdata->svTRID = strdup(response->svTRID);
+
+	CORBA_free(response);
+	return CORBA_OK;
+}
+
+corba_status
 epp_call_login(void *globs, int *session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -119,9 +151,9 @@ epp_call_login(void *globs, int *session, epp_command_data *cdata)
 
 	response = ccReg_EPP_ClientLogin(((epp_corba_globs *) globs)->service,
 			cdata->un.login.clID,
-			cdata->clTRID,
 			cdata->un.login.pw,
 			cdata->un.login.newPW,
+			cdata->clTRID,
 			session,
 			ev);
 	if (raised_exception(ev)) {
@@ -178,19 +210,36 @@ epp_call_logout(void *globs, int session, epp_command_data *cdata)
 }
 
 corba_status
-epp_call_dummy(void *globs, int session, epp_command_data *cdata)
+epp_call_check_contact(void *corba_globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
+	ccReg_Contacts	*ids = ccReg_Contacts__alloc();
+	corba_status	ret;
+	int	len, i;
+
+	/* get number of contacts */
+	CL_LENGTH(cdata->un.check.idbools, len);
+	ids._buffer = ccReg_Contacts_allocbuf(len);
+	ids._length = len;
+	ids._maximum = len;
 	CORBA_exception_init(ev);
 
-	response = ccReg_EPP_GetTransaction(((epp_corba_globs *) globs)->service,
+	i = 0;
+	CL_FOREACH(cdata->un.check.idbools) {
+		ids._buffer[i++] = CORBA_string_dup(
+			((struct stringbools *) cdata->un.check.idbools)->string);
+	}
+
+	response = ccReg_EPP_ContactCheck(( (epp_corba_globs *) globs)->service,
+			ids,
+			/* bools */
 			session,
 			cdata->clTRID,
-			cdata->rc,
 			ev);
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
+		CORBA_free(ids);
 		return CORBA_ERROR;
 	}
 
@@ -198,13 +247,46 @@ epp_call_dummy(void *globs, int session, epp_command_data *cdata)
 	 * in case of an error of EPP server (CR) the svTRID field is
 	 * empty string
 	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+	if (*response->svTRID == '\0') ret = CORBA_REMOTE_ERROR;
+	else {
+		cdata->svTRID = strdup(response->svTRID);
+		cdata->rc = response->errCode;
+		ret = CORBA_OK;
 	}
 
-	cdata->svTRID = strdup(response->svTRID);
-
 	CORBA_free(response);
+	CORBA_free(ids);
+	CORBA_free(/*bools*/);
+
+	return ret;
+}
+
+corba_status
+epp_call_check_domain(void *corba_globs, int session, epp_command_data *cdata)
+{
+	return CORBA_OK;
+}
+
+corba_status
+epp_call_info_contact(void *corba_globs, int session, epp_command_data *cdata)
+{
+	return CORBA_OK;
+}
+
+corba_status
+epp_call_info_domain(void *corba_globs, int session, epp_command_data *cdata)
+{
+	return CORBA_OK;
+}
+
+corba_status
+epp_call_poll_req(void *corba_globs, int session, epp_command_data *cdata)
+{
+	return CORBA_OK;
+}
+
+corba_status
+epp_call_poll_ack(void *corba_globs, int session, epp_command_data *cdata)
+{
 	return CORBA_OK;
 }

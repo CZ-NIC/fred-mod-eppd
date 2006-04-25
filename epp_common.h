@@ -14,8 +14,13 @@ typedef enum {
 	EPP_DUMMY,
 	EPP_LOGIN,
 	EPP_LOGOUT,
-	EPP_CHECK_CONTACT
-} epp_command_type;
+	EPP_CHECK_CONTACT,
+	EPP_CHECK_DOMAIN,
+	EPP_INFO_CONTACT,
+	EPP_INFO_DOMAIN,
+	EPP_POLL_REQ,
+	EPP_POLL_ACK
+}epp_command_type;
 
 /**
  * Stringbool is combination of string and boolean. It is used in check
@@ -83,6 +88,10 @@ struct circ_list {
 		free(cl);							\
 	} while(0)
 
+/* count the number of items in the list */
+#define CL_LENGTH(cl, i)	\
+	for ((cl) = (cl)->next, i = 0; (cl)->content != NULL; (cl) = (cl)->next, i++)
+
 /**
  * This structure gathers outputs of parsing stage and serves as input
  * for corba function call stage and then as input for response generation
@@ -109,6 +118,65 @@ typedef struct {
 			/* ids (names) combined with bools */
 			struct circ_list	*idbools;
 		}check;
+		/* additional info contact parameters */
+		struct {
+			char	*id;
+			char	*roid;
+			struct circ_list	*status;
+			char	*name;
+			char	*org;
+			char	*street;
+			char	*sp;	/* state or province */
+			char	*pc;	/* postal code */
+			char	*cc;	/* country code */
+			char	*voice;
+			char	*fax;
+			char	*email;
+			char	*clID;
+			char	*crID;
+			long	*crDate;
+			char	*upID;
+			long	*upDate;
+			long	*trDate;
+			char	*authInfo;
+			char	discl_name;
+			char	discl_organization;
+			char	discl_address;
+			char	discl_telephone;
+			char	discl_fax;
+			char	discl_email;
+		}info_contact;
+		/* additional info domain parameters */
+		struct {
+			char	*name;
+			char	*roid;
+			struct circ_list	*status;
+			char	*registrant;
+			struct circ_list	*contacts;
+			char	*nsset;
+			char	*clID;
+			char	*crID;
+			long	*crDate;
+			long	*exDate;
+			char	*upID;
+			long	*upDate;
+			long	*trDate;
+			char	*authInfo;
+		}info_domain;
+		/* additional poll request parameters */
+		struct {
+			int	count;
+			int	msgid;
+			long	qdate;
+			char	*msg;
+			void	*specific_resdata;
+		}poll_req;
+		/* additional poll acknoledge parameters */
+		struct {
+			int	msgid;
+			int	count;
+			int	new_msgid;
+		}poll_ack;
 	}un;
 }epp_command_data;
 

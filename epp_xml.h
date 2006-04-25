@@ -115,6 +115,60 @@ gen_status
 epp_gen_dummy(void *xml_globs, epp_command_data *cdata, char **result);
 
 /**
+ * Generate check contact answer in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_check_contact(void *xml_globs, epp_command_data *cdata, char **result);
+
+/**
+ * Generate check domain answer in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_check_domain(void *xml_globs, epp_command_data *cdata, char **result);
+
+/**
+ * Generate info contact answer in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result);
+
+/**
+ * Generate info domain answer in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result);
+
+/**
+ * Generate poll request answer in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result);
+
+/**
+ * Generate poll acknoledge answer in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_poll_ack(void *xml_globs, epp_command_data *cdata, char **result);
+
+/**
  * free string allocated by generate functions.
  * @par genstring String to be freed
  */

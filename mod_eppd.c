@@ -326,6 +326,48 @@ static int epp_process_connection(conn_rec *c)
 					gstat = epp_gen_logout(sc->xml_globs, &cdata, &genstring);
 				}
 				break;
+			case EPP_CHECK_CONTACT:
+				cstat = epp_call_check_contact(sc->corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					gstat = epp_gen_check_contact(sc->xml_globs, &cdata,
+							&genstring);
+				}
+				break;
+			case EPP_CHECK_DOMAIN:
+				cstat = epp_call_check_domain(sc->corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					gstat = epp_gen_check_domain(sc->xml_globs, &cdata,
+							&genstring);
+				}
+				break;
+			case EPP_INFO_CONTACT:
+				cstat = epp_call_info_contact(sc->corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					gstat = epp_gen_info_contact(sc->xml_globs, &cdata,
+							&genstring);
+				}
+				break;
+			case EPP_INFO_DOMAIN:
+				cstat = epp_call_info_domain(sc->corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					gstat = epp_gen_info_domain(sc->xml_globs, &cdata,
+							&genstring);
+				}
+				break;
+			case EPP_POLL_REQ:
+				cstat = epp_call_poll_req(sc->corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					gstat = epp_gen_poll_req(sc->xml_globs, &cdata,
+							&genstring);
+				}
+				break;
+			case EPP_POLL_ACK:
+				cstat = epp_call_poll_ack(sc->corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					gstat = epp_gen_poll_ack(sc->xml_globs, &cdata,
+							&genstring);
+				}
+				break;
 			default:
 				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
 						"Unknown epp frame type - terminating session");

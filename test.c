@@ -55,11 +55,11 @@ int readfile(char *text)
 {
 	int c;
 	int i;
-	char filename[20];
+	char filename[50];
 	FILE *f;
 
 	fputs("type filename: ", stderr);
-	for (i = 0; (c = getchar()) != '\n' && i < 19; i++) {
+	for (i = 0; (c = getchar()) != '\n' && i < 49; i++) {
 		filename[i] = c;
 	}
 	filename[i] = 0;
@@ -212,6 +212,34 @@ int main(int argc, char *argv[])
 				if (cstat == CORBA_OK) {
 					/* API: generate dummy */
 					gstat = epp_gen_dummy(xml_globs, &cdata, &result);
+					if (gstat == GEN_OK) {
+						puts(result);
+						epp_free_genstring(result);
+					}
+					else fputs("Generator error\n", stderr);
+				}
+				else fputs("Corba call failed\n", stderr);
+				break;
+			case EPP_CHECK_CONTACT:
+				/* API: call check contact */
+				cstat = epp_call_check_contact(corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					/* API: generate check contact */
+					gstat = epp_gen_check_contact(xml_globs, &cdata, &result);
+					if (gstat == GEN_OK) {
+						puts(result);
+						epp_free_genstring(result);
+					}
+					else fputs("Generator error\n", stderr);
+				}
+				else fputs("Corba call failed\n", stderr);
+				break;
+			case EPP_CHECK_DOMAIN:
+				/* API: call check domain */
+				cstat = epp_call_check_domain(corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					/* API: generate check domain */
+					gstat = epp_gen_check_domain(xml_globs, &cdata, &result);
 					if (gstat == GEN_OK) {
 						puts(result);
 						epp_free_genstring(result);
