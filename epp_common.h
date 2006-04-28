@@ -23,6 +23,15 @@ typedef enum {
 }epp_command_type;
 
 /**
+ * Enumeration of objects this server operates on.
+ */
+typedef enum {
+	EPP_UNKNOWN_OBJ,
+	EPP_CONTACT,
+	EPP_DOMAIN
+}epp_object_type;
+
+/**
  * Stringbool is combination of string and boolean. It is used in check
  * commands as item of list.
  */
@@ -134,10 +143,10 @@ typedef struct {
 			char	*email;
 			char	*clID;
 			char	*crID;
-			long	*crDate;
+			long	crDate;
 			char	*upID;
-			long	*upDate;
-			long	*trDate;
+			long	upDate;
+			long	trDate;
 			char	*authInfo;
 			char	discl_name;
 			char	discl_organization;
@@ -156,11 +165,11 @@ typedef struct {
 			char	*nsset;
 			char	*clID;
 			char	*crID;
-			long	*crDate;
-			long	*exDate;
+			long	crDate;
+			long	exDate;
 			char	*upID;
-			long	*upDate;
-			long	*trDate;
+			long	upDate;
+			long	trDate;
 			char	*authInfo;
 		}info_domain;
 		/* additional poll request parameters */
@@ -169,7 +178,6 @@ typedef struct {
 			int	msgid;
 			long	qdate;
 			char	*msg;
-			void	*specific_resdata;
 		}poll_req;
 		/* additional poll acknoledge parameters */
 		struct {

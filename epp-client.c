@@ -209,34 +209,50 @@ epp_call_logout(void *globs, int session, epp_command_data *cdata)
 	return CORBA_OK;
 }
 
-corba_status
-epp_call_check_contact(void *corba_globs, int session, epp_command_data *cdata)
+/**
+ * <check> for different objects is so much similar that it is worth of
+ * having the code in one function and create just wrappers for different
+ * kinds of objects.
+ */
+static corba_status
+epp_call_check(void *globs, int session, epp_command_data *cdata,
+		epp_object_type obj)
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
-	ccReg_Contacts	*ids = ccReg_Contacts__alloc();
 	corba_status	ret;
 	int	len, i;
+	ccReg_Check	*ids = ccReg_Check__alloc();
+	ccReg_Avail	*bools;
 
 	/* get number of contacts */
 	CL_LENGTH(cdata->un.check.idbools, len);
-	ids._buffer = ccReg_Contacts_allocbuf(len);
-	ids._length = len;
-	ids._maximum = len;
+	ids->_buffer = ccReg_Check_allocbuf(len);
+	ids->_length = len;
+	ids->_maximum = len;
 	CORBA_exception_init(ev);
 
 	i = 0;
 	CL_FOREACH(cdata->un.check.idbools) {
-		ids._buffer[i++] = CORBA_string_dup(
-			((struct stringbools *) cdata->un.check.idbools)->string);
+		ids->_buffer[i++] = CORBA_string_dup(
+			((stringbool *) cdata->un.check.idbools->content)->string);
 	}
 
-	response = ccReg_EPP_ContactCheck(( (epp_corba_globs *) globs)->service,
-			ids,
-			/* bools */
-			session,
-			cdata->clTRID,
-			ev);
+	if (obj == EPP_CONTACT)
+		response = ccReg_EPP_ContactCheck(( (epp_corba_globs *) globs)->service,
+				ids,
+				&bools,
+				session,
+				cdata->clTRID,
+				ev);
+	else
+		response = ccReg_EPP_DomainCheck(( (epp_corba_globs *) globs)->service,
+				ids,
+				&bools,
+				session,
+				cdata->clTRID,
+				ev);
+
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_free(ids);
@@ -247,46 +263,59 @@ epp_call_check_contact(void *corba_globs, int session, epp_command_data *cdata)
 	 * in case of an error of EPP server (CR) the svTRID field is
 	 * empty string
 	 */
-	if (*response->svTRID == '\0') ret = CORBA_REMOTE_ERROR;
+	if (*response->svTRID == '\0') {
+		ret = CORBA_REMOTE_ERROR;
+	}
 	else {
 		cdata->svTRID = strdup(response->svTRID);
 		cdata->rc = response->errCode;
 		ret = CORBA_OK;
+		i = 0;
+		CL_FOREACH(cdata->un.check.idbools) {
+			((stringbool *) cdata->un.check.idbools->content)->boolean =
+				bools->_buffer[i++];
+		}
 	}
 
 	CORBA_free(response);
 	CORBA_free(ids);
-	CORBA_free(/*bools*/);
+	CORBA_free(bools);
 
 	return ret;
 }
 
 corba_status
-epp_call_check_domain(void *corba_globs, int session, epp_command_data *cdata)
+epp_call_check_contact(void *globs, int session, epp_command_data *cdata)
+{
+	return epp_call_check(globs, session, cdata, EPP_CONTACT);
+}
+
+corba_status
+epp_call_check_domain(void *globs, int session, epp_command_data *cdata)
+{
+	return epp_call_check(globs, session, cdata, EPP_DOMAIN);
+}
+
+corba_status
+epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 {
 	return CORBA_OK;
 }
 
 corba_status
-epp_call_info_contact(void *corba_globs, int session, epp_command_data *cdata)
+epp_call_info_domain(void *globs, int session, epp_command_data *cdata)
 {
 	return CORBA_OK;
 }
 
 corba_status
-epp_call_info_domain(void *corba_globs, int session, epp_command_data *cdata)
+epp_call_poll_req(void *globs, int session, epp_command_data *cdata)
 {
 	return CORBA_OK;
 }
 
 corba_status
-epp_call_poll_req(void *corba_globs, int session, epp_command_data *cdata)
-{
-	return CORBA_OK;
-}
-
-corba_status
-epp_call_poll_ack(void *corba_globs, int session, epp_command_data *cdata)
+epp_call_poll_ack(void *globs, int session, epp_command_data *cdata)
 {
 	return CORBA_OK;
 }

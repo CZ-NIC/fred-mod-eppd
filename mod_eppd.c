@@ -382,7 +382,7 @@ static int epp_process_connection(conn_rec *c)
 			if (cstat == CORBA_ERROR)
 				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
 						"Corba call failed - terminating session");
-			else if (cstat == CORBA_ERROR)
+			else if (cstat == CORBA_REMOTE_ERROR)
 				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
 						"Unqualified answer from server - terminating session");
 			return HTTP_INTERNAL_SERVER_ERROR;

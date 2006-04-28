@@ -53,17 +53,17 @@
 
 #define START_ELEMENT(writer, err_handler, elem)	\
 	do {										\
-		if (xmlTextWriterStartElement(writer, BAD_CAST elem) < 0) goto err_handler;	\
+		if (xmlTextWriterStartElement(writer, BAD_CAST (elem)) < 0) goto err_handler;	\
 	}while(0)
 
 #define WRITE_ELEMENT(writer, err_handler, elem, str)	\
 	do {										\
-		if (xmlTextWriterWriteElement(writer, BAD_CAST elem, BAD_CAST str) < 0) goto err_handler;	\
+		if (xmlTextWriterWriteElement(writer, BAD_CAST (elem), BAD_CAST (str)) < 0) goto err_handler;	\
 	}while(0)
 
 #define WRITE_ATTRIBUTE(writer, err_handler, attr_name, attr_value)	\
 	do {										\
-		if (xmlTextWriterWriteAttribute(writer, BAD_CAST attr_name, BAD_CAST attr_value) < 0) goto err_handler;	\
+		if (xmlTextWriterWriteAttribute(writer, BAD_CAST (attr_name), BAD_CAST (attr_value)) < 0) goto err_handler;	\
 	}while(0)
 
 #define END_ELEMENT(writer, err_handler)	\
@@ -89,15 +89,6 @@ typedef enum {
 	EPP_RED_RENEW,
 	EPP_RED_UPDATE
 }epp_red_command_type;
-
-/**
- * Enumeration of obejcts this server operates on.
- */
-typedef enum {
-	EPP_UNKNOWN_OBJ,
-	EPP_CONTACT,
-	EPP_DOMAIN
-}epp_object_type;
 
 /* item of message hash table */
 typedef struct msg_hash_item_t msg_hash_item;
@@ -1030,11 +1021,7 @@ parse_poll(
 		epp_command_data *cdata)
 {
 	xmlXPathObjectPtr	xpathObj;
-	xmlNodeSetPtr	nodeset;
-	xmlNode	*node;
-	stringbool	*strbool;
-	struct circ_list	*item;
-	int	i;
+	xmlChar	*str;
 
 	/* check if the user is logged in */
 	if (session == 0) {
@@ -1067,17 +1054,19 @@ parse_poll(
 			xmlXPathFreeObject(xpathObj);
 			cdata->rc = 2000;
 			cdata->type = EPP_DUMMY;
-		}
-		/* it is request */
-		else {
-			xmlXPathFreeObject(xpathObj);
-			cdata->type = EPP_POLL_REQ;
 			return;
 		}
+		/* it is acknoledge */
+		/* get value of attr msgID */
+		str = xmlGetNsProp(xpathObj->nodesetval->nodeTab[0],
+				BAD_CAST "msgID", NS_EPP);
+		/* conversion is safe, if str in not a number, validator catches it */
+		cdata->un.poll_ack.msgid = atoi(str);
+		xmlFree(str);
+		cdata->type = EPP_POLL_ACK;
 	}
-	/* it is acknoledge */
-
-	/* XXX get value of attr msgID */
+	/* it is request */
+	else cdata->type = EPP_POLL_REQ;
 
 	xmlXPathFreeObject(xpathObj);
 	return;
@@ -1127,8 +1116,6 @@ epp_gen_check(
 	char	res_code[5];
 	stringbool	*strbool;
 	char	error_seen = 1;
-	const char	*no = "0";
-	const char	*yes = "1";
 
 	// make up response
 	buf = xmlBufferCreate();
@@ -1179,10 +1166,13 @@ epp_gen_check(
 		}
 		else {
 			START_ELEMENT(writer, simple_err, "domain:cd");
+			/* XXX */
+			/* XXX */
+			/* XXX */
 			WRITE_ELEMENT(writer, simple_err, "domain:name", strbool->string);
 		}
-		WRITE_ATTRIBUTE(writer, simple_err, "avail",
-				(strbool->boolean) ? yes : no);
+		if (strbool->boolean) WRITE_ATTRIBUTE(writer, simple_err, "avail", "1");
+		else WRITE_ATTRIBUTE(writer, simple_err, "avail", "0");
 		END_ELEMENT(writer, simple_err);
 	}
 	END_ELEMENT(writer, simple_err);
@@ -1225,7 +1215,7 @@ epp_gen_check_domain(void *globs, epp_command_data *cdata, char **result)
 }
 
 gen_status
-epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result)
 {
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -1233,7 +1223,7 @@ epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result);
 }
 
 gen_status
-epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result)
 {
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -1241,7 +1231,7 @@ epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result);
 }
 
 gen_status
-epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result)
 {
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -1249,7 +1239,7 @@ epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result);
 }
 
 gen_status
-epp_gen_poll_ack(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_poll_ack(void *xml_globs, epp_command_data *cdata, char **result)
 {
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -1462,20 +1452,55 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 		case EPP_CHECK_CONTACT:
 		case EPP_CHECK_DOMAIN:
 			/* destroy ids and bools */
-			CL_RESET(cdata->un.check.idbools);
 			CL_FOREACH(cdata->un.check.idbools) {
 				free(( (stringbool *)
 							cdata->un.check.idbools->content)->string);
 				free(cdata->un.check.idbools->content);
 			}
 			CL_PURGE(cdata->un.check.idbools);
+			break;
 		case EPP_INFO_CONTACT:
 			free(cdata->un.info_contact.id);
+			free(cdata->un.info_contact.roid);
+			free(cdata->un.info_contact.name);
+			free(cdata->un.info_contact.org);
+			free(cdata->un.info_contact.street);
+			free(cdata->un.info_contact.sp);
+			free(cdata->un.info_contact.pc);
+			free(cdata->un.info_contact.cc);
+			free(cdata->un.info_contact.voice);
+			free(cdata->un.info_contact.fax);
+			free(cdata->un.info_contact.email);
+			free(cdata->un.info_contact.clID);
+			free(cdata->un.info_contact.crID);
+			free(cdata->un.info_contact.upID);
+			free(cdata->un.info_contact.authInfo);
+			/* status */
+			CL_FOREACH(cdata->un.info_contact.status)
+				free(cdata->un.info_contact.status->content);
+			CL_PURGE(cdata->un.info_contact.status);
 			break;
 		case EPP_INFO_DOMAIN:
 			free(cdata->un.info_domain.name);
+			free(cdata->un.info_domain.roid);
+			free(cdata->un.info_domain.registrant);
+			free(cdata->un.info_domain.nsset);
+			free(cdata->un.info_domain.clID);
+			free(cdata->un.info_domain.crID);
+			free(cdata->un.info_domain.upID);
+			free(cdata->un.info_domain.authInfo);
+			/* status */
+			CL_FOREACH(cdata->un.info_domain.status)
+				free(cdata->un.info_domain.status->content);
+			CL_PURGE(cdata->un.info_domain.status);
+			/* admin contacts */
+			CL_FOREACH(cdata->un.info_domain.contacts)
+				free(cdata->un.info_domain.contacts->content);
+			CL_PURGE(cdata->un.info_domain.contacts);
 			break;
 		case EPP_POLL_REQ:
+			free(cdata->un.poll_req.msg);
+			break;
 		case EPP_POLL_ACK:
 		case EPP_LOGOUT:
 		case EPP_DUMMY:
