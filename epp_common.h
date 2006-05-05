@@ -32,15 +32,6 @@ typedef enum {
 }epp_object_type;
 
 /**
- * Stringbool is combination of string and boolean. It is used in check
- * commands as item of list.
- */
-typedef struct {
-	char	*string;
-	int	boolean;
-}stringbool;
-
-/**
  * circular list of void pointers
  * sentinel has content == NULL
  */
@@ -63,6 +54,9 @@ struct circ_list {
 		(newcl)->next = (cl)->next;	\
 		(cl)->next = (newcl);		\
 	} while(0)
+
+#define CL_NEXT(cl)	((cl) = (cl)->next)
+#define CL_CONTENT(cl)	(cl)->content
 
 /*
  * caller must be sure that the list pointer is at the beginning when using
@@ -101,18 +95,57 @@ struct circ_list {
 #define CL_LENGTH(cl, i)	\
 	for ((cl) = (cl)->next, i = 0; (cl)->content != NULL; (cl) = (cl)->next, i++)
 
+
 /**
- * This structure gathers outputs of parsing stage and serves as input
- * for corba function call stage and then as input for response generation
- * stage. Structure fits for all kinds of commands. And is self-identifing.
+ * Structure gathers postal info about contact. Can be used for both -
+ * international and local address.
  */
 typedef struct {
+	char	*name;
+	char	*org;
+	char	*street1;
+	char	*street2;
+	char	*street3;
+	char	*city;
+	char	*sp;	/* state or province */
+	char	*pc;	/* postal code */
+	char	*cc;	/* country code */
+}epp_postalInfo;
+
+/**
+ * Disclose information concerning contact.
+ * All items inside are booleans.
+ */
+typedef struct {
+	char	name_int;
+	char	name_loc;
+	char	org_int;
+	char	org_loc;
+	char	addr_int;
+	char	addr_loc;
+	char	voice;
+	char	fax;
+	char	email;
+}epp_discl;
+
+/**
+ * This structure gathers outputs of parsing stage and serves as input
+ * for corba function call stage and after that as input for response
+ * generation stage. Structure fits for all kinds of commands. And is
+ * self-identifing.
+ */
+typedef struct {
+	/* this part is same for all commands */
 	char	*clTRID;	/* client TRID - may be null */
-	char	*svTRID;	/* server TRID, must not be null */
+	char	*svTRID;	/* server TRID, must not be null at the end */
 	int	rc;	/* epp return code */
 
 	epp_command_type type;
-	/* logout, dummy have no additional parameters */
+	/* logout and dummy have no additional parameters */
+	/*
+	 * input parameters
+	 * are allocated and initialized during parsing stage
+	 */
 	union {
 		/* additional login parameters */
 		struct {
@@ -124,68 +157,83 @@ typedef struct {
 		}login;
 		/* additional check contact and domain parameters */
 		struct {
-			/* ids (names) combined with bools */
-			struct circ_list	*idbools;
+			struct circ_list	*ids; /* ids of objects */
 		}check;
 		/* additional info contact parameters */
 		struct {
 			char	*id;
+		}info_contact;
+		/* additional info domain parameters */
+		struct {
+			char	*name;
+		}info_domain;
+		/* additional poll acknoledge parameters */
+		struct {
+			int	msgid;
+		}poll_ack;
+	}*in;
+	/*
+	 * output parameters
+	 * are allocated and initialized after corba function call and used
+	 * in response generator
+	 */
+	union {
+		/* additional check contact and domain parameters */
+		struct {
+			/* booleans are answers to check */
+			struct circ_list	*bools;
+		}check;
+		/* additional info contact parameters */
+		struct {
 			char	*roid;
 			struct circ_list	*status;
-			char	*name;
-			char	*org;
-			char	*street;
-			char	*sp;	/* state or province */
-			char	*pc;	/* postal code */
-			char	*cc;	/* country code */
+			epp_postalInfo	*postalInfo_int;
+			epp_postalInfo	*postalInfo_loc;
 			char	*voice;
 			char	*fax;
 			char	*email;
 			char	*clID;
 			char	*crID;
-			long	crDate;
+			long long	crDate;
 			char	*upID;
-			long	upDate;
-			long	trDate;
+			long long	upDate;
+			long long	trDate;
 			char	*authInfo;
-			char	discl_name;
-			char	discl_organization;
-			char	discl_address;
-			char	discl_telephone;
-			char	discl_fax;
-			char	discl_email;
+			char	*notify_email;
+			char	*vat;
+			char	*ssn;
+			epp_discl	*discl;
 		}info_contact;
 		/* additional info domain parameters */
 		struct {
-			char	*name;
 			char	*roid;
 			struct circ_list	*status;
 			char	*registrant;
-			struct circ_list	*contacts;
+			struct circ_list	*admin;
+			struct circ_list	*tech;
 			char	*nsset;
 			char	*clID;
 			char	*crID;
-			long	crDate;
-			long	exDate;
+			long long	crDate;
+			long long	exDate;
 			char	*upID;
-			long	upDate;
-			long	trDate;
+			long long	upDate;
+			long long	trDate;
 			char	*authInfo;
 		}info_domain;
 		/* additional poll request parameters */
 		struct {
 			int	count;
 			int	msgid;
-			long	qdate;
+			long long	qdate;
 			char	*msg;
 		}poll_req;
 		/* additional poll acknoledge parameters */
 		struct {
-			int	msgid;
 			int	count;
-			int	new_msgid;
+			int	msgid;
 		}poll_ack;
-	}un;
+	}*out;
 }epp_command_data;
 
 #endif

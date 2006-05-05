@@ -44,6 +44,7 @@ module AP_MODULE_DECLARE_DATA eppd_module;
  */
 typedef struct {
 	int	epp_enabled;
+	char	*servername;	/* epp server name in <greeting> */
 	char	*iorfile;	/* file with corba object ref */
 	char	*ior;	/* object reference */
 	char	*schema;	/* URL of EPP schema */
@@ -178,11 +179,11 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, int *bytes)
  */
 static int epp_process_connection(conn_rec *c)
 {
-	char	*greeting;
 	char	*genstring;
-	int	session;
+	int	session;	/* session = 0 when not autenticated yet */
 	int	rc;
-	int	logout;
+	int	logout;	/* if true, terminate request loop */
+	int	firsttime;	/* if true, generate greeting in request loop */
 	parser_status	pstat;
 	corba_status	cstat;
 	gen_status	gstat;
@@ -206,44 +207,7 @@ static int epp_process_connection(conn_rec *c)
 	/* add connection output filter */
 	ap_add_output_filter("EPP_OUTPUT_FILTER", NULL, NULL, c);
 
-	/*
-	 * Send epp greeting - note that we don't even try to read <hello>
-	 * message since epp-tcp mapping does not mention it (opening connection
-	 * is enough).
-	 */
-	status = apr_rfc822_date(date, apr_time_now());
-	if (status != APR_SUCCESS) {
-		ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, c,
-				"Error when getting current date");
-		date[0] = 0;
-	}
 	bb = apr_brigade_create(c->pool, c->bucket_alloc);
-	gstat = epp_gen_greeting("Server name (ID)", date, &greeting);
-	if (gstat != GEN_OK) {
-		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-			"Error when creating epp greeting");
-		return HTTP_INTERNAL_SERVER_ERROR;
-	}
-	apr_brigade_puts(bb, NULL, NULL, greeting);
-
-	status = ap_fflush(c->output_filters, bb);
-	if (status != APR_SUCCESS) {
-		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-			"Error when sending greeting to client");
-		return HTTP_INTERNAL_SERVER_ERROR;
-	}
-
-	epp_free_greeting(greeting);
-	ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
-			"epp greeting has been sent");
-
-	status = apr_brigade_cleanup(bb);
-	if (status != APR_SUCCESS) {
-		ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-				"Could not cleanup bucket brigade used for greeting");
-		return HTTP_INTERNAL_SERVER_ERROR;
-	}
-
 	/* session value 0 means that the user is not logged in yet */
 	session = 0;
 
@@ -253,6 +217,7 @@ static int epp_process_connection(conn_rec *c)
 	 */
 	rc = OK;
 	logout = 0;
+	firsttime = 1;
 	while (!logout) {
 		char *request;
 		unsigned	bytes;
@@ -262,51 +227,41 @@ static int epp_process_connection(conn_rec *c)
 		apr_pool_create(&rpool, c->pool);
 		apr_pool_tag(rpool, "EPP_request");
 
-		/* read request */
-		if (!epp_read_request(rpool, c, &request, &bytes)) {
-			rc = HTTP_INTERNAL_SERVER_ERROR;
-			break;
-		}
-
-		/* initialize cdata structure */
-		bzero(&cdata, sizeof cdata);
-		/* deliver request to XML parser */
-		pstat = epp_parse_command(session, sc->xml_globs, request,bytes, &cdata);
-
-		/* analyze what happened */
-		if (pstat != PARSER_OK) {
-			switch (pstat) {
-				case PARSER_NOT_XML:
-					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
-							"Request is not XML");
-					rc = HTTP_BAD_REQUEST;
-					break;
-				case PARSER_NOT_VALID:
-					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
-							"Request doest not validate");
-					rc = HTTP_BAD_REQUEST;
-					break;
-				case PARSER_NOT_COMMAND:
-					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
-							"Request is not a command");
-					rc = HTTP_BAD_REQUEST;
-					break;
-				case PARSER_EINTERNAL:
-					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-						"Internal parser error occured when processing request");
-					rc = HTTP_INTERNAL_SERVER_ERROR;
-					break;
-				default:
-					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-							"Unknown error occured during parsing stage");
-					rc = HTTP_BAD_REQUEST;
-					break;
+		if (!firsttime) {
+			/* read request */
+			if (!epp_read_request(rpool, c, &request, &bytes)) {
+				rc = HTTP_INTERNAL_SERVER_ERROR;
+				break;
 			}
-			return rc;
+
+			/* initialize cdata structure */
+			bzero(&cdata, sizeof cdata);
+			/* deliver request to XML parser */
+			pstat = epp_parse_command(session, sc->xml_globs, request, bytes,
+					&cdata);
+		}
+		else {
+			/*
+			 * bogus branch in order to generate greeting when firsttime
+			 * in request loop
+			 */
+			firsttime = 0;
+			pstat = PARSER_HELLO;
 		}
 
-		/* go ahead to corba function call */
-		switch (cdata.type) {
+		/* is it <hello> frame? */
+		if (pstat == PARSER_HELLO) {
+			gstat = epp_gen_greeting(sc->server_name, &genstring);
+			if (gstat != GEN_OK) {
+				ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+					"Error when creating epp greeting");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+		}
+		/* is it a command? */
+		else if (pstat == PARSER_OK) {
+			/* go ahead to corba function call */
+			switch (cdata.type) {
 			case EPP_DUMMY:
 				cstat = epp_call_dummy(sc->corba_globs, session, &cdata);
 				if (cstat == CORBA_OK) {
@@ -373,26 +328,62 @@ static int epp_process_connection(conn_rec *c)
 						"Unknown epp frame type - terminating session");
 				epp_command_data_cleanup(&cdata);
 				return HTTP_INTERNAL_SERVER_ERROR;
-		}
+			}
 
-		epp_command_data_cleanup(&cdata);
+			epp_command_data_cleanup(&cdata);
 
-		/* catch corba failures */
-		if (cstat != CORBA_OK) {
-			if (cstat == CORBA_ERROR)
+			/* catch corba failures */
+			if (cstat != CORBA_OK) {
+				if (cstat == CORBA_ERROR)
+					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+							"Corba call failed - terminating session");
+				else if (cstat == CORBA_REMOTE_ERROR)
+					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+							"Unqualified answer from server - terminating session");
+				else if (cstat == CORBA_INT_ERROR)
+					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+							"Malloc in corba wrapper failed");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+
+			/* catch xml generator failures */
+			if (gstat != GEN_OK) {
 				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-						"Corba call failed - terminating session");
-			else if (cstat == CORBA_REMOTE_ERROR)
-				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-						"Unqualified answer from server - terminating session");
-			return HTTP_INTERNAL_SERVER_ERROR;
-		}
+						"XML Generator failed - terminating session");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
 
-		/* catch xml generator failures */
-		if (gstat != GEN_OK) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-					"XML Generator failed - terminating session");
-			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+		/* failure which will close connection */
+		else {
+			switch (pstat) {
+				case PARSER_NOT_XML:
+					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
+							"Request is not XML");
+					rc = HTTP_BAD_REQUEST;
+					break;
+				case PARSER_NOT_VALID:
+					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
+							"Request doest not validate");
+					rc = HTTP_BAD_REQUEST;
+					break;
+				case PARSER_NOT_COMMAND:
+					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
+							"Request is not a command");
+					rc = HTTP_BAD_REQUEST;
+					break;
+				case PARSER_EINTERNAL:
+					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+						"Internal parser error occured when processing request");
+					rc = HTTP_INTERNAL_SERVER_ERROR;
+					break;
+				default:
+					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+							"Unknown error occured during parsing stage");
+					rc = HTTP_BAD_REQUEST;
+					break;
+			}
+			return rc;
 		}
 
 		/* send response back to client */
@@ -415,7 +406,6 @@ static int epp_process_connection(conn_rec *c)
 
 		apr_pool_destroy(rpool);
 	}
-
 	return HTTP_OK;
 }
 

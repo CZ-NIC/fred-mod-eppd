@@ -286,11 +286,11 @@
 
     <simpleType name="transferOpType">
       <restriction base="token">
+        <enumeration value="request"/>
         <enumeration value="approve"/>
         <enumeration value="cancel"/>
         <enumeration value="query"/>
         <enumeration value="reject"/>
-        <enumeration value="request"/>
       </restriction>
     </simpleType>
 

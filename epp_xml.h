@@ -7,6 +7,11 @@
 typedef enum {
 	PARSER_OK,
 	/*
+	 * request is not command but <hello> frame
+	 * this indicates that greeting should be generated
+	 */
+	PARSER_HELLO,
+	/*
 	 * when following status values are returned, connection is closed
 	 */
 	/* request is not valid xml */
@@ -53,24 +58,6 @@ void *epp_xml_init(const char *url_schema);
 void epp_xml_init_cleanup(void *par);
 
 /**
- * Routine makes up epp greeting frame. It is assumed that Output parameters
- * struct is filled by zeros upon function entry.
- *
- * @par svid EPP server ID
- * @par svdate When the greeting was generated
- * @par greeting Greeting frame
- * @ret GEN_OK or other status in case of failure
- */
-gen_status epp_gen_greeting(const char *svid, const char *svdate,
-		char **greeting);
-
-/**
- * Let the parser take care of allocated output parameters.
- * @par Greeting Greeting string to be freed
- */
-void epp_free_greeting(char *greeting);
-
-/**
  * Parses request and gets structured data.
  * @par	session	Session ID
  * @par	globs	Server context
@@ -86,6 +73,17 @@ epp_parse_command(
 		const char *request,
 		unsigned bytes,
 		epp_command_data *cdata);
+
+/**
+ * Routine makes up epp greeting frame. It is assumed that Output parameters
+ * struct is filled by zeros upon function entry.
+ *
+ * @par svid EPP server ID
+ * @par svdate When the greeting was generated
+ * @par greeting Greeting frame
+ * @ret GEN_OK or other status in case of failure
+ */
+gen_status epp_gen_greeting(const char *svid, char **greeting);
 
 /**
  * Generate login answer in XML format.

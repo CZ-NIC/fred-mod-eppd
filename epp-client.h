@@ -6,6 +6,8 @@ typedef enum {
 	CORBA_OK,
 	/* corba function call failed (e.g. server is not available) */
 	CORBA_ERROR,
+	/* this should be really unusual (e.g. malloc failed) */
+	CORBA_INT_ERROR,
 	/*
 	 * epp server is ok but cannot send qualified response because of an error
 	 */
