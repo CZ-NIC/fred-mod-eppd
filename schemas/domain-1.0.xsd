@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="urn:ietf:params:xml:ns:domain-1.0"
-          xmlns:domain="urn:ietf:params:xml:ns:domain-1.0"
-          xmlns:host="urn:ietf:params:xml:ns:host-1.0"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/domain-1.0"
+          xmlns:domain="http://www.nic.cz/xml/epp/domain-1.0"
           xmlns:epp="urn:ietf:params:xml:ns:epp-1.0"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
           xmlns="http://www.w3.org/2001/XMLSchema"
@@ -15,8 +14,6 @@
             schemaLocation="eppcom-1.0.xsd"/>
     <import namespace="urn:ietf:params:xml:ns:epp-1.0"
             schemaLocation="epp-1.0.xsd"/>
-    <import namespace="urn:ietf:params:xml:ns:host-1.0"
-            schemaLocation="host-1.0.xsd"/>
 
     <annotation>
       <documentation>
@@ -44,7 +41,7 @@
         <element name="name" type="eppcom:labelType"/>
         <element name="period" type="domain:periodType"
          minOccurs="0"/>
-        <element name="ns" type="domain:nsType"
+        <element name="nsset" type="eppcom:labelType"
          minOccurs="0"/>
         <element name="registrant" type="eppcom:clIDType"
          minOccurs="0"/>
@@ -77,25 +74,6 @@
       </restriction>
     </simpleType>
 
-    <complexType name="nsType">
-      <choice>
-        <element name="hostObj" type="eppcom:labelType"
-         maxOccurs="unbounded"/>
-        <element name="hostAttr" type="domain:hostAttrType"
-         maxOccurs="unbounded"/>
-      </choice>
-    </complexType>
-  <!--
-  Name servers are either host objects or attributes.
-  -->
-
-    <complexType name="hostAttrType">
-      <sequence>
-        <element name="hostName" type="eppcom:labelType"/>
-        <element name="hostAddr" type="host:addrType"
-         minOccurs="0" maxOccurs="unbounded"/>
-      </sequence>
-    </complexType>
   <!--
   If attributes, addresses are optional and follow the
   structure defined in the host mapping.
@@ -147,29 +125,11 @@
   -->
     <complexType name="infoType">
       <sequence>
-        <element name="name" type="domain:infoNameType"/>
+        <element name="name" type="eppcom:labelType"/>
         <element name="authInfo" type="domain:authInfoType"
          minOccurs="0"/>
       </sequence>
     </complexType>
-
-    <complexType name="infoNameType">
-      <simpleContent>
-        <extension base = "eppcom:labelType">
-          <attribute name="hosts" type="domain:hostsType"
-           default="all"/>
-        </extension>
-      </simpleContent>
-    </complexType>
-
-    <simpleType name="hostsType">
-      <restriction base="token">
-        <enumeration value="all"/>
-        <enumeration value="del"/>
-        <enumeration value="none"/>
-        <enumeration value="sub"/>
-      </restriction>
-    </simpleType>
 
   <!--
   Child elements of the <renew> command.
@@ -216,7 +176,7 @@
   -->
     <complexType name="addRemType">
       <sequence>
-        <element name="ns" type="domain:nsType"
+        <element name="nsset" type="eppcom:labelType"
          minOccurs="0"/>
         <element name="contact" type="domain:contactType"
          minOccurs="0" maxOccurs="unbounded"/>
@@ -323,10 +283,8 @@
          minOccurs="0"/>
         <element name="contact" type="domain:contactType"
          minOccurs="0" maxOccurs="unbounded"/>
-        <element name="ns" type="domain:nsType"
+        <element name="nsset" type="eppcom:labelType"
          minOccurs="0"/>
-        <element name="host" type="eppcom:labelType"
-         minOccurs="0" maxOccurs="unbounded"/>
         <element name="clID" type="eppcom:clIDType"/>
         <element name="crID" type="eppcom:clIDType"
          minOccurs="0"/>
