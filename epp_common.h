@@ -16,8 +16,10 @@ typedef enum {
 	EPP_LOGOUT,
 	EPP_CHECK_CONTACT,
 	EPP_CHECK_DOMAIN,
+	EPP_CHECK_NSSET,
 	EPP_INFO_CONTACT,
 	EPP_INFO_DOMAIN,
+	EPP_INFO_NSSET,
 	EPP_POLL_REQ,
 	EPP_POLL_ACK
 }epp_command_type;
@@ -28,7 +30,8 @@ typedef enum {
 typedef enum {
 	EPP_UNKNOWN_OBJ,
 	EPP_CONTACT,
-	EPP_DOMAIN
+	EPP_DOMAIN,
+	EPP_NSSET
 }epp_object_type;
 
 /**
@@ -117,16 +120,22 @@ typedef struct {
  * All items inside are booleans.
  */
 typedef struct {
-	char	name_int;
-	char	name_loc;
-	char	org_int;
-	char	org_loc;
-	char	addr_int;
-	char	addr_loc;
+	char	name;
+	char	org;
+	char	addr;
 	char	voice;
 	char	fax;
 	char	email;
 }epp_discl;
+
+/**
+ * Nameserver has a name and possibly more than one ip address and more than
+ * one tech contact.
+ */
+typedef struct {
+	char	*name;
+	struct circ_list	*addr;
+}epp_ns;
 
 /**
  * This structure gathers outputs of parsing stage and serves as input
@@ -155,18 +164,14 @@ typedef struct {
 			struct circ_list	*objuri; // currently not used
 			struct circ_list	*exturi; // currently not used
 		}login;
-		/* additional check contact and domain parameters */
+		/* additional check contact, domain and nsset parameters */
 		struct {
 			struct circ_list	*ids; /* ids of objects */
 		}check;
-		/* additional info contact parameters */
+		/* additional info contact, domain and nsset parameters */
 		struct {
 			char	*id;
-		}info_contact;
-		/* additional info domain parameters */
-		struct {
-			char	*name;
-		}info_domain;
+		}info;
 		/* additional poll acknoledge parameters */
 		struct {
 			int	msgid;
@@ -187,8 +192,7 @@ typedef struct {
 		struct {
 			char	*roid;
 			struct circ_list	*status;
-			epp_postalInfo	*postalInfo_int;
-			epp_postalInfo	*postalInfo_loc;
+			epp_postalInfo	*postalInfo;
 			char	*voice;
 			char	*fax;
 			char	*email;
@@ -221,6 +225,20 @@ typedef struct {
 			long long	trDate;
 			char	*authInfo;
 		}info_domain;
+		/* additional info nsset parameters */
+		struct {
+			char	*roid;
+			struct circ_list	*status;
+			char	*clID;
+			char	*crID;
+			char	*upID;
+			long long	crDate;
+			long long	upDate;
+			long long	trDate;
+			char	*authInfo;
+			struct circ_list	*ns;
+			struct circ_list	*tech;
+		}info_nsset;
 		/* additional poll request parameters */
 		struct {
 			int	count;

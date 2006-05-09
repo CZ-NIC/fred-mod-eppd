@@ -82,6 +82,16 @@ corba_status
 epp_call_check_domain(void *corba_globs, int session, epp_command_data *cdata);
 
 /**
+ * Call corba check nsset function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_check_nsset(void *corba_globs, int session, epp_command_data *cdata);
+
+/**
  * Call corba info contact function.
  * @par corba_globs Corba global-like variables
  * @par session Session identifier
@@ -100,6 +110,16 @@ epp_call_info_contact(void *corba_globs, int session, epp_command_data *cdata);
  */
 corba_status
 epp_call_info_domain(void *corba_globs, int session, epp_command_data *cdata);
+
+/**
+ * Call corba info nsset function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_info_nsset(void *corba_globs, int session, epp_command_data *cdata);
 
 /**
  * Call corba poll request function.

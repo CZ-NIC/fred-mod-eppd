@@ -131,6 +131,15 @@ gen_status
 epp_gen_check_domain(void *xml_globs, epp_command_data *cdata, char **result);
 
 /**
+ * Generate check nsset answer in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_check_nsset(void *xml_globs, epp_command_data *cdata, char **result);
+
+/**
  * Generate info contact answer in XML format.
  * @par cdata Input values
  * @par result Generated string
@@ -147,6 +156,15 @@ epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result);
  */
 gen_status
 epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result);
+
+/**
+ * Generate info nsset answer in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_info_nsset(void *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate poll request answer in XML format.

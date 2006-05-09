@@ -27,7 +27,7 @@ AP_LIBS	+=$(shell $(APR-CONFIG) --libs)
 
 AP_INSTALLDIR	= $(shell $(APXS) -q LIBEXECDIR)
 
-CFLAGS	= -DNDEBUG -g -O0 -fPIC -Wall
+CFLAGS	= -g -O0 -fPIC -Wall
 LDFLAGS	= -rpath $(AP_INSTALLDIR) -Bshareable
 
 build: mod_eppd.so

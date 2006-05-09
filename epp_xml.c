@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <assert.h>
 
 #include <libxml/parser.h>
@@ -20,11 +21,13 @@
 #define XSI	"http://www.w3.org/2001/XMLSchema-instance"
 #define NS_EPP	"urn:ietf:params:xml:ns:epp-1.0"
 #define NS_EPPCOM	"urn:ietf:params:xml:ns:eppcom-1.0"
-#define NS_CONTACT	"urn:ietf:params:xml:ns:contact-1.0"
-#define NS_DOMAIN	"urn:ietf:params:xml:ns:domain-1.0"
+#define NS_CONTACT	"http://www.nic.cz/xml/epp/contact-1.0"
+#define NS_DOMAIN	"http://www.nic.cz/xml/epp/domain-1.0"
+#define NS_NSSET	"http://www.nic.cz/xml/epp/nsset-1.0"
 #define LOC_EPP	NS_EPP " epp-1.0.xsd"
 #define LOC_CONTACT	NS_CONTACT " contact-1.0.xsd"
 #define LOC_DOMAIN	NS_DOMAIN " domain-1.0.xsd"
+#define LOC_NSSET	NS_NSSET " nsset-1.0.xsd"
 /*
  * should be less than 255 since hash value is unsigned char.
  * applies to both hashes (message and command hash)
@@ -58,7 +61,7 @@
 
 #define WRITE_ELEMENT(writer, err_handler, elem, str)	\
 	do {										\
-		if (str[0] == '\0')						\
+		if (((char *) str)[0] == '\0')						\
 			if (xmlTextWriterWriteElement(writer, BAD_CAST (elem), BAD_CAST (str)) < 0) goto err_handler;	\
 	}while(0)
 
@@ -136,9 +139,10 @@ typedef struct {
 static void get_rfc3339_date(long long date, char *str)
 {
 	struct tm t;
+	time_t	time = date;
 
 	/* we will leave empty buffer if gmtime failes */
-	if (gmtime_r(date, &t) == NULL) {
+	if (gmtime_r(&time, &t) == NULL) {
 		str[0] = '\0';
 		return;
 	}
@@ -465,7 +469,6 @@ epp_gen_greeting(const char *svid, char **greeting)
 	int	error_seen = 1;
 
 	assert(svid != NULL);
-	assert(svdate != NULL);
 
 	buf = xmlBufferCreate();
 	if (buf == NULL) {
@@ -497,6 +500,7 @@ epp_gen_greeting(const char *svid, char **greeting)
 	START_ELEMENT(writer, greeting_err, "svcs");
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_CONTACT);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_DOMAIN);
+	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_NSSET);
 	END_ELEMENT(writer, greeting_err);
 
 	/* dcp part */
@@ -857,7 +861,7 @@ parse_check(
 		return;
 	}
 
-	/* get object type - contact or domain */
+	/* get object type - contact, domain or nsset */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST
 			"/epp:epp/epp:command/epp:check/contact:check",
 			xpathCtx);
@@ -877,12 +881,26 @@ parse_check(
 			return;
 		}
 		if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
-			/* unexpected object type */
 			xmlXPathFreeObject(xpathObj);
-			cdata->rc = 2000;
-			cdata->type = EPP_DUMMY;
+			xpathObj = xmlXPathEvalExpression(BAD_CAST
+					"/epp:epp/epp:command/epp:check/nsset:check",
+					xpathCtx);
+			if (xpathObj == NULL) {
+				cdata->rc = 2400;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+			if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+				/* unexpected object type */
+				xmlXPathFreeObject(xpathObj);
+				cdata->rc = 2000;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+			/* object is a nsset */
+			else obj_type = EPP_NSSET;
 		}
-		/* object is domain */
+		/* object is a domain */
 		else obj_type = EPP_DOMAIN;
 	}
 	/* object is contact */
@@ -890,18 +908,29 @@ parse_check(
 	xmlXPathFreeObject(xpathObj);
 
 	/*  --- code length optimization ---
-	 *  since contact and domain <check> have the same structure and the
+	 *  since contact, domain and nsset <check> have the same structure and the
 	 *  only difference is in names of two xml tags, the code for passing
 	 *  is mostly shared
 	 */
-	if (obj_type == EPP_CONTACT)
+	if (obj_type == EPP_CONTACT) {
+		cdata->type = EPP_CHECK_CONTACT;
 		xpathObj = xmlXPathEvalExpression(
 			BAD_CAST "/epp:epp/epp:command/epp:check/contact:check/contact:id",
 			xpathCtx);
-	else
+	}
+	else if (obj_type == EPP_DOMAIN) {
+		cdata->type = EPP_CHECK_DOMAIN;
 		xpathObj = xmlXPathEvalExpression(
 			BAD_CAST "/epp:epp/epp:command/epp:check/domain:check/domain:name",
 			xpathCtx);
+	}
+	else {
+		assert(obj_type == EPP_NSSET);
+		cdata->type = EPP_CHECK_NSSET;
+		xpathObj = xmlXPathEvalExpression(
+			BAD_CAST "/epp:epp/epp:command/epp:check/nsset:check/nsset:name",
+			xpathCtx);
+	}
 	if (xpathObj == NULL) {
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
@@ -946,13 +975,11 @@ parse_check(
 	}
 	xmlXPathFreeObject(xpathObj);
 
-	if (obj_type == EPP_CONTACT) cdata->type = EPP_CHECK_CONTACT;
-	else cdata->type = EPP_CHECK_DOMAIN;
 	return;
 }
 
 /**
- * <info> parser for domain and contact object.
+ * <info> parser for domain, contact and nsset object.
  * Ignores authinfo.
  */
 static void
@@ -994,10 +1021,24 @@ parse_info(
 			return;
 		}
 		if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
-			/* unexpected object type */
 			xmlXPathFreeObject(xpathObj);
-			cdata->rc = 2000;
-			cdata->type = EPP_DUMMY;
+			xpathObj = xmlXPathEvalExpression(BAD_CAST
+					"/epp:epp/epp:command/epp:info/nsset:info",
+					xpathCtx);
+			if (xpathObj == NULL) {
+				cdata->rc = 2400;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+			if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+				/* unexpected object type */
+				xmlXPathFreeObject(xpathObj);
+				cdata->rc = 2000;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+			/* object is domain */
+			else obj_type = EPP_NSSET;
 		}
 		/* object is domain */
 		else obj_type = EPP_DOMAIN;
@@ -1011,14 +1052,25 @@ parse_info(
 	 *  only difference is in names of two xml tags, the code for passing
 	 *  is mostly shared
 	 */
-	if (obj_type == EPP_CONTACT)
+	if (obj_type == EPP_CONTACT) {
+		cdata->type = EPP_INFO_CONTACT;
 		xpathObj = xmlXPathEvalExpression(
 			BAD_CAST "/epp:epp/epp:command/epp:info/contact:info/contact:id",
 			xpathCtx);
-	else
+	}
+	else if (obj_type == EPP_DOMAIN) {
+		cdata->type = EPP_INFO_DOMAIN;
 		xpathObj = xmlXPathEvalExpression(
 			BAD_CAST "/epp:epp/epp:command/epp:info/domain:info/domain:name",
 			xpathCtx);
+	}
+	else {
+		assert(obj_type == EPP_NSSET);
+		cdata->type = EPP_INFO_NSSET;
+		xpathObj = xmlXPathEvalExpression(
+			BAD_CAST "/epp:epp/epp:command/epp:info/nsset:info/nsset:name",
+			xpathCtx);
+	}
 	if (xpathObj == NULL) {
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
@@ -1034,16 +1086,9 @@ parse_info(
 		return;
 	}
 	node = nodeset->nodeTab[0];
-	if (obj_type == EPP_CONTACT)
-		cdata->in->info_contact.id =
-			xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
-	else
-		cdata->in->info_domain.name =
-			xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
+	cdata->in->info.id = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
 	xmlXPathFreeObject(xpathObj);
 
-	if (obj_type == EPP_CONTACT) cdata->type = EPP_INFO_CONTACT;
-	else cdata->type = EPP_INFO_DOMAIN;
 	return;
 }
 
@@ -1143,8 +1188,8 @@ epp_gen_dummy(void *globs, epp_command_data *cdata, char **result)
 }
 
 /**
- * This routine is same for contact and domain object. Except small
- * peaces the code is same. The fourth parameter is object type.
+ * This routine is same for contact, domain and nsset object except small
+ * peaces of the code. The fourth parameter is object type.
  */
 static gen_status
 epp_gen_check(
@@ -1194,10 +1239,16 @@ epp_gen_check(
 		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
 		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
 	}
-	else {
+	else if (obj_type == EPP_DOMAIN) {
 		START_ELEMENT(writer, simple_err, "domain:chkData");
 		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
 		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_DOMAIN);
+	}
+	else {
+		assert(obj_type == EPP_NSSET);
+		START_ELEMENT(writer, simple_err, "nsset:chkData");
+		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
+		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_NSSET);
 	}
 	CL_RESET(cdata->in->check.ids);
 	CL_RESET(cdata->out->check.bools);
@@ -1208,9 +1259,13 @@ epp_gen_check(
 			START_ELEMENT(writer, simple_err, "contact:cd");
 			START_ELEMENT(writer, simple_err, "contact:id");
 		}
-		else {
+		else if (obj_type == EPP_DOMAIN) {
 			START_ELEMENT(writer, simple_err, "domain:cd");
 			START_ELEMENT(writer, simple_err, "domain:name");
+		}
+		else {
+			START_ELEMENT(writer, simple_err, "nsset:cd");
+			START_ELEMENT(writer, simple_err, "nsset:name");
 		}
 		WRITE_ATTRIBUTE(writer, simple_err, "avail",
 				CL_CONTENT(cdata->out->check.bools) ? "1" : "0");
@@ -1260,16 +1315,26 @@ epp_gen_check_domain(void *globs, epp_command_data *cdata, char **result)
 }
 
 gen_status
+epp_gen_check_nsset(void *globs, epp_command_data *cdata, char **result)
+{
+	assert(globs != NULL);
+	assert(cdata != NULL);
+	assert(cdata->out != NULL);
+	return epp_gen_check(globs, cdata, result, EPP_NSSET);
+}
+
+gen_status
 epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result)
 {
+	epp_postalInfo	*pi;
+	epp_discl	*discl;
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
 	char	*str;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	error_seen = 1;
-	int	i;
 
-	assert(globs != NULL);
+	assert(xml_globs != NULL);
 	assert(cdata != NULL);
 	assert(cdata->out != NULL);
 
@@ -1296,7 +1361,7 @@ epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
 	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) xml_globs)->hash_msg, cdata->rc);
 	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "msg", str);
 	END_ELEMENT(writer, simple_err);
@@ -1306,7 +1371,7 @@ epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "contact:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
-	WRITE_ELEMENT(writer, simple_err, "contact:id", cdata->in->info_contact.id);
+	WRITE_ELEMENT(writer, simple_err, "contact:id", cdata->in->info.id);
 	WRITE_ELEMENT(writer, simple_err, "contact:roid",
 			cdata->out->info_contact.roid);
 	CL_RESET(cdata->out->info_contact.status);
@@ -1316,31 +1381,21 @@ epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result)
 				CL_CONTENT(cdata->out->info_contact.status));
 		END_ELEMENT(writer, simple_err);
 	}
-	/* generate international and local form of postal info */
-	for (i = 0; i < 2; i++) {
-		epp_postalInfo	*pi;
-		START_ELEMENT(writer, simple_err, "contact:postalInfo");
-		if (i) {
-			pi = cdata->out->info_contact.postalInfo_int;
-			WRITE_ATTRIBUTE(writer, simple_err, "type", "int");
-		}
-		else {
-			pi = cdata->out->info_contact.postalInfo_loc;
-			WRITE_ATTRIBUTE(writer, simple_err, "type", "loc");
-		}
-		WRITE_ELEMENT(writer, simple_err, "contact:name", pi->name);
-		WRITE_ELEMENT(writer, simple_err, "contact:org", pi->org);
-		START_ELEMENT(writer, simple_err, "contact:addr");
-		WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street1);
-		WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street2);
-		WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street3);
-		WRITE_ELEMENT(writer, simple_err, "contact:city", pi->city);
-		WRITE_ELEMENT(writer, simple_err, "contact:sp", pi->sp);
-		WRITE_ELEMENT(writer, simple_err, "contact:pc", pi->pc);
-		WRITE_ELEMENT(writer, simple_err, "contact:cc", pi->cc);
-		END_ELEMENT(writer, simple_err); /* addr */
-		END_ELEMENT(writer, simple_err); /* postal info */
-	}
+	// postal info
+	pi = cdata->out->info_contact.postalInfo;
+	START_ELEMENT(writer, simple_err, "contact:postalInfo");
+	WRITE_ELEMENT(writer, simple_err, "contact:name", pi->name);
+	WRITE_ELEMENT(writer, simple_err, "contact:org", pi->org);
+	START_ELEMENT(writer, simple_err, "contact:addr");
+	WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street1);
+	WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street2);
+	WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street3);
+	WRITE_ELEMENT(writer, simple_err, "contact:city", pi->city);
+	WRITE_ELEMENT(writer, simple_err, "contact:sp", pi->sp);
+	WRITE_ELEMENT(writer, simple_err, "contact:pc", pi->pc);
+	WRITE_ELEMENT(writer, simple_err, "contact:cc", pi->cc);
+	END_ELEMENT(writer, simple_err); /* addr */
+	END_ELEMENT(writer, simple_err); /* postal info */
 	WRITE_ELEMENT(writer, simple_err, "contact:voice",
 			cdata->out->info_contact.voice);
 	WRITE_ELEMENT(writer, simple_err, "contact:fax",
@@ -1364,47 +1419,30 @@ epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result)
 			cdata->out->info_contact.authInfo);
 	END_ELEMENT(writer, simple_err); /* auth info */
 	/* disclose section */
+	discl = cdata->out->info_contact.discl;
 	START_ELEMENT(writer, simple_err, "contact:disclose");
 	WRITE_ATTRIBUTE(writer, simple_err, "flag", "0");
-	if (!cdata->out->info_contact.discl->name_int) {
+	if (!discl->name) {
 		START_ELEMENT(writer, simple_err, "contact:name");
-		WRITE_ATTRIBUTE(writer, simple_err, "type", "int");
 		END_ELEMENT(writer, simple_err);
 	}
-	if (!cdata->out->info_contact.discl->name_loc) {
-		START_ELEMENT(writer, simple_err, "contact:name");
-		WRITE_ATTRIBUTE(writer, simple_err, "type", "loc");
-		END_ELEMENT(writer, simple_err);
-	}
-	if (!cdata->out->info_contact.discl->org_int) {
+	if (!discl->org) {
 		START_ELEMENT(writer, simple_err, "contact:org");
-		WRITE_ATTRIBUTE(writer, simple_err, "type", "int");
 		END_ELEMENT(writer, simple_err);
 	}
-	if (!cdata->out->info_contact.discl->org_loc) {
-		START_ELEMENT(writer, simple_err, "contact:org");
-		WRITE_ATTRIBUTE(writer, simple_err, "type", "loc");
-		END_ELEMENT(writer, simple_err);
-	}
-	if (!cdata->out->info_contact.discl->addr_int) {
+	if (!discl->addr) {
 		START_ELEMENT(writer, simple_err, "contact:addr");
-		WRITE_ATTRIBUTE(writer, simple_err, "type", "int");
 		END_ELEMENT(writer, simple_err);
 	}
-	if (!cdata->out->info_contact.discl->addr_loc) {
-		START_ELEMENT(writer, simple_err, "contact:addr");
-		WRITE_ATTRIBUTE(writer, simple_err, "type", "loc");
-		END_ELEMENT(writer, simple_err);
-	}
-	if (!cdata->out->info_contact.discl->voice) {
+	if (!discl->voice) {
 		START_ELEMENT(writer, simple_err, "contact:voice");
 		END_ELEMENT(writer, simple_err);
 	}
-	if (!cdata->out->info_contact.discl->fax) {
+	if (!discl->fax) {
 		START_ELEMENT(writer, simple_err, "contact:fax");
 		END_ELEMENT(writer, simple_err);
 	}
-	if (!cdata->out->info_contact.discl->email) {
+	if (!discl->email) {
 		START_ELEMENT(writer, simple_err, "contact:email");
 		END_ELEMENT(writer, simple_err);
 	}
@@ -1440,11 +1478,9 @@ epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result)
 	xmlTextWriterPtr writer;
 	char	*str;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
-	stringbool	*strbool;
 	char	error_seen = 1;
-	int	i;
 
-	assert(globs != NULL);
+	assert(xml_globs != NULL);
 	assert(cdata != NULL);
 	assert(cdata->out != NULL);
 
@@ -1471,7 +1507,7 @@ epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
 	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) xml_globs)->hash_msg, cdata->rc);
 	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "msg", str);
 	END_ELEMENT(writer, simple_err);
@@ -1481,7 +1517,7 @@ epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "domain:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_DOMAIN);
-	WRITE_ELEMENT(writer, simple_err, "domain:name",cdata->in->info_domain.name);
+	WRITE_ELEMENT(writer, simple_err, "domain:name",cdata->in->info.id);
 	WRITE_ELEMENT(writer, simple_err, "domain:roid",
 			cdata->out->info_domain.roid);
 	CL_RESET(cdata->out->info_domain.status);
@@ -1506,11 +1542,10 @@ epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result)
 		START_ELEMENT(writer, simple_err, "domain:contact");
 		WRITE_ATTRIBUTE(writer, simple_err, "type", "tech");
 		WRITE_STRING(writer, simple_err,
-				CL_CONTENT(cdata->out->info_domain.tech->content));
+				CL_CONTENT(cdata->out->info_domain.tech));
 		END_ELEMENT(writer, simple_err);
 	}
-	/* XXX update to nsset */
-	WRITE_ELEMENT(writer, simple_err, "domain:ns",
+	WRITE_ELEMENT(writer, simple_err, "domain:nsset",
 			cdata->out->info_domain.nsset);
 	WRITE_ELEMENT(writer, simple_err, "domain:clID",
 			cdata->out->info_domain.clID);
@@ -1555,7 +1590,7 @@ simple_err:
 }
 
 gen_status
-epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result)
+epp_gen_info_nsset(void *xml_globs, epp_command_data *cdata, char **result)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -1563,7 +1598,7 @@ epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result)
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	error_seen = 1;
 
-	assert(globs != NULL);
+	assert(xml_globs != NULL);
 	assert(cdata != NULL);
 	assert(cdata->out != NULL);
 
@@ -1590,7 +1625,112 @@ epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
 	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) xml_globs)->hash_msg, cdata->rc);
+	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
+	WRITE_ELEMENT(writer, simple_err, "msg", str);
+	END_ELEMENT(writer, simple_err);
+
+	// specific part of response
+	START_ELEMENT(writer, simple_err, "resData");
+	START_ELEMENT(writer, simple_err, "nsset:infData");
+	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
+	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_NSSET);
+	WRITE_ELEMENT(writer, simple_err, "nsset:id",cdata->in->info.id);
+	WRITE_ELEMENT(writer, simple_err, "nsset:roid", cdata->out->info_nsset.roid);
+	/* status flags */
+	CL_RESET(cdata->out->info_nsset.status);
+	CL_FOREACH(cdata->out->info_nsset.status) {
+		START_ELEMENT(writer, simple_err, "nsset:status");
+		WRITE_ATTRIBUTE(writer, simple_err, "s",
+				CL_CONTENT(cdata->out->info_nsset.status));
+		END_ELEMENT(writer, simple_err);
+	}
+	WRITE_ELEMENT(writer, simple_err, "nsset:clID", cdata->out->info_nsset.clID);
+	WRITE_ELEMENT(writer, simple_err, "nsset:crID", cdata->out->info_nsset.crID);
+	get_rfc3339_date(cdata->out->info_nsset.crDate, strbuf);
+	WRITE_ELEMENT(writer, simple_err, "nsset:crDate", strbuf);
+	WRITE_ELEMENT(writer, simple_err, "nsset:upID", cdata->out->info_nsset.upID);
+	get_rfc3339_date(cdata->out->info_nsset.upDate, strbuf);
+	WRITE_ELEMENT(writer, simple_err, "nsset:upDate", strbuf);
+	get_rfc3339_date(cdata->out->info_nsset.trDate, strbuf);
+	WRITE_ELEMENT(writer, simple_err, "nsset:trDate", strbuf);
+	WRITE_ELEMENT(writer, simple_err, "nsset:authInfo",
+			cdata->out->info_nsset.authInfo);
+	CL_RESET(cdata->out->info_nsset.ns);
+	/* print nameservers */
+	CL_FOREACH(cdata->out->info_nsset.ns) {
+		epp_ns	*ns = (epp_ns *) CL_CONTENT(cdata->out->info_nsset.ns);
+		START_ELEMENT(writer, simple_err, "nsset:ns");
+		WRITE_ELEMENT(writer, simple_err, "nsset:name", ns->name);
+		/* print addrs of nameserver */
+		CL_RESET(ns->addr);
+		CL_FOREACH(ns->addr) {
+			WRITE_ELEMENT(writer, simple_err, "nsset:addr",
+					CL_CONTENT(ns->addr));
+			END_ELEMENT(writer, simple_err); /* ns */
+		}
+	}
+	END_ELEMENT(writer, simple_err); /* infdata */
+	END_ELEMENT(writer, simple_err); /* resdata */
+
+	// traditional end of response
+	START_ELEMENT(writer, simple_err, "trID");
+	if (cdata->clTRID)
+		WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
+	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
+	END_DOCUMENT(writer, simple_err);
+
+	error_seen = 0;
+
+simple_err:
+	xmlFreeTextWriter(writer);
+	if (error_seen) {
+		xmlBufferFree(buf);
+		return GEN_EBUILD;
+	}
+
+	*result = strdup(buf->content);
+	xmlBufferFree(buf);
+	return GEN_OK;
+}
+
+gen_status
+epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result)
+{
+	xmlBufferPtr buf;
+	xmlTextWriterPtr writer;
+	char	*str;
+	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
+	char	error_seen = 1;
+
+	assert(xml_globs != NULL);
+	assert(cdata != NULL);
+	assert(cdata->out != NULL);
+
+	// make up response
+	buf = xmlBufferCreate();
+	if (buf == NULL) {
+		return GEN_EBUFFER;
+	}
+	writer = xmlNewTextWriterMemory(buf, 0);
+	if (writer == NULL) {
+		xmlBufferFree(buf);
+		return GEN_EWRITER;
+	}
+
+	START_DOCUMENT(writer, simple_err);
+
+	// epp header
+	START_ELEMENT(writer, simple_err, "epp");
+	WRITE_ATTRIBUTE(writer, simple_err, "xmlns", NS_EPP);
+	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:xsi", XSI);
+	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EPP);
+
+	// epp traditional part of response
+	START_ELEMENT(writer, simple_err, "response");
+	START_ELEMENT(writer, simple_err, "result");
+	snprintf(strbuf, 5, "%d", cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) xml_globs)->hash_msg, cdata->rc);
 	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "msg", str);
 	END_ELEMENT(writer, simple_err);
@@ -1634,10 +1774,9 @@ epp_gen_poll_ack(void *xml_globs, epp_command_data *cdata, char **result)
 	xmlTextWriterPtr writer;
 	char	*str;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
-	stringbool	*strbool;
 	char	error_seen = 1;
 
-	assert(globs != NULL);
+	assert(xml_globs != NULL);
 	assert(cdata != NULL);
 	assert(cdata->out != NULL);
 
@@ -1664,7 +1803,7 @@ epp_gen_poll_ack(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
 	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) xml_globs)->hash_msg, cdata->rc);
 	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "msg", str);
 	END_ELEMENT(writer, simple_err);
@@ -1778,6 +1917,11 @@ epp_parse_command(
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
+	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "nsset", BAD_CAST NS_NSSET)) {
+		xmlXPathFreeContext(xpathCtx);
+		xmlFreeDoc(doc);
+		return PARSER_EINTERNAL;
+	}
 
 	/* if it is a <hello> frame, we will send greeting and return */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:hello", xpathCtx);
@@ -1821,7 +1965,7 @@ epp_parse_command(
 		cdata->clTRID = xmlNodeListGetString(doc,
 				nodeset->nodeTab[0]->xmlChildrenNode, 1);
 	else {
-		/* we cannot leave clTRID NULL because of corba */
+		/* we cannot leave clTRID NULL becauseof corba */
 		cdata->clTRID = xmlStrdup("");
 	}
 	xmlXPathFreeObject(xpathObj);
@@ -1894,8 +2038,6 @@ epp_parse_command(
  */
 void epp_command_data_cleanup(epp_command_data *cdata)
 {
-	int	i;
-
 	assert(cdata != NULL);
 
 	assert(cdata->clTRID != NULL);
@@ -1929,6 +2071,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			break;
 		case EPP_CHECK_CONTACT:
 		case EPP_CHECK_DOMAIN:
+		case EPP_CHECK_NSSET:
 			assert(cdata->in != NULL);
 			/* destroy ids */
 			CL_RESET(cdata->in->check.ids);
@@ -1947,7 +2090,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			break;
 		case EPP_INFO_CONTACT:
 			assert(cdata->in != NULL);
-			free(cdata->in->info_contact.id);
+			free(cdata->in->info.id);
 			if (cdata->out != NULL) {
 				epp_postalInfo	*pi;
 				epp_discl	*discl;
@@ -1958,22 +2101,19 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				CL_FOREACH(cdata->out->info_contact.status)
 					free(CL_CONTENT(cdata->out->info_contact.status));
 				CL_PURGE(cdata->out->info_contact.status);
-				pi = cdata->out->info_contact.postalInfo_int;
-				for (i = 0; i < 2; i++) {
-					assert(pi != NULL);
-					free(pi->name);
-					free(pi->org);
-					free(pi->street1);
-					free(pi->street2);
-					free(pi->street3);
-					free(pi->city);
-					free(pi->sp);
-					free(pi->pc);
-					free(pi->cc);
-					pi = cdata->out->info_contact.postalInfo_loc;
-				}
-				free(cdata->out->info_contact.postalInfo_int);
-				free(cdata->out->info_contact.postalInfo_loc);
+				/* postal info */
+				pi = cdata->out->info_contact.postalInfo;
+				assert(pi != NULL);
+				free(pi->name);
+				free(pi->org);
+				free(pi->street1);
+				free(pi->street2);
+				free(pi->street3);
+				free(pi->city);
+				free(pi->sp);
+				free(pi->pc);
+				free(pi->cc);
+				free(cdata->out->info_contact.postalInfo);
 				free(cdata->out->info_contact.voice);
 				free(cdata->out->info_contact.fax);
 				free(cdata->out->info_contact.email);
@@ -1984,23 +2124,15 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(cdata->out->info_contact.authInfo);
 				free(cdata->out->info_contact.vat);	/* ext */
 				free(cdata->out->info_contact.ssn);	/* ext */
+				/* disclose info */
 				discl = cdata->out->info_contact.discl;
 				assert(discl != NULL);
-				free(discl->name_int);
-				free(discl->name_loc);
-				free(discl->org_int);
-				free(discl->org_loc);
-				free(discl->addr_int);
-				free(discl->addr_loc);
-				free(discl->voice);
-				free(discl->fax);
-				free(discl->email);
 				free(discl);
 			}
 			break;
 		case EPP_INFO_DOMAIN:
 			assert(cdata->in != NULL);
-			free(cdata->in->info_domain.name);
+			free(cdata->in->info.id);
 			if (cdata->out != NULL) {
 				free(cdata->out->info_domain.roid);
 				/* status */
@@ -2024,6 +2156,31 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(cdata->out->info_domain.crID);
 				free(cdata->out->info_domain.upID);
 				free(cdata->out->info_domain.authInfo);
+			}
+			break;
+		case EPP_INFO_NSSET:
+			assert(cdata->in != NULL);
+			free(cdata->in->info.id);
+			if (cdata->out != NULL) {
+				free(cdata->out->info_nsset.roid);
+				/* ns */
+				CL_RESET(cdata->out->info_nsset.ns);
+				CL_FOREACH(cdata->out->info_nsset.ns) {
+					epp_ns	*ns = (epp_ns *)
+						CL_CONTENT(cdata->out->info_nsset.ns);
+					free(ns->name);
+					/* addr */
+					CL_RESET(ns->addr);
+					CL_FOREACH(ns->addr) free(CL_CONTENT(ns->addr));
+					CL_PURGE(ns->addr);
+					free(CL_CONTENT(cdata->out->info_nsset.ns));
+				}
+				CL_PURGE(cdata->out->info_nsset.ns);
+				/* tech */
+				CL_RESET(cdata->out->info_nsset.tech);
+				CL_FOREACH(cdata->out->info_nsset.tech)
+					free(CL_CONTENT(cdata->out->info_nsset.tech));
+				CL_PURGE(cdata->out->info_nsset.tech);
 			}
 			break;
 		case EPP_POLL_REQ:

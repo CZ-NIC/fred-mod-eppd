@@ -151,9 +151,9 @@ epp_call_login(void *globs, int *session, epp_command_data *cdata)
 	ccReg_Response *response;
 
 	response = ccReg_EPP_ClientLogin(((epp_corba_globs *) globs)->service,
-			cdata->un.login.clID,
-			cdata->un.login.pw,
-			cdata->un.login.newPW,
+			cdata->in->login.clID,
+			cdata->in->login.pw,
+			cdata->in->login.newPW,
 			cdata->clTRID,
 			&c_session,
 			ev);
@@ -236,7 +236,7 @@ epp_call_check(void *globs, int session, epp_command_data *cdata,
 	i = 0;
 	CL_FOREACH(cdata->in->check.ids)
 		ids->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->un.check.idbools));
+				CL_CONTENT(cdata->in->check.ids));
 
 	if (obj == EPP_CONTACT)
 		response = ccReg_EPP_ContactCheck(( (epp_corba_globs *) globs)->service,
@@ -245,8 +245,15 @@ epp_call_check(void *globs, int session, epp_command_data *cdata,
 				session,
 				cdata->clTRID,
 				ev);
-	else
+	else if (obj == EPP_DOMAIN)
 		response = ccReg_EPP_DomainCheck(( (epp_corba_globs *) globs)->service,
+				ids,
+				&bools,
+				session,
+				cdata->clTRID,
+				ev);
+	else
+		response = ccReg_EPP_NSSetCheck(( (epp_corba_globs *) globs)->service,
 				ids,
 				&bools,
 				session,
@@ -282,7 +289,7 @@ epp_call_check(void *globs, int session, epp_command_data *cdata,
 				for (i = 0; i < bools->_length; i++) {
 					item = malloc(sizeof *item);
 					CL_CONTENT(cdata->out->check.bools) = (void *)
-						bools->_buffer[i];
+						(bools->_buffer[i] ? 1 : 0);
 				}
 				if (i == bools->_length) ret = CORBA_OK;
 				cdata->svTRID = strdup(response->svTRID);
@@ -311,6 +318,12 @@ epp_call_check_domain(void *globs, int session, epp_command_data *cdata)
 }
 
 corba_status
+epp_call_check_nsset(void *globs, int session, epp_command_data *cdata)
+{
+	return epp_call_check(globs, session, cdata, EPP_NSSET);
+}
+
+corba_status
 epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -321,7 +334,7 @@ epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 	CORBA_exception_init(ev);
 
 	response = ccReg_EPP_ContactInfo(( (epp_corba_globs *) globs)->service,
-			cdata->in->info_contact.id,
+			cdata->in->info.id,
 			c_contact,
 			session,
 			cdata->clTRID,
@@ -345,40 +358,33 @@ epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 
 		if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL)
 			ret = CORBA_INT_ERROR;
-		else if ((cdata->out->info_contact.addr_int = calloc(1, sizeof *pi))
-					== NULL)
+		else if ((cdata->out->info_contact.postalInfo = calloc(1, sizeof *pi))
+				== NULL)
 		{
-			free(cdata->out);
-			cdata->out = NULL;
-			ret = CORBA_INT_ERROR;
-		}
-		else if ((cdata->out->info_contact.addr_loc = calloc(1, sizeof *pi))
-					== NULL)
-		{
-			free(cdata->out->info_contact.addr_int);
 			free(cdata->out);
 			cdata->out = NULL;
 			ret = CORBA_INT_ERROR;
 		}
 		else if ((cdata->out->info_contact.discl = calloc(1, sizeof *discl))
-					== NULL)
+				== NULL)
 		{
-			free(cdata->out->info_contact.addr_int);
-			free(cdata->out->info_contact.addr_loc);
+			free(cdata->out->info_contact.postalInfo);
 			free(cdata->out);
 			cdata->out = NULL;
 			ret = CORBA_INT_ERROR;
 		}
-		else if ((cdata->out->info_contact.status=malloc(sizeof *item)) == NULL)
+		else if ((cdata->out->info_contact.status = malloc(sizeof *item))
+				== NULL)
 		{
-			free(cdata->out->info_contact.addr_int);
-			free(cdata->out->info_contact.addr_loc);
+			free(cdata->out->info_contact.postalInfo);
 			free(cdata->out);
 			cdata->out = NULL;
 			ret = CORBA_INT_ERROR;
 		}
 		/* ok, now everything was successfully allocated */
 		else {
+			int	i;
+
 			cdata->out->info_contact.roid = strdup(c_contact->ROID);
 			cdata->out->info_contact.clID = strdup(c_contact->ClID);
 			cdata->out->info_contact.crID = strdup(c_contact->CrID);
@@ -390,31 +396,19 @@ epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 			CL_NEW(cdata->out->info_contact.status);
 			for (i = 0; i < c_contact->status->_length; i++) {
 				item = malloc(sizeof *item);
-				CL_CONTENT(cdata->out->info_contact.status) = (void *)
-					strdup(c_contact->status->_buffer[i]);
+				CL_CONTENT(item) =(void *) strdup(c_contact->status->_buffer[i]);
+				CL_ADD(cdata->out->info_contact.status, item);
 			}
-			/* local address */
-			pi = cdata->out->info_contact.addr_loc;
-			pi->name = strdup(c_contact->addr_loc->Name);
-			pi->org = strdup(c_contact->addr_loc->Organization);
-			pi->street1 = strdup(c_contact->addr_loc->Street1);
-			pi->street2 = strdup(c_contact->addr_loc->Street2);
-			pi->street3 = strdup(c_contact->addr_loc->Street3);
-			pi->city = strdup(c_contact->addr_loc->City);
-			pi->sp = strdup(c_contact->addr_loc->StateOrProvince);
-			pi->pc = strdup(c_contact->addr_loc->PostalCode);
-			pi->cc = strdup(c_contact->addr_loc->Country);
-			/* international address */
-			pi = cdata->out->info_contact.addr_int;
-			pi->name = strdup(c_contact->addr_int->Name);
-			pi->org = strdup(c_contact->addr_int->Organization);
-			pi->street1 = strdup(c_contact->addr_int->Street1);
-			pi->street2 = strdup(c_contact->addr_int->Street2);
-			pi->street3 = strdup(c_contact->addr_int->Street3);
-			pi->city = strdup(c_contact->addr_int->City);
-			pi->sp = strdup(c_contact->addr_int->StateOrProvince);
-			pi->pc = strdup(c_contact->addr_int->PostalCode);
-			pi->cc = strdup(c_contact->addr_int->Country);
+			pi = cdata->out->info_contact.postalInfo;
+			pi->name = strdup(c_contact->postalInfo->Name);
+			pi->org = strdup(c_contact->postalInfo->Organization);
+			pi->street1 = strdup(c_contact->postalInfo->Street1);
+			pi->street2 = strdup(c_contact->postalInfo->Street2);
+			pi->street3 = strdup(c_contact->postalInfo->Street3);
+			pi->city = strdup(c_contact->postalInfo->City);
+			pi->sp = strdup(c_contact->postalInfo->StateOrProvince);
+			pi->pc = strdup(c_contact->postalInfo->PostalCode);
+			pi->cc = strdup(c_contact->postalInfo->Country);
 			/* others */
 			cdata->out->info_contact.voice = strdup(c_contact->Telephone);
 			cdata->out->info_contact.fax = strdup(c_contact->Fax);
@@ -426,12 +420,9 @@ epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 			cdata->out->info_contact.authInfo = strdup(c_contact->AuthInfoPw);
 			/* disclose info */
 			discl = cdata->out->info_contact.discl;
-			discl->name_int = c_contact->DiscloseNameInt;
-			discl->name_loc = c_contact->DiscloseNameLoc;
-			discl->org_int = c_contact->DiscloseOrganizationInt;
-			discl->org_loc = c_contact->DiscloseOrganizationLoc;
-			discl->addr_int = c_contact->DiscloseAddressInt;
-			discl->addr_loc = c_contact->DiscloseAddressLoc;
+			discl->name = c_contact->DiscloseName;
+			discl->org = c_contact->DiscloseOrganization;
+			discl->addr = c_contact->DiscloseAddress;
 			discl->voice = c_contact->DiscloseTelephone;
 			discl->fax = c_contact->DiscloseFax;
 			discl->email = c_contact->DiscloseEmail;
@@ -458,7 +449,7 @@ epp_call_info_domain(void *globs, int session, epp_command_data *cdata)
 	CORBA_exception_init(ev);
 
 	response = ccReg_EPP_DomainInfo(( (epp_corba_globs *) globs)->service,
-			cdata->in->info_domain.name,
+			cdata->in->info.id,
 			c_domain,
 			session,
 			cdata->clTRID,
@@ -481,7 +472,7 @@ epp_call_info_domain(void *globs, int session, epp_command_data *cdata)
 
 		if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL)
 			ret = CORBA_INT_ERROR;
-		else if ((cdata->out->info_domain.status =malloc(sizeof *item)) == NULL)
+		else if ((cdata->out->info_domain.status = malloc(sizeof *item)) == NULL)
 		{
 			free(cdata->out);
 			cdata->out = NULL;
@@ -513,7 +504,7 @@ epp_call_info_domain(void *globs, int session, epp_command_data *cdata)
 			cdata->out->info_domain.crDate = c_domain->CrDate;
 			cdata->out->info_domain.upDate = c_domain->UpDate;
 			cdata->out->info_domain.trDate = c_domain->TrDate;
-			cdata->out->info_domain.trDate = c_domain->ExDate;
+			cdata->out->info_domain.exDate = c_domain->ExDate;
 
 			cdata->out->info_domain.registrant = strdup(c_domain->Registrant);
 			cdata->out->info_domain.nsset = strdup(c_domain->nsset);
@@ -525,27 +516,148 @@ epp_call_info_domain(void *globs, int session, epp_command_data *cdata)
 			CL_NEW(cdata->out->info_domain.tech);
 			for (i = 0; i < c_domain->status->_length; i++) {
 				item = malloc(sizeof *item);
-				CL_CONTENT(cdata->out->info_domain.status) = (void *)
-					strdup(c_domain->status->_buffer[i]);
+				CL_CONTENT(item) = (void *) strdup(c_domain->status->_buffer[i]);
+				CL_ADD(cdata->out->info_domain.status, item);
 			}
 			for (i = 0; i < c_domain->admin->_length; i++) {
 				item = malloc(sizeof *item);
-				CL_CONTENT(cdata->out->info_domain.admin) = (void *)
-					strdup(c_domain->admin->_buffer[i]);
+				CL_CONTENT(item) = (void *) strdup(c_domain->admin->_buffer[i]);
+				CL_ADD(cdata->out->info_domain.admin, item);
 			}
 			for (i = 0; i < c_domain->tech->_length; i++) {
 				item = malloc(sizeof *item);
-				CL_CONTENT(cdata->out->info_domain.tech) = (void *)
-					strdup(c_domain->tech->_buffer[i]);
+				CL_CONTENT(item) = (void *) strdup(c_domain->tech->_buffer[i]);
+				CL_ADD(cdata->out->info_domain.tech, item);
 			}
 
 			cdata->svTRID = strdup(response->svTRID);
 			cdata->rc = response->errCode;
 			ret = CORBA_OK;
+		}
 	}
 
 	CORBA_free(response);
-	CORBA_free(c_contact);
+	CORBA_free(c_domain);
+
+	return ret;
+}
+
+corba_status
+epp_call_info_nsset(void *globs, int session, epp_command_data *cdata)
+{
+	CORBA_Environment ev[1];
+	corba_status	ret;
+	ccReg_Response	*response;
+	ccReg_NSSet	*c_nsset;
+	struct circ_list	*tech;
+	struct circ_list	*addr;
+	epp_ns	*ns;
+
+	CORBA_exception_init(ev);
+
+	response = ccReg_EPP_NSSetInfo(( (epp_corba_globs *) globs)->service,
+			cdata->in->info.id,
+			c_nsset,
+			session,
+			cdata->clTRID,
+			ev);
+
+	if (raised_exception(ev)) {
+		/* do NOT try to free response even if not NULL -> segfault */
+		return CORBA_ERROR;
+	}
+
+	/*
+	 * in case of an error of EPP server (CR) the svTRID field is
+	 * empty string
+	 */
+	if (*response->svTRID == '\0') {
+		ret = CORBA_REMOTE_ERROR;
+	}
+	else {
+		struct circ_list	*item;
+
+		if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL)
+			ret = CORBA_INT_ERROR;
+		else if ((cdata->out->info_nsset.status = malloc(sizeof *item)) == NULL)
+		{
+			free(cdata->out);
+			cdata->out = NULL;
+			ret = CORBA_INT_ERROR;
+		}
+		else if ((cdata->out->info_nsset.ns = malloc(sizeof *item)) == NULL)
+		{
+			free(cdata->out->info_nsset.status);
+			free(cdata->out);
+			cdata->out = NULL;
+			ret = CORBA_INT_ERROR;
+		}
+		else if ((cdata->out->info_nsset.tech = malloc(sizeof *item)) == NULL)
+		{
+			free(cdata->out->info_nsset.ns);
+			free(cdata->out->info_nsset.status);
+			free(cdata->out);
+			cdata->out = NULL;
+			ret = CORBA_INT_ERROR;
+		}
+		/* ok, now alomost everything was successfully allocated */
+		else {
+			int i, j;
+
+			cdata->out->info_nsset.roid = strdup(c_nsset->ROID);
+			cdata->out->info_nsset.clID = strdup(c_nsset->ClID);
+			cdata->out->info_nsset.crID = strdup(c_nsset->CrID);
+			cdata->out->info_nsset.upID = strdup(c_nsset->UpID);
+			cdata->out->info_nsset.crDate = c_nsset->CrDate;
+			cdata->out->info_nsset.upDate = c_nsset->UpDate;
+			cdata->out->info_nsset.trDate = c_nsset->TrDate;
+			cdata->out->info_nsset.authInfo = strdup(c_nsset->AuthInfoPw);
+
+			/* allocate and initialize status list */
+			CL_NEW(cdata->out->info_nsset.status);
+			for (i = 0; i < c_nsset->status->_length; i++) {
+				item = malloc(sizeof *item);
+				CL_CONTENT(item) = (void *) strdup(c_nsset->status->_buffer[i]);
+				CL_ADD(cdata->out->info_nsset.status, item);
+			}
+			/* allocate and initialize tech list */
+			CL_NEW(cdata->out->info_nsset.tech);
+			for (i = 0; i < c_nsset->tech->_length; i++) {
+				item = malloc(sizeof *item);
+				CL_CONTENT(item) = (void *) strdup(c_nsset->tech->_buffer[i]);
+				CL_ADD(cdata->out->info_nsset.tech, item);
+			}
+			/*
+			 * allocate and initialize required number of ns items
+			 */
+			CL_NEW(cdata->out->info_nsset.ns);
+			for (i = 0; i < c_nsset->dns->_length; i++) {
+				struct circ_list	*item_addr;
+				epp_ns	*item_ns;
+				/* ns item */
+				item = malloc(sizeof *item);
+				((epp_ns *) CL_CONTENT(item)) = item_ns = malloc(sizeof *epp_ns);
+				CL_ADD(cdata->out->info_nsset.ns, item);
+				/* content of ns item */
+				item_ns->name = strdup(c_nsset->dns->_buffer[i]->fqdn);
+				item_ns->addr = malloc(sizeof (struct circ_list));
+				CL_NEW(item_ns->addr);
+				for (j = 0; j < c_nsset->dns->_buffer[i].inet->_length; j++) {
+					item = malloc(sizeof *item);
+					CL_CONTENT(item) = (void *)
+						strdup(c_nsset->dns->_buffer[i].inet->_buffer[j]);
+					CL_ADD(item_ns->addr, item);
+				}
+			}
+
+			cdata->svTRID = strdup(response->svTRID);
+			cdata->rc = response->errCode;
+			ret = CORBA_OK;
+		}
+	}
+
+	CORBA_free(response);
+	CORBA_free(c_nsset);
 
 	return ret;
 }
@@ -558,7 +670,7 @@ epp_call_poll_req(void *globs, int session, epp_command_data *cdata)
 	CORBA_Environment	ev[1];
 	CORBA_long	c_count;
 	CORBA_long	c_msgID;
-	CORBA_unsigned_long_long	qdate;
+	CORBA_unsigned_long_long	c_qdate;
 	CORBA_char	*c_msg;
 
 	CORBA_exception_init(ev);
@@ -590,7 +702,7 @@ epp_call_poll_req(void *globs, int session, epp_command_data *cdata)
 		ret = CORBA_INT_ERROR;
 	else {
 		cdata->out->poll_req.count = c_count;
-		cdata->out->poll_req.msgid = c_msgid;
+		cdata->out->poll_req.msgid = c_msgID;
 		cdata->out->poll_req.qdate = c_qdate;
 		cdata->out->poll_req.msg = strdup(c_msg);
 
@@ -615,7 +727,7 @@ epp_call_poll_ack(void *globs, int session, epp_command_data *cdata)
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
 
-	response = ccReg_EPP_PollAck(( (epp_corba_globs *) globs)->service,
+	response = ccReg_EPP_PollAcknoledge(( (epp_corba_globs *) globs)->service,
 			cdata->in->poll_ack.msgid,
 			&c_count,
 			&c_msgID,

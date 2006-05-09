@@ -41,8 +41,26 @@
   -->
     <complexType name="crupdType">
       <sequence>
-        <element name="name" type="nsset:nssT"/>
+        <element name="id" type="nsset:nssT"/>
+        <element name="roid" type="eppcom:roidType"/>
+        <element name="status" type="nsset:statusType"
+         minOccurs="0" maxOccurs="11"/>
+        <element name="clID" type="eppcom:clIDType"/>
+        <element name="crID" type="eppcom:clIDType"
+         minOccurs="0"/>
+        <element name="crDate" type="dateTime"
+         minOccurs="0"/>
+        <element name="upID" type="eppcom:clIDType"
+         minOccurs="0"/>
+        <element name="upDate" type="dateTime"
+         minOccurs="0"/>
+        <element name="trDate" type="dateTime"
+         minOccurs="0"/>
+        <element name="authInfo" type="domain:authInfoType"
+         minOccurs="0"/>
         <element name="ns" type="nsset:nsT" minOccurs="0" maxOccurs="9"/>
+        <element name="tech" type="eppcom:clIDType"
+         minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
     </complexType>
 
@@ -56,18 +74,9 @@
     <complexType name="nsT">
       <sequence>
         <element name="name" type="eppcom:labelType"/>
-        <element name="addr" type="nsset:addrType"
+        <element name="addr" type="nsset:addrStringType"
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
-    </complexType>
-
-    <complexType name="addrType">
-      <simpleContent>
-        <extension base="nsset:addrStringType">
-          <attribute name="ip" type="nsset:ipType"
-           default="v4"/>
-        </extension>
-      </simpleContent>
     </complexType>
 
     <simpleType name="addrStringType">
@@ -77,10 +86,37 @@
       </restriction>
     </simpleType>
 
-    <simpleType name="ipType">
+  <!--
+  Status is a combination of attributes and an optional human-readable
+  message that may be expressed in languages other than English.
+  -->
+    <complexType name="statusType">
+      <simpleContent>
+        <extension base="normalizedString">
+          <attribute name="s" type="nsset:statusValueType"
+           use="required"/>
+          <attribute name="lang" type="language"
+           default="en"/>
+        </extension>
+      </simpleContent>
+    </complexType>
+
+    <simpleType name="statusValueType">
       <restriction base="token">
-        <enumeration value="v4"/>
-        <enumeration value="v6"/>
+        <enumeration value="clientDeleteProhibited"/>
+        <enumeration value="clientHold"/>
+        <enumeration value="clientTransferProhibited"/>
+        <enumeration value="clientUpdateProhibited"/>
+        <enumeration value="inactive"/>
+        <enumeration value="ok"/>
+        <enumeration value="pendingCreate"/>
+        <enumeration value="pendingDelete"/>
+        <enumeration value="pendingTransfer"/>
+        <enumeration value="pendingUpdate"/>
+        <enumeration value="serverDeleteProhibited"/>
+        <enumeration value="serverHold"/>
+        <enumeration value="serverTransferProhibited"/>
+        <enumeration value="serverUpdateProhibited"/>
       </restriction>
     </simpleType>
 
@@ -89,7 +125,7 @@
   -->
     <complexType name="sIDType">
       <sequence>
-        <element name="name" type="nsset:nssT"/>
+        <element name="id" type="nsset:nssT"/>
       </sequence>
     </complexType>
 
@@ -98,7 +134,7 @@
   -->
     <complexType name="mNameType">
       <sequence>
-        <element name="name" type="nsset:nssT"
+        <element name="id" type="nsset:nssT"
          maxOccurs="unbounded"/>
       </sequence>
     </complexType>
@@ -121,7 +157,7 @@
 
     <complexType name="checkType">
       <sequence>
-        <element name="name" type="nsset:checkNameType"/>
+        <element name="id" type="nsset:checkNameType"/>
         <element name="reason" type="eppcom:reasonType"
          minOccurs="0"/>
       </sequence>
