@@ -70,7 +70,7 @@ typedef struct {
  * @ret Status (1 = success, 0 = failure)
  */
 static int
-epp_read_request(apr_pool_t *p, conn_rec *c, char **content, int *bytes)
+epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes)
 {
 		char *buf; /* buffer for user request */
 		uint32_t	hbo_size; /* size of request in host byte order */
@@ -105,7 +105,7 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, int *bytes)
 		}
 		if (len != EPP_HEADER_LENGTH) {
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-					"Weird EPP header size! (%d bytes)", len);
+					"Weird EPP header size! (%u bytes)", (unsigned int) len);
 			apr_brigade_destroy(bb);
 			return 0;
 		}
@@ -148,18 +148,18 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, int *bytes)
 		}
 
 		/* convert bucket brigade to string */
-		status = apr_brigade_pflatten(bb, content, bytes, p);
+		status = apr_brigade_pflatten(bb, content, &len, p);
 		if (status != APR_SUCCESS) {
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"Could not flatten apr_brigade!");
 			apr_brigade_destroy(bb);
 			return 0;
 		}
-		if (*bytes != hbo_size) {
+		if (len != hbo_size) {
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"EPP request's body size is other than claimed one:\n"
-					"\treal size is %4d bytes\n\tclaimed size is %4d bytes",
-					*bytes, hbo_size);
+					"\treal size is %4u bytes\n\tclaimed size is %4d bytes",
+					(unsigned) len, hbo_size);
 			apr_brigade_destroy(bb);
 			return 0;
 		}
@@ -168,6 +168,7 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, int *bytes)
 				"epp request received (length %u bytes)", hbo_size);
 
 		apr_brigade_destroy(bb);
+		*bytes = (unsigned) len;
 		return 1;
 }
 
@@ -184,10 +185,6 @@ static int epp_process_connection(conn_rec *c)
 	int	rc;
 	int	logout;	/* if true, terminate request loop */
 	int	firsttime;	/* if true, generate greeting in request loop */
-	parser_status	pstat;
-	corba_status	cstat;
-	gen_status	gstat;
-	epp_command_data	cdata;
 
 	apr_bucket_brigade	*bb;
 	apr_status_t	status;
@@ -221,6 +218,10 @@ static int epp_process_connection(conn_rec *c)
 		char *request;
 		unsigned	bytes;
 		apr_pool_t	*rpool;
+		parser_status	pstat;
+		epp_command_data	cdata;
+		corba_status	cstat = CORBA_OK;
+		gen_status	gstat = GEN_OK;
 
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
@@ -252,7 +253,7 @@ static int epp_process_connection(conn_rec *c)
 		if (pstat == PARSER_HELLO) {
 			gstat = epp_gen_greeting(sc->servername, &genstring);
 			if (gstat != GEN_OK) {
-				ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
 					"Error when creating epp greeting");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
@@ -358,9 +359,8 @@ static int epp_process_connection(conn_rec *c)
 							"Malloc in corba wrapper failed");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-
-			/* catch xml generator failures */
-			if (gstat != GEN_OK) {
+			else if (gstat != GEN_OK) {
+				/* catch xml generator failures */
 				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
 						"XML Generator failed - terminating session");
 				return HTTP_INTERNAL_SERVER_ERROR;
@@ -452,7 +452,7 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
 
 	if (len > 0)
 		ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, f->c,
-				"epp frame transmitted (length %u bytes)", len);
+				"epp frame transmitted (length %u bytes)", (unsigned) len);
 
 	return ap_pass_brigade(f->next, bb);
 }

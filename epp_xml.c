@@ -530,7 +530,7 @@ greeting_err:
 	xmlFreeTextWriter(writer);
 	if (!error_seen) {
 		/* succesfull end */
-		*greeting = strdup(buf->content);
+		*greeting = strdup((char *) buf->content);
 		xmlBufferFree(buf);
 		return GEN_OK;
 	}
@@ -607,7 +607,7 @@ simple_err:
 		return GEN_EBUILD;
 	}
 
-	*result = strdup(buf->content);
+	*result = strdup((char *) buf->content);
 	xmlBufferFree(buf);
 	return GEN_OK;
 }
@@ -737,7 +737,7 @@ parse_login(
 	}
 	else {
 		/* newPW cannot stay NULL */
-		cdata->in->login.newPW = xmlStrdup("");
+		cdata->in->login.newPW = (char *) xmlStrdup((xmlChar *) "");
 	}
 	xmlXPathFreeObject(xpathObj);
 
@@ -1085,7 +1085,8 @@ parse_info(
 		return;
 	}
 	node = nodeset->nodeTab[0];
-	cdata->in->info.id = xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
+	cdata->in->info.id = (char *)
+		xmlNodeListGetString(doc, node->xmlChildrenNode, 1);
 	xmlXPathFreeObject(xpathObj);
 
 	return;
@@ -1146,9 +1147,9 @@ parse_poll(
 		}
 		/* get value of attr msgID */
 		str = xmlGetNsProp(xpathObj->nodesetval->nodeTab[0],
-				BAD_CAST "msgID", NS_EPP);
+				BAD_CAST "msgID", BAD_CAST NS_EPP);
 		/* conversion is safe, if str in not a number, validator catches it */
-		cdata->in->poll_ack.msgid = atoi(str);
+		cdata->in->poll_ack.msgid = atoi((char *) str);
 		xmlFree(str);
 		cdata->type = EPP_POLL_ACK;
 	}
@@ -1296,7 +1297,7 @@ simple_err:
 		return GEN_EBUILD;
 	}
 
-	*result = strdup(buf->content);
+	*result = strdup((char *) buf->content);
 	xmlBufferFree(buf);
 	return GEN_OK;
 }
@@ -1478,7 +1479,7 @@ simple_err:
 		return GEN_EBUILD;
 	}
 
-	*result = strdup(buf->content);
+	*result = strdup((char *) buf->content);
 	xmlBufferFree(buf);
 	return GEN_OK;
 }
@@ -1595,7 +1596,7 @@ simple_err:
 		return GEN_EBUILD;
 	}
 
-	*result = strdup(buf->content);
+	*result = strdup((char *) buf->content);
 	xmlBufferFree(buf);
 	return GEN_OK;
 }
@@ -1707,7 +1708,7 @@ simple_err:
 		return GEN_EBUILD;
 	}
 
-	*result = strdup(buf->content);
+	*result = strdup((char *) buf->content);
 	xmlBufferFree(buf);
 	return GEN_OK;
 }
@@ -1787,7 +1788,7 @@ simple_err:
 		return GEN_EBUILD;
 	}
 
-	*result = strdup(buf->content);
+	*result = strdup((char *) buf->content);
 	xmlBufferFree(buf);
 	return GEN_OK;
 }
@@ -1864,7 +1865,7 @@ simple_err:
 		return GEN_EBUILD;
 	}
 
-	*result = strdup(buf->content);
+	*result = strdup((char *) buf->content);
 	xmlBufferFree(buf);
 	return GEN_OK;
 }
@@ -1994,11 +1995,11 @@ epp_parse_command(
 	}
 	nodeset = xpathObj->nodesetval;
 	if (nodeset && nodeset->nodeNr)
-		cdata->clTRID = xmlNodeListGetString(doc,
+		cdata->clTRID = (char *) xmlNodeListGetString(doc,
 				nodeset->nodeTab[0]->xmlChildrenNode, 1);
 	else {
 		/* we cannot leave clTRID NULL becauseof corba */
-		cdata->clTRID = xmlStrdup("");
+		cdata->clTRID = (char *) xmlStrdup(BAD_CAST "");
 	}
 	xmlXPathFreeObject(xpathObj);
 
@@ -2017,7 +2018,8 @@ epp_parse_command(
 	assert(nodeset && nodeset->nodeNr);
 
 	/* command lookup through hash table .. huraaa :) */
-	cmd = cmd_hash_lookup(globs->hash_cmd, nodeset->nodeTab[0]->name);
+	cmd = cmd_hash_lookup(globs->hash_cmd,
+			(char *) nodeset->nodeTab[0]->name);
 	xmlXPathFreeObject(xpathObj);
 
 	switch (cmd) {
