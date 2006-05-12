@@ -83,7 +83,8 @@ epp_parse_command(
  * @par greeting Greeting frame
  * @ret GEN_OK or other status in case of failure
  */
-gen_status epp_gen_greeting(const char *svid, char **greeting);
+gen_status
+epp_gen_greeting(const char *svid, char **greeting);
 
 /**
  * Generate login answer in XML format.

@@ -7,7 +7,7 @@ rfc 3730 and object mappings in rfc 3731, 3732, 3733 and our implementation.
 
 	*) New object mapping for domain (which is not compatible with standard
 	rfc 3731) was introduced. This is consequence of having nsset instead
-	of ns attribute and host object.
+	of ns attribute or host object. Tech contacts were moved in nsset object.
 
 	*) New object mapping for contact is used (which is not compatible with
 	standard rfc 3733). There are not international and local versions of

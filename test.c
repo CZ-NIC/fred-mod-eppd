@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* API: greeting */
-	gstat = epp_gen_greeting("Server ID", "curent:date", &greeting);
+	gstat = epp_gen_greeting("Server ID", &greeting);
 	if (gstat != GEN_OK) {
 		fputs("Error in greeting generator\n", stderr);
 		return 1;
@@ -144,12 +144,13 @@ int main(int argc, char *argv[])
 	else {
 		puts(greeting);
 	}
-	/* API: free greeting data */
-	epp_free_greeting(greeting);
 
 	session = 0;
 
 	while (1) {
+		int dofree;
+
+		dofree = 1;
 		fputs("Command: ", stderr);
 		switch (cmd = getcmd()) {
 			case CMD_CUSTOM:
@@ -173,16 +174,18 @@ int main(int argc, char *argv[])
 		pstat = epp_parse_command(session, xml_globs, text, strlen(text),
 				&cdata);
 		if (pstat == PARSER_HELLO) {
-			gstat = epp_gen_greeting(sc->server_name, &genstring);
+			gstat = epp_gen_greeting("Server ID", &greeting);
 			if (gstat != GEN_OK) {
 				fputs("Error when creating epp greeting\n", stderr);
 				return 1;
 			}
+			puts(greeting);
 		}
 		else if (pstat != PARSER_OK) {
 			fputs("Parser error\n", stderr);
 			continue;
 		}
+		else {
 
 		switch (cdata.type) {
 			case EPP_LOGIN:
@@ -311,14 +314,47 @@ int main(int argc, char *argv[])
 				}
 				else fputs("Corba call failed\n", stderr);
 				break;
+			case EPP_POLL_REQ:
+				/* API: call info nsset */
+				cstat = epp_call_poll_req(corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					/* API: generate info nsset */
+					gstat = epp_gen_poll_req(xml_globs, &cdata, &result);
+					if (gstat == GEN_OK) {
+						puts(result);
+						epp_free_genstring(result);
+					}
+					else fputs("Generator error\n", stderr);
+				}
+				else fputs("Corba call failed\n", stderr);
+				break;
+			case EPP_POLL_ACK:
+				/* API: call info nsset */
+				cstat = epp_call_poll_req(corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					/* API: generate info nsset */
+					gstat = epp_gen_poll_req(xml_globs, &cdata, &result);
+					if (gstat == GEN_OK) {
+						puts(result);
+						epp_free_genstring(result);
+					}
+					else fputs("Generator error\n", stderr);
+				}
+				else fputs("Corba call failed\n", stderr);
+				break;
 			default:
 				fputs("Unknown epp frame type\n", stderr);
+				dofree = 0;
 				break;
 		}
 
 		/* API: clean up command data */
-		epp_command_data_cleanup(&cdata);
+		if (dofree) epp_command_data_cleanup(&cdata);
 	}
+	}
+
+	/* API: free greeting data */
+	epp_free_genstring(greeting);
 
 	/* API: clean up globs */
 	epp_xml_init_cleanup(xml_globs);

@@ -129,8 +129,7 @@ typedef struct {
 }epp_discl;
 
 /**
- * Nameserver has a name and possibly more than one ip address and more than
- * one tech contact.
+ * Nameserver has a name and possibly more than one ip address
  */
 typedef struct {
 	char	*name;
@@ -214,7 +213,6 @@ typedef struct {
 			struct circ_list	*status;
 			char	*registrant;
 			struct circ_list	*admin;
-			struct circ_list	*tech;
 			char	*nsset;
 			char	*clID;
 			char	*crID;

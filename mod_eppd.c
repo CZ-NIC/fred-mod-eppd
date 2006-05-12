@@ -188,7 +188,6 @@ static int epp_process_connection(conn_rec *c)
 	corba_status	cstat;
 	gen_status	gstat;
 	epp_command_data	cdata;
-	char date[40]; /* should be enough for rfc822 date */
 
 	apr_bucket_brigade	*bb;
 	apr_status_t	status;
@@ -251,7 +250,7 @@ static int epp_process_connection(conn_rec *c)
 
 		/* is it <hello> frame? */
 		if (pstat == PARSER_HELLO) {
-			gstat = epp_gen_greeting(sc->server_name, &genstring);
+			gstat = epp_gen_greeting(sc->servername, &genstring);
 			if (gstat != GEN_OK) {
 				ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
 					"Error when creating epp greeting");
@@ -295,6 +294,13 @@ static int epp_process_connection(conn_rec *c)
 							&genstring);
 				}
 				break;
+			case EPP_CHECK_NSSET:
+				cstat = epp_call_check_nsset(sc->corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					gstat = epp_gen_check_nsset(sc->xml_globs, &cdata,
+							&genstring);
+				}
+				break;
 			case EPP_INFO_CONTACT:
 				cstat = epp_call_info_contact(sc->corba_globs, session, &cdata);
 				if (cstat == CORBA_OK) {
@@ -306,6 +312,13 @@ static int epp_process_connection(conn_rec *c)
 				cstat = epp_call_info_domain(sc->corba_globs, session, &cdata);
 				if (cstat == CORBA_OK) {
 					gstat = epp_gen_info_domain(sc->xml_globs, &cdata,
+							&genstring);
+				}
+				break;
+			case EPP_INFO_NSSET:
+				cstat = epp_call_info_nsset(sc->corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					gstat = epp_gen_info_nsset(sc->xml_globs, &cdata,
 							&genstring);
 				}
 				break;
@@ -462,7 +475,18 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 
 		if (sc->epp_enabled) {
 			if (sc->iorfile == NULL) {
-				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s, "EPPiorfile not configured");
+				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+						"EPPiorfile not configured");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+			if (sc->schema == NULL) {
+				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+						"EPP schema not configured");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+			if (sc->servername == NULL) {
+				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+						"EPP Servername not configured");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 
@@ -593,6 +617,33 @@ static const char *set_schema(cmd_parms *cmd, void *dummy,
     return NULL;
 }
 
+static const char *set_servername(cmd_parms *cmd, void *dummy,
+		const char *a1)
+{
+	const char *err;
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(s->module_config, &eppd_module);
+
+	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
+    if (err) return err;
+
+	/*
+	 * catch double definition of servername
+	 * that's not serious fault so we will just print message in log
+	 */
+	if (sc->servername != NULL) {
+		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+			"mod_eppd: more than one definition of servername. All but\
+			the first one will be ignored");
+		return NULL;
+	}
+
+	sc->servername = apr_pstrdup(cmd->pool, a1);
+
+    return NULL;
+}
+
 static const command_rec eppd_cmds[] = {
     AP_INIT_FLAG("EPPprotocol", set_epp_protocol, NULL, RSRC_CONF,
 			 "Whether this server is serving the epp protocol"),
@@ -600,6 +651,8 @@ static const command_rec eppd_cmds[] = {
 		 "File where is stored IOR of EPP service"),
 	AP_INIT_TAKE1("EPPschema", set_schema, NULL, RSRC_CONF,
 		 "URL of XML schema of EPP protocol"),
+	AP_INIT_TAKE1("EPPservername", set_servername, NULL, RSRC_CONF,
+		 "Name of server sent in EPP greeting"),
     { NULL }
 };
 

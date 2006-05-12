@@ -91,7 +91,6 @@
       <restriction base="token">
         <enumeration value="admin"/>
         <enumeration value="billing"/>
-        <enumeration value="tech"/>
       </restriction>
     </simpleType>
 

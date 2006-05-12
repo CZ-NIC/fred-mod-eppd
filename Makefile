@@ -1,12 +1,18 @@
+#
+# Konfigurovatelna cast Makefilu
+#
 APXS	= apxs
 APR-CONFIG	= apr-config
 ORBIT2-CONFIG	= orbit2-config
 ORBIT-IDL-2	= orbit-idl-2
 PKG-CONFIG	= pkg-config
+IDL	= ../cr/idl/ccReg.idl
 
+#
+# Nasledujici cast by nemela vyzadovat zadne zasahy
+#
 IDLOUT	= ccReg.h ccReg-common.c ccReg-stubs.c
 OBJS	= mod_eppd.o epp_xml.o epp-client.o ccReg-common.o ccReg-stubs.o
-IDL	= ../cr/idl/ccReg.idl
 
 ORB_LDFLAGS	= $(shell $(ORBIT2-CONFIG) --libs | sed -e s/-Wl,//g -e s/-pthread/-lpthread/g)
 ORB_CFLAGS	= $(shell $(ORBIT2-CONFIG) --cflags)

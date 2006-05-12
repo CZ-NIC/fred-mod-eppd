@@ -61,7 +61,7 @@
 
 #define WRITE_ELEMENT(writer, err_handler, elem, str)	\
 	do {										\
-		if (((char *) str)[0] == '\0')						\
+		if (((char *) str)[0] != '\0')						\
 			if (xmlTextWriterWriteElement(writer, BAD_CAST (elem), BAD_CAST (str)) < 0) goto err_handler;	\
 	}while(0)
 
@@ -147,7 +147,7 @@ static void get_rfc3339_date(long long date, char *str)
 		return;
 	}
 	snprintf(str, 25, "%04d-%02d-%02dT%02d:%02d:%02d.0Z",
-			t.tm_year, t.tm_mon, t.tm_mday,
+			1900 + t.tm_year, t.tm_mon, t.tm_mday,
 			t.tm_hour, t.tm_min, t.tm_sec);
 }
 
@@ -496,13 +496,12 @@ epp_gen_greeting(const char *svid, char **greeting)
 	START_ELEMENT(writer, greeting_err, "svcMenu");
 	WRITE_ELEMENT(writer, greeting_err, "version", "1.0");
 	WRITE_ELEMENT(writer, greeting_err, "lang", "en");
-	END_ELEMENT(writer, greeting_err);
+	END_ELEMENT(writer, greeting_err); /* svcMenu */
 	START_ELEMENT(writer, greeting_err, "svcs");
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_CONTACT);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_DOMAIN);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_NSSET);
-	END_ELEMENT(writer, greeting_err);
-
+	END_ELEMENT(writer, greeting_err); /* svcs */
 	/* dcp part */
 	START_ELEMENT(writer, greeting_err, "dcp");
 	START_ELEMENT(writer, greeting_err, "access");
@@ -928,7 +927,7 @@ parse_check(
 		assert(obj_type == EPP_NSSET);
 		cdata->type = EPP_CHECK_NSSET;
 		xpathObj = xmlXPathEvalExpression(
-			BAD_CAST "/epp:epp/epp:command/epp:check/nsset:check/nsset:name",
+			BAD_CAST "/epp:epp/epp:command/epp:check/nsset:check/nsset:id",
 			xpathCtx);
 	}
 	if (xpathObj == NULL) {
@@ -1068,7 +1067,7 @@ parse_info(
 		assert(obj_type == EPP_NSSET);
 		cdata->type = EPP_INFO_NSSET;
 		xpathObj = xmlXPathEvalExpression(
-			BAD_CAST "/epp:epp/epp:command/epp:info/nsset:info/nsset:name",
+			BAD_CAST "/epp:epp/epp:command/epp:info/nsset:info/nsset:id",
 			xpathCtx);
 	}
 	if (xpathObj == NULL) {
@@ -1204,6 +1203,13 @@ epp_gen_check(
 	char	res_code[5];
 	char	error_seen = 1;
 
+	/* catch error responses */
+	if (cdata->rc != 1000) {
+		simple_response(((epp_xml_globs *) globs)->hash_msg,
+				cdata->rc, cdata->clTRID, cdata->svTRID, result);
+		return GEN_OK;
+	}
+
 	// make up response
 	buf = xmlBufferCreate();
 	if (buf == NULL) {
@@ -1254,7 +1260,6 @@ epp_gen_check(
 	CL_RESET(cdata->out->check.bools);
 	CL_FOREACH(cdata->in->check.ids) {
 		CL_NEXT(cdata->out->check.bools);
-		assert(CL_CONTENT(cdata->out->check.bools) != NULL);
 		if (obj_type == EPP_CONTACT) {
 			START_ELEMENT(writer, simple_err, "contact:cd");
 			START_ELEMENT(writer, simple_err, "contact:id");
@@ -1324,7 +1329,7 @@ epp_gen_check_nsset(void *globs, epp_command_data *cdata, char **result)
 }
 
 gen_status
-epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result)
+epp_gen_info_contact(void *globs, epp_command_data *cdata, char **result)
 {
 	epp_postalInfo	*pi;
 	epp_discl	*discl;
@@ -1334,9 +1339,16 @@ epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result)
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	error_seen = 1;
 
-	assert(xml_globs != NULL);
+	assert(globs != NULL);
 	assert(cdata != NULL);
 	assert(cdata->out != NULL);
+
+	/* catch error responses */
+	if (cdata->rc != 1000) {
+		simple_response(((epp_xml_globs *) globs)->hash_msg,
+				cdata->rc, cdata->clTRID, cdata->svTRID, result);
+		return GEN_OK;
+	}
 
 	// make up response
 	buf = xmlBufferCreate();
@@ -1361,7 +1373,7 @@ epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
 	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) xml_globs)->hash_msg, cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
 	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "msg", str);
 	END_ELEMENT(writer, simple_err);
@@ -1472,7 +1484,7 @@ simple_err:
 }
 
 gen_status
-epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result)
+epp_gen_info_domain(void *globs, epp_command_data *cdata, char **result)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -1480,9 +1492,16 @@ epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result)
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	error_seen = 1;
 
-	assert(xml_globs != NULL);
+	assert(globs != NULL);
 	assert(cdata != NULL);
 	assert(cdata->out != NULL);
+
+	/* catch error responses */
+	if (cdata->rc != 1000) {
+		simple_response(((epp_xml_globs *) globs)->hash_msg,
+				cdata->rc, cdata->clTRID, cdata->svTRID, result);
+		return GEN_OK;
+	}
 
 	// make up response
 	buf = xmlBufferCreate();
@@ -1507,7 +1526,7 @@ epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
 	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) xml_globs)->hash_msg, cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
 	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "msg", str);
 	END_ELEMENT(writer, simple_err);
@@ -1535,14 +1554,6 @@ epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result)
 		WRITE_ATTRIBUTE(writer, simple_err, "type", "admin");
 		WRITE_STRING(writer, simple_err,
 				CL_CONTENT(cdata->out->info_domain.admin));
-		END_ELEMENT(writer, simple_err);
-	}
-	CL_RESET(cdata->out->info_domain.tech);
-	CL_FOREACH(cdata->out->info_domain.tech) {
-		START_ELEMENT(writer, simple_err, "domain:contact");
-		WRITE_ATTRIBUTE(writer, simple_err, "type", "tech");
-		WRITE_STRING(writer, simple_err,
-				CL_CONTENT(cdata->out->info_domain.tech));
 		END_ELEMENT(writer, simple_err);
 	}
 	WRITE_ELEMENT(writer, simple_err, "domain:nsset",
@@ -1590,7 +1601,7 @@ simple_err:
 }
 
 gen_status
-epp_gen_info_nsset(void *xml_globs, epp_command_data *cdata, char **result)
+epp_gen_info_nsset(void *globs, epp_command_data *cdata, char **result)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -1598,9 +1609,16 @@ epp_gen_info_nsset(void *xml_globs, epp_command_data *cdata, char **result)
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	error_seen = 1;
 
-	assert(xml_globs != NULL);
+	assert(globs != NULL);
 	assert(cdata != NULL);
 	assert(cdata->out != NULL);
+
+	/* catch error responses */
+	if (cdata->rc != 1000) {
+		simple_response(((epp_xml_globs *) globs)->hash_msg,
+				cdata->rc, cdata->clTRID, cdata->svTRID, result);
+		return GEN_OK;
+	}
 
 	// make up response
 	buf = xmlBufferCreate();
@@ -1625,7 +1643,7 @@ epp_gen_info_nsset(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
 	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) xml_globs)->hash_msg, cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
 	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "msg", str);
 	END_ELEMENT(writer, simple_err);
@@ -1695,7 +1713,7 @@ simple_err:
 }
 
 gen_status
-epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result)
+epp_gen_poll_req(void *globs, epp_command_data *cdata, char **result)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -1703,9 +1721,16 @@ epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result)
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	error_seen = 1;
 
-	assert(xml_globs != NULL);
+	assert(globs != NULL);
 	assert(cdata != NULL);
 	assert(cdata->out != NULL);
+
+	/* catch error responses */
+	if (cdata->rc != 1301) {
+		simple_response(((epp_xml_globs *) globs)->hash_msg,
+				cdata->rc, cdata->clTRID, cdata->svTRID, result);
+		return GEN_OK;
+	}
 
 	// make up response
 	buf = xmlBufferCreate();
@@ -1730,7 +1755,7 @@ epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
 	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) xml_globs)->hash_msg, cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
 	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "msg", str);
 	END_ELEMENT(writer, simple_err);
@@ -1768,7 +1793,7 @@ simple_err:
 }
 
 gen_status
-epp_gen_poll_ack(void *xml_globs, epp_command_data *cdata, char **result)
+epp_gen_poll_ack(void *globs, epp_command_data *cdata, char **result)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -1776,9 +1801,16 @@ epp_gen_poll_ack(void *xml_globs, epp_command_data *cdata, char **result)
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	error_seen = 1;
 
-	assert(xml_globs != NULL);
+	assert(globs != NULL);
 	assert(cdata != NULL);
 	assert(cdata->out != NULL);
+
+	/* catch error responses */
+	if (cdata->rc != 1000) {
+		simple_response(((epp_xml_globs *) globs)->hash_msg,
+				cdata->rc, cdata->clTRID, cdata->svTRID, result);
+		return GEN_OK;
+	}
 
 	// make up response
 	buf = xmlBufferCreate();
@@ -1803,7 +1835,7 @@ epp_gen_poll_ack(void *xml_globs, epp_command_data *cdata, char **result)
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
 	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) xml_globs)->hash_msg, cdata->rc);
+	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
 	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "msg", str);
 	END_ELEMENT(writer, simple_err);
@@ -1930,7 +1962,7 @@ epp_parse_command(
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
-	if (xpathObj->nodesetval || xpathObj->nodesetval->nodeNr == 1) {
+	if (xpathObj->nodesetval && xpathObj->nodesetval->nodeNr == 1) {
 		xmlXPathFreeObject(xpathObj);
 		xmlFreeDoc(doc);
 		return PARSER_HELLO;
@@ -2046,10 +2078,8 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 	 * corba function might not be called and therefore svTRID might be
 	 * still NULL.
 	 */
-	if (cdata->svTRID != NULL) {
+	if (cdata->svTRID != NULL)
 		free(cdata->svTRID);
-		assert(cdata->out == NULL);
-	}
 
 	switch (cdata->type) {
 		case EPP_LOGIN:
@@ -2146,11 +2176,6 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				CL_FOREACH(cdata->out->info_domain.admin)
 					free(CL_CONTENT(cdata->out->info_domain.admin));
 				CL_PURGE(cdata->out->info_domain.admin);
-				/* tech contacts */
-				CL_RESET(cdata->out->info_domain.tech);
-				CL_FOREACH(cdata->out->info_domain.tech)
-					free(CL_CONTENT(cdata->out->info_domain.tech));
-				CL_PURGE(cdata->out->info_domain.tech);
 				free(cdata->out->info_domain.nsset);
 				free(cdata->out->info_domain.clID);
 				free(cdata->out->info_domain.crID);
@@ -2184,7 +2209,6 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			}
 			break;
 		case EPP_POLL_REQ:
-			assert(cdata->in != NULL);
 			if (cdata->out != NULL)
 				free(cdata->out->poll_req.msg);
 			break;

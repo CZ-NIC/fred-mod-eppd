@@ -274,6 +274,7 @@ epp_call_check(void *globs, int session, epp_command_data *cdata,
 		ret = CORBA_REMOTE_ERROR;
 	}
 	else {
+		ret = CORBA_OK;
 		if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL)
 			ret = CORBA_INT_ERROR;
 		else {
@@ -286,12 +287,13 @@ epp_call_check(void *globs, int session, epp_command_data *cdata,
 			}
 			else {
 				CL_NEW(cdata->out->check.bools);
+				assert(len == bools->_length);
 				for (i = 0; i < bools->_length; i++) {
 					item = malloc(sizeof *item);
-					CL_CONTENT(cdata->out->check.bools) = (void *)
-						(bools->_buffer[i] ? 1 : 0);
+					CL_CONTENT(item) = (void *) (bools->_buffer[i] ? 1 : 0);
+					CL_ADD(cdata->out->check.bools, item);
 				}
-				if (i == bools->_length) ret = CORBA_OK;
+				if (i != bools->_length) ret = CORBA_INT_ERROR;
 				cdata->svTRID = strdup(response->svTRID);
 				cdata->rc = response->errCode;
 			}
@@ -335,7 +337,7 @@ epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 
 	response = ccReg_EPP_ContactInfo(( (epp_corba_globs *) globs)->service,
 			cdata->in->info.id,
-			c_contact,
+			&c_contact,
 			session,
 			cdata->clTRID,
 			ev);
@@ -355,6 +357,7 @@ epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 	else {
 		epp_postalInfo	*pi;
 		epp_discl	*discl;
+		struct circ_list	*item;
 
 		if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL)
 			ret = CORBA_INT_ERROR;
@@ -394,21 +397,21 @@ epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 			cdata->out->info_contact.trDate = c_contact->TrDate;
 			/* contact status */
 			CL_NEW(cdata->out->info_contact.status);
-			for (i = 0; i < c_contact->status->_length; i++) {
+			for (i = 0; i < c_contact->stat._length; i++) {
 				item = malloc(sizeof *item);
-				CL_CONTENT(item) =(void *) strdup(c_contact->status->_buffer[i]);
+				CL_CONTENT(item) =(void *) strdup(c_contact->stat._buffer[i]);
 				CL_ADD(cdata->out->info_contact.status, item);
 			}
 			pi = cdata->out->info_contact.postalInfo;
-			pi->name = strdup(c_contact->postalInfo->Name);
-			pi->org = strdup(c_contact->postalInfo->Organization);
-			pi->street1 = strdup(c_contact->postalInfo->Street1);
-			pi->street2 = strdup(c_contact->postalInfo->Street2);
-			pi->street3 = strdup(c_contact->postalInfo->Street3);
-			pi->city = strdup(c_contact->postalInfo->City);
-			pi->sp = strdup(c_contact->postalInfo->StateOrProvince);
-			pi->pc = strdup(c_contact->postalInfo->PostalCode);
-			pi->cc = strdup(c_contact->postalInfo->Country);
+			pi->name = strdup(c_contact->Name);
+			pi->org = strdup(c_contact->Organization);
+			pi->street1 = strdup(c_contact->Street1);
+			pi->street2 = strdup(c_contact->Street2);
+			pi->street3 = strdup(c_contact->Street3);
+			pi->city = strdup(c_contact->City);
+			pi->sp = strdup(c_contact->StateOrProvince);
+			pi->pc = strdup(c_contact->PostalCode);
+			pi->cc = strdup(c_contact->Country);
 			/* others */
 			cdata->out->info_contact.voice = strdup(c_contact->Telephone);
 			cdata->out->info_contact.fax = strdup(c_contact->Fax);
@@ -430,6 +433,7 @@ epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 			cdata->svTRID = strdup(response->svTRID);
 			cdata->rc = response->errCode;
 			ret = CORBA_OK;
+		}
 	}
 
 	CORBA_free(response);
@@ -450,7 +454,7 @@ epp_call_info_domain(void *globs, int session, epp_command_data *cdata)
 
 	response = ccReg_EPP_DomainInfo(( (epp_corba_globs *) globs)->service,
 			cdata->in->info.id,
-			c_domain,
+			&c_domain,
 			session,
 			cdata->clTRID,
 			ev);
@@ -485,14 +489,6 @@ epp_call_info_domain(void *globs, int session, epp_command_data *cdata)
 			cdata->out = NULL;
 			ret = CORBA_INT_ERROR;
 		}
-		else if ((cdata->out->info_domain.tech = malloc(sizeof *item)) == NULL)
-		{
-			free(cdata->out->info_domain.admin);
-			free(cdata->out->info_domain.status);
-			free(cdata->out);
-			cdata->out = NULL;
-			ret = CORBA_INT_ERROR;
-		}
 		/* ok, now everything was successfully allocated */
 		else {
 			int i;
@@ -510,24 +506,18 @@ epp_call_info_domain(void *globs, int session, epp_command_data *cdata)
 			cdata->out->info_domain.nsset = strdup(c_domain->nsset);
 			cdata->out->info_domain.authInfo = strdup(c_domain->AuthInfoPw);
 
-			/* allocate and initialize status, admin and tech lists */
+			/* allocate and initialize status, admin lists */
 			CL_NEW(cdata->out->info_domain.status);
 			CL_NEW(cdata->out->info_domain.admin);
-			CL_NEW(cdata->out->info_domain.tech);
-			for (i = 0; i < c_domain->status->_length; i++) {
+			for (i = 0; i < c_domain->stat._length; i++) {
 				item = malloc(sizeof *item);
-				CL_CONTENT(item) = (void *) strdup(c_domain->status->_buffer[i]);
+				CL_CONTENT(item) = (void *) strdup(c_domain->stat._buffer[i]);
 				CL_ADD(cdata->out->info_domain.status, item);
 			}
-			for (i = 0; i < c_domain->admin->_length; i++) {
+			for (i = 0; i < c_domain->admin._length; i++) {
 				item = malloc(sizeof *item);
-				CL_CONTENT(item) = (void *) strdup(c_domain->admin->_buffer[i]);
+				CL_CONTENT(item) = (void *) strdup(c_domain->admin._buffer[i]);
 				CL_ADD(cdata->out->info_domain.admin, item);
-			}
-			for (i = 0; i < c_domain->tech->_length; i++) {
-				item = malloc(sizeof *item);
-				CL_CONTENT(item) = (void *) strdup(c_domain->tech->_buffer[i]);
-				CL_ADD(cdata->out->info_domain.tech, item);
 			}
 
 			cdata->svTRID = strdup(response->svTRID);
@@ -549,15 +539,12 @@ epp_call_info_nsset(void *globs, int session, epp_command_data *cdata)
 	corba_status	ret;
 	ccReg_Response	*response;
 	ccReg_NSSet	*c_nsset;
-	struct circ_list	*tech;
-	struct circ_list	*addr;
-	epp_ns	*ns;
 
 	CORBA_exception_init(ev);
 
 	response = ccReg_EPP_NSSetInfo(( (epp_corba_globs *) globs)->service,
 			cdata->in->info.id,
-			c_nsset,
+			&c_nsset,
 			session,
 			cdata->clTRID,
 			ev);
@@ -615,37 +602,38 @@ epp_call_info_nsset(void *globs, int session, epp_command_data *cdata)
 
 			/* allocate and initialize status list */
 			CL_NEW(cdata->out->info_nsset.status);
-			for (i = 0; i < c_nsset->status->_length; i++) {
+			for (i = 0; i < c_nsset->stat._length; i++) {
 				item = malloc(sizeof *item);
-				CL_CONTENT(item) = (void *) strdup(c_nsset->status->_buffer[i]);
+				CL_CONTENT(item) = (void *) strdup(c_nsset->stat._buffer[i]);
 				CL_ADD(cdata->out->info_nsset.status, item);
 			}
 			/* allocate and initialize tech list */
 			CL_NEW(cdata->out->info_nsset.tech);
-			for (i = 0; i < c_nsset->tech->_length; i++) {
+			for (i = 0; i < c_nsset->tech._length; i++) {
 				item = malloc(sizeof *item);
-				CL_CONTENT(item) = (void *) strdup(c_nsset->tech->_buffer[i]);
+				CL_CONTENT(item) = (void *) strdup(c_nsset->tech._buffer[i]);
 				CL_ADD(cdata->out->info_nsset.tech, item);
 			}
 			/*
 			 * allocate and initialize required number of ns items
 			 */
 			CL_NEW(cdata->out->info_nsset.ns);
-			for (i = 0; i < c_nsset->dns->_length; i++) {
-				struct circ_list	*item_addr;
+			for (i = 0; i < c_nsset->dns._length; i++) {
 				epp_ns	*item_ns;
+
 				/* ns item */
 				item = malloc(sizeof *item);
-				((epp_ns *) CL_CONTENT(item)) = item_ns = malloc(sizeof *epp_ns);
+				item_ns = malloc(sizeof *item_ns);
+				CL_CONTENT(item) = (void *) item_ns;
 				CL_ADD(cdata->out->info_nsset.ns, item);
 				/* content of ns item */
-				item_ns->name = strdup(c_nsset->dns->_buffer[i]->fqdn);
+				item_ns->name = strdup(c_nsset->dns._buffer[i].fqdn);
 				item_ns->addr = malloc(sizeof (struct circ_list));
 				CL_NEW(item_ns->addr);
-				for (j = 0; j < c_nsset->dns->_buffer[i].inet->_length; j++) {
+				for (j = 0; j < c_nsset->dns._buffer[i].inet._length; j++) {
 					item = malloc(sizeof *item);
 					CL_CONTENT(item) = (void *)
-						strdup(c_nsset->dns->_buffer[i].inet->_buffer[j]);
+						strdup(c_nsset->dns._buffer[i].inet._buffer[j]);
 					CL_ADD(item_ns->addr, item);
 				}
 			}
@@ -668,16 +656,16 @@ epp_call_poll_req(void *globs, int session, epp_command_data *cdata)
 	ccReg_Response	*response;
 	corba_status	ret;
 	CORBA_Environment	ev[1];
-	CORBA_long	c_count;
+	CORBA_short	c_count;
 	CORBA_long	c_msgID;
-	CORBA_unsigned_long_long	c_qdate;
+	ccReg_timestamp	c_qdate;
 	CORBA_char	*c_msg;
 
 	CORBA_exception_init(ev);
 
 	response = ccReg_EPP_PollRequest(( (epp_corba_globs *) globs)->service,
-			&c_count,
 			&c_msgID,
+			&c_count,
 			&c_qdate,
 			&c_msg,
 			session,
@@ -710,7 +698,7 @@ epp_call_poll_req(void *globs, int session, epp_command_data *cdata)
 		cdata->rc = response->errCode;
 	}
 
-	CORBA_free(msg);
+	CORBA_free(c_msg);
 	CORBA_free(response);
 	return CORBA_OK;
 }
@@ -727,7 +715,7 @@ epp_call_poll_ack(void *globs, int session, epp_command_data *cdata)
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
 
-	response = ccReg_EPP_PollAcknoledge(( (epp_corba_globs *) globs)->service,
+	response = ccReg_EPP_PollAcknowledgement(( (epp_corba_globs *) globs)->service,
 			cdata->in->poll_ack.msgid,
 			&c_count,
 			&c_msgID,
