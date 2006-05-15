@@ -3,6 +3,7 @@
  */
 
 #include "httpd.h"
+#include "http_core.h"
 #include "http_log.h"
 #define CORE_PRIVATE
 #include "http_config.h"
@@ -16,8 +17,8 @@
 #ifndef APR_FOPEN_READ
 #define APR_FOPEN_READ	APR_READ
 #endif
-
 #include "apr_general.h"
+#include "apr_global_mutex.h"
 #include "apr_lib.h"	/* apr_isdigit() */
 #include "apr_pools.h"
 #include "apr_strings.h"
@@ -25,6 +26,9 @@
 
 #include "scoreboard.h"
 #include "util_filter.h"
+#ifdef AP_NEED_SET_MUTEX_PERMS
+#include "unixd.h"
+#endif
 
 /*
  * our header files
@@ -39,6 +43,17 @@
 
 module AP_MODULE_DECLARE_DATA eppd_module;
 
+/*
+ * Log levels used for logging to eppd log file.
+ */
+typedef enum {
+	EPP_FATAL = 1,
+	EPP_ERROR,
+	EPP_WARNING,
+	EPP_INFO,
+	EPP_DEBUG
+}epp_loglevel;
+
 /**
  * Configuration structure of eppd module.
  */
@@ -48,9 +63,15 @@ typedef struct {
 	char	*iorfile;	/* file with corba object ref */
 	char	*ior;	/* object reference */
 	char	*schema;	/* URL of EPP schema */
-	void	*xml_globs;	/* variables needed for xml parser and generator */
-	void	*corba_globs;	/* variables needed for corba part */
+	epp_xml_globs *xml_globs; /* variables needed for xml parser and generator */
+	epp_corba_globs	*corba_globs;	/* variables needed for corba part */
+	char	*epplog;	/* epp log file name */
+	apr_file_t	*epplogfp;	/* epp log file descriptor */
+	epp_loglevel	loglevel;	/* epp log level */
 }eppd_server_conf;
+
+/* used for epp log file */
+static apr_global_mutex_t *epp_log_lock;
 
 /**
  * This is wrapper function for compatibility reason. Apache 2.0 does
@@ -62,15 +83,87 @@ typedef struct {
 #endif
 
 /**
+ * Get well formated time for purposes of logging.
+ */
+static void current_logtime(char *buf, int nbytes)
+{
+    apr_time_exp_t t;
+    apr_size_t len;
+ 
+    apr_time_exp_lt(&t, apr_time_now());
+ 
+    apr_strftime(buf, &len, nbytes, "[%d/%b/%Y:%H:%M:%S ", &t);
+    apr_snprintf(buf+len, nbytes-len, "%c%.2d%.2d]",
+                 t.tm_gmtoff < 0 ? '-' : '+',
+                 t.tm_gmtoff / (60*60), t.tm_gmtoff % (60*60));
+}
+
+/**
+ * Write a log message to eppd's dedicated log file.
+ * @par c Connection record
+ * @par p Pool from which to allocate strings for internal use
+ * @par session Session ID of client
+ * @par level Log level
+ */
+static void epplog(conn_rec *c, apr_pool_t *p, int session, epp_loglevel level,
+						const char *fmt, ...)
+{
+    char *logline, *text;
+	char timestr[80];
+    const char *rhost;
+    apr_size_t nbytes;
+    apr_status_t rv;
+    va_list ap;
+    eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(c->base_server->module_config, &eppd_module);
+ 
+    if (!sc->epplogfp || level > sc->loglevel) {
+        return;
+    }
+ 
+    rhost = ap_get_remote_host(c, NULL, REMOTE_NOLOOKUP, NULL);
+ 
+    va_start(ap, fmt);
+    text = apr_pvsprintf(p, fmt, ap);
+    va_end(ap);
+ 
+	current_logtime(timestr, 79);
+    logline = apr_psprintf(p, "%s %s [sessionID %d] %s" APR_EOL_STR,
+						timestr,
+						rhost ? rhost : "UNKNOWN-HOST",
+						session,
+						text);
+
+    rv = apr_global_mutex_lock(epp_log_lock);
+    if (rv != APR_SUCCESS) {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, c,
+                      "apr_global_mutex_lock(epp_log_lock) failed");
+    }
+
+    nbytes = strlen(logline);
+    apr_file_write(sc->epplogfp, logline, &nbytes);
+
+    rv = apr_global_mutex_unlock(epp_log_lock);
+    if (rv != APR_SUCCESS) {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, c,
+                      "apr_global_mutex_unlock(epp_log_lock) failed");
+    }
+
+    return;
+}
+
+/**
  * Reads epp request.
  * @par c Connection
  * @par p Pool from which to allocate memory
  * @par content The resulting message
  * @par bytes Number of bytes in message
+ * @par session Session ID is passed only for logging purposes
  * @ret Status (1 = success, 0 = failure)
  */
 static int
-epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes)
+epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
+		int session)
 {
 		char *buf; /* buffer for user request */
 		uint32_t	hbo_size; /* size of request in host byte order */
@@ -85,8 +178,7 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes)
 		status = ap_get_brigade(c->input_filters, bb, AP_MODE_READBYTES,
 									APR_BLOCK_READ, EPP_HEADER_LENGTH);
 		if (status != APR_SUCCESS) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-					"Error when reading epp header");
+			epplog(c, p, session, EPP_FATAL, "Error when reading epp header");
 			return 0;
 		}
 
@@ -98,13 +190,12 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes)
 		len = EPP_HEADER_LENGTH;
 		status = apr_brigade_pflatten(bb, &buf, &len, p);
 		if (status != APR_SUCCESS) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-					"Could not flatten apr_brigade!");
+			epplog(c, p, session, EPP_FATAL, "Could not flatten apr_brigade!");
 			apr_brigade_destroy(bb);
 			return 0;
 		}
 		if (len != EPP_HEADER_LENGTH) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+			epplog(c, p, session, EPP_ERROR,
 					"Weird EPP header size! (%u bytes)", (unsigned int) len);
 			apr_brigade_destroy(bb);
 			return 0;
@@ -117,8 +208,7 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes)
 
 		status = apr_brigade_cleanup(bb);
 		if (status != APR_SUCCESS) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-					"Could not cleanup brigade!");
+			epplog(c, p, session, EPP_FATAL, "Could not cleanup brigade!");
 			apr_brigade_destroy(bb);
 			return 0;
 		}
@@ -131,7 +221,7 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes)
 		 * garbage
 		 */
 		if (hbo_size < 1 || hbo_size > MAX_FRAME_LENGTH) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+			epplog(c, p, session, EPP_ERROR,
 					"Invalid epp frame length (%u bytes)", hbo_size);
 			apr_brigade_destroy(bb);
 			return 0;
@@ -141,7 +231,7 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes)
 		status = ap_get_brigade(c->input_filters, bb, AP_MODE_READBYTES,
 									APR_BLOCK_READ, len);
 		if (status != APR_SUCCESS) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+			epplog(c, p, session, EPP_ERROR,
 					"Error when reading epp request's body");
 			apr_brigade_destroy(bb);
 			return 0;
@@ -150,13 +240,12 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes)
 		/* convert bucket brigade to string */
 		status = apr_brigade_pflatten(bb, content, &len, p);
 		if (status != APR_SUCCESS) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
-					"Could not flatten apr_brigade!");
+			epplog(c, p, session, EPP_FATAL, "Could not flatten apr_brigade!");
 			apr_brigade_destroy(bb);
 			return 0;
 		}
 		if (len != hbo_size) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+			epplog(c, p, session, EPP_ERROR,
 					"EPP request's body size is other than claimed one:\n"
 					"\treal size is %4u bytes\n\tclaimed size is %4d bytes",
 					(unsigned) len, hbo_size);
@@ -164,8 +253,9 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes)
 			return 0;
 		}
 
-		ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
-				"epp request received (length %u bytes)", hbo_size);
+		epplog(c, p, session, EPP_DEBUG, "request received (length %u bytes)",
+				hbo_size);
+		epplog(c, p, session, EPP_DEBUG, "request content: %s", *content);
 
 		apr_brigade_destroy(bb);
 		*bytes = (unsigned) len;
@@ -196,8 +286,6 @@ static int epp_process_connection(conn_rec *c)
 	if (!sc->epp_enabled)
 		return DECLINED;
 
-	ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
-			"epp connection handler enabled");
 	ap_update_child_status(c->sbh, SERVER_BUSY_READ, NULL);
 
 	/* add connection output filter */
@@ -229,7 +317,7 @@ static int epp_process_connection(conn_rec *c)
 
 		if (!firsttime) {
 			/* read request */
-			if (!epp_read_request(rpool, c, &request, &bytes)) {
+			if (!epp_read_request(rpool, c, &request, &bytes, session)) {
 				rc = HTTP_INTERNAL_SERVER_ERROR;
 				break;
 			}
@@ -247,13 +335,14 @@ static int epp_process_connection(conn_rec *c)
 			 */
 			firsttime = 0;
 			pstat = PARSER_HELLO;
+			epplog(c, rpool, session, EPP_DEBUG, "Client connected");
 		}
 
 		/* is it <hello> frame? */
 		if (pstat == PARSER_HELLO) {
 			gstat = epp_gen_greeting(sc->servername, &genstring);
 			if (gstat != GEN_OK) {
-				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+				epplog(c, rpool, session, EPP_FATAL,
 					"Error when creating epp greeting");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
@@ -338,7 +427,7 @@ static int epp_process_connection(conn_rec *c)
 				}
 				break;
 			default:
-				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+				epplog(c, rpool, session, EPP_WARNING,
 						"Unknown epp frame type - terminating session");
 				epp_command_data_cleanup(&cdata);
 				return HTTP_INTERNAL_SERVER_ERROR;
@@ -349,19 +438,19 @@ static int epp_process_connection(conn_rec *c)
 			/* catch corba failures */
 			if (cstat != CORBA_OK) {
 				if (cstat == CORBA_ERROR)
-					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+					epplog(c, rpool, session, EPP_ERROR,
 							"Corba call failed - terminating session");
 				else if (cstat == CORBA_REMOTE_ERROR)
-					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+					epplog(c, rpool, session, EPP_ERROR,
 							"Unqualified answer from server - terminating session");
 				else if (cstat == CORBA_INT_ERROR)
-					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+					epplog(c, rpool, session, EPP_FATAL,
 							"Malloc in corba wrapper failed");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 			else if (gstat != GEN_OK) {
 				/* catch xml generator failures */
-				ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+				epplog(c, rpool, session, EPP_FATAL,
 						"XML Generator failed - terminating session");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
@@ -371,27 +460,27 @@ static int epp_process_connection(conn_rec *c)
 		else {
 			switch (pstat) {
 				case PARSER_NOT_XML:
-					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
+					epplog(c, rpool, session, EPP_WARNING,
 							"Request is not XML");
 					rc = HTTP_BAD_REQUEST;
 					break;
 				case PARSER_NOT_VALID:
-					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
+					epplog(c, rpool, session, EPP_WARNING,
 							"Request doest not validate");
 					rc = HTTP_BAD_REQUEST;
 					break;
 				case PARSER_NOT_COMMAND:
-					ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, c,
-							"Request is not a command");
+					epplog(c, rpool, session, EPP_WARNING,
+							"Request is neither a command nor hello");
 					rc = HTTP_BAD_REQUEST;
 					break;
 				case PARSER_EINTERNAL:
-					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+					epplog(c, rpool, session, EPP_FATAL,
 						"Internal parser error occured when processing request");
 					rc = HTTP_INTERNAL_SERVER_ERROR;
 					break;
 				default:
-					ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+					epplog(c, rpool, session, EPP_FATAL,
 							"Unknown error occured during parsing stage");
 					rc = HTTP_BAD_REQUEST;
 					break;
@@ -403,22 +492,27 @@ static int epp_process_connection(conn_rec *c)
 		apr_brigade_puts(bb, NULL, NULL, genstring);
 		status = ap_fflush(c->output_filters, bb);
 		if (status != APR_SUCCESS) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+			epplog(c, rpool, session, EPP_FATAL,
 				"Error when sending response to client");
 			epp_free_genstring(genstring);
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
+
+		epplog(c, rpool, session, EPP_DEBUG, "Response sent back to client");
+		epplog(c, rpool, session, EPP_DEBUG, "Response content: %s", genstring);
 		epp_free_genstring(genstring);
 
 		status = apr_brigade_cleanup(bb);
 		if (status != APR_SUCCESS) {
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, status, c,
+			epplog(c, rpool, session, EPP_FATAL,
 				"Could not cleanup bucket brigade used for response");
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
 		apr_pool_destroy(rpool);
 	}
+
+	epplog(c, c->pool, session, EPP_INFO, "Client logged out");
 	return HTTP_OK;
 }
 
@@ -439,7 +533,7 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
 		/* catch weird situation which will probably never happen */
 		if (b->length == -1)
 			ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, f->c,
-			"Bucket with unknown length ... weird");
+			"mod_eppd: in filter - Bucket with unknown length ... weird");
 		else
 			len += b->length;
 	}
@@ -450,26 +544,53 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
 			NULL, f->c->bucket_alloc);
 	APR_BUCKET_INSERT_BEFORE(APR_BRIGADE_FIRST(bb), bnew);
 
-	if (len > 0)
-		ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, f->c,
-				"epp frame transmitted (length %u bytes)", (unsigned) len);
-
 	return ap_pass_brigade(f->next, bb);
+}
+
+static void epp_init_child_hook(apr_pool_t *p, server_rec *s)
+{
+	apr_status_t	rv;
+
+	rv = apr_global_mutex_child_init(&epp_log_lock, NULL, p);
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+                     "mod_eppd: could not init epp log lock in child");
+    }
 }
 
 static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 		apr_pool_t *ptemp, server_rec *s)
 {
 	eppd_server_conf *sc;
-	void	*xml_globs;
-	void	*corba_globs;
-	char	err_seen = 0;
+	apr_status_t	rv;
+
+    /* create the rewriting lockfiles in the parent */
+    if ((rv = apr_global_mutex_create(&epp_log_lock, NULL,
+                                      APR_LOCK_DEFAULT, p)) != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+                     "mod_eppd: could not create epp_log_lock");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+ 
+#ifdef AP_NEED_SET_MUTEX_PERMS  
+    rv = unixd_set_global_mutex_perms(epp_log_lock);
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+                     "mod_eppd: Could not set permissions on "
+                     "epp_log_lock; check User and Group directives");
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+#endif /* perms */
 
 	/*
 	 * Iterate through available servers and if eppd is enabled
-	 * do further checking
+	 * open epp log file and do further checking
 	 */
 	while (s != NULL) {
+		epp_xml_globs	*xml_globs;
+		epp_corba_globs	*corba_globs;
+		char	*fname;
+
 		sc = (eppd_server_conf *) ap_get_module_config(s->module_config,
 				&eppd_module);
 
@@ -489,7 +610,6 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 						"EPP Servername not configured");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-
 			/*
 			 * do initialization of xml
 			 */
@@ -499,7 +619,6 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 						"Could not initialize xml part");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-
 			/*
 			 * do initialization of corba
 			 */
@@ -509,15 +628,32 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 						"Corba initialization failed");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-
-
 			sc->xml_globs = xml_globs;
 			sc->corba_globs = corba_globs;
+
+			/*
+			 * open epp log file (if configured to do so)
+			 */
+			if (sc->epplog && !sc->epplogfp) {
+				fname = ap_server_root_relative(p, sc->epplog);
+				if (!fname) {
+					ap_log_error(APLOG_MARK, APLOG_ERR, APR_EBADPATH, s,
+							 "mod_eppd: Invalid EPPlog path %s", sc->epplog);
+					return HTTP_INTERNAL_SERVER_ERROR; 
+				}
+				if ((rv = apr_file_open(&sc->epplogfp, fname,
+							(APR_WRITE | APR_APPEND | APR_CREATE),
+							( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD ),
+							p))
+						!= APR_SUCCESS) {
+					ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+							 "mod_eppd: could not open EPPlog file %s", fname);
+					return HTTP_INTERNAL_SERVER_ERROR;
+				}
+			}
 		}
 		s = s->next;
 	}
-
-	if (err_seen) return HTTP_INTERNAL_SERVER_ERROR;
 
 	return OK;
 }
@@ -617,6 +753,33 @@ static const char *set_schema(cmd_parms *cmd, void *dummy,
     return NULL;
 }
 
+static const char *set_epplog(cmd_parms *cmd, void *dummy,
+		const char *a1)
+{
+	const char *err;
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(s->module_config, &eppd_module);
+
+	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
+    if (err) return err;
+
+	/*
+	 * catch double definition of iorfile
+	 * that's not serious fault so we will just print message in log
+	 */
+	if (sc->epplog != NULL) {
+		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+			"mod_eppd: more than one definition of epplog file. All but\
+			the first one will be ignored");
+		return NULL;
+	}
+
+	sc->epplog = apr_pstrdup(cmd->pool, a1);
+
+    return NULL;
+}
+
 static const char *set_servername(cmd_parms *cmd, void *dummy,
 		const char *a1)
 {
@@ -644,6 +807,47 @@ static const char *set_servername(cmd_parms *cmd, void *dummy,
     return NULL;
 }
 
+static const char *set_loglevel(cmd_parms *cmd, void *dummy,
+		const char *a1)
+{
+	const char *err;
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(s->module_config, &eppd_module);
+
+	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
+    if (err) return err;
+
+	/*
+	 * catch double definition of loglevel
+	 * that's not serious fault so we will just print message in log
+	 */
+	if (sc->loglevel != 0) {
+		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+			"mod_eppd: loglevel defined more than once. All but\
+			the first definition will be ignored");
+		return NULL;
+	}
+
+	/* translate loglevel name to loglevel number */
+	if (!apr_strnatcmp("fatal", a1))
+		sc->loglevel = EPP_FATAL;
+	else if (!apr_strnatcmp("error", a1))
+		sc->loglevel = EPP_ERROR;
+	else if (!apr_strnatcmp("warning", a1))
+		sc->loglevel = EPP_WARNING;
+	else if (!apr_strnatcmp("info", a1))
+		sc->loglevel = EPP_INFO;
+	else if (!apr_strnatcmp("debug", a1))
+		sc->loglevel = EPP_DEBUG;
+	else {
+		return "mod_eppd: log level must be one of "
+				"fatal, error, warning, info, debug";
+	}
+
+    return NULL;
+}
+
 static const command_rec eppd_cmds[] = {
     AP_INIT_FLAG("EPPprotocol", set_epp_protocol, NULL, RSRC_CONF,
 			 "Whether this server is serving the epp protocol"),
@@ -653,6 +857,10 @@ static const command_rec eppd_cmds[] = {
 		 "URL of XML schema of EPP protocol"),
 	AP_INIT_TAKE1("EPPservername", set_servername, NULL, RSRC_CONF,
 		 "Name of server sent in EPP greeting"),
+	AP_INIT_TAKE1("EPPlog", set_epplog, NULL, RSRC_CONF,
+		 "The file where come all log messages from mod_eppd"),
+	AP_INIT_TAKE1("EPPloglevel", set_loglevel, NULL, RSRC_CONF,
+		 "Log level setting for epp log (fatal, error, warning, info, debug)"),
     { NULL }
 };
 
@@ -666,6 +874,7 @@ static void *create_eppd_config(apr_pool_t *p, server_rec *s)
 
 static void register_hooks(apr_pool_t *p)
 {
+	ap_hook_child_init(epp_init_child_hook, NULL, NULL, APR_HOOK_MIDDLE);
 	ap_hook_post_config(epp_postconfig_hook, NULL, NULL, APR_HOOK_MIDDLE);
 	ap_hook_process_connection(epp_process_connection, NULL, NULL, APR_HOOK_MIDDLE);
 

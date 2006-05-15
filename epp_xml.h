@@ -42,20 +42,26 @@ typedef enum {
 } gen_status;
 
 /**
+ * Opaque stucture containing variables necessary for xml parsing and
+ * generating.
+ */
+typedef struct epp_xml_globs_t epp_xml_globs;
+
+/**
  * This routine should be called in postconfig phase.
  * This routine loads and checks validity of epp scheme.
  * Preprocessed schemes are returned for later use in epp request handler.
  * @par url_schema URL of schema
  * @ret Opaque server context
  */
-void *epp_xml_init(const char *url_schema);
+epp_xml_globs *epp_xml_init(const char *url_schema);
 
 /**
  * This will clean up preprocessed epp schema and message hash table.
  * Corba resources are released as well.
  * @par par Opaque server context
  */
-void epp_xml_init_cleanup(void *par);
+void epp_xml_init_cleanup(epp_xml_globs *xml_globs);
 
 /**
  * Parses request and gets structured data.
@@ -69,7 +75,7 @@ void epp_xml_init_cleanup(void *par);
 parser_status
 epp_parse_command(
 		int session,
-		void *globs,
+		epp_xml_globs *globs,
 		const char *request,
 		unsigned bytes,
 		epp_command_data *cdata);
@@ -93,7 +99,7 @@ epp_gen_greeting(const char *svid, char **greeting);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_login(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_login(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate logout answer in XML format.
@@ -102,7 +108,7 @@ epp_gen_login(void *xml_globs, epp_command_data *cdata, char **result);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_logout(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_logout(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate dummy (error) answer in XML format.
@@ -111,7 +117,7 @@ epp_gen_logout(void *xml_globs, epp_command_data *cdata, char **result);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_dummy(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_dummy(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate check contact answer in XML format.
@@ -120,7 +126,7 @@ epp_gen_dummy(void *xml_globs, epp_command_data *cdata, char **result);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_check_contact(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_check_contact(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate check domain answer in XML format.
@@ -129,7 +135,7 @@ epp_gen_check_contact(void *xml_globs, epp_command_data *cdata, char **result);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_check_domain(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_check_domain(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate check nsset answer in XML format.
@@ -138,7 +144,7 @@ epp_gen_check_domain(void *xml_globs, epp_command_data *cdata, char **result);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_check_nsset(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_check_nsset(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate info contact answer in XML format.
@@ -147,7 +153,7 @@ epp_gen_check_nsset(void *xml_globs, epp_command_data *cdata, char **result);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_info_contact(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate info domain answer in XML format.
@@ -156,7 +162,7 @@ epp_gen_info_contact(void *xml_globs, epp_command_data *cdata, char **result);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_info_domain(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate info nsset answer in XML format.
@@ -165,7 +171,7 @@ epp_gen_info_domain(void *xml_globs, epp_command_data *cdata, char **result);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_info_nsset(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_info_nsset(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate poll request answer in XML format.
@@ -174,7 +180,7 @@ epp_gen_info_nsset(void *xml_globs, epp_command_data *cdata, char **result);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_poll_req(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * Generate poll acknoledge answer in XML format.
@@ -183,7 +189,7 @@ epp_gen_poll_req(void *xml_globs, epp_command_data *cdata, char **result);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_poll_ack(void *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_poll_ack(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
  * free string allocated by generate functions.

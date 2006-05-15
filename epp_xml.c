@@ -121,13 +121,13 @@ struct cmd_hash_item_t {
  * represent global variables and are accessible through parser context
  * struct.
  */
-typedef struct {
+struct epp_xml_globs_t {
 	xmlSchemaPtr schema; /* schema against which are validated requests */
 	/* hash table for mapping return codes to textual messages */
 	msg_hash_item	*hash_msg[HASH_SIZE_MSG];
 	/* hash table for quick command lookup */
 	cmd_hash_item	*hash_cmd[HASH_SIZE_CMD];
-}epp_xml_globs;
+};
 
 
 /**
@@ -329,7 +329,7 @@ cmd_hash_clean(cmd_hash_item *hash_cmd[])
 	}
 }
 
-void *epp_xml_init(const char *url_schema)
+epp_xml_globs *epp_xml_init(const char *url_schema)
 {
 	xmlSchemaParserCtxtPtr spctx;
 	epp_xml_globs	*globs;
@@ -442,10 +442,10 @@ void *epp_xml_init(const char *url_schema)
 
 	xmlInitParser();
 
-	return (void *) globs;
+	return globs;
 }
 
-void epp_xml_init_cleanup(void *par)
+void epp_xml_init_cleanup(epp_xml_globs *par)
 {
 	epp_xml_globs	*globs = (epp_xml_globs *) par;
 
@@ -693,6 +693,7 @@ parse_login(
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:clID", xpathCtx);
 	if (xpathObj == NULL) {
 		free(cdata->in);
+		cdata->in = NULL;
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
 		return;
@@ -709,6 +710,7 @@ parse_login(
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:pw", xpathCtx);
 	if (xpathObj == NULL) {
 		free(cdata->in);
+		cdata->in = NULL;
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
 		return;
@@ -725,6 +727,7 @@ parse_login(
 		BAD_CAST "/epp:epp/epp:command/epp:login/epp:newPW", xpathCtx);
 	if (xpathObj == NULL) {
 		free(cdata->in);
+		cdata->in = NULL;
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
 		return;
@@ -747,6 +750,7 @@ parse_login(
 		xpathCtx);
 	if (xpathObj == NULL) {
 		free(cdata->in);
+		cdata->in = NULL;
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
 		return;
@@ -759,6 +763,7 @@ parse_login(
 		if ((cdata->in->login.objuri = malloc(sizeof *item)) == NULL)
 		{
 			free(cdata->in);
+			cdata->in = NULL;
 			cdata->rc = 2400;
 			cdata->type = EPP_DUMMY;
 			xmlXPathFreeObject(xpathObj);
@@ -772,6 +777,7 @@ parse_login(
 					free(CL_CONTENT(cdata->in->login.objuri));
 				CL_PURGE(cdata->in->login.objuri);
 				free(cdata->in);
+				cdata->in = NULL;
 				cdata->rc = 2400;
 				cdata->type = EPP_DUMMY;
 				xmlXPathFreeObject(xpathObj);
@@ -792,6 +798,7 @@ parse_login(
 		xpathCtx);
 	if (xpathObj == NULL) {
 		free(cdata->in);
+		cdata->in = NULL;
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
 		return;
@@ -803,6 +810,7 @@ parse_login(
 
 		if ((cdata->in->login.exturi = malloc(sizeof *item)) == NULL) {
 			free(cdata->in);
+			cdata->in = NULL;
 			cdata->rc = 2400;
 			cdata->type = EPP_DUMMY;
 			xmlXPathFreeObject(xpathObj);
@@ -817,6 +825,7 @@ parse_login(
 					free(CL_CONTENT(cdata->in->login.exturi));
 				CL_PURGE(cdata->in->login.exturi);
 				free(cdata->in);
+				cdata->in = NULL;
 				cdata->rc = 2400;
 				cdata->type = EPP_DUMMY;
 				return;
@@ -835,7 +844,7 @@ parse_login(
 }
 
 /**
- * <check> parser for domain and contact object.
+ * <check> parser for domain, contact and nsset object.
  * data in:
  *   - names of objects to be checked
  */
@@ -852,13 +861,6 @@ parse_check(
 	epp_object_type	obj_type;
 	struct circ_list	*item;
 	int	i;
-
-	/* check if the user is logged in */
-	if (session == 0) {
-		cdata->type = EPP_DUMMY;
-		cdata->rc = 2002;
-		return;
-	}
 
 	/* get object type - contact, domain or nsset */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST
@@ -947,6 +949,7 @@ parse_check(
 	if ((cdata->in->check.ids = malloc(sizeof *item)) == NULL) {
 		xmlXPathFreeObject(xpathObj);
 		free(cdata->in);
+		cdata->in = NULL;
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
 		return;
@@ -962,6 +965,7 @@ parse_check(
 				free(CL_CONTENT(cdata->in->check.ids));
 			CL_PURGE(cdata->in->check.ids);
 			free(cdata->in);
+			cdata->in = NULL;
 			cdata->rc = 2400;
 			cdata->type = EPP_DUMMY;
 			return;
@@ -992,13 +996,6 @@ parse_info(
 	xmlNodeSetPtr	nodeset;
 	xmlNode	*node;
 	epp_object_type	obj_type;
-
-	/* check if the user is logged in */
-	if (session == 0) {
-		cdata->type = EPP_DUMMY;
-		cdata->rc = 2002;
-		return;
-	}
 
 	/* get object type - contact or domain */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST
@@ -1105,13 +1102,6 @@ parse_poll(
 	xmlXPathObjectPtr	xpathObj;
 	xmlChar	*str;
 
-	/* check if the user is logged in */
-	if (session == 0) {
-		cdata->type = EPP_DUMMY;
-		cdata->rc = 2002;
-		return;
-	}
-
 	/* get poll type - request or acknoledge */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST
 			"/epp:epp/epp:command/epp:poll[@op='req']",
@@ -1160,8 +1150,420 @@ parse_poll(
 	return;
 }
 
+/**
+ * <create> parser for domain, contact and nsset object.
+ */
+static void
+parse_create(
+		int session,
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+	xmlNodeSetPtr	nodeset;
+	xmlChar	*str;
+	epp_object_type	obj_type;
+	struct circ_list	*item;
+	int	i;
+
+	/* get object type - contact, domain or nsset */
+	xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:create/contact:create",
+			xpathCtx);
+	if (xpathObj == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+		xmlXPathFreeObject(xpathObj);
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+				"/epp:epp/epp:command/epp:create/domain:create",
+				xpathCtx);
+		if (xpathObj == NULL) {
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+			xmlXPathFreeObject(xpathObj);
+			xpathObj = xmlXPathEvalExpression(BAD_CAST
+					"/epp:epp/epp:command/epp:create/nsset:create",
+					xpathCtx);
+			if (xpathObj == NULL) {
+				cdata->rc = 2400;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+			if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+				/* unexpected object type */
+				xmlXPathFreeObject(xpathObj);
+				cdata->rc = 2000;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+			/* object is a nsset */
+			else obj_type = EPP_NSSET;
+		}
+		/* object is a domain */
+		else obj_type = EPP_DOMAIN;
+	}
+	/* object is contact */
+	else obj_type = EPP_CONTACT;
+	xmlXPathFreeObject(xpathObj);
+
+	/*
+	 * Parse data for object domain 
+	 */
+	if (obj_type == EPP_DOMAIN) {
+		/* allocate necessary structures */
+		if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		if ((cdata->in->create_domain.admin = malloc(sizeof *item)) == NULL) {
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		/* get the domain data */
+		xpathObj = xmlXPathEvalExpression(
+			BAD_CAST "/epp:epp/epp:command/epp:create/domain:create/domain:name",
+			xpathCtx);
+		if (xpathObj == NULL) {
+			CL_PURGE(cdata->in->create_domain.admin);
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		nodeset = xpathObj->nodesetval;
+		assert(nodeset && nodeset->nodeNr == 1);
+		cdata->in->create_domain.name = xmlNodeListGetString(doc,
+				nodeset->nodeTab[0]->xmlChildrenNode, 1);
+		xmlXPathFreeObject(xpathObj);
+
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:create/domain:create/domain:registrant",
+			xpathCtx);
+		if (xpathObj == NULL) {
+			free(cdata->in->create_domain.name);
+			CL_PURGE(cdata->in->create_domain.admin);
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		nodeset = xpathObj->nodesetval;
+		if (nodeset && nodeset->nodeNr == 1)
+			cdata->in->create_domain.registrant = xmlNodeListGetString(doc,
+					nodeset->nodeTab[0]->xmlChildrenNode, 1);
+		else cdata->in->create_domain.registrant = strdup("");
+		xmlXPathFreeObject(xpathObj);
+		
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:create/domain:create/domain:nsset",
+			xpathCtx);
+		if (xpathObj == NULL) {
+			free(cdata->in->create_domain.name);
+			free(cdata->in->create_domain.registrant);
+			CL_PURGE(cdata->in->create_domain.admin);
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		nodeset = xpathObj->nodesetval;
+		if (nodeset && nodeset->nodeNr == 1)
+			cdata->in->create_domain.nsset = xmlNodeListGetString(doc,
+					nodeset->nodeTab[0]->xmlChildrenNode, 1);
+		else cdata->in->create_domain.registrant = strdup("");
+		xmlXPathFreeObject(xpathObj);
+		
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:create/domain:create/domain:period",
+			xpathCtx);
+		if (xpathObj == NULL) {
+			free(cdata->in->create_domain.name);
+			free(cdata->in->create_domain.registrant);
+			free(cdata->in->create_domain.nsset);
+			CL_PURGE(cdata->in->create_domain.admin);
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		nodeset = xpathObj->nodesetval;
+		if (nodeset && nodeset->nodeNr == 1) {
+			str = xmlNodeListGetString(doc,
+					nodeset->nodeTab[0]->xmlChildrenNode, 1);
+			cdata->in->create_domain.period = atoi(str);
+			xmlFree(str);
+			/* correct period value if given in years and not months */
+			str = xmlGetNsProp(nodeset->nodeTab[0],
+					BAD_CAST "unit", BAD_CAST NS_DOMAIN);
+			assert(str != NULL);
+			if (*str == 'y') cdata->in->create_domain.period *= 12;
+			xmlFree(str);
+		}
+		xmlXPathFreeObject(xpathObj);
+
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:create/domain:create/domain:authInfo",
+			xpathCtx);
+		if (xpathObj == NULL) {
+			free(cdata->in->create_domain.name);
+			free(cdata->in->create_domain.registrant);
+			free(cdata->in->create_domain.nsset);
+			CL_PURGE(cdata->in->create_domain.admin);
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		nodeset = xpathObj->nodesetval;
+		assert(nodeset && nodeset->nodeNr == 1);
+		cdata->in->create_domain.authInfo = xmlNodeListGetString(doc,
+				nodeset->nodeTab[0]->xmlChildrenNode, 1);
+		xmlXPathFreeObject(xpathObj);
+
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+			"/epp:epp/epp:command/epp:create/domain:create/domain:contact",
+			xpathCtx);
+		if (xpathObj == NULL) {
+			free(cdata->in->create_domain.name);
+			free(cdata->in->create_domain.registrant);
+			free(cdata->in->create_domain.nsset);
+			free(cdata->in->create_domain.authInfo);
+			CL_PURGE(cdata->in->create_domain.admin);
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		nodeset = xpathObj->nodesetval;
+		CL_NEW(cdata->in->create_domain.admin);
+		if (nodeset && nodeset->nodeNr > 0) {
+			for (i = 0; i < nodeset->nodeNr; i++) {
+				/* allocate new string list item */
+				if ((item = malloc(sizeof *item)) == NULL)
+				{
+					xmlXPathFreeObject(xpathObj);
+					/* free so far allocated items */
+					CL_FOREACH(cdata->in->create_domain.admin)
+						free(CL_CONTENT(cdata->in->create_domain.admin));
+					CL_PURGE(cdata->in->check.ids);
+					free(cdata->in->create_domain.name);
+					free(cdata->in->create_domain.registrant);
+					free(cdata->in->create_domain.nsset);
+					free(cdata->in->create_domain.authInfo);
+					CL_PURGE(cdata->in->create_domain.admin);
+					free(cdata->in);
+					cdata->in = NULL;
+					cdata->rc = 2400;
+					cdata->type = EPP_DUMMY;
+					return;
+				}
+				/* enqueue contact to admin list */
+				CL_CONTENT(item) = (void *)
+					xmlNodeListGetString(doc,
+							nodeset->nodeTab[i]->xmlChildrenNode,
+							1);
+				CL_ADD(cdata->in->create_domain.admin, item);
+			}
+		}
+		xmlXPathFreeObject(xpathObj);
+
+		cdata->type = EPP_CREATE_DOMAIN;
+	} /* DOMAIN object */
+
+	/*
+	 * Parse data for object contact 
+	 */
+	else if (obj_type == EPP_CONTACT) {
+		/* allocate necessary structures */
+		if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		if ((cdata->in->create_contact.postalInfo = calloc(1, sizeof
+						(*cdata->in->create_contact.postalInfo))) == NULL) {
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		if ((cdata->in->create_contact.discl = calloc(1, sizeof
+						(*cdata->in->create_contact.discl))) == NULL) {
+			free(cdata->in->create_contact.postalInfo);
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		/* get the contact data */
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+				"/epp:epp/epp:command/epp:create/contact:create/contact:id",
+				xpathCtx);
+		if (xpathObj == NULL) {
+			free(cdata->in->create_contact.discl);
+			free(cdata->in->create_contact.postalInfo);
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		nodeset = xpathObj->nodesetval;
+		assert(nodeset && nodeset->nodeNr == 1);
+		cdata->in->create_contact.id = xmlNodeListGetString(doc,
+				nodeset->nodeTab[0]->xmlChildrenNode, 1);
+		xmlXPathFreeObject(xpathObj);
+
+		xpathObj = xmlXPathEvalExpression(BAD_CAST
+				"/epp:epp/epp:command/epp:create/contact:create/"
+				"contact:postalInfo",
+				xpathCtx);
+		if (xpathObj == NULL) {
+			free(cdata->in->create_contact.discl);
+			free(cdata->in->create_contact.postalInfo);
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		nodeset = xpathObj->nodesetval;
+		if (nodeset && nodeset->nodeNr == 1) {
+			epp_postalInfo	*pi = cdata->in->create_contact.postalInfo;
+			xmlXPathFreeObject(xpathObj);
+			xpathObj = xmlXPathEvalExpression(BAD_CAST
+					"/epp:epp/epp:command/epp:create/contact:create/"
+					"contact:postalInfo/contact:name",
+					xpathCtx);
+			if (xpathObj == NULL) {
+				free(cdata->in->create_contact.discl);
+				free(pi);
+				free(cdata->in);
+				cdata->in = NULL;
+				cdata->rc = 2400;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+			nodeset = xpathObj->nodesetval;
+			assert(nodeset && nodeset->nodeNr == 1);
+			pi->name = xmlNodeListGetString(doc,
+					nodeset->nodeTab[0]->xmlChildrenNode, 1);
+			xmlXPathFreeObject(xpathObj);
+
+			xpathObj = xmlXPathEvalExpression(BAD_CAST
+					"/epp:epp/epp:command/epp:create/contact:create/"
+					"contact:postalInfo/contact:org",
+					xpathCtx);
+			if (xpathObj == NULL) {
+				free(pi->name);
+				free(pi);
+				free(cdata->in->create_contact.discl);
+				free(cdata->in);
+				cdata->in = NULL;
+				cdata->rc = 2400;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+			nodeset = xpathObj->nodesetval;
+			if (nodeset && nodeset->nodeNr == 1)
+				pi->org = xmlNodeListGetString(doc,
+						nodeset->nodeTab[0]->xmlChildrenNode, 1);
+			xmlXPathFreeObject(xpathObj);
+
+			xpathObj = xmlXPathEvalExpression(BAD_CAST
+					"/epp:epp/epp:command/epp:create/contact:create/"
+					"contact:postalInfo/contact:addr",
+					xpathCtx);
+			if (xpathObj == NULL) {
+				free(pi->org);
+				free(pi->name);
+				free(pi);
+				free(cdata->in->create_contact.discl);
+				free(cdata->in);
+				cdata->in = NULL;
+				cdata->rc = 2400;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+			nodeset = xpathObj->nodesetval;
+			assert(nodeset && nodeset->nodeNr == 1);
+			xmlXPathFreeObject(xpathObj);
+
+			xpathObj = xmlXPathEvalExpression(BAD_CAST
+					"/epp:epp/epp:command/epp:create/contact:create/"
+					"contact:postalInfo/contact:addr/contact:street",
+					xpathCtx);
+			if (xpathObj == NULL) {
+				free(pi->org);
+				free(pi->name);
+				free(pi);
+				free(cdata->in->create_contact.discl);
+				free(cdata->in);
+				cdata->in = NULL;
+				cdata->rc = 2400;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+			nodeset = xpathObj->nodesetval;
+			if (nodeset && nodeset->nodeNr > 0) {
+				int	i;
+
+				for (i = 0; i < nodeset->nodeNr; i++) {
+					switch (i) {
+						case 0:
+							pi->street1 = xmlNodeListGetString(doc,
+									nodeset->nodeTab[i]->xmlChildrenNode, 1);
+							break;
+						case 1:
+							pi->street2 = xmlNodeListGetString(doc,
+									nodeset->nodeTab[i]->xmlChildrenNode, 1);
+							break;
+						default:
+							pi->street3 = xmlNodeListGetString(doc,
+									nodeset->nodeTab[i]->xmlChildrenNode, 1);
+							break;
+					}
+				}
+				/* XXX */
+				/* XXX */
+				/* XXX */
+				/* Koood na hovno!!! */
+				/* XXX */
+				/* XXX */
+			}
+			xmlXPathFreeObject(xpathObj);
+		}
+		else {
+			xmlXPathFreeObject(xpathObj);
+			/* dumb init XXX */
+		}
+
+		cdata->type = EPP_CREATE_CONTACT;
+	} /* CONTACT object */
+
+}
+
 gen_status
-epp_gen_login(void *globs, epp_command_data *cdata, char **result)
+epp_gen_login(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -1170,7 +1572,7 @@ epp_gen_login(void *globs, epp_command_data *cdata, char **result)
 }
 
 gen_status
-epp_gen_logout(void *globs, epp_command_data *cdata, char **result)
+epp_gen_logout(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -1179,7 +1581,7 @@ epp_gen_logout(void *globs, epp_command_data *cdata, char **result)
 }
 
 gen_status
-epp_gen_dummy(void *globs, epp_command_data *cdata, char **result)
+epp_gen_dummy(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -1193,7 +1595,7 @@ epp_gen_dummy(void *globs, epp_command_data *cdata, char **result)
  */
 static gen_status
 epp_gen_check(
-		void *globs,
+		epp_xml_globs *globs,
 		epp_command_data *cdata,
 		char **result,
 		epp_object_type obj_type)
@@ -1303,7 +1705,7 @@ simple_err:
 }
 
 gen_status
-epp_gen_check_contact(void *globs, epp_command_data *cdata, char **result)
+epp_gen_check_contact(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -1312,7 +1714,7 @@ epp_gen_check_contact(void *globs, epp_command_data *cdata, char **result)
 }
 
 gen_status
-epp_gen_check_domain(void *globs, epp_command_data *cdata, char **result)
+epp_gen_check_domain(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -1321,7 +1723,7 @@ epp_gen_check_domain(void *globs, epp_command_data *cdata, char **result)
 }
 
 gen_status
-epp_gen_check_nsset(void *globs, epp_command_data *cdata, char **result)
+epp_gen_check_nsset(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -1330,7 +1732,7 @@ epp_gen_check_nsset(void *globs, epp_command_data *cdata, char **result)
 }
 
 gen_status
-epp_gen_info_contact(void *globs, epp_command_data *cdata, char **result)
+epp_gen_info_contact(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	epp_postalInfo	*pi;
 	epp_discl	*discl;
@@ -1485,7 +1887,7 @@ simple_err:
 }
 
 gen_status
-epp_gen_info_domain(void *globs, epp_command_data *cdata, char **result)
+epp_gen_info_domain(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -1602,7 +2004,7 @@ simple_err:
 }
 
 gen_status
-epp_gen_info_nsset(void *globs, epp_command_data *cdata, char **result)
+epp_gen_info_nsset(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -1714,7 +2116,7 @@ simple_err:
 }
 
 gen_status
-epp_gen_poll_req(void *globs, epp_command_data *cdata, char **result)
+epp_gen_poll_req(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -1794,7 +2196,7 @@ simple_err:
 }
 
 gen_status
-epp_gen_poll_ack(void *globs, epp_command_data *cdata, char **result)
+epp_gen_poll_ack(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -1879,7 +2281,7 @@ void epp_free_genstring(char *genstring)
 parser_status
 epp_parse_command(
 		int session,
-		void *par_globs,
+		epp_xml_globs *globs,
 		const char *request,
 		unsigned bytes,
 		epp_command_data *cdata)
@@ -1891,7 +2293,6 @@ epp_parse_command(
 	xmlXPathObjectPtr	xpathObj;
 	xmlNodeSetPtr	nodeset;
 	epp_red_command_type	cmd;
-	epp_xml_globs	*globs = (epp_xml_globs *) par_globs;
 
 	/* check input parameters */
 	assert(globs != NULL);
@@ -2022,6 +2423,15 @@ epp_parse_command(
 			(char *) nodeset->nodeTab[0]->name);
 	xmlXPathFreeObject(xpathObj);
 
+	/* check if the user is logged in */
+	if (cmd != EPP_RED_LOGIN && session == 0) {
+		cdata->type = EPP_DUMMY;
+		cdata->rc = 2002;
+		xmlXPathFreeContext(xpathCtx);
+		xmlFreeDoc(doc);
+		return PARSER_OK;
+	}
+
 	switch (cmd) {
 		case EPP_RED_LOGIN:
 			parse_login(session, doc, xpathCtx, cdata);
@@ -2047,11 +2457,13 @@ epp_parse_command(
 		case EPP_RED_POLL:
 			parse_poll(session, doc, xpathCtx, cdata);
 			break;
-		case EPP_RED_TRANSFER:
 		case EPP_RED_CREATE:
+			parse_create(session, doc, xpathCtx, cdata);
+			break;
 		case EPP_RED_DELETE:
 		case EPP_RED_RENEW:
 		case EPP_RED_UPDATE:
+		case EPP_RED_TRANSFER:
 		case EPP_RED_UNKNOWN_CMD:
 		default:
 			cdata->rc = 2000;
@@ -2209,6 +2621,45 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 					free(CL_CONTENT(cdata->out->info_nsset.tech));
 				CL_PURGE(cdata->out->info_nsset.tech);
 			}
+			break;
+		case EPP_CREATE_DOMAIN:
+			assert(cdata->in != NULL);
+			free(cdata->in->create_domain.name);
+			free(cdata->in->create_domain.registrant);
+			free(cdata->in->create_domain.nsset);
+			free(cdata->in->create_domain.authInfo);
+			/* admin */
+			CL_RESET(cdata->in->create_domain.admin);
+			CL_FOREACH(cdata->in->create_domain.admin)
+				free(CL_CONTENT(cdata->in->create_domain.admin));
+			CL_PURGE(cdata->in->create_domain.admin);
+			break;
+		case EPP_CREATE_CONTACT:
+			assert(cdata->in != NULL);
+			free(cdata->in->create_contact.id);
+			free(cdata->in->create_contact.voice);
+			free(cdata->in->create_contact.fax);
+			free(cdata->in->create_contact.email);
+			free(cdata->in->create_contact.authInfo);
+			free(cdata->in->create_contact.notify_email);
+			free(cdata->in->create_contact.vat);
+			free(cdata->in->create_contact.ssn);
+			assert(cdata->in->create_contact.postalInfo != NULL);
+			{
+				epp_postalInfo	*pi = cdata->in->create_contact.postalInfo;
+				free(pi->name);
+				free(pi->org);
+				free(pi->street1);
+				free(pi->street2);
+				free(pi->street3);
+				free(pi->city);
+				free(pi->sp);
+				free(pi->pc);
+				free(pi->cc);
+				free(pi);
+			}
+			assert(cdata->in->create_contact.discl != NULL);
+			free(cdata->in->create_contact.discl);
 			break;
 		case EPP_POLL_REQ:
 			if (cdata->out != NULL)

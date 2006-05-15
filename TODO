@@ -1,2 +1,3 @@
 *) Pri loginu je automaticky piggybacked zprava o poctu zprav ve fronte
-*) Adresa u nameserveru je unbounded - jak to pasuje do databaze?
+*) udelat logovani z epp do zvlastniho souboru
+*) dodelat transformacni funkce

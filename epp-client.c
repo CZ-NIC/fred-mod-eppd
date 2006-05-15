@@ -14,11 +14,15 @@
 
 #define raised_exception(ev)	((ev)->_major != CORBA_NO_EXCEPTION)
 
-
-typedef struct {
+/**
+ * Needed for corba function calls.
+ *   - corba is global corba object
+ *   - service is ccReg object handle
+ */
+struct epp_corba_globs_t {
 	CORBA_ORB	corba;
 	ccReg_EPP	service;
-}epp_corba_globs;
+};
 
 /**
  * Read string from stream.
@@ -57,7 +61,7 @@ read_string_from_stream(FILE *stream)
 }
 
 
-void *
+epp_corba_globs *
 epp_corba_init(const char *ior)
 {
 	CORBA_ORB  global_orb = CORBA_OBJECT_NIL; /* global orb */
@@ -92,11 +96,11 @@ epp_corba_init(const char *ior)
 
 	globs->corba = global_orb;
 	globs->service = e_service;
-	return (void *) globs;
+	return globs;
 }
 
 void
-epp_corba_init_cleanup(void *corba_globs)
+epp_corba_init_cleanup(epp_corba_globs *corba_globs)
 {
 	CORBA_Environment ev[1];
 	epp_corba_globs	*globs = (epp_corba_globs *) corba_globs;
@@ -111,7 +115,7 @@ epp_corba_init_cleanup(void *corba_globs)
 }
 
 corba_status
-epp_call_dummy(void *globs, int session, epp_command_data *cdata)
+epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
@@ -143,7 +147,7 @@ epp_call_dummy(void *globs, int session, epp_command_data *cdata)
 }
 
 corba_status
-epp_call_login(void *globs, int *session, epp_command_data *cdata)
+epp_call_login(epp_corba_globs *globs, int *session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	CORBA_exception_init(ev);
@@ -180,7 +184,7 @@ epp_call_login(void *globs, int *session, epp_command_data *cdata)
 }
 
 corba_status
-epp_call_logout(void *globs, int session, epp_command_data *cdata)
+epp_call_logout(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
@@ -217,7 +221,7 @@ epp_call_logout(void *globs, int session, epp_command_data *cdata)
  * kinds of objects.
  */
 static corba_status
-epp_call_check(void *globs, int session, epp_command_data *cdata,
+epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 		epp_object_type obj)
 {
 	CORBA_Environment ev[1];
@@ -308,25 +312,25 @@ epp_call_check(void *globs, int session, epp_command_data *cdata,
 }
 
 corba_status
-epp_call_check_contact(void *globs, int session, epp_command_data *cdata)
+epp_call_check_contact(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	return epp_call_check(globs, session, cdata, EPP_CONTACT);
 }
 
 corba_status
-epp_call_check_domain(void *globs, int session, epp_command_data *cdata)
+epp_call_check_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	return epp_call_check(globs, session, cdata, EPP_DOMAIN);
 }
 
 corba_status
-epp_call_check_nsset(void *globs, int session, epp_command_data *cdata)
+epp_call_check_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	return epp_call_check(globs, session, cdata, EPP_NSSET);
 }
 
 corba_status
-epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
+epp_call_info_contact(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	corba_status	ret;
@@ -443,7 +447,7 @@ epp_call_info_contact(void *globs, int session, epp_command_data *cdata)
 }
 
 corba_status
-epp_call_info_domain(void *globs, int session, epp_command_data *cdata)
+epp_call_info_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	corba_status	ret;
@@ -533,7 +537,7 @@ epp_call_info_domain(void *globs, int session, epp_command_data *cdata)
 }
 
 corba_status
-epp_call_info_nsset(void *globs, int session, epp_command_data *cdata)
+epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	corba_status	ret;
@@ -651,7 +655,7 @@ epp_call_info_nsset(void *globs, int session, epp_command_data *cdata)
 }
 
 corba_status
-epp_call_poll_req(void *globs, int session, epp_command_data *cdata)
+epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	ccReg_Response	*response;
 	corba_status	ret;
@@ -704,7 +708,7 @@ epp_call_poll_req(void *globs, int session, epp_command_data *cdata)
 }
 
 corba_status
-epp_call_poll_ack(void *globs, int session, epp_command_data *cdata)
+epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	CORBA_long	c_msgID;

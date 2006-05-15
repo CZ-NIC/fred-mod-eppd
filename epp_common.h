@@ -9,11 +9,13 @@ typedef enum {
 	EPP_UNKNOWN_CMD,
 	/*
 	 * 'dummy' is not a command from point of view of epp client, but is
-	 * command from central repozitory's point of view
+	 * command from central repository's point of view
 	 */
 	EPP_DUMMY,
+	/* session commands */
 	EPP_LOGIN,
 	EPP_LOGOUT,
+	/* query commands */
 	EPP_CHECK_CONTACT,
 	EPP_CHECK_DOMAIN,
 	EPP_CHECK_NSSET,
@@ -21,7 +23,21 @@ typedef enum {
 	EPP_INFO_DOMAIN,
 	EPP_INFO_NSSET,
 	EPP_POLL_REQ,
-	EPP_POLL_ACK
+	EPP_POLL_ACK,
+	/* transform commands */
+	EPP_CREATE_CONTACT,
+	EPP_CREATE_DOMAIN,
+	EPP_CREATE_NSSET,
+	EPP_DELETE_CONTACT,
+	EPP_DELETE_DOMAIN,
+	EPP_DELETE_NSSET,
+	EPP_UPDATE_CONTACT,
+	EPP_UPDATE_DOMAIN,
+	EPP_UPDATE_NSSET,
+	EPP_TRANSFER_CONTACT,
+	EPP_TRANSFER_DOMAIN,
+	EPP_TRANSFER_NSSET,
+	EPP_RENEW_DOMAIN
 }epp_command_type;
 
 /**
@@ -175,6 +191,28 @@ typedef struct {
 		struct {
 			int	msgid;
 		}poll_ack;
+		/* additional create domain parameters */
+		struct {
+			char	*name;
+			char	*registrant;
+			struct circ_list	*admin;
+			char	*nsset;
+			int	period;	/* in months */
+			char	*authInfo;
+		}create_domain;
+		/* additional create contact parameters */
+		struct {
+			char	*id;
+			epp_postalInfo	*postalInfo;
+			char	*voice;
+			char	*fax;
+			char	*email;
+			char	*authInfo;
+			char	*notify_email;
+			char	*vat;
+			char	*ssn;
+			epp_discl	*discl;
+		}create_contact;
 	}*in;
 	/*
 	 * output parameters
@@ -249,6 +287,15 @@ typedef struct {
 			int	count;
 			int	msgid;
 		}poll_ack;
+		/* additional create domain parameters */
+		struct {
+			long long	crDate;
+			long long	exdate;
+		}create_domain;
+		/* additional create contact parameters */
+		struct {
+			long long	crDate;
+		}create_domain;
 	}*out;
 }epp_command_data;
 
