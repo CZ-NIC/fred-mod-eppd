@@ -213,6 +213,13 @@ typedef struct {
 			char	*ssn;
 			epp_discl	*discl;
 		}create_contact;
+		/* additional create nsset parameters */
+		struct {
+			char	*id;
+			char	*authInfo;
+			struct circ_list	*tech;
+			struct circ_list	*ns;
+		}create_nsset;
 	}*in;
 	/*
 	 * output parameters
@@ -290,12 +297,8 @@ typedef struct {
 		/* additional create domain parameters */
 		struct {
 			long long	crDate;
-			long long	exdate;
-		}create_domain;
-		/* additional create contact parameters */
-		struct {
-			long long	crDate;
-		}create_domain;
+			long long	exDate; /* used only in domain object */
+		}create;
 	}*out;
 }epp_command_data;
 

@@ -146,6 +146,36 @@ epp_call_poll_req(epp_corba_globs *corba_globs, int session, epp_command_data *c
 corba_status
 epp_call_poll_ack(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
 
+/**
+ * Call corba create domain function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_create_domain(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
+
+/**
+ * Call corba create contact function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_create_contact(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
+
+/**
+ * Call corba create nsset function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_create_nsset(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
+
 
 /* Tranfer Commands
 typedef struct {

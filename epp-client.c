@@ -754,3 +754,24 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	CORBA_free(response);
 	return CORBA_OK;
 }
+
+corba_status
+epp_call_create_domain(epp_corba_globs *corba_globs, int session,
+		epp_command_data *cdata)
+{
+	return CORBA_OK;
+}
+
+corba_status
+epp_call_create_contact(epp_corba_globs *corba_globs, int session,
+		epp_command_data *cdata)
+{
+	return CORBA_OK;
+}
+
+corba_status
+epp_call_create_nsset(epp_corba_globs *corba_globs, int session,
+		epp_command_data *cdata)
+{
+	return CORBA_OK;
+}

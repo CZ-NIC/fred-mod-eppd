@@ -192,6 +192,33 @@ gen_status
 epp_gen_poll_ack(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
 
 /**
+ * Generate create domain in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_create_domain(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
+
+/**
+ * Generate create contact in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_create_contact(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
+
+/**
+ * Generate create nsset in XML format.
+ * @par cdata Input values
+ * @par result Generated string
+ * @ret GEN_OK if success
+ */
+gen_status
+epp_gen_create_nsset(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
+
+/**
  * free string allocated by generate functions.
  * @par genstring String to be freed
  */

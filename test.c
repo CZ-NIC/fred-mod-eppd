@@ -342,6 +342,48 @@ int main(int argc, char *argv[])
 				}
 				else fputs("Corba call failed\n", stderr);
 				break;
+			case EPP_CREATE_CONTACT:
+				/* API: call create contact */
+				cstat = epp_call_create_contact(corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					/* API: generate create contact */
+					gstat = epp_gen_create_contact(xml_globs, &cdata, &result);
+					if (gstat == GEN_OK) {
+						puts(result);
+						epp_free_genstring(result);
+					}
+					else fputs("Generator error\n", stderr);
+				}
+				else fputs("Corba call failed\n", stderr);
+				break;
+			case EPP_CREATE_DOMAIN:
+				/* API: call create domain */
+				cstat = epp_call_create_domain(corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					/* API: generate create domain */
+					gstat = epp_gen_create_domain(xml_globs, &cdata, &result);
+					if (gstat == GEN_OK) {
+						puts(result);
+						epp_free_genstring(result);
+					}
+					else fputs("Generator error\n", stderr);
+				}
+				else fputs("Corba call failed\n", stderr);
+				break;
+			case EPP_CREATE_NSSET:
+				/* API: call create nsset */
+				cstat = epp_call_create_nsset(corba_globs, session, &cdata);
+				if (cstat == CORBA_OK) {
+					/* API: generate create nsset */
+					gstat = epp_gen_create_nsset(xml_globs, &cdata, &result);
+					if (gstat == GEN_OK) {
+						puts(result);
+						epp_free_genstring(result);
+					}
+					else fputs("Generator error\n", stderr);
+				}
+				else fputs("Corba call failed\n", stderr);
+				break;
 			default:
 				fputs("Unknown epp frame type\n", stderr);
 				dofree = 0;
