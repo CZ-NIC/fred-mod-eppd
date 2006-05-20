@@ -88,10 +88,27 @@
  * This Combines xpath evaluation and error handling if unsuccessful
  */
 #define XPATH_EVAL(obj, ctx, err_handler, expr)	\
-	do {	\
-		(obj) = xmlXPathEvalExpression(BAD_CAST (expr), (ctx));	\
-		if (obj == NULL) goto err_handler;	\
+	do {                                        \
+		(obj) = xmlXPathEvalExpression(BAD_CAST (expr), (ctx));\
+		if (obj == NULL) goto err_handler;      \
 	}while(0);
+
+/*
+ * Sometimes we want to know only if the element is there or not
+ * If error occures we return 0, which means: object is not there
+ * (hope that it doesn't do much damage).
+ */
+static inline
+char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
+{
+		int ret;
+
+		xmlXPathObjectPtr obj = xmlXPathEvalExpression(BAD_CAST expr, ctx);
+		if (obj == NULL) return 0;
+		ret = xmlXPathNodeSetGetLength(obj->nodesetval);
+		xmlXPathFreeObject(obj);
+		return ret;
+}
 
 /*
  * In str is put the content of element described by xpath expression.
@@ -100,9 +117,9 @@
 #define XPATH_REQ1(str, doc, ctx, err_handler, expr)            \
 	do {                                                        \
 		xmlXPathObjectPtr obj = xmlXPathEvalExpression(BAD_CAST (expr), (ctx));\
-		if (obj == NULL) goto err_handler;                    \
-		assert(obj->nodesetval && obj->nodesetval->nodeNr == 1);\
-		(str) = xmlNodeListGetString((doc), obj->nodesetval->nodeTab[0]->xmlChildrenNode, 1);\
+		if (obj == NULL) goto err_handler;                      \
+		assert(xmlXPathNodeSetGetLength(obj->nodesetval) == 1); \
+		(str) = xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
 		xmlXPathFreeObject(obj);                                \
 	}while(0);
 
@@ -114,9 +131,9 @@
 #define XPATH_TAKE1(str, doc, ctx, err_handler, expr)           \
 	do {                                                        \
 		xmlXPathObjectPtr obj = xmlXPathEvalExpression(BAD_CAST (expr), (ctx));\
-		if (obj == NULL) goto err_handler;                    \
-		if (obj->nodesetval && obj->nodesetval->nodeNr == 1) {  \
-			(str) = xmlNodeListGetString((doc), obj->nodesetval->nodeTab[0]->xmlChildrenNode, 1);\
+		if (obj == NULL) goto err_handler;                      \
+		if (xmlXPathNodeSetGetLength(obj->nodesetval) == 1) {   \
+			(str) = xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
 		}                                                       \
 		else (str) = strdup("");                                \
 		xmlXPathFreeObject(obj);                                \
@@ -125,23 +142,23 @@
 /*
  * Same as above but fills a list of values instead of just one.
  */
-#define XPATH_TAKEN(list, doc, ctx, err_handler, expr)               \
+#define XPATH_TAKEN(list, doc, ctx, err_handler, expr)          \
 	do {                                                        \
 		int	i;                                                  \
 		struct circ_list	*item;                              \
 		xmlXPathObjectPtr obj = xmlXPathEvalExpression(BAD_CAST (expr), (ctx));\
 		if (obj == NULL) goto err_handler;                      \
-		if (obj->nodesetval && obj->nodesetval->nodeNr > 0) {   \
-			for (i = 0; i < obj->nodesetval->nodeNr; i++) {     \
+		if (xmlXPathNodeSetGetLength(obj->nodesetval) > 0) {    \
+			for (i = 0; i < xmlXPathNodeSetGetLength(obj->nodesetval); i++) {\
 				if ((item = malloc(sizeof *item)) == NULL) {    \
 					xmlXPathFreeObject(obj);                    \
 					goto err_handler;                           \
 				}                                               \
-				CL_CONTENT(item) = (void *) xmlNodeListGetString((doc), obj->nodesetval->nodeTab[i]->xmlChildrenNode, 1);\
-				CL_ADD((list), item);                             \
+				CL_CONTENT(item) = (void *) xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, i)->xmlChildrenNode, 1);\
+				CL_ADD((list), item);                           \
 			}                                                   \
 		}                                                       \
-		xmlXPathFreeObject(xpathObj);                           \
+		xmlXPathFreeObject(obj);                           \
 	}while(0);
 
 
@@ -611,77 +628,6 @@ greeting_err:
 }
 
 /**
- * Purpose of this function is to make things little bit easier
- * when generating simple frames, containing only code and message.
- * This is used mostly for generating error frames, but also for login
- * and logout responses.
- * @par hash_msg	Hash for textual message lookup
- * @par code	Result code
- * @par clTRID	Client transaction ID
- * @par svTRID	Server transaction ID
- * ret String containing response, NULL in case of failure
- */
-static gen_status
-simple_response(
-		msg_hash_item **hash_msg,
-		int code,
-		const char *clTRID,
-		const char *svTRID,
-		char **result)
-{
-	xmlBufferPtr buf;
-	xmlTextWriterPtr writer;
-	char	*str;
-	char	res_code[5];
-	char	error_seen = 1;
-
-	// make up response
-	buf = xmlBufferCreate();
-	if (buf == NULL) {
-		return GEN_EBUFFER;
-	}
-	writer = xmlNewTextWriterMemory(buf, 0);
-	if (writer == NULL) {
-		xmlBufferFree(buf);
-		return GEN_EWRITER;
-	}
-
-	START_DOCUMENT(writer, simple_err);
-
-	// epp header
-	START_ELEMENT(writer, simple_err, "epp");
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns", NS_EPP);
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:xsi", XSI);
-	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EPP);
-
-	// epp response
-	START_ELEMENT(writer, simple_err, "response");
-	START_ELEMENT(writer, simple_err, "result");
-	snprintf(res_code, 5, "%d", code);
-	str = msg_hash_lookup(hash_msg, code);
-	WRITE_ATTRIBUTE(writer, simple_err, "code", res_code);
-	WRITE_ELEMENT(writer, simple_err, "msg", str);
-	END_ELEMENT(writer, simple_err);
-	START_ELEMENT(writer, simple_err, "trID");
-	if (clTRID) WRITE_ELEMENT(writer, simple_err, "clTRID", clTRID);
-	WRITE_ELEMENT(writer, simple_err, "svTRID", svTRID);
-	END_DOCUMENT(writer, simple_err);
-
-	error_seen = 0;
-
-simple_err:
-	xmlFreeTextWriter(writer);
-	if (error_seen) {
-		xmlBufferFree(buf);
-		return GEN_EBUILD;
-	}
-
-	*result = strdup((char *) buf->content);
-	xmlBufferFree(buf);
-	return GEN_OK;
-}
-
-/**
  * Login parser.
  * checks:
  *   - language supported
@@ -794,57 +740,6 @@ parse_check(
 	epp_object_type	obj_type;
 	struct circ_list	*item;
 
-	/* get object type - contact, domain or nsset */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST
-			"/epp:epp/epp:command/epp:check/contact:check",
-			xpathCtx);
-	if (xpathObj == NULL) {
-		cdata->rc = 2400;
-		cdata->type = EPP_DUMMY;
-		return;
-	}
-	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
-		xmlXPathFreeObject(xpathObj);
-		xpathObj = xmlXPathEvalExpression(BAD_CAST
-				"/epp:epp/epp:command/epp:check/domain:check",
-				xpathCtx);
-		if (xpathObj == NULL) {
-			cdata->rc = 2400;
-			cdata->type = EPP_DUMMY;
-			return;
-		}
-		if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
-			xmlXPathFreeObject(xpathObj);
-			xpathObj = xmlXPathEvalExpression(BAD_CAST
-					"/epp:epp/epp:command/epp:check/nsset:check",
-					xpathCtx);
-			if (xpathObj == NULL) {
-				cdata->rc = 2400;
-				cdata->type = EPP_DUMMY;
-				return;
-			}
-			if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
-				/* unexpected object type */
-				xmlXPathFreeObject(xpathObj);
-				cdata->rc = 2000;
-				cdata->type = EPP_DUMMY;
-				return;
-			}
-			/* object is a nsset */
-			else obj_type = EPP_NSSET;
-		}
-		/* object is a domain */
-		else obj_type = EPP_DOMAIN;
-	}
-	/* object is contact */
-	else obj_type = EPP_CONTACT;
-	xmlXPathFreeObject(xpathObj);
-
-	/*  --- code length optimization ---
-	 *  since contact, domain and nsset <check> have the same structure and the
-	 *  only difference is in names of two xml tags, the code for passing
-	 *  is mostly shared
-	 */
 	/* allocate necessary structures */
 	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
 		cdata->rc = 2400;
@@ -859,22 +754,39 @@ parse_check(
 		return;
 	}
 	CL_NEW(cdata->in->check.ids);
-	/* get data */
-	if (obj_type == EPP_CONTACT) {
-		cdata->type = EPP_CHECK_CONTACT;
+
+	/* get object type - contact, domain or nsset */
+	if (xpath_exists(xpathCtx, "/epp:epp/epp:command/epp:check/contact:check"))
+	{
+		/* object is contact */
 		XPATH_TAKEN(cdata->in->check.ids, doc, xpathCtx, error_ch,
 				"/epp:epp/epp:command/epp:check/contact:check/contact:id");
+		cdata->type = EPP_CHECK_CONTACT;
 	}
-	else if (obj_type == EPP_DOMAIN) {
-		cdata->type = EPP_CHECK_DOMAIN;
+	else if (xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:check/domain:check"))
+	{
+		/* object is a domain */
 		XPATH_TAKEN(cdata->in->check.ids, doc, xpathCtx, error_ch,
 				"/epp:epp/epp:command/epp:check/domain:check/domain:name");
+		cdata->type = EPP_CHECK_DOMAIN;
 	}
-	else {
-		assert(obj_type == EPP_NSSET);
-		cdata->type = EPP_CHECK_NSSET;
+	else if (xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:check/nsset:check"))
+	{
+		/* object is a nsset */
 		XPATH_TAKEN(cdata->in->check.ids, doc, xpathCtx, error_ch,
 				"/epp:epp/epp:command/epp:check/nsset:check/nsset:id");
+		cdata->type = EPP_CHECK_NSSET;
+	}
+	else {
+		/* unexpected object type */
+		free(cdata->in->check.ids);
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2000;
+		cdata->type = EPP_DUMMY;
+		return;
 	}
 
 	return;
@@ -907,79 +819,44 @@ parse_info(
 	xmlXPathObjectPtr	xpathObj;
 	epp_object_type	obj_type;
 
-	/* get object type - contact, nsset or domain */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST
-			"/epp:epp/epp:command/epp:info/contact:info",
-			xpathCtx);
-	if (xpathObj == NULL) {
-		cdata->rc = 2400;
-		cdata->type = EPP_DUMMY;
-		return;
-	}
-	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
-		xmlXPathFreeObject(xpathObj);
-		xpathObj = xmlXPathEvalExpression(BAD_CAST
-				"/epp:epp/epp:command/epp:info/domain:info",
-				xpathCtx);
-		if (xpathObj == NULL) {
-			cdata->rc = 2400;
-			cdata->type = EPP_DUMMY;
-			return;
-		}
-		if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
-			xmlXPathFreeObject(xpathObj);
-			xpathObj = xmlXPathEvalExpression(BAD_CAST
-					"/epp:epp/epp:command/epp:info/nsset:info",
-					xpathCtx);
-			if (xpathObj == NULL) {
-				cdata->rc = 2400;
-				cdata->type = EPP_DUMMY;
-				return;
-			}
-			if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
-				/* unexpected object type */
-				xmlXPathFreeObject(xpathObj);
-				cdata->rc = 2000;
-				cdata->type = EPP_DUMMY;
-				return;
-			}
-			/* object is domain */
-			else obj_type = EPP_NSSET;
-		}
-		/* object is domain */
-		else obj_type = EPP_DOMAIN;
-	}
-	/* object is contact */
-	else obj_type = EPP_CONTACT;
-	xmlXPathFreeObject(xpathObj);
-
-	/*  --- code length optimization ---
-	 *  since contact and domain <info> have the same structure and the
-	 *  only difference is in names of two xml tags, the code for passing
-	 *  is mostly shared
-	 */
 	/* allocate necessary structures */
 	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
 		return;
 	}
-	/* get data */
-	if (obj_type == EPP_CONTACT) {
-		cdata->type = EPP_INFO_CONTACT;
+
+	/* get object type - contact, domain or nsset */
+	if (xpath_exists(xpathCtx, "/epp:epp/epp:command/epp:info/contact:info"))
+	{
+		/* object is contact */
 		XPATH_REQ1(cdata->in->info.id, doc, xpathCtx, error_i,
 				"/epp:epp/epp:command/epp:info/contact:info/contact:id");
+		cdata->type = EPP_INFO_CONTACT;
 	}
-	else if (obj_type == EPP_DOMAIN) {
-		cdata->type = EPP_INFO_DOMAIN;
+	else if (xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:info/domain:info"))
+	{
+		/* object is a domain */
 		XPATH_REQ1(cdata->in->info.id, doc, xpathCtx, error_i,
 				"/epp:epp/epp:command/epp:info/domain:info/domain:name");
+		cdata->type = EPP_INFO_DOMAIN;
 	}
-	else {
-		assert(obj_type == EPP_NSSET);
-		cdata->type = EPP_INFO_NSSET;
+	else if (xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:info/nsset:info"))
+	{
+		/* object is a nsset */
 		XPATH_REQ1(cdata->in->info.id, doc, xpathCtx, error_i,
 				"/epp:epp/epp:command/epp:info/nsset:info/nsset:id");
+		cdata->type = EPP_INFO_NSSET;
+	}
+	else {
+		/* unexpected object type */
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2000;
+		cdata->type = EPP_DUMMY;
+		return;
 	}
 
 	return;
@@ -1010,21 +887,12 @@ parse_poll(
 	xmlChar	*str;
 
 	/* get poll type - request or acknoledge */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST
-			"/epp:epp/epp:command/epp:poll[@op='req']",
-			xpathCtx);
-	if (xpathObj == NULL) {
-		cdata->rc = 2400;
-		cdata->type = EPP_DUMMY;
-		return;
-	}
-	if (xpathObj->nodesetval != NULL && xpathObj->nodesetval->nodeNr == 1) {
+	if (xpath_exists(xpathCtx, "/epp:epp/epp:command/epp:poll[@op='req']"))
+	{
 		/* it is request */
 		cdata->type = EPP_POLL_REQ;
-		xmlXPathFreeObject(xpathObj);
 		return;
 	}
-	xmlXPathFreeObject(xpathObj);
 
 	/* it should be acknoledge */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST
@@ -1035,7 +903,7 @@ parse_poll(
 		cdata->type = EPP_DUMMY;
 		return;
 	}
-	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
 		/* unexpected attr value */
 		xmlXPathFreeObject(xpathObj);
 		cdata->rc = 2000;
@@ -1050,7 +918,7 @@ parse_poll(
 		return;
 	}
 	/* get value of attr msgID */
-	str = xmlGetNsProp(xpathObj->nodesetval->nodeTab[0],
+	str = xmlGetNsProp(xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
 			BAD_CAST "msgID", BAD_CAST NS_EPP);
 	xmlXPathFreeObject(xpathObj);
 	/* conversion is safe, if str in not a number, validator catches it */
@@ -1085,33 +953,37 @@ parse_create_domain(
 		return;
 	}
 	CL_NEW(cdata->in->create_domain.admin);
+
 	/* get the domain data */
-	XPATH_REQ1(cdata->in->create_domain.name, doc, xpathCtx, cd_error,
+	XPATH_REQ1(cdata->in->create_domain.name, doc, xpathCtx, error_cd,
 			"/epp:epp/epp:command/epp:create/domain:create/domain:name");
-	XPATH_TAKE1(cdata->in->create_domain.registrant, doc, xpathCtx, cd_error,
+	XPATH_TAKE1(cdata->in->create_domain.registrant, doc, xpathCtx, error_cd,
 			"/epp:epp/epp:command/epp:create/domain:create/domain:registrant");
-	XPATH_TAKE1(cdata->in->create_domain.nsset, doc, xpathCtx, cd_error,
+	XPATH_TAKE1(cdata->in->create_domain.nsset, doc, xpathCtx, error_cd,
 			"/epp:epp/epp:command/epp:create/domain:create/domain:nsset");
-	XPATH_REQ1(cdata->in->create_domain.authInfo, doc, xpathCtx, cd_error,
+	XPATH_REQ1(cdata->in->create_domain.authInfo, doc, xpathCtx, error_cd,
 			"/epp:epp/epp:command/epp:create/domain:create/domain:authInfo");
 	/* domain period handling is slightly more difficult */
-	XPATH_EVAL(xpathObj, xpathCtx, cd_error,
+	XPATH_EVAL(xpathObj, xpathCtx, error_cd,
 			"/epp:epp/epp:command/epp:create/domain:create/domain:period");
-	if (xpathObj->nodesetval && xpathObj->nodesetval->nodeNr == 1) {
-		xmlChar	*str;
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
+		xmlChar	*str = xmlNodeListGetString(doc,
+				xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->xmlChildrenNode,
+				1);
+		assert(str != NULL && *str != '\0');
 		cdata->in->create_domain.period = atoi(str);
 		xmlFree(str);
 		/* correct period value if given in years and not months */
-		str = xmlGetNsProp(xpathObj->nodesetval->nodeTab[0],
+		str = xmlGetNsProp(xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
 				BAD_CAST "unit", BAD_CAST NS_DOMAIN);
-		assert(str != NULL);
+		assert(str != NULL && *str != '\0');
 		if (*str == 'y') cdata->in->create_domain.period *= 12;
 		xmlFree(str);
 	}
 	else cdata->in->create_domain.period = 0;
 	xmlXPathFreeObject(xpathObj);
-	/* process "unbounded" number of contacts */
-	XPATH_TAKEN(cdata->in->create_domain.admin, doc, xpathCtx, cd_error,
+	/* process "unbounded" number of admin contacts */
+	XPATH_TAKEN(cdata->in->create_domain.admin, doc, xpathCtx, error_cd,
 			"/epp:epp/epp:command/epp:create/domain:create/domain:contact");
 
 	cdata->type = EPP_CREATE_DOMAIN;
@@ -1122,7 +994,7 @@ parse_create_domain(
 	 * Used in case of internal critical failure. It is not terribly
 	 * effecient but this case should not occure very often.
 	 */
-cd_error:
+error_cd:
 	FREENULL(cdata->in->create_domain.name);
 	FREENULL(cdata->in->create_domain.registrant);
 	FREENULL(cdata->in->create_domain.admin);
@@ -1160,7 +1032,7 @@ parse_create_contact(
 		cdata->type = EPP_DUMMY;
 		return;
 	}
-	if ((cdata->in->create_contact.discl = calloc(1, sizeof
+	if ((cdata->in->create_contact.discl = malloc(sizeof
 					(*cdata->in->create_contact.discl))) == NULL) {
 		free(cdata->in->create_contact.postalInfo);
 		free(cdata->in);
@@ -1170,49 +1042,80 @@ parse_create_contact(
 		return;
 	}
 	/* get the contact data */
-	XPATH_REQ1(cdata->in->create_contact.id, doc, xpathCtx, cc_error,
+	XPATH_REQ1(cdata->in->create_contact.id, doc, xpathCtx, error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:id");
-	XPATH_TAKE1(cdata->in->create_contact.voice, doc, xpathCtx, cc_error,
+	XPATH_TAKE1(cdata->in->create_contact.voice, doc, xpathCtx, error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:voice");
-	XPATH_TAKE1(cdata->in->create_contact.fax, doc, xpathCtx, cc_error,
+	XPATH_TAKE1(cdata->in->create_contact.fax, doc, xpathCtx, error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:fax");
-	XPATH_REQ1(cdata->in->create_contact.email, doc, xpathCtx, cc_error,
+	XPATH_REQ1(cdata->in->create_contact.email, doc, xpathCtx, error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:email");
-	XPATH_TAKE1(cdata->in->create_contact.authInfo, doc, xpathCtx, cc_error,
+	XPATH_TAKE1(cdata->in->create_contact.authInfo, doc, xpathCtx, error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:authInfo");
-	XPATH_TAKE1(cdata->in->create_contact.vat, doc, xpathCtx, cc_error,
+	XPATH_TAKE1(cdata->in->create_contact.vat, doc, xpathCtx, error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:vat");
-	XPATH_TAKE1(cdata->in->create_contact.ssn, doc, xpathCtx, cc_error,
+	XPATH_TAKE1(cdata->in->create_contact.ssn, doc, xpathCtx, error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:ssn");
 	/* disclose info */
-	/* TODO parse disclose Info */
+	if (xpath_exists(xpathCtx,
+			"/epp:epp/epp:command/epp:create/contact:create"
+			"/contact:disclose[@flag='0']"))
+	{
+		cdata->in->create_contact.discl->name = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:create/contact:create"
+				"/contact:disclose/contact:name");
+		cdata->in->create_contact.discl->org = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:create/contact:create"
+				"/contact:disclose/contact:org");
+		cdata->in->create_contact.discl->addr = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:create/contact:create"
+				"/contact:disclose/contact:addr");
+		cdata->in->create_contact.discl->voice = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:create/contact:create"
+				"/contact:disclose/contact:voice");
+		cdata->in->create_contact.discl->fax = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:create/contact:create"
+				"/contact:disclose/contact:fax");
+		cdata->in->create_contact.discl->email = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:create/contact:create"
+				"/contact:disclose/contact:email");
+	}
 	/* postal info */
 	XPATH_REQ1(cdata->in->create_contact.postalInfo->name, doc, xpathCtx,
-			cc_error,
+			error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:postalInfo"
 			"/contact:name");
 	XPATH_TAKE1(cdata->in->create_contact.postalInfo->org, doc, xpathCtx,
-			cc_error,
+			error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:postalInfo"
 			"/contact:org");
-	/* TODO parse streets */
-	cdata->in->create_contact.postalInfo->street1 = strdup("");
-	cdata->in->create_contact.postalInfo->street2 = strdup("");
-	cdata->in->create_contact.postalInfo->street3 = strdup("");
+	XPATH_EVAL(xpathObj, xpathCtx, error_cc,
+			"/epp:epp/epp:command/epp:create/contact:create/contact:postalInfo"
+			"/contact:addr/contact:street");
+	if (xpathObj->nodesetval) {
+		int	i, j;
+		for (i = 0; i < xmlXPathNodeSetGetLength(xpathObj->nodesetval); i++)
+			cdata->in->create_contact.postalInfo->street[i] =
+					xmlNodeListGetString(doc, xmlXPathNodeSetItem(
+								xpathObj->nodesetval, i)->xmlChildrenNode, 1);
+		/* the rest must be empty strings */
+		for (j = i; j < 3; j++)
+			cdata->in->create_contact.postalInfo->street[i] = strdup("");
+	}
 	XPATH_REQ1(cdata->in->create_contact.postalInfo->city, doc, xpathCtx,
-			cc_error,
+			error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:postalInfo"
 			"/contact:addr/contact:city");
 	XPATH_TAKE1(cdata->in->create_contact.postalInfo->sp, doc, xpathCtx,
-			cc_error,
+			error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:postalInfo"
 			"/contact:addr/contact:sp");
 	XPATH_TAKE1(cdata->in->create_contact.postalInfo->pc, doc, xpathCtx,
-			cc_error,
+			error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:postalInfo"
 			"/contact:addr/contact:pc");
 	XPATH_REQ1(cdata->in->create_contact.postalInfo->cc, doc, xpathCtx,
-			cc_error,
+			error_cc,
 			"/epp:epp/epp:command/epp:create/contact:create/contact:postalInfo"
 			"/contact:addr/contact:cc");
 
@@ -1224,7 +1127,7 @@ parse_create_contact(
 	 * Used in case of internal critical failure. It is not terribly
 	 * effecient but this case should not occure very often.
 	 */
-cc_error:
+error_cc:
 	FREENULL(cdata->in->create_contact.id);
 	FREENULL(cdata->in->create_contact.voice);
 	FREENULL(cdata->in->create_contact.fax);
@@ -1236,16 +1139,16 @@ cc_error:
 	/* postal info */
 	FREENULL(cdata->in->create_contact.postalInfo->name);
 	FREENULL(cdata->in->create_contact.postalInfo->org);
-	FREENULL(cdata->in->create_contact.postalInfo->street1);
-	FREENULL(cdata->in->create_contact.postalInfo->street2);
-	FREENULL(cdata->in->create_contact.postalInfo->street3);
+	FREENULL(cdata->in->create_contact.postalInfo->street[0]);
+	FREENULL(cdata->in->create_contact.postalInfo->street[1]);
+	FREENULL(cdata->in->create_contact.postalInfo->street[2]);
 	FREENULL(cdata->in->create_contact.postalInfo->city);
 	FREENULL(cdata->in->create_contact.postalInfo->sp);
 	FREENULL(cdata->in->create_contact.postalInfo->pc);
 	FREENULL(cdata->in->create_contact.postalInfo->cc);
-	FREENULL(cdata->in->create_contact.postalInfo);
+	free(cdata->in->create_contact.postalInfo);
 	/* disclose info */
-	FREENULL(cdata->in->create_contact.discl);
+	free(cdata->in->create_contact.discl);
 	free(cdata->in);
 	cdata->in = NULL;
 	cdata->rc = 2400;
@@ -1288,12 +1191,12 @@ parse_create_nsset(
 	}
 	CL_NEW(cdata->in->create_nsset.ns);
 	/* get the domain data */
-	XPATH_REQ1(cdata->in->create_nsset.id, doc, xpathCtx, cn_error,
+	XPATH_REQ1(cdata->in->create_nsset.id, doc, xpathCtx, error_cn,
 			"/epp:epp/epp:command/epp:create/nsset:create/nsset:id");
-	XPATH_REQ1(cdata->in->create_nsset.authInfo, doc, xpathCtx, cn_error,
+	XPATH_REQ1(cdata->in->create_nsset.authInfo, doc, xpathCtx, error_cn,
 			"/epp:epp/epp:command/epp:create/nsset:create/nsset:authInfo");
 	/* process "unbounded" number of tech contacts */
-	XPATH_TAKEN(cdata->in->create_nsset.ns, doc, xpathCtx, cn_error,
+	XPATH_TAKEN(cdata->in->create_nsset.tech, doc, xpathCtx, error_cn,
 			"/epp:epp/epp:command/epp:create/nsset:create/nsset:tech");
 	/* TODO process ns list */
 	cdata->type = EPP_CREATE_NSSET;
@@ -1304,7 +1207,7 @@ parse_create_nsset(
 	 * Used in case of internal critical failure. It is not terribly
 	 * effecient but this case should not occure very often.
 	 */
-cn_error:
+error_cn:
 	FREENULL(cdata->in->create_nsset.id);
 	FREENULL(cdata->in->create_nsset.authInfo);
 	CL_FOREACH(cdata->in->create_nsset.tech)
@@ -1328,271 +1231,644 @@ parse_create(
 	xmlXPathObjectPtr	xpathObj;
 
 	/* get object type - contact, domain or nsset */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST
-			"/epp:epp/epp:command/epp:create/contact:create",
-			xpathCtx);
-	if (xpathObj == NULL) {
+	if (xpath_exists(xpathCtx,"/epp:epp/epp:command/epp:create/contact:create"))
+	{
+		/* object is contact */
+		parse_create_contact(doc, xpathCtx, cdata);
+	}
+	else if (xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:create/domain:create"))
+	{
+		/* object is a domain */
+		parse_create_domain(doc, xpathCtx, cdata);
+	}
+	else if (xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:create/nsset:create"))
+	{
+		/* object is a nsset */
+		parse_create_nsset(doc, xpathCtx, cdata);
+	}
+	else {
+		/* unexpected object type */
+		cdata->rc = 2000;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+}
+
+/**
+ * <delete> parser for domain, contact and nsset object.
+ */
+static void
+parse_delete(
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+
+	/* allocate necessary structures */
+	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
 		cdata->rc = 2400;
 		cdata->type = EPP_DUMMY;
 		return;
 	}
-	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
-		xmlXPathFreeObject(xpathObj);
-		xpathObj = xmlXPathEvalExpression(BAD_CAST
-				"/epp:epp/epp:command/epp:create/domain:create",
-				xpathCtx);
-		if (xpathObj == NULL) {
-			cdata->rc = 2400;
-			cdata->type = EPP_DUMMY;
-			return;
-		}
-		if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
-			xmlXPathFreeObject(xpathObj);
-			xpathObj = xmlXPathEvalExpression(BAD_CAST
-					"/epp:epp/epp:command/epp:create/nsset:create",
-					xpathCtx);
-			if (xpathObj == NULL) {
-				cdata->rc = 2400;
-				cdata->type = EPP_DUMMY;
-				return;
+
+	/* get object type - contact, domain or nsset */
+	if (xpath_exists(xpathCtx,"/epp:epp/epp:command/epp:delete/contact:delete"))
+	{
+		/* object is contact */
+		XPATH_REQ1(cdata->in->delete.id, doc, xpathCtx, error_d,
+				"/epp:epp/epp:command/epp:delete/contact:delete/contact:id");
+		cdata->type = EPP_DELETE_CONTACT;
+	}
+	else if (xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:delete/domain:delete"))
+	{
+		/* object is a domain */
+		XPATH_REQ1(cdata->in->delete.id, doc, xpathCtx, error_d,
+				"/epp:epp/epp:command/epp:delete/domain:delete/domain:name");
+		cdata->type = EPP_DELETE_DOMAIN;
+	}
+	else if (xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:delete/nsset:delete"))
+	{
+		/* object is a nsset */
+		XPATH_REQ1(cdata->in->delete.id, doc, xpathCtx, error_d,
+				"/epp:epp/epp:command/epp:delete/nsset:delete/nsset:id");
+		cdata->type = EPP_DELETE_NSSET;
+	}
+	else {
+		/* unexpected object type */
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2000;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+
+	return;
+
+	/*
+	 * nasty error's epilog
+	 * Used in case of internal critical failure. It is not terribly
+	 * effecient but this case should not occure very often.
+	 */
+error_d:
+	FREENULL(cdata->in->delete.id);
+	free(cdata->in);
+	cdata->in = NULL;
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
+/**
+ * Assistant procedure for parsing <update> domain
+ */
+static void
+parse_update_domain(
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+	struct circ_list	*item;
+
+	/* allocate necessary structures */
+	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	if ((cdata->in->update_domain.add_admin = malloc(sizeof *item)) == NULL) {
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_domain.add_admin);
+	if ((cdata->in->update_domain.rem_admin = malloc(sizeof *item)) == NULL) {
+		free(cdata->in->update_domain.add_admin);
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_domain.rem_admin);
+	if ((cdata->in->update_domain.add_status = malloc(sizeof *item)) == NULL) {
+		free(cdata->in->update_domain.add_admin);
+		free(cdata->in->update_domain.rem_admin);
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_domain.add_status);
+	if ((cdata->in->update_domain.rem_status = malloc(sizeof *item)) == NULL) {
+		free(cdata->in->update_domain.add_status);
+		free(cdata->in->update_domain.add_admin);
+		free(cdata->in->update_domain.rem_admin);
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_domain.rem_status);
+
+	/* get the update-domain data */
+	XPATH_REQ1(cdata->in->update_domain.name, doc, xpathCtx, error_ud,
+			"/epp:epp/epp:command/epp:update/domain:update/domain:name");
+	/* chg data */
+	XPATH_TAKE1(cdata->in->update_domain.registrant, doc, xpathCtx, error_ud,
+			"/epp:epp/epp:command/epp:update/domain:update/domain:chg"
+			"/domain:registrant");
+	XPATH_TAKE1(cdata->in->update_domain.nsset, doc, xpathCtx, error_ud,
+			"/epp:epp/epp:command/epp:update/domain:update/domain:chg"
+			"/domain:nsset");
+	XPATH_TAKE1(cdata->in->update_domain.authInfo, doc, xpathCtx, error_ud,
+			"/epp:epp/epp:command/epp:update/domain:update/domain:chg"
+			"/domain:authInfo");
+	/* add & rem data */
+	XPATH_TAKEN(cdata->in->update_domain.add_admin, doc, xpathCtx, error_ud,
+			"/epp:epp/epp:command/epp:update/domain:update/domain:add"
+			"/domain:contact");
+	XPATH_TAKEN(cdata->in->update_domain.rem_admin, doc, xpathCtx, error_ud,
+			"/epp:epp/epp:command/epp:update/domain:update/domain:rem"
+			"/domain:contact");
+	/* TODO status (attrs) */
+
+	cdata->type = EPP_UPDATE_DOMAIN;
+	return;
+
+	/*
+	 * nasty error's epilog
+	 * Used in case of internal critical failure. It is not terribly
+	 * effecient but this case should not occure very often.
+	 */
+error_ud:
+	FREENULL(cdata->in->update_domain.name);
+	FREENULL(cdata->in->update_domain.registrant);
+	FREENULL(cdata->in->update_domain.nsset);
+	FREENULL(cdata->in->update_domain.authInfo);
+	CL_FOREACH(cdata->in->update_domain.add_admin)
+		free(CL_CONTENT(cdata->in->update_domain.add_admin));
+	CL_PURGE(cdata->in->update_domain.add_admin);
+	CL_FOREACH(cdata->in->update_domain.rem_admin)
+		free(CL_CONTENT(cdata->in->update_domain.rem_admin));
+	CL_PURGE(cdata->in->update_domain.rem_admin);
+	/* TODO free status */
+	free(cdata->in);
+	cdata->in = NULL;
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
+/**
+ * Assistant procedure for parsing <update> contact
+ */
+static void
+parse_update_contact(
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+	struct circ_list	*item;
+
+	/* allocate necessary structures */
+	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	if ((cdata->in->update_contact.add_admin = malloc(sizeof *item)) == NULL) {
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	if ((cdata->in->update_contact.add_status = malloc(sizeof *item)) == NULL) {
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_contact.add_status);
+	if ((cdata->in->update_contact.rem_status = malloc(sizeof *item)) == NULL) {
+		free(cdata->in->update_contact.add_status);
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_contact.rem_status);
+
+	/* get the update-contact data */
+	XPATH_REQ1(cdata->in->update_contact.id, doc, xpathCtx, error_uc,
+			"/epp:epp/epp:command/epp:update/contact:update/contact:id");
+	/* chg data */
+	XPATH_TAKE1(cdata->in->update_contact.voice, doc, xpathCtx, error_uc,
+			"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+			"/contact:voice");
+	XPATH_TAKE1(cdata->in->update_contact.fax, doc, xpathCtx, error_uc,
+			"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+			"/contact:fax");
+	XPATH_TAKE1(cdata->in->update_contact.email, doc, xpathCtx, error_uc,
+			"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+			"/contact:email");
+	XPATH_TAKE1(cdata->in->update_contact.authInfo, doc, xpathCtx, error_uc,
+			"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+			"/contact:authInfo");
+	XPATH_TAKE1(cdata->in->update_contact.notify_email, doc, xpathCtx, error_uc,
+			"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+			"/contact:notifyEmail");
+	XPATH_TAKE1(cdata->in->update_contact.vat, doc, xpathCtx, error_uc,
+			"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+			"/contact:vat");
+	XPATH_TAKE1(cdata->in->update_contact.ssn, doc, xpathCtx, error_uc,
+			"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+			"/contact:ssn");
+	/* is there disclose section ? */
+	if (xpath_exists(xpathCtx,
+			"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+			"/contact:disclose"))
+	{
+		cdata->in->update_contact.discl = malloc(sizeof (struct epp_discl));
+		if (cdata->in->update_contact.discl == NULL) goto error_uc;
+		cdata->in->update_contact.discl->name = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+				"/contact:disclose/contact:name");
+		cdata->in->update_contact.discl->org = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+				"/contact:disclose/contact:org");
+		cdata->in->update_contact.discl->addr = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+				"/contact:disclose/contact:addr");
+		cdata->in->update_contact.discl->voice = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+				"/contact:disclose/contact:voice");
+		cdata->in->update_contact.discl->fax = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+				"/contact:disclose/contact:fax");
+		cdata->in->update_contact.discl->email = xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+				"/contact:disclose/contact:email");
+	}
+	/* is there postalInfo section ? */
+	if (xpath_exists(xpathCtx,
+			"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+			"/contact:postalInfo"))
+	{
+		cdata->in->update_contact.postalInfo =
+			calloc(1, sizeof (struct epp_postalInfo));
+		if (cdata->in->update_contact.postalInfo == NULL) goto error_uc;
+		/* XXX how to recognize filed updated to empty value and field
+		 * which is not updated
+		 */
+		XPATH_TAKE1(cdata->in->update_contact.postaInfo->name,
+				doc, xpathCtx, error_uc,
+				"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+				"/contact:postalInfo/contact:name");
+		XPATH_TAKE1(cdata->in->update_contact.postaInfo->org,
+				doc, xpathCtx, error_uc,
+				"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+				"/contact:postalInfo/contact:org");
+		/* is there address section? */
+		if (xpath_exists(xpathCtx,
+				"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+				"/contact:postalInfo/contact:addr"))
+		{
+			XPATH_REQ1(cdata->in->update_contact.postaInfo->city,
+					doc, xpathCtx, error_uc,
+					"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+					"/contact:postalInfo/contact:addr/contact:city");
+			XPATH_TAKE1(cdata->in->update_contact.postaInfo->sp,
+					doc, xpathCtx, error_uc,
+					"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+					"/contact:postalInfo/contact:addr/contact:sp");
+			XPATH_TAKE1(cdata->in->update_contact.postaInfo->pc,
+					doc, xpathCtx, error_uc,
+					"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+					"/contact:postalInfo/contact:addr/contact:pc");
+			XPATH_REQ1(cdata->in->update_contact.postaInfo->cc,
+					doc, xpathCtx, error_uc,
+					"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+					"/contact:postalInfo/contact:addr/contact:cc");
+			XPATH_EVAL(xpathObj, xpathCtx, error_uc,
+					"/epp:epp/epp:command/epp:update/contact:update/contact:chg"
+					"/contact:postalInfo/contact:addr/contact:street");
+			if (xpathObj->nodesetval) {
+				int	i, j;
+				for (i = 0;
+						i < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
+						i++)
+					cdata->in->update_contact.postalInfo->street[i] =
+							xmlNodeListGetString(doc, xmlXPathNodeSetItem(
+								xpathObj->nodesetval, i)->xmlChildrenNode, 1);
+				/* the rest must be empty strings */
+				for (j = i; j < 3; j++)
+					cdata->in->update_contact.postalInfo->street[i] = strdup("");
 			}
-			if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+		}
+	}
+	/* add & rem data */
+	/* TODO status (attrs) */
+
+	cdata->type = EPP_UPDATE_CONTACT;
+	return;
+
+	/*
+	 * nasty error's epilog
+	 * Used in case of internal critical failure. It is not terribly
+	 * effecient but this case should not occure very often.
+	 */
+error_uc:
+	FREENULL(cdata->in->update_contact.id);
+	FREENULL(cdata->in->update_contact.voice);
+	FREENULL(cdata->in->update_contact.fax);
+	FREENULL(cdata->in->update_contact.email);
+	FREENULL(cdata->in->update_contact.authInfo);
+	FREENULL(cdata->in->update_contact.notify_email);
+	FREENULL(cdata->in->update_contact.vat);
+	FREENULL(cdata->in->update_contact.ssn);
+	FREENULL(cdata->in->update_contact.discl);
+	/* postal info */
+	if (cdata->in->update_contact.postalInfo != NULL) {
+		FREENULL(cdata->in->update_contact.postalInfo->name);
+		FREENULL(cdata->in->update_contact.postalInfo->org);
+		FREENULL(cdata->in->update_contact.postalInfo->street[0]);
+		FREENULL(cdata->in->update_contact.postalInfo->street[1]);
+		FREENULL(cdata->in->update_contact.postalInfo->street[2]);
+		FREENULL(cdata->in->update_contact.postalInfo->city);
+		FREENULL(cdata->in->update_contact.postalInfo->sp);
+		FREENULL(cdata->in->update_contact.postalInfo->pc);
+		FREENULL(cdata->in->update_contact.postalInfo->cc);
+		free(cdata->in->update_contact.postalInfo);
+	}
+	/* TODO free status */
+	free(cdata->in);
+	cdata->in = NULL;
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
+/**
+ * Assistant procedure for parsing <update> nsset
+ */
+static void
+parse_update_nsset(
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+	struct circ_list	*item;
+
+	/* allocate necessary structures */
+	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	if ((cdata->in->update_nsset.add_ns = malloc(sizeof *item)) == NULL) {
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_nsset.add_ns);
+	if ((cdata->in->update_nsset.rem_ns = malloc(sizeof *item)) == NULL) {
+		free(cdata->in->update_nsset.add_ns);
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_nsset.rem_ns);
+	if ((cdata->in->update_nsset.add_tech = malloc(sizeof *item)) == NULL) {
+		free(cdata->in->update_nsset.rem_ns);
+		free(cdata->in->update_nsset.add_ns);
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_nsset.add_tech);
+	if ((cdata->in->update_nsset.rem_tech = malloc(sizeof *item)) == NULL) {
+		free(cdata->in->update_nsset.add_tech);
+		free(cdata->in->update_nsset.rem_ns);
+		free(cdata->in->update_nsset.add_ns);
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_nsset.rem_tech);
+	if ((cdata->in->update_nsset.add_status = malloc(sizeof *item)) == NULL) {
+		free(cdata->in->update_nsset.rem_tech);
+		free(cdata->in->update_nsset.add_tech);
+		free(cdata->in->update_nsset.rem_ns);
+		free(cdata->in->update_nsset.add_ns);
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_nsset.add_status);
+	if ((cdata->in->update_nsset.rem_status = malloc(sizeof *item)) == NULL) {
+		free(cdata->in->update_nsset.add_status);
+		free(cdata->in->update_nsset.rem_tech);
+		free(cdata->in->update_nsset.add_tech);
+		free(cdata->in->update_nsset.rem_ns);
+		free(cdata->in->update_nsset.add_ns);
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->update_nsset.rem_status);
+
+	/* get the update-nsset data */
+	XPATH_REQ1(cdata->in->update_nsset.name, doc, xpathCtx, error_un,
+			"/epp:epp/epp:command/epp:update/nsset:update/nsset:id");
+	/* chg data */
+	XPATH_TAKE1(cdata->in->update_nsset.authInfo, doc, xpathCtx, error_un,
+			"/epp:epp/epp:command/epp:update/nsset:update/nsset:chg"
+			"/nsset:authInfo");
+	/* add & rem data */
+	XPATH_TAKEN(cdata->in->update_nsset.add_tech, doc, xpathCtx, error_ud,
+			"/epp:epp/epp:command/epp:update/nsset:update/nsset:add"
+			"/nsset:tech");
+	XPATH_TAKEN(cdata->in->update_nsset.rem_tech, doc, xpathCtx, error_ud,
+			"/epp:epp/epp:command/epp:update/nsset:update/nsset:rem"
+			"/nsset:tech");
+	/* TODO status (attrs) */
+
+	cdata->type = EPP_UPDATE_NSSET;
+	return;
+
+	/*
+	 * nasty error's epilog
+	 * Used in case of internal critical failure. It is not terribly
+	 * effecient but this case should not occure very often.
+	 */
+error_ud:
+	FREENULL(cdata->in->update_nsset.id);
+	FREENULL(cdata->in->update_nsset.authInfo);
+	CL_FOREACH(cdata->in->update_nsset.add_tech)
+		free(CL_CONTENT(cdata->in->update_nsset.add_tech));
+	CL_PURGE(cdata->in->update_nsset.add_tech);
+	CL_FOREACH(cdata->in->update_nsset.rem_tech)
+		free(CL_CONTENT(cdata->in->update_nsset.rem_tech));
+	CL_PURGE(cdata->in->update_nsset.rem_tech);
+	CL_FOREACH(cdata->in->update_nsset.add_ns)
+		free(CL_CONTENT(cdata->in->update_nsset.add_ns));
+	CL_PURGE(cdata->in->update_nsset.add_ns);
+	CL_FOREACH(cdata->in->update_nsset.rem_ns)
+		free(CL_CONTENT(cdata->in->update_nsset.rem_ns));
+	CL_PURGE(cdata->in->update_nsset.rem_ns);
+	/* TODO free status */
+	free(cdata->in);
+	cdata->in = NULL;
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
+
+/**
+ * <update> parser for domain, contact and nsset object.
+ */
+static void
+parse_update(
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+
+	/* get object type - contact, domain or nsset */
+	XPATH_EVAL(xpathObj, xpathCtx, error_u,
+			"/epp:epp/epp:command/epp:update/contact:update");
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
+		xmlXPathFreeObject(xpathObj);
+		XPATH_EVAL(xpathObj, xpathCtx, error_u,
+				"/epp:epp/epp:command/epp:update/domain:update");
+		if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
+			xmlXPathFreeObject(xpathObj);
+			XPATH_EVAL(xpathObj, xpathCtx, error_u,
+					"/epp:epp/epp:command/epp:update/nsset:update");
+			if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
 				/* unexpected object type */
 				xmlXPathFreeObject(xpathObj);
+				cdata->in = NULL;
 				cdata->rc = 2000;
 				cdata->type = EPP_DUMMY;
 				return;
 			}
 			/* object is a nsset */
-			else parse_create_nsset(doc, xpathCtx, cdata);
+			else parse_update_nsset(doc, xpathCtx, cdata);
 		}
 		/* object is a domain */
-		else parse_create_domain(doc, xpathCtx, cdata);
+		else parse_update_domain(doc, xpathCtx, cdata);
 	}
 	/* object is contact */
-	else parse_create_contact(doc, xpathCtx, cdata);
-}
+	else parse_update_contact(doc, xpathCtx, cdata);
+	xmlXPathFreeObject(xpathObj);
+	return;
 
-gen_status
-epp_gen_login(epp_xml_globs *globs, epp_command_data *cdata, char **result)
-{
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	return simple_response(((epp_xml_globs *) globs)->hash_msg,
-			cdata->rc, cdata->clTRID, cdata->svTRID, result);
-}
-
-gen_status
-epp_gen_logout(epp_xml_globs *globs, epp_command_data *cdata, char **result)
-{
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	return simple_response(((epp_xml_globs *) globs)->hash_msg,
-			cdata->rc, cdata->clTRID, cdata->svTRID, result);
-}
-
-gen_status
-epp_gen_dummy(epp_xml_globs *globs, epp_command_data *cdata, char **result)
-{
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	return simple_response(((epp_xml_globs *) globs)->hash_msg,
-			cdata->rc, cdata->clTRID, cdata->svTRID, result);
+	/*
+	 * nasty error's epilog
+	 * Used in case of internal critical failure. It is not terribly
+	 * effecient but this case should not occure very often.
+	 */
+error_u:
+	cdata->in = NULL;
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
 }
 
 /**
- * This routine is same for contact, domain and nsset object except small
- * peaces of the code. The fourth parameter is object type.
+ * <renew> parser for domain object.
  */
-static gen_status
-epp_gen_check(
-		epp_xml_globs *globs,
-		epp_command_data *cdata,
-		char **result,
-		epp_object_type obj_type)
+static void
+parse_renew(
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
 {
-	xmlBufferPtr buf;
-	xmlTextWriterPtr writer;
-	char	*str;
-	char	res_code[5];
-	char	error_seen = 1;
+	xmlXPathObjectPtr	xpathObj;
+	xmlChar	*str;
+	struct tm t;
 
-	/* catch error responses */
-	if (cdata->rc != 1000) {
-		simple_response(((epp_xml_globs *) globs)->hash_msg,
-				cdata->rc, cdata->clTRID, cdata->svTRID, result);
-		return GEN_OK;
+	/* allocate necessary structures */
+	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
 	}
-
-	// make up response
-	buf = xmlBufferCreate();
-	if (buf == NULL) {
-		return GEN_EBUFFER;
+	/* get renew data */
+	XPATH_REQ1(cdata->in->renew.name, doc, xpathCtx, error_r,
+		"/epp:epp/epp:command/epp:renew/domain:renew/domain:name");
+	XPATH_REQ1(str, doc, xpathCtx, error_r,
+		"/epp:epp/epp:command/epp:renew/domain:renew/domain:curExpDate");
+	strptime(str, "%Y-%m-%d", &t);
+	cdata->in->renew.exDate = mktime(&t);
+	free(str);
+	/* domain period handling is slightly more difficult */
+	XPATH_EVAL(xpathObj, xpathCtx, error_r,
+			"/epp:epp/epp:command/epp:renew/domain:renew/domain:period");
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
+		xmlChar	*str;
+		str = xmlNodeListGetString(doc, xmlXPathNodeSetItem(
+					xpathObj->nodesetval, 0)->xmlChildrenNode, 1);
+		assert(str != NULL && *str != '\0');
+		cdata->in->renew.period = atoi(str);
+		xmlFree(str);
+		/* correct period value if given in years and not months */
+		str = xmlGetNsProp(xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
+				BAD_CAST "unit", BAD_CAST NS_DOMAIN);
+		assert(str != NULL);
+		if (*str == 'y') cdata->in->renew.period *= 12;
+		xmlFree(str);
 	}
-	writer = xmlNewTextWriterMemory(buf, 0);
-	if (writer == NULL) {
-		xmlBufferFree(buf);
-		return GEN_EWRITER;
-	}
+	else cdata->in->renew.period = 0;
 
-	START_DOCUMENT(writer, simple_err);
+	xmlXPathFreeObject(xpathObj);
+	cdata->type = EPP_RENEW_DOMAIN;
 
-	// epp header
-	START_ELEMENT(writer, simple_err, "epp");
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns", NS_EPP);
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:xsi", XSI);
-	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EPP);
-
-	// epp traditional part of response
-	START_ELEMENT(writer, simple_err, "response");
-	START_ELEMENT(writer, simple_err, "result");
-	snprintf(res_code, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
-	WRITE_ATTRIBUTE(writer, simple_err, "code", res_code);
-	WRITE_ELEMENT(writer, simple_err, "msg", str);
-	END_ELEMENT(writer, simple_err);
-
-	// specific part of response
-	START_ELEMENT(writer, simple_err, "resData");
-	if (obj_type == EPP_CONTACT) {
-		START_ELEMENT(writer, simple_err, "contact:chkData");
-		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
-		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
-	}
-	else if (obj_type == EPP_DOMAIN) {
-		START_ELEMENT(writer, simple_err, "domain:chkData");
-		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
-		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_DOMAIN);
-	}
-	else {
-		assert(obj_type == EPP_NSSET);
-		START_ELEMENT(writer, simple_err, "nsset:chkData");
-		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
-		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_NSSET);
-	}
-	CL_RESET(cdata->in->check.ids);
-	CL_RESET(cdata->out->check.bools);
-	CL_FOREACH(cdata->in->check.ids) {
-		CL_NEXT(cdata->out->check.bools);
-		if (obj_type == EPP_CONTACT) {
-			START_ELEMENT(writer, simple_err, "contact:cd");
-			START_ELEMENT(writer, simple_err, "contact:id");
-		}
-		else if (obj_type == EPP_DOMAIN) {
-			START_ELEMENT(writer, simple_err, "domain:cd");
-			START_ELEMENT(writer, simple_err, "domain:name");
-		}
-		else {
-			START_ELEMENT(writer, simple_err, "nsset:cd");
-			START_ELEMENT(writer, simple_err, "nsset:name");
-		}
-		WRITE_ATTRIBUTE(writer, simple_err, "avail",
-				CL_CONTENT(cdata->out->check.bools) ? "1" : "0");
-		WRITE_STRING(writer, simple_err, CL_CONTENT(cdata->in->check.ids));
-		END_ELEMENT(writer, simple_err);
-		END_ELEMENT(writer, simple_err);
-	}
-	END_ELEMENT(writer, simple_err);
-
-	// traditional end of response
-	START_ELEMENT(writer, simple_err, "trID");
-	if (cdata->clTRID)
-		WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
-	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
-	END_DOCUMENT(writer, simple_err);
-
-	error_seen = 0;
-
-simple_err:
-	xmlFreeTextWriter(writer);
-	if (error_seen) {
-		xmlBufferFree(buf);
-		return GEN_EBUILD;
-	}
-
-	*result = strdup((char *) buf->content);
-	xmlBufferFree(buf);
-	return GEN_OK;
+	/*
+	 * nasty error's epilog
+	 * Used in case of internal critical failure. It is not terribly
+	 * effecient but this case should not occure very often.
+	 */
+error_r:
+	FREENULL(cdata->in->renew.name);
+	free(cdata->in);
+	cdata->in = NULL;
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
 }
 
-gen_status
-epp_gen_check_contact(epp_xml_globs *globs, epp_command_data *cdata, char **result)
-{
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-	return epp_gen_check(globs, cdata, result, EPP_CONTACT);
-}
-
-gen_status
-epp_gen_check_domain(epp_xml_globs *globs, epp_command_data *cdata, char **result)
-{
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-	return epp_gen_check(globs, cdata, result, EPP_DOMAIN);
-}
-
-gen_status
-epp_gen_check_nsset(epp_xml_globs *globs, epp_command_data *cdata, char **result)
-{
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-	return epp_gen_check(globs, cdata, result, EPP_NSSET);
-}
-
-gen_status
-epp_gen_info_contact(epp_xml_globs *globs, epp_command_data *cdata, char **result)
+static char
+gen_info_contact(xmlTextWriterPtr *writer, epp_command_data *cdata)
 {
 	epp_postalInfo	*pi;
 	epp_discl	*discl;
-	xmlBufferPtr buf;
-	xmlTextWriterPtr writer;
-	char	*str;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
-	char	error_seen = 1;
 
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-
-	/* catch error responses */
-	if (cdata->rc != 1000) {
-		simple_response(((epp_xml_globs *) globs)->hash_msg,
-				cdata->rc, cdata->clTRID, cdata->svTRID, result);
-		return GEN_OK;
-	}
-
-	// make up response
-	buf = xmlBufferCreate();
-	if (buf == NULL) {
-		return GEN_EBUFFER;
-	}
-	writer = xmlNewTextWriterMemory(buf, 0);
-	if (writer == NULL) {
-		xmlBufferFree(buf);
-		return GEN_EWRITER;
-	}
-
-	START_DOCUMENT(writer, simple_err);
-
-	// epp header
-	START_ELEMENT(writer, simple_err, "epp");
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns", NS_EPP);
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:xsi", XSI);
-	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EPP);
-
-	// epp traditional part of response
-	START_ELEMENT(writer, simple_err, "response");
-	START_ELEMENT(writer, simple_err, "result");
-	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
-	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
-	WRITE_ELEMENT(writer, simple_err, "msg", str);
-	END_ELEMENT(writer, simple_err);
-
-	// specific part of response
 	START_ELEMENT(writer, simple_err, "resData");
 	START_ELEMENT(writer, simple_err, "contact:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
@@ -1613,9 +1889,9 @@ epp_gen_info_contact(epp_xml_globs *globs, epp_command_data *cdata, char **resul
 	WRITE_ELEMENT(writer, simple_err, "contact:name", pi->name);
 	WRITE_ELEMENT(writer, simple_err, "contact:org", pi->org);
 	START_ELEMENT(writer, simple_err, "contact:addr");
-	WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street1);
-	WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street2);
-	WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street3);
+	WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street[0]);
+	WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street[1]);
+	WRITE_ELEMENT(writer, simple_err, "contact:street", pi->street[2]);
 	WRITE_ELEMENT(writer, simple_err, "contact:city", pi->city);
 	WRITE_ELEMENT(writer, simple_err, "contact:sp", pi->sp);
 	WRITE_ELEMENT(writer, simple_err, "contact:pc", pi->pc);
@@ -1675,77 +1951,17 @@ epp_gen_info_contact(epp_xml_globs *globs, epp_command_data *cdata, char **resul
 	END_ELEMENT(writer, simple_err); /* disclose */
 	END_ELEMENT(writer, simple_err); /* infdata */
 	END_ELEMENT(writer, simple_err); /* resdata */
-
-	// traditional end of response
-	START_ELEMENT(writer, simple_err, "trID");
-	if (cdata->clTRID)
-		WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
-	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
-	END_DOCUMENT(writer, simple_err);
-
-	error_seen = 0;
+	return 1;
 
 simple_err:
-	xmlFreeTextWriter(writer);
-	if (error_seen) {
-		xmlBufferFree(buf);
-		return GEN_EBUILD;
-	}
-
-	*result = strdup((char *) buf->content);
-	xmlBufferFree(buf);
-	return GEN_OK;
+	return 0;
 }
 
-gen_status
-epp_gen_info_domain(epp_xml_globs *globs, epp_command_data *cdata, char **result)
+static char
+gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
-	xmlBufferPtr buf;
-	xmlTextWriterPtr writer;
-	char	*str;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
-	char	error_seen = 1;
 
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-
-	/* catch error responses */
-	if (cdata->rc != 1000) {
-		simple_response(((epp_xml_globs *) globs)->hash_msg,
-				cdata->rc, cdata->clTRID, cdata->svTRID, result);
-		return GEN_OK;
-	}
-
-	// make up response
-	buf = xmlBufferCreate();
-	if (buf == NULL) {
-		return GEN_EBUFFER;
-	}
-	writer = xmlNewTextWriterMemory(buf, 0);
-	if (writer == NULL) {
-		xmlBufferFree(buf);
-		return GEN_EWRITER;
-	}
-
-	START_DOCUMENT(writer, simple_err);
-
-	// epp header
-	START_ELEMENT(writer, simple_err, "epp");
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns", NS_EPP);
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:xsi", XSI);
-	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EPP);
-
-	// epp traditional part of response
-	START_ELEMENT(writer, simple_err, "response");
-	START_ELEMENT(writer, simple_err, "result");
-	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
-	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
-	WRITE_ELEMENT(writer, simple_err, "msg", str);
-	END_ELEMENT(writer, simple_err);
-
-	// specific part of response
 	START_ELEMENT(writer, simple_err, "resData");
 	START_ELEMENT(writer, simple_err, "domain:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
@@ -1792,83 +2008,23 @@ epp_gen_info_domain(epp_xml_globs *globs, epp_command_data *cdata, char **result
 	END_ELEMENT(writer, simple_err); /* auth info */
 	END_ELEMENT(writer, simple_err); /* infdata */
 	END_ELEMENT(writer, simple_err); /* resdata */
-
-	// traditional end of response
-	START_ELEMENT(writer, simple_err, "trID");
-	if (cdata->clTRID)
-		WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
-	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
-	END_DOCUMENT(writer, simple_err);
-
-	error_seen = 0;
+	return 1;
 
 simple_err:
-	xmlFreeTextWriter(writer);
-	if (error_seen) {
-		xmlBufferFree(buf);
-		return GEN_EBUILD;
-	}
-
-	*result = strdup((char *) buf->content);
-	xmlBufferFree(buf);
-	return GEN_OK;
+	return 0;
 }
 
-gen_status
-epp_gen_info_nsset(epp_xml_globs *globs, epp_command_data *cdata, char **result)
+static char
+gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
-	xmlBufferPtr buf;
-	xmlTextWriterPtr writer;
-	char	*str;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
-	char	error_seen = 1;
 
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-
-	/* catch error responses */
-	if (cdata->rc != 1000) {
-		simple_response(((epp_xml_globs *) globs)->hash_msg,
-				cdata->rc, cdata->clTRID, cdata->svTRID, result);
-		return GEN_OK;
-	}
-
-	// make up response
-	buf = xmlBufferCreate();
-	if (buf == NULL) {
-		return GEN_EBUFFER;
-	}
-	writer = xmlNewTextWriterMemory(buf, 0);
-	if (writer == NULL) {
-		xmlBufferFree(buf);
-		return GEN_EWRITER;
-	}
-
-	START_DOCUMENT(writer, simple_err);
-
-	// epp header
-	START_ELEMENT(writer, simple_err, "epp");
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns", NS_EPP);
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:xsi", XSI);
-	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EPP);
-
-	// epp traditional part of response
-	START_ELEMENT(writer, simple_err, "response");
-	START_ELEMENT(writer, simple_err, "result");
-	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
-	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
-	WRITE_ELEMENT(writer, simple_err, "msg", str);
-	END_ELEMENT(writer, simple_err);
-
-	// specific part of response
 	START_ELEMENT(writer, simple_err, "resData");
 	START_ELEMENT(writer, simple_err, "nsset:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_NSSET);
 	WRITE_ELEMENT(writer, simple_err, "nsset:id",cdata->in->info.id);
-	WRITE_ELEMENT(writer, simple_err, "nsset:roid", cdata->out->info_nsset.roid);
+	WRITE_ELEMENT(writer, simple_err, "nsset:roid",cdata->out->info_nsset.roid);
 	/* status flags */
 	CL_RESET(cdata->out->info_nsset.status);
 	CL_FOREACH(cdata->out->info_nsset.status) {
@@ -1904,47 +2060,25 @@ epp_gen_info_nsset(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 	}
 	END_ELEMENT(writer, simple_err); /* infdata */
 	END_ELEMENT(writer, simple_err); /* resdata */
-
-	// traditional end of response
-	START_ELEMENT(writer, simple_err, "trID");
-	if (cdata->clTRID)
-		WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
-	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
-	END_DOCUMENT(writer, simple_err);
-
-	error_seen = 0;
+	return 1;
 
 simple_err:
-	xmlFreeTextWriter(writer);
-	if (error_seen) {
-		xmlBufferFree(buf);
-		return GEN_EBUILD;
-	}
-
-	*result = strdup((char *) buf->content);
-	xmlBufferFree(buf);
-	return GEN_OK;
+	return 0;
 }
 
 gen_status
-epp_gen_poll_req(epp_xml_globs *globs, epp_command_data *cdata, char **result)
+epp_gen(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
 	char	*str;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
+	char	res_code[5];
 	char	error_seen = 1;
+	msg_hash_item **hash_msg = globs->hash_msg;
 
 	assert(globs != NULL);
 	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-
-	/* catch error responses */
-	if (cdata->rc != 1301) {
-		simple_response(((epp_xml_globs *) globs)->hash_msg,
-				cdata->rc, cdata->clTRID, cdata->svTRID, result);
-		return GEN_OK;
-	}
 
 	// make up response
 	buf = xmlBufferCreate();
@@ -1965,30 +2099,197 @@ epp_gen_poll_req(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:xsi", XSI);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EPP);
 
-	// epp traditional part of response
+	// epp response
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
-	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
-	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
+	snprintf(res_code, 5, "%d", cdata->rc);
+	str = msg_hash_lookup(hash_msg, cdata->rc);
+	WRITE_ATTRIBUTE(writer, simple_err, "code", res_code);
 	WRITE_ELEMENT(writer, simple_err, "msg", str);
-	END_ELEMENT(writer, simple_err);
+	END_ELEMENT(writer, simple_err); /* result */
 
-	// specific part of response
-	START_ELEMENT(writer, simple_err, "msgQ");
-	snprintf(strbuf, 25, "%d", cdata->out->poll_req.count);
-	WRITE_ATTRIBUTE(writer, simple_err, "count", strbuf);
-	snprintf(strbuf, 25, "%d", cdata->out->poll_req.msgid);
-	WRITE_ATTRIBUTE(writer, simple_err, "msgid", strbuf);
-	get_rfc3339_date(cdata->out->poll_req.qdate, strbuf);
-	WRITE_ELEMENT(writer, simple_err, "qDate", strbuf);
-	WRITE_ELEMENT(writer, simple_err, "msg", cdata->out->poll_req.msg);
-	END_ELEMENT(writer, simple_err);
+	/*
+	 * Here is handler for each kind of response
+	 * Short reponses are coded directly into swich, long responses are
+	 * coded into separate functions called within the switch
+	 */
+	switch (cdata->type) {
+		case EPP_DUMMY:
+		/* commands with no <resData> element */
+		case EPP_LOGIN:
+		case EPP_LOGOUT:
+		case EPP_DELETE_DOMAIN:
+		case EPP_DELETE_CONTACT:
+		case EPP_DELETE_NSSET:
+		case EPP_UPDATE_DOMAIN:
+		case EPP_UPDATE_CONTACT:
+		case EPP_UPDATE_NSSET:
+			break;
+		/* commands with <msgQ> element */
+		case EPP_POLL_REQ:
+			if (cdata->rc != 1301) break;
+			START_ELEMENT(writer, simple_err, "msgQ");
+			snprintf(strbuf, 25, "%d", cdata->out->poll_req.count);
+			WRITE_ATTRIBUTE(writer, simple_err, "count", strbuf);
+			snprintf(strbuf, 25, "%d", cdata->out->poll_req.msgid);
+			WRITE_ATTRIBUTE(writer, simple_err, "msgid", strbuf);
+			get_rfc3339_date(cdata->out->poll_req.qdate, strbuf);
+			WRITE_ELEMENT(writer, simple_err, "qDate", strbuf);
+			WRITE_ELEMENT(writer, simple_err, "msg", cdata->out->poll_req.msg);
+			END_ELEMENT(writer, simple_err);
+			break;
+		case EPP_POLL_ACK:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "msgQ");
+			snprintf(strbuf, 25, "%d", cdata->out->poll_ack.count);
+			WRITE_ATTRIBUTE(writer, simple_err, "count", strbuf);
+			snprintf(strbuf, 25, "%d", cdata->out->poll_ack.msgid);
+			WRITE_ATTRIBUTE(writer, simple_err, "msgid", strbuf);
+			END_ELEMENT(writer, simple_err);
+			break;
+		/* query commands with <resData> element */
+		case EPP_CHECK_DOMAIN:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "resData");
+			START_ELEMENT(writer, simple_err, "domain:chkData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
+					LOC_DOMAIN);
+			CL_RESET(cdata->in->check.ids);
+			CL_RESET(cdata->out->check.bools);
+			CL_FOREACH(cdata->in->check.ids) {
+				CL_NEXT(cdata->out->check.bools);
+				START_ELEMENT(writer, simple_err, "domain:cd");
+				START_ELEMENT(writer, simple_err, "domain:name");
+				WRITE_ATTRIBUTE(writer, simple_err, "avail",
+						CL_CONTENT(cdata->out->check.bools) ? "1" : "0");
+				WRITE_STRING(writer, simple_err,
+						CL_CONTENT(cdata->in->check.ids));
+				END_ELEMENT(writer, simple_err);
+				END_ELEMENT(writer, simple_err);
+			}
+			END_ELEMENT(writer, simple_err);
+			break;
+		case EPP_CHECK_CONTACT:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "resData");
+			START_ELEMENT(writer, simple_err, "contact:chkData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
+					LOC_CONTACT);
+			CL_RESET(cdata->in->check.ids);
+			CL_RESET(cdata->out->check.bools);
+			CL_FOREACH(cdata->in->check.ids) {
+				CL_NEXT(cdata->out->check.bools);
+				START_ELEMENT(writer, simple_err, "contact:cd");
+				START_ELEMENT(writer, simple_err, "contact:id");
+				WRITE_ATTRIBUTE(writer, simple_err, "avail",
+						CL_CONTENT(cdata->out->check.bools) ? "1" : "0");
+				WRITE_STRING(writer, simple_err,
+						CL_CONTENT(cdata->in->check.ids));
+				END_ELEMENT(writer, simple_err);
+				END_ELEMENT(writer, simple_err);
+			}
+			END_ELEMENT(writer, simple_err);
+			break;
+		case EPP_CHECK_NSSET:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "resData");
+			START_ELEMENT(writer, simple_err, "nsset:chkData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",LOC_NSSET);
+			CL_RESET(cdata->in->check.ids);
+			CL_RESET(cdata->out->check.bools);
+			CL_FOREACH(cdata->in->check.ids) {
+				CL_NEXT(cdata->out->check.bools);
+				START_ELEMENT(writer, simple_err, "nsset:cd");
+				START_ELEMENT(writer, simple_err, "nsset:name");
+				WRITE_ATTRIBUTE(writer, simple_err, "avail",
+						CL_CONTENT(cdata->out->check.bools) ? "1" : "0");
+				WRITE_STRING(writer, simple_err,
+						CL_CONTENT(cdata->in->check.ids));
+				END_ELEMENT(writer, simple_err);
+				END_ELEMENT(writer, simple_err);
+			}
+			END_ELEMENT(writer, simple_err);
+			break;
+		case EPP_INFO_DOMAIN:
+			if (cdata->rc != 1000) break;
+			if (!gen_info_domain(writer, cdata)) goto simple_err;
+			break;
+		case EPP_INFO_CONTACT:
+			if (cdata->rc != 1000) break;
+			if (!gen_info_contact(writer, cdata)) goto simple_err;
+			break;
+		case EPP_INFO_NSSET:
+			if (cdata->rc != 1000) break;
+			if (!gen_info_nsset(writer, cdata)) goto simple_err;
+			break;
+		/* transform commands with <resData> element */
+		case EPP_CREATE_DOMAIN:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "resData");
+			START_ELEMENT(writer, simple_err, "domain:creData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
+					LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:name",
+					cdata->in->create_domain.name);
+			get_rfc3339_date(cdata->out->create.crDate, strbuf);
+			WRITE_ELEMENT(writer, simple_err, "domain:crDate", strbuf);
+			get_rfc3339_date(cdata->out->create.exDate, strbuf);
+			WRITE_ELEMENT(writer, simple_err, "domain:exDate", strbuf);
+			END_ELEMENT(writer, simple_err); /* credata */
+			END_ELEMENT(writer, simple_err); /* resdata */
+			break;
+		case EPP_CREATE_CONTACT:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "resData");
+			START_ELEMENT(writer, simple_err, "contact:creData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_CONTACT);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
+					LOC_CONTACT);
+			WRITE_ELEMENT(writer, simple_err, "contact:id",
+					cdata->in->create_contact.id);
+			get_rfc3339_date(cdata->out->create.crDate, strbuf);
+			WRITE_ELEMENT(writer, simple_err, "contact:crDate", strbuf);
+			END_ELEMENT(writer, simple_err); /* credata */
+			END_ELEMENT(writer, simple_err); /* resdata */
+			break;
+		case EPP_CREATE_NSSET:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "resData");
+			START_ELEMENT(writer, simple_err, "nsset:creData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",LOC_NSSET);
+			WRITE_ELEMENT(writer, simple_err, "nsset:id",
+					cdata->in->create_nsset.id);
+			get_rfc3339_date(cdata->out->create.crDate, strbuf);
+			WRITE_ELEMENT(writer, simple_err, "nsset:crDate", strbuf);
+			END_ELEMENT(writer, simple_err); /* credata */
+			END_ELEMENT(writer, simple_err); /* resdata */
+			break;
+		case EPP_RENEW_DOMAIN:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "resData");
+			START_ELEMENT(writer, simple_err, "domain:renData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
+					LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:name",
+					cdata->in->renew.name);
+			get_rfc3339_date(cdata->out->renew.exDate, strbuf);
+			WRITE_ELEMENT(writer, simple_err, "domain:exDate", strbuf);
+			END_ELEMENT(writer, simple_err); /* renData */
+			END_ELEMENT(writer, simple_err); /* resData */
+			break;
+		default:
+			assert(1 == 0);
+	}
 
-	// traditional end of response
+	// epp epilog
 	START_ELEMENT(writer, simple_err, "trID");
-	if (cdata->clTRID)
-		WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
+	WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
 	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
 	END_DOCUMENT(writer, simple_err);
 
@@ -2004,217 +2305,6 @@ simple_err:
 	*result = strdup((char *) buf->content);
 	xmlBufferFree(buf);
 	return GEN_OK;
-}
-
-gen_status
-epp_gen_poll_ack(epp_xml_globs *globs, epp_command_data *cdata, char **result)
-{
-	xmlBufferPtr buf;
-	xmlTextWriterPtr writer;
-	char	*str;
-	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
-	char	error_seen = 1;
-
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-
-	/* catch error responses */
-	if (cdata->rc != 1000) {
-		simple_response(((epp_xml_globs *) globs)->hash_msg,
-				cdata->rc, cdata->clTRID, cdata->svTRID, result);
-		return GEN_OK;
-	}
-
-	// make up response
-	buf = xmlBufferCreate();
-	if (buf == NULL) {
-		return GEN_EBUFFER;
-	}
-	writer = xmlNewTextWriterMemory(buf, 0);
-	if (writer == NULL) {
-		xmlBufferFree(buf);
-		return GEN_EWRITER;
-	}
-
-	START_DOCUMENT(writer, simple_err);
-
-	// epp header
-	START_ELEMENT(writer, simple_err, "epp");
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns", NS_EPP);
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:xsi", XSI);
-	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EPP);
-
-	// epp traditional part of response
-	START_ELEMENT(writer, simple_err, "response");
-	START_ELEMENT(writer, simple_err, "result");
-	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
-	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
-	WRITE_ELEMENT(writer, simple_err, "msg", str);
-	END_ELEMENT(writer, simple_err);
-
-	// specific part of response
-	START_ELEMENT(writer, simple_err, "msgQ");
-	snprintf(strbuf, 25, "%d", cdata->out->poll_ack.count);
-	WRITE_ATTRIBUTE(writer, simple_err, "count", strbuf);
-	snprintf(strbuf, 25, "%d", cdata->out->poll_ack.msgid);
-	WRITE_ATTRIBUTE(writer, simple_err, "msgid", strbuf);
-	END_ELEMENT(writer, simple_err);
-
-	// traditional end of response
-	START_ELEMENT(writer, simple_err, "trID");
-	if (cdata->clTRID)
-		WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
-	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
-	END_DOCUMENT(writer, simple_err);
-
-	error_seen = 0;
-
-simple_err:
-	xmlFreeTextWriter(writer);
-	if (error_seen) {
-		xmlBufferFree(buf);
-		return GEN_EBUILD;
-	}
-
-	*result = strdup((char *) buf->content);
-	xmlBufferFree(buf);
-	return GEN_OK;
-}
-
-static gen_status
-epp_gen_create(epp_xml_globs *globs, epp_command_data *cdata,
-		char **result, epp_object_type obj_type)
-{
-	xmlBufferPtr buf;
-	xmlTextWriterPtr writer;
-	char	*str;
-	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
-	char	error_seen = 1;
-
-	/* catch error responses */
-	if (cdata->rc != 1000) {
-		simple_response(((epp_xml_globs *) globs)->hash_msg,
-				cdata->rc, cdata->clTRID, cdata->svTRID, result);
-		return GEN_OK;
-	}
-
-	// make up response
-	buf = xmlBufferCreate();
-	if (buf == NULL) {
-		return GEN_EBUFFER;
-	}
-	writer = xmlNewTextWriterMemory(buf, 0);
-	if (writer == NULL) {
-		xmlBufferFree(buf);
-		return GEN_EWRITER;
-	}
-
-	START_DOCUMENT(writer, simple_err);
-
-	// epp header
-	START_ELEMENT(writer, simple_err, "epp");
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns", NS_EPP);
-	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:xsi", XSI);
-	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EPP);
-
-	// epp traditional part of response
-	START_ELEMENT(writer, simple_err, "response");
-	START_ELEMENT(writer, simple_err, "result");
-	snprintf(strbuf, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(( (epp_xml_globs *) globs)->hash_msg, cdata->rc);
-	WRITE_ATTRIBUTE(writer, simple_err, "code", strbuf);
-	WRITE_ELEMENT(writer, simple_err, "msg", str);
-	END_ELEMENT(writer, simple_err);
-
-	// specific part of response
-	START_ELEMENT(writer, simple_err, "resData");
-	get_rfc3339_date(cdata->out->create.crDate, strbuf);
-	/* object dependent fork */
-	if (obj_type == EPP_CONTACT) {
-		START_ELEMENT(writer, simple_err, "contact:creData");
-		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_CONTACT);
-		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
-		WRITE_ELEMENT(writer, simple_err, "contact:id",
-				cdata->in->create_contact.id);
-		WRITE_ELEMENT(writer, simple_err, "contact:crDate", strbuf);
-	}
-	else if (obj_type == EPP_NSSET) {
-		START_ELEMENT(writer, simple_err, "nsset:creData");
-		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
-		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_NSSET);
-		WRITE_ELEMENT(writer, simple_err, "nsset:id",
-				cdata->in->create_nsset.id);
-		WRITE_ELEMENT(writer, simple_err, "nsset:crDate", strbuf);
-	}
-	else {
-		START_ELEMENT(writer, simple_err, "domain:creData");
-		WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_DOMAIN);
-		WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_DOMAIN);
-		WRITE_ELEMENT(writer, simple_err, "domain:id",
-				cdata->in->create_domain.name);
-		WRITE_ELEMENT(writer, simple_err, "domain:crDate", strbuf);
-		get_rfc3339_date(cdata->out->create.exDate, strbuf);
-		WRITE_ELEMENT(writer, simple_err, "domain:exDate", strbuf);
-	}
-	END_ELEMENT(writer, simple_err); /* credata */
-	END_ELEMENT(writer, simple_err); /* resdata */
-	// traditional end of response
-	START_ELEMENT(writer, simple_err, "trID");
-	if (cdata->clTRID)
-		WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
-	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
-	END_DOCUMENT(writer, simple_err);
-
-	error_seen = 0;
-
-simple_err:
-	xmlFreeTextWriter(writer);
-	if (error_seen) {
-		xmlBufferFree(buf);
-		return GEN_EBUILD;
-	}
-
-	*result = strdup((char *) buf->content);
-	xmlBufferFree(buf);
-	return GEN_OK;
-}
-
-gen_status
-epp_gen_create_contact(epp_xml_globs *globs, epp_command_data *cdata,
-		char **result)
-{
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-	assert(cdata->in != NULL);
-
-	return epp_gen_create(globs, cdata, result, EPP_CONTACT);
-}
-
-gen_status
-epp_gen_create_domain(epp_xml_globs *globs, epp_command_data *cdata,
-		char **result)
-{
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-	assert(cdata->in != NULL);
-
-	return epp_gen_create(globs, cdata, result, EPP_DOMAIN);
-}
-
-gen_status
-epp_gen_create_nsset(epp_xml_globs *globs, epp_command_data *cdata,
-		char **result)
-{
-	assert(globs != NULL);
-	assert(cdata != NULL);
-	assert(cdata->out != NULL);
-	assert(cdata->in != NULL);
-
-	return epp_gen_create(globs, cdata, result, EPP_NSSET);
 }
 
 void epp_free_genstring(char *genstring)
@@ -2309,7 +2399,7 @@ epp_parse_command(
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
-	if (xpathObj->nodesetval && xpathObj->nodesetval->nodeNr == 1) {
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
 		xmlXPathFreeObject(xpathObj);
 		xmlFreeDoc(doc);
 		return PARSER_HELLO;
@@ -2324,7 +2414,7 @@ epp_parse_command(
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
-	if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr == 0) {
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
 		xmlXPathFreeObject(xpathObj);
 		xmlFreeDoc(doc);
 		return PARSER_NOT_COMMAND;
@@ -2340,9 +2430,9 @@ epp_parse_command(
 		return PARSER_EINTERNAL;
 	}
 	nodeset = xpathObj->nodesetval;
-	if (nodeset && nodeset->nodeNr)
-		cdata->clTRID = (char *) xmlNodeListGetString(doc,
-				nodeset->nodeTab[0]->xmlChildrenNode, 1);
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
+		cdata->clTRID = (char *) xmlNodeListGetString(doc, xmlXPathNodeSetItem(
+					xpathObj->nodesetval, 0)->xmlChildrenNode, 1);
 	else {
 		/* we cannot leave clTRID NULL becauseof corba */
 		cdata->clTRID = (char *) xmlStrdup(BAD_CAST "");
@@ -2360,12 +2450,11 @@ epp_parse_command(
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
-	nodeset = xpathObj->nodesetval;
-	assert(nodeset && nodeset->nodeNr);
+	assert(xmlXPathNodeSetGetLength(xpathObj->nodesetval) > 0);
 
 	/* command lookup through hash table .. huraaa :) */
 	cmd = cmd_hash_lookup(globs->hash_cmd,
-			(char *) nodeset->nodeTab[0]->name);
+			(char *) xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->name);
 	xmlXPathFreeObject(xpathObj);
 
 	/*
@@ -2511,9 +2600,9 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				assert(pi != NULL);
 				free(pi->name);
 				free(pi->org);
-				free(pi->street1);
-				free(pi->street2);
-				free(pi->street3);
+				free(pi->street[0]);
+				free(pi->street[1]);
+				free(pi->street[2]);
 				free(pi->city);
 				free(pi->sp);
 				free(pi->pc);
@@ -2610,9 +2699,9 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				epp_postalInfo	*pi = cdata->in->create_contact.postalInfo;
 				free(pi->name);
 				free(pi->org);
-				free(pi->street1);
-				free(pi->street2);
-				free(pi->street3);
+				free(pi->street[0]);
+				free(pi->street[1]);
+				free(pi->street[2]);
 				free(pi->city);
 				free(pi->sp);
 				free(pi->pc);

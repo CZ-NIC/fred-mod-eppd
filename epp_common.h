@@ -122,9 +122,7 @@ struct circ_list {
 typedef struct {
 	char	*name;
 	char	*org;
-	char	*street1;
-	char	*street2;
-	char	*street3;
+	char	*street[3];
 	char	*city;
 	char	*sp;	/* state or province */
 	char	*pc;	/* postal code */
@@ -133,7 +131,11 @@ typedef struct {
 
 /**
  * Disclose information concerning contact.
- * All items inside are booleans.
+ * All items inside are treated as booleans.
+ * Value 1 means it is an exception to data collection policy.
+ * Example: if server data collection policy is "public"
+ * 	then value 1 in this structure means the item should be private.
+ * Note: Data collection policy of our server is "public".
  */
 typedef struct {
 	char	name;
@@ -220,6 +222,53 @@ typedef struct {
 			struct circ_list	*tech;
 			struct circ_list	*ns;
 		}create_nsset;
+		/* additional delete parameters */
+		struct {
+			char	*id;
+		}delete;
+		/* additional renew domain parameters */
+		struct {
+			char	*name;
+			long long	*exDate;
+			int	period;
+		}renew;
+		/* additional update domain parameters */
+		struct {
+			char	*name;
+			struct circ_list	*add_admin;
+			struct circ_list	*rem_admin;
+			struct circ_list	*add_status;
+			struct circ_list	*rem_status;
+			char	*registrant;
+			char	*nsset;
+			char	*authInfo;
+		}update_domain;
+		/* additional update contact parameters */
+		struct {
+			char	*id;
+			struct circ_list	*add_status;
+			struct circ_list	*rem_status;
+			epp_postalInfo	*postalInfo;
+			char	*voice;
+			char	*fax;
+			char	*email;
+			char	*authInfo;
+			char	*notify_email;
+			char	*vat;
+			char	*ssn;
+			epp_discl	*discl;
+		}update_contact;
+		/* additional update nsset parameters */
+		struct {
+			char	*id;
+			struct circ_list	*add_status;
+			struct circ_list	*rem_status;
+			struct circ_list	*add_ns;
+			struct circ_list	*rem_ns;
+			struct circ_list	*add_tech;
+			struct circ_list	*rem_tech;
+			char	*authInfo;
+		}update_nsset;
 	}*in;
 	/*
 	 * output parameters
@@ -294,11 +343,15 @@ typedef struct {
 			int	count;
 			int	msgid;
 		}poll_ack;
-		/* additional create domain parameters */
+		/* additional create contact, nsset or domain parameters */
 		struct {
 			long long	crDate;
 			long long	exDate; /* used only in domain object */
 		}create;
+		/* additional renew domain parameters */
+		struct {
+			long long	exDate;
+		}renew;
 	}*out;
 }epp_command_data;
 
