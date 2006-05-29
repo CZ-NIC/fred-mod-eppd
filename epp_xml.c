@@ -121,7 +121,7 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		xmlXPathObjectPtr obj = xmlXPathEvalExpression(BAD_CAST (expr), (ctx));\
 		if (obj == NULL) goto err_handler;                      \
 		assert(xmlXPathNodeSetGetLength(obj->nodesetval) == 1); \
-		(str) = xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
+		(str) = (char *) xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
 		xmlXPathFreeObject(obj);                                \
 	}while(0);
 
@@ -135,7 +135,7 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		xmlXPathObjectPtr obj = xmlXPathEvalExpression(BAD_CAST (expr), (ctx));\
 		if (obj == NULL) goto err_handler;                      \
 		if (xmlXPathNodeSetGetLength(obj->nodesetval) == 1) {   \
-			(str) = xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
+			(str) = (char *) xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
 		}                                                       \
 		else (str) = strdup("");                                \
 		xmlXPathFreeObject(obj);                                \
@@ -156,7 +156,7 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		xmlXPathObjectPtr obj = xmlXPathEvalExpression(BAD_CAST (expr), (ctx));\
 		if (obj == NULL) goto err_handler;                      \
 		if (xmlXPathNodeSetGetLength(obj->nodesetval) == 1) {   \
-			(str) = xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
+			(str) = (char *) xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
 			if (*(str) == '\0') {                               \
 				free(str);                                      \
 				if ((str = malloc(2)) == NULL) {                \
@@ -208,7 +208,7 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 					xmlXPathFreeObject(obj);                    \
 					goto err_handler;                           \
 				}                                               \
-				CL_CONTENT(item) = (void *) xmlGetProp(xmlXPathNodeSetItem(obj->nodesetval, i)->xmlChildrenNode, (attr));\
+				CL_CONTENT(item) = (void *) xmlGetProp(xmlXPathNodeSetItem(obj->nodesetval, i)->xmlChildrenNode, (xmlChar *) (attr));\
 				CL_ADD((list), item);                           \
 			}                                                   \
 		}                                                       \
@@ -704,7 +704,7 @@ parse_login(
 		xmlXPathContextPtr xpathCtx,
 		epp_command_data *cdata)
 {
-	xmlChar	*str;
+	char	*str;
 	struct circ_list	*item;
 
 	/* allocate necessary structures */
@@ -734,7 +734,7 @@ parse_login(
 	/* check if language matches */
 	XPATH_REQ1(str, doc, xpathCtx, error_l,
 			"epp:login/epp:options/epp:lang");
-	if (!xmlStrEqual(str, BAD_CAST "en")) {
+	if (!xmlStrEqual((xmlChar *) str, BAD_CAST "en")) {
 		xmlFree(str);
 		cdata->type = EPP_DUMMY;
 		cdata->rc = 2102;
@@ -745,7 +745,7 @@ parse_login(
 	/* check if EPP version matches */
 	XPATH_REQ1(str, doc, xpathCtx, error_l,
 			"epp:login/epp:options/epp:version");
-	if (!xmlStrEqual(str, BAD_CAST "1.0")) {
+	if (!xmlStrEqual((xmlChar *) str, BAD_CAST "1.0")) {
 		xmlFree(str);
 		cdata->type = EPP_DUMMY;
 		cdata->rc = 2100;
@@ -1026,14 +1026,14 @@ parse_create_domain(
 	XPATH_EVAL(xpathObj, xpathCtx, error_cd,
 			"domain:period");
 	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
-		xmlChar	*str = xmlNodeListGetString(doc,
+		char	*str = (char *) xmlNodeListGetString(doc,
 				xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->xmlChildrenNode,
 				1);
 		assert(str != NULL && *str != '\0');
 		cdata->in->create_domain.period = atoi(str);
 		xmlFree(str);
 		/* correct period value if given in years and not months */
-		str = xmlGetProp(xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
+		str = (char *) xmlGetProp(xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
 				BAD_CAST "unit");
 		assert(str != NULL && *str != '\0');
 		if (*str == 'y') cdata->in->create_domain.period *= 12;
@@ -1147,7 +1147,7 @@ parse_create_contact(
 	if (xpathObj->nodesetval) {
 		int	i, j;
 		for (i = 0; i < xmlXPathNodeSetGetLength(xpathObj->nodesetval); i++)
-			cdata->in->create_contact.postalInfo->street[i] =
+			cdata->in->create_contact.postalInfo->street[i] = (char *)
 					xmlNodeListGetString(doc, xmlXPathNodeSetItem(
 								xpathObj->nodesetval, i)->xmlChildrenNode, 1);
 		/* the rest must be empty strings */
@@ -1689,7 +1689,7 @@ parse_update_contact(
 				for (i = 0;
 						i < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
 						i++)
-					cdata->in->update_contact.postalInfo->street[i] =
+					cdata->in->update_contact.postalInfo->street[i] = (char *)
 							xmlNodeListGetString(doc, xmlXPathNodeSetItem(
 								xpathObj->nodesetval, i)->xmlChildrenNode, 1);
 				/* the rest must be empty strings */
@@ -2032,7 +2032,7 @@ parse_renew(
 		epp_command_data *cdata)
 {
 	xmlXPathObjectPtr	xpathObj;
-	xmlChar	*str;
+	char	*str;
 	struct tm t;
 
 	/* allocate necessary structures */
@@ -2054,18 +2054,17 @@ parse_renew(
 	XPATH_EVAL(xpathObj, xpathCtx, error_r,
 			"epp:renew/domain:renew/domain:period");
 	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
-		xmlChar	*str;
-		str = xmlNodeListGetString(doc, xmlXPathNodeSetItem(
+		str = (char *) xmlNodeListGetString(doc, xmlXPathNodeSetItem(
 					xpathObj->nodesetval, 0)->xmlChildrenNode, 1);
 		assert(str != NULL && *str != '\0');
 		cdata->in->renew.period = atoi(str);
-		xmlFree(str);
+		free(str);
 		/* correct period value if given in years and not months */
 		str = xmlGetProp(xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
 				BAD_CAST "unit");
 		assert(str != NULL);
 		if (*str == 'y') cdata->in->renew.period *= 12;
-		xmlFree(str);
+		free(str);
 	}
 	else cdata->in->renew.period = 0;
 
