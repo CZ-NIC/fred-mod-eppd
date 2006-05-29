@@ -209,7 +209,6 @@ typedef struct {
 			char	*voice;
 			char	*fax;
 			char	*email;
-			char	*authInfo;
 			char	*notify_email;
 			char	*vat;
 			char	*ssn;
@@ -229,7 +228,7 @@ typedef struct {
 		/* additional renew domain parameters */
 		struct {
 			char	*name;
-			long long	*exDate;
+			long long	exDate;
 			int	period;
 		}renew;
 		/* additional update domain parameters */
@@ -252,7 +251,6 @@ typedef struct {
 			char	*voice;
 			char	*fax;
 			char	*email;
-			char	*authInfo;
 			char	*notify_email;
 			char	*vat;
 			char	*ssn;
@@ -289,13 +287,10 @@ typedef struct {
 			char	*voice;
 			char	*fax;
 			char	*email;
-			char	*clID;
 			char	*crID;
 			long long	crDate;
 			char	*upID;
 			long long	upDate;
-			long long	trDate;
-			char	*authInfo;
 			char	*notify_email;
 			char	*vat;
 			char	*ssn;

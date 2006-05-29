@@ -353,78 +353,68 @@ static int epp_process_connection(conn_rec *c)
 			switch (cdata.type) {
 			case EPP_DUMMY:
 				cstat = epp_call_dummy(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					gstat = epp_gen_dummy(sc->xml_globs, &cdata, &genstring);
-				}
 				break;
 			case EPP_LOGIN:
 				cstat = epp_call_login(sc->corba_globs, &session, &cdata);
-				if (cstat == CORBA_OK) {
-					gstat = epp_gen_login(sc->xml_globs, &cdata, &genstring);
-				}
 				break;
 			case EPP_LOGOUT:
 				cstat = epp_call_logout(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
+				if (cstat == CORBA_OK)
 					if (cdata.rc == 1500) logout = 1;
-					gstat = epp_gen_logout(sc->xml_globs, &cdata, &genstring);
-				}
 				break;
 			case EPP_CHECK_CONTACT:
 				cstat = epp_call_check_contact(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					gstat = epp_gen_check_contact(sc->xml_globs, &cdata,
-							&genstring);
-				}
 				break;
 			case EPP_CHECK_DOMAIN:
 				cstat = epp_call_check_domain(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					gstat = epp_gen_check_domain(sc->xml_globs, &cdata,
-							&genstring);
-				}
 				break;
 			case EPP_CHECK_NSSET:
 				cstat = epp_call_check_nsset(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					gstat = epp_gen_check_nsset(sc->xml_globs, &cdata,
-							&genstring);
-				}
 				break;
 			case EPP_INFO_CONTACT:
 				cstat = epp_call_info_contact(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					gstat = epp_gen_info_contact(sc->xml_globs, &cdata,
-							&genstring);
-				}
 				break;
 			case EPP_INFO_DOMAIN:
 				cstat = epp_call_info_domain(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					gstat = epp_gen_info_domain(sc->xml_globs, &cdata,
-							&genstring);
-				}
 				break;
 			case EPP_INFO_NSSET:
 				cstat = epp_call_info_nsset(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					gstat = epp_gen_info_nsset(sc->xml_globs, &cdata,
-							&genstring);
-				}
 				break;
 			case EPP_POLL_REQ:
 				cstat = epp_call_poll_req(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					gstat = epp_gen_poll_req(sc->xml_globs, &cdata,
-							&genstring);
-				}
 				break;
 			case EPP_POLL_ACK:
 				cstat = epp_call_poll_ack(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					gstat = epp_gen_poll_ack(sc->xml_globs, &cdata,
-							&genstring);
-				}
+				break;
+			case EPP_CREATE_CONTACT:
+				cstat = epp_call_create_contact(sc->corba_globs, session,&cdata);
+				break;
+			case EPP_CREATE_DOMAIN:
+				cstat = epp_call_create_domain(sc->corba_globs, session, &cdata);
+				break;
+			case EPP_CREATE_NSSET:
+				cstat = epp_call_create_nsset(sc->corba_globs, session, &cdata);
+				break;
+			case EPP_DELETE_CONTACT:
+				cstat = epp_call_delete_contact(sc->corba_globs, session,&cdata);
+				break;
+			case EPP_DELETE_DOMAIN:
+				cstat = epp_call_delete_domain(sc->corba_globs, session, &cdata);
+				break;
+			case EPP_DELETE_NSSET:
+				cstat = epp_call_delete_nsset(sc->corba_globs, session, &cdata);
+				break;
+			case EPP_UPDATE_CONTACT:
+				cstat = epp_call_update_contact(sc->corba_globs, session,&cdata);
+				break;
+			case EPP_UPDATE_DOMAIN:
+				cstat = epp_call_update_domain(sc->corba_globs, session, &cdata);
+				break;
+			case EPP_UPDATE_NSSET:
+				cstat = epp_call_update_nsset(sc->corba_globs, session, &cdata);
+				break;
+			case EPP_RENEW_DOMAIN:
+				cstat = epp_call_renew_domain(sc->corba_globs, session, &cdata);
 				break;
 			default:
 				epplog(c, rpool, session, EPP_WARNING,
@@ -433,10 +423,9 @@ static int epp_process_connection(conn_rec *c)
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 
-			epp_command_data_cleanup(&cdata);
-
 			/* catch corba failures */
 			if (cstat != CORBA_OK) {
+				epp_command_data_cleanup(&cdata);
 				if (cstat == CORBA_ERROR)
 					epplog(c, rpool, session, EPP_ERROR,
 							"Corba call failed - terminating session");
@@ -448,15 +437,21 @@ static int epp_process_connection(conn_rec *c)
 							"Malloc in corba wrapper failed");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-			else if (gstat != GEN_OK) {
-				/* catch xml generator failures */
-				epplog(c, rpool, session, EPP_FATAL,
-						"XML Generator failed - terminating session");
-				return HTTP_INTERNAL_SERVER_ERROR;
+			else {
+				gstat = epp_gen_response(sc->xml_globs, &cdata, &genstring);
+				if (gstat != GEN_OK) {
+					/* catch xml generator failures */
+					epp_command_data_cleanup(&cdata);
+					epplog(c, rpool, session, EPP_FATAL,
+							"XML Generator failed - terminating session");
+					return HTTP_INTERNAL_SERVER_ERROR;
+				}
 			}
+			epp_command_data_cleanup(&cdata);
+
 
 		}
-		/* failure which will close connection */
+		/* parser error - failure which will close connection */
 		else {
 			switch (pstat) {
 				case PARSER_NOT_XML:

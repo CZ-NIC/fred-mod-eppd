@@ -5,7 +5,7 @@
 #include "epp_xml.h"
 #include "epp-client.h"
 
-#define MAX_LENGTH	1000
+#define MAX_LENGTH	10000
 
 typedef enum {
 	CMD_UNKNOWN,
@@ -191,204 +191,102 @@ int main(int argc, char *argv[])
 			case EPP_LOGIN:
 				/* API: call login */
 				cstat = epp_call_login(corba_globs, &session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate login */
-					gstat = epp_gen_login(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_LOGOUT:
 				/* API: call logout */
 				cstat = epp_call_logout(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate logout */
-					gstat = epp_gen_logout(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_DUMMY:
 				/* API: call dummy */
 				cstat = epp_call_dummy(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate dummy */
-					gstat = epp_gen_dummy(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_CHECK_CONTACT:
 				/* API: call check contact */
 				cstat = epp_call_check_contact(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate check contact */
-					gstat = epp_gen_check_contact(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_CHECK_DOMAIN:
 				/* API: call check domain */
 				cstat = epp_call_check_domain(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate check domain */
-					gstat = epp_gen_check_domain(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_CHECK_NSSET:
 				/* API: call check nsset */
 				cstat = epp_call_check_nsset(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate check nsset */
-					gstat = epp_gen_check_nsset(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_INFO_CONTACT:
 				/* API: call info contact */
 				cstat = epp_call_info_contact(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate info contact */
-					gstat = epp_gen_info_contact(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_INFO_DOMAIN:
 				/* API: call info domain */
 				cstat = epp_call_info_domain(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate info domain */
-					gstat = epp_gen_info_domain(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_INFO_NSSET:
 				/* API: call info nsset */
 				cstat = epp_call_info_nsset(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate info nsset */
-					gstat = epp_gen_info_nsset(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_POLL_REQ:
 				/* API: call info nsset */
 				cstat = epp_call_poll_req(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate info nsset */
-					gstat = epp_gen_poll_req(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_POLL_ACK:
 				/* API: call info nsset */
 				cstat = epp_call_poll_req(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate info nsset */
-					gstat = epp_gen_poll_req(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_CREATE_CONTACT:
 				/* API: call create contact */
 				cstat = epp_call_create_contact(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate create contact */
-					gstat = epp_gen_create_contact(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_CREATE_DOMAIN:
 				/* API: call create domain */
 				cstat = epp_call_create_domain(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate create domain */
-					gstat = epp_gen_create_domain(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
 				break;
 			case EPP_CREATE_NSSET:
 				/* API: call create nsset */
 				cstat = epp_call_create_nsset(corba_globs, session, &cdata);
-				if (cstat == CORBA_OK) {
-					/* API: generate create nsset */
-					gstat = epp_gen_create_nsset(xml_globs, &cdata, &result);
-					if (gstat == GEN_OK) {
-						puts(result);
-						epp_free_genstring(result);
-					}
-					else fputs("Generator error\n", stderr);
-				}
-				else fputs("Corba call failed\n", stderr);
+				break;
+			case EPP_DELETE_CONTACT:
+				/* API: call create contact */
+				cstat = epp_call_delete_contact(corba_globs, session, &cdata);
+				break;
+			case EPP_DELETE_DOMAIN:
+				/* API: call create contact */
+				cstat = epp_call_delete_domain(corba_globs, session, &cdata);
+				break;
+			case EPP_DELETE_NSSET:
+				/* API: call create contact */
+				cstat = epp_call_delete_nsset(corba_globs, session, &cdata);
+				break;
+			case EPP_RENEW_DOMAIN:
+				/* API: call create contact */
+				cstat = epp_call_renew_domain(corba_globs, session, &cdata);
+				break;
+			case EPP_UPDATE_DOMAIN:
+				/* API: call create contact */
+				cstat = epp_call_update_domain(corba_globs, session, &cdata);
+				break;
+			case EPP_UPDATE_CONTACT:
+				/* API: call create contact */
+				cstat = epp_call_update_contact(corba_globs, session, &cdata);
+				break;
+			case EPP_UPDATE_NSSET:
+				/* API: call create contact */
+				cstat = epp_call_update_nsset(corba_globs, session, &cdata);
 				break;
 			default:
 				fputs("Unknown epp frame type\n", stderr);
 				dofree = 0;
 				break;
 		}
+		if (cstat == CORBA_OK) {
+			/* API: generate response */
+			gstat = epp_gen_response(xml_globs, &cdata, &result);
+			if (gstat == GEN_OK) {
+				puts(result);
+				epp_free_genstring(result);
+			}
+			else fputs("Generator error\n", stderr);
+		}
+		else fputs("Corba call failed\n", stderr);
 
 		/* API: clean up command data */
 		if (dofree) epp_command_data_cleanup(&cdata);

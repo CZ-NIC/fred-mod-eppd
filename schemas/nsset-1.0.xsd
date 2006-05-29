@@ -5,7 +5,6 @@
           xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.0"
           xmlns:epp="urn:ietf:params:xml:ns:epp-1.0"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
-          xmlns:domain="http://www.nic.cz/xml/epp/domain-1.0"
           xmlns="http://www.w3.org/2001/XMLSchema"
           elementFormDefault="qualified">
 
@@ -16,9 +15,6 @@
             schemaLocation="eppcom-1.0.xsd"/>
     <import namespace="urn:ietf:params:xml:ns:epp-1.0"
             schemaLocation="epp-1.0.xsd"/>
-    <import namespace="http://www.nic.cz/xml/epp/domain-1.0"
-            schemaLocation="domain-1.0.xsd"/>
-
 
   <annotation>
     <documentation>
@@ -42,25 +38,11 @@
     <complexType name="crupdType">
       <sequence>
         <element name="id" type="nsset:nssT"/>
-        <element name="roid" type="eppcom:roidType"/>
-        <element name="status" type="nsset:statusType"
-         minOccurs="0" maxOccurs="11"/>
-        <element name="clID" type="eppcom:clIDType"/>
-        <element name="crID" type="eppcom:clIDType"
-         minOccurs="0"/>
-        <element name="crDate" type="dateTime"
-         minOccurs="0"/>
-        <element name="upID" type="eppcom:clIDType"
-         minOccurs="0"/>
-        <element name="upDate" type="dateTime"
-         minOccurs="0"/>
-        <element name="trDate" type="dateTime"
-         minOccurs="0"/>
-        <element name="authInfo" type="domain:authInfoType"
-         minOccurs="0"/>
         <element name="ns" type="nsset:nsT" minOccurs="0" maxOccurs="9"/>
         <element name="tech" type="eppcom:clIDType"
          minOccurs="0" maxOccurs="unbounded"/>
+        <element name="authInfo" type="nsset:authInfoType"
+         minOccurs="0"/>
       </sequence>
     </complexType>
 
@@ -143,7 +125,7 @@
   Child response elements.
   -->
     <element name="chkData" type="nsset:chkDataType"/>
-    <element name="infData" type="nsset:crupdType"/>
+    <element name="infData" type="nsset:infDataType"/>
 
   <!--
   <check> response elements.
@@ -169,6 +151,38 @@
           <attribute name="avail" type="boolean" use="required"/>
         </extension>
       </simpleContent>
+    </complexType>
+
+    <complexType name="infDataType">
+      <sequence>
+        <element name="id" type="nsset:nssT"/>
+        <element name="roid" type="eppcom:roidType"/>
+        <element name="status" type="nsset:statusType"
+         minOccurs="0" maxOccurs="11"/>
+        <element name="clID" type="eppcom:clIDType"/>
+        <element name="crID" type="eppcom:clIDType"
+         minOccurs="0"/>
+        <element name="crDate" type="dateTime"
+         minOccurs="0"/>
+        <element name="upID" type="eppcom:clIDType"
+         minOccurs="0"/>
+        <element name="upDate" type="dateTime"
+         minOccurs="0"/>
+        <element name="trDate" type="dateTime"
+         minOccurs="0"/>
+        <element name="authInfo" type="nsset:authInfoType"
+         minOccurs="0"/>
+        <element name="ns" type="nsset:nsT" minOccurs="0" maxOccurs="9"/>
+        <element name="tech" type="eppcom:clIDType"
+         minOccurs="0" maxOccurs="unbounded"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="authInfoType">
+      <choice>
+        <element name="pw" type="eppcom:pwAuthInfoType"/>
+        <element name="ext" type="eppcom:extAuthInfoType"/>
+      </choice>
     </complexType>
 
   <!--

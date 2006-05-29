@@ -176,27 +176,74 @@ epp_call_create_contact(epp_corba_globs *corba_globs, int session, epp_command_d
 corba_status
 epp_call_create_nsset(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
 
+/**
+ * Call corba delete domain function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_delete_domain(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
 
-/* Tranfer Commands
-typedef struct {
-	int dummy;
-} epp_data_create;
+/**
+ * Call corba delete contact function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_delete_contact(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
 
-typedef struct {
-	int dummy;
-} epp_data_delete;
+/**
+ * Call corba delete nsset function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_delete_nsset(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
 
-typedef struct {
-	int dummy;
-} epp_data_renew;
+/**
+ * Call corba renew domain function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_renew_domain(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
 
-typedef struct {
-	int dummy;
-} epp_data_tranfer_transform;
+/**
+ * Call corba update domain function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_update_domain(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
 
-typedef struct {
-	int dummy;
-} epp_data_update;
-*/
+/**
+ * Call corba update contact function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_update_contact(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
+
+/**
+ * Call corba update nsset function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_update_nsset(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
 
 #endif /* EPP_CLIENT_H */

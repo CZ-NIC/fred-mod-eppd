@@ -93,130 +93,15 @@ gen_status
 epp_gen_greeting(const char *svid, char **greeting);
 
 /**
- * Generate login answer in XML format.
+ * Generate command response in XML format.
+ * @par xml_globs Used to lookup message in hash table
  * @par cdata Input values
  * @par result Generated string
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_login(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate logout answer in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_logout(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate dummy (error) answer in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_dummy(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate check contact answer in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_check_contact(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate check domain answer in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_check_domain(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate check nsset answer in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_check_nsset(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate info contact answer in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_info_contact(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate info domain answer in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_info_domain(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate info nsset answer in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_info_nsset(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate poll request answer in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_poll_req(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate poll acknoledge answer in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_poll_ack(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate create domain in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_create_domain(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate create contact in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_create_contact(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
-
-/**
- * Generate create nsset in XML format.
- * @par cdata Input values
- * @par result Generated string
- * @ret GEN_OK if success
- */
-gen_status
-epp_gen_create_nsset(epp_xml_globs *xml_globs, epp_command_data *cdata, char **result);
+epp_gen_response(epp_xml_globs *xml_globs, epp_command_data *cdata,
+		char **result);
 
 /**
  * free string allocated by generate functions.
