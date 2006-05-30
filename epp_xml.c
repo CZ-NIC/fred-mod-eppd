@@ -2060,7 +2060,8 @@ parse_renew(
 		cdata->in->renew.period = atoi(str);
 		free(str);
 		/* correct period value if given in years and not months */
-		str = xmlGetProp(xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
+		str = (char *) xmlGetProp(
+				xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
 				BAD_CAST "unit");
 		assert(str != NULL);
 		if (*str == 'y') cdata->in->renew.period *= 12;

@@ -26,9 +26,9 @@
 
 #include "scoreboard.h"
 #include "util_filter.h"
-#ifdef AP_NEED_SET_MUTEX_PERMS
+//#ifdef AP_NEED_SET_MUTEX_PERMS
 #include "unixd.h"
-#endif
+//#endif
 
 /*
  * our header files
@@ -416,6 +416,13 @@ static int epp_process_connection(conn_rec *c)
 			case EPP_RENEW_DOMAIN:
 				cstat = epp_call_renew_domain(sc->corba_globs, session, &cdata);
 				break;
+			case EPP_TRANSFER_DOMAIN:
+				cstat = epp_call_transfer_domain(sc->corba_globs, session,
+						&cdata);
+				break;
+			case EPP_TRANSFER_NSSET:
+				cstat = epp_call_transfer_nsset(sc->corba_globs, session,&cdata);
+				break;
 			default:
 				epplog(c, rpool, session, EPP_WARNING,
 						"Unknown epp frame type - terminating session");
@@ -567,7 +574,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
  
-#ifdef AP_NEED_SET_MUTEX_PERMS  
+//#ifdef AP_NEED_SET_MUTEX_PERMS  
     rv = unixd_set_global_mutex_perms(epp_log_lock);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
@@ -575,7 +582,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
                      "epp_log_lock; check User and Group directives");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
-#endif /* perms */
+//#endif /* perms */
 
 	/*
 	 * Iterate through available servers and if eppd is enabled
