@@ -272,6 +272,14 @@ int main(int argc, char *argv[])
 				/* API: call create contact */
 				cstat = epp_call_update_nsset(corba_globs, session, &cdata);
 				break;
+			case EPP_TRANSFER_DOMAIN:
+				/* API: call transfer domain */
+				cstat = epp_call_transfer_domain(corba_globs, session, &cdata);
+				break;
+			case EPP_TRANSFER_NSSET:
+				/* API: call transfer nsset */
+				cstat = epp_call_transfer_nsset(corba_globs, session, &cdata);
+				break;
 			default:
 				fputs("Unknown epp frame type\n", stderr);
 				dofree = 0;

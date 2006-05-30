@@ -797,6 +797,8 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
+	ccReg_timestamp	c_crDate;
+	ccReg_timestamp	c_exDate;
 	ccReg_Response *response;
 	ccReg_AdminContact	*c_admin;
 	int	len, i;
@@ -820,6 +822,8 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 			cdata->in->create_domain.authInfo,
 			cdata->in->create_domain.period,
 			c_admin,
+			&c_crDate,
+			&c_exDate,
 			session,
 			cdata->clTRID,
 			ev);
@@ -842,6 +846,15 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
+	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+		CORBA_free(c_admin);
+		CORBA_free(response);
+		return CORBA_INT_ERROR;
+	}
+
+	cdata->out->create.crDate = c_crDate;
+	cdata->out->create.exDate = c_exDate;
+
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->rc = response->errCode;
 
@@ -855,6 +868,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
+	ccReg_timestamp	c_crDate;
 	ccReg_Response *response;
 	ccReg_ContactChange	*c_contact;
 
@@ -898,6 +912,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	response = ccReg_EPP_ContactCreate(globs->service,
 			cdata->in->create_contact.id,
 			c_contact,
+			&c_crDate,
 			session,
 			cdata->clTRID,
 			ev);
@@ -920,6 +935,13 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
+	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(response);
+		return CORBA_INT_ERROR;
+	}
+
+	cdata->out->create.crDate = c_crDate;
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->rc = response->errCode;
 
@@ -933,6 +955,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
+	ccReg_timestamp	c_crDate;
 	ccReg_Response *response;
 	ccReg_DNSHost	*c_dnshost;
 	ccReg_TechContact	*c_tech;
@@ -976,6 +999,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 			cdata->in->create_nsset.authInfo,
 			c_tech,
 			c_dnshost,
+			&c_crDate,
 			session,
 			cdata->clTRID,
 			ev);
@@ -999,9 +1023,15 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 		ret = CORBA_REMOTE_ERROR;
 	}
 	else {
-		cdata->svTRID = strdup(response->svTRID);
-		cdata->rc = response->errCode;
-		ret = CORBA_OK;
+		if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+			ret = CORBA_INT_ERROR;
+		}
+		else {
+			cdata->out->create.crDate = c_crDate;
+			cdata->svTRID = strdup(response->svTRID);
+			cdata->rc = response->errCode;
+			ret = CORBA_OK;
+		}
 	}
 
 	CORBA_free(c_tech);
@@ -1475,3 +1505,66 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 	return ret;
 }
 
+static corba_status
+epp_call_transfer(epp_corba_globs *globs, int session,
+		epp_command_data *cdata, epp_object_type obj)
+{
+	CORBA_Environment ev[1];
+	ccReg_Response *response;
+
+	CORBA_exception_init(ev);
+
+	if (obj == EPP_DOMAIN)
+		response = ccReg_EPP_DomainTransfer(globs->service,
+				cdata->in->transfer.id,
+				cdata->in->transfer.authInfo,
+				session,
+				cdata->clTRID,
+				ev);
+	else {
+		assert(obj == EPP_NSSET);
+		response = ccReg_EPP_NSSetTransfer(globs->service,
+				cdata->in->transfer.id,
+				cdata->in->transfer.authInfo,
+				session,
+				cdata->clTRID,
+				ev);
+	}
+
+	if (raised_exception(ev)) {
+		/* do NOT try to free response even if not NULL -> segfault */
+		CORBA_exception_free(ev);
+		return CORBA_ERROR;
+	}
+	CORBA_exception_free(ev);
+
+	/*
+	 * in case of an error of EPP server (CR) the svTRID field is
+	 * empty string
+	 */
+	if (*response->svTRID == '\0') {
+		CORBA_free(response);
+		return CORBA_REMOTE_ERROR;
+	}
+
+	cdata->svTRID = strdup(response->svTRID);
+	cdata->rc = response->errCode;
+	CORBA_free(response);
+	return CORBA_OK;
+}
+
+corba_status
+epp_call_transfer_domain(epp_corba_globs *globs, int session,
+		epp_command_data *cdata)
+{
+	assert(cdata->in != NULL);
+	return epp_call_transfer(globs, session, cdata, EPP_DOMAIN);
+}
+
+corba_status
+epp_call_transfer_nsset(epp_corba_globs *globs, int session,
+		epp_command_data *cdata)
+{
+	assert(cdata->in != NULL);
+	return epp_call_transfer(globs, session, cdata, EPP_NSSET);
+}

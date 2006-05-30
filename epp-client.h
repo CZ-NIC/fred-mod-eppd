@@ -246,4 +246,24 @@ epp_call_update_contact(epp_corba_globs *corba_globs, int session, epp_command_d
 corba_status
 epp_call_update_nsset(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
 
+/**
+ * Call corba transfer domain function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_transfer_domain(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
+
+/**
+ * Call corba transfer nsset function.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_transfer_nsset(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
+
 #endif /* EPP_CLIENT_H */

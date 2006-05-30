@@ -31,6 +31,18 @@
     <element name="delete" type="nsset:sIDType"/>
     <element name="info" type="nsset:sIDType"/>
     <element name="update" type="nsset:crupdType"/>
+    <element name="transfer" type="nsset:transferType"/>
+
+  <!--
+  Child elements of the <transfer> command.
+  -->
+    <complexType name="transferType">
+      <sequence>
+        <element name="id" type="eppcom:labelType"/>
+        <element name="authInfo" type="nsset:authInfoType"
+         minOccurs="0"/>
+      </sequence>
+    </complexType>
 
   <!--
   Child elements of the <create> or <update> command.
@@ -86,17 +98,19 @@
     <simpleType name="statusValueType">
       <restriction base="token">
         <enumeration value="clientDeleteProhibited"/>
-        <enumeration value="clientHold"/>
         <enumeration value="clientTransferProhibited"/>
         <enumeration value="clientUpdateProhibited"/>
-        <enumeration value="inactive"/>
         <enumeration value="ok"/>
+	<!--
+        <enumeration value="inactive"/>
+        <enumeration value="clientHold"/>
         <enumeration value="pendingCreate"/>
         <enumeration value="pendingDelete"/>
         <enumeration value="pendingTransfer"/>
         <enumeration value="pendingUpdate"/>
-        <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverHold"/>
+	-->
+        <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
       </restriction>

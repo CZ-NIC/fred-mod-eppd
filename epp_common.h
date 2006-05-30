@@ -34,7 +34,6 @@ typedef enum {
 	EPP_UPDATE_CONTACT,
 	EPP_UPDATE_DOMAIN,
 	EPP_UPDATE_NSSET,
-	EPP_TRANSFER_CONTACT,
 	EPP_TRANSFER_DOMAIN,
 	EPP_TRANSFER_NSSET,
 	EPP_RENEW_DOMAIN
@@ -267,6 +266,11 @@ typedef struct {
 			struct circ_list	*rem_tech;
 			char	*authInfo;
 		}update_nsset;
+		/* additional transfer parameters */
+		struct {
+			char	*id;
+			char	*authInfo;
+		}transfer;
 	}*in;
 	/*
 	 * output parameters

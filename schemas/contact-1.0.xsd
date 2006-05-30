@@ -352,10 +352,12 @@
         <enumeration value="clientUpdateProhibited"/>
         <enumeration value="linked"/>
         <enumeration value="ok"/>
+	<!--
         <enumeration value="pendingCreate"/>
         <enumeration value="pendingDelete"/>
         <enumeration value="pendingTransfer"/>
         <enumeration value="pendingUpdate"/>
+	-->
         <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverUpdateProhibited"/>

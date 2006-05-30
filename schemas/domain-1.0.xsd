@@ -148,8 +148,10 @@
     <complexType name="transferType">
       <sequence>
         <element name="name" type="eppcom:labelType"/>
+	<!--
         <element name="period" type="domain:periodType"
          minOccurs="0"/>
+	 -->
         <element name="authInfo" type="domain:authInfoType"
          minOccurs="0"/>
       </sequence>
@@ -226,9 +228,11 @@
     <element name="chkData" type="domain:chkDataType"/>
     <element name="creData" type="domain:creDataType"/>
     <element name="infData" type="domain:infDataType"/>
-    <element name="panData" type="domain:panDataType"/>
     <element name="renData" type="domain:renDataType"/>
+    <!--
+    <element name="panData" type="domain:panDataType"/>
     <element name="trnData" type="domain:trnDataType"/>
+    -->
 
   <!--
   <check> response elements.
@@ -320,19 +324,21 @@
     <simpleType name="statusValueType">
       <restriction base="token">
         <enumeration value="clientDeleteProhibited"/>
-        <enumeration value="clientHold"/>
         <enumeration value="clientRenewProhibited"/>
         <enumeration value="clientTransferProhibited"/>
         <enumeration value="clientUpdateProhibited"/>
-        <enumeration value="inactive"/>
         <enumeration value="ok"/>
+	<!--
+        <enumeration value="clientHold"/>
+        <enumeration value="inactive"/>
         <enumeration value="pendingCreate"/>
         <enumeration value="pendingDelete"/>
         <enumeration value="pendingRenew"/>
         <enumeration value="pendingTransfer"/>
         <enumeration value="pendingUpdate"/>
-        <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverHold"/>
+	-->
+        <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverRenewProhibited"/>
         <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
@@ -342,6 +348,7 @@
   <!--
   Pending action notification response elements.
   -->
+  <!--
     <complexType name="panDataType">
       <sequence>
         <element name="name" type="domain:paNameType"/>
@@ -358,6 +365,7 @@
         </extension>
       </simpleContent>
     </complexType>
+    -->
 
   <!--
   <renew> response elements.
@@ -373,6 +381,7 @@
   <!--
   <transfer> response elements.
   -->
+  <!--
     <complexType name="trnDataType">
       <sequence>
         <element name="name" type="eppcom:labelType"/>
@@ -385,6 +394,7 @@
          minOccurs="0"/>
       </sequence>
     </complexType>
+    -->
 
   <!--
   End of schema.

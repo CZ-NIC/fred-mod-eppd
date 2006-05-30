@@ -2070,6 +2070,7 @@ parse_renew(
 
 	xmlXPathFreeObject(xpathObj);
 	cdata->type = EPP_RENEW_DOMAIN;
+	return;
 
 	/*
 	 * nasty error's epilog
@@ -2078,6 +2079,84 @@ parse_renew(
 	 */
 error_r:
 	FREENULL(cdata->in->renew.name);
+	free(cdata->in);
+	cdata->in = NULL;
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
+/**
+ * <transfer> parser for domain object.
+ */
+static void
+parse_transfer(
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+
+	/* allocate necessary structures */
+	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+
+	/*
+	 * we process only transfer requests (not approves, cancels, queries, ..)
+	 * though all transfer commands are valid according to xml schemas
+	 * because we don't want to be incompatible with epp-1.0 schema.
+	 * If there is another command than transfer request we return
+	 * 2101 "Unimplemented command" response.
+	 */
+
+	/* get object type - domain or nsset */
+	XPATH_EVAL(xpathObj, xpathCtx, error_t,
+			"epp:transfer[@op='request']/domain:transfer");
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
+		xmlXPathFreeObject(xpathObj);
+		XPATH_EVAL(xpathObj, xpathCtx, error_t,
+				"epp:transfer[@op='request']/nsset:transfer");
+		if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
+			/* transfer not implemented for object */
+			xmlXPathFreeObject(xpathObj);
+			free(cdata->in);
+			cdata->in = NULL;
+			cdata->rc = 2101;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
+		else {
+			/* object is a nsset */
+			xmlXPathFreeObject(xpathObj);
+			XPATH_REQ1(cdata->in->transfer.id, doc, xpathCtx, error_t,
+					"epp:transfer/nsset:transfer/nsset:id");
+			XPATH_TAKE1(cdata->in->transfer.authInfo, doc, xpathCtx,
+					error_t,
+					"epp:transfer/nsset:transfer/nsset:authInfo/domain:pw");
+			cdata->type = EPP_TRANSFER_NSSET;
+		}
+	}
+	else {
+		/* object is a domain */
+		xmlXPathFreeObject(xpathObj);
+		XPATH_REQ1(cdata->in->transfer.id, doc, xpathCtx, error_t,
+				"epp:transfer/domain:transfer/domain:name");
+		XPATH_TAKE1(cdata->in->transfer.authInfo, doc, xpathCtx, error_t,
+				"epp:transfer/domain:transfer/domain:authInfo/domain:pw");
+		cdata->type = EPP_TRANSFER_DOMAIN;
+	}
+	return;
+
+	/*
+	 * nasty error's epilog
+	 * Used in case of internal critical failure. It is not terribly
+	 * effecient but this case should not occure very often.
+	 */
+error_t:
+	FREENULL(cdata->in->transfer.id);
+	FREENULL(cdata->in->transfer.authInfo);
 	free(cdata->in);
 	cdata->in = NULL;
 	cdata->rc = 2400;
@@ -2338,6 +2417,8 @@ epp_gen_response(epp_xml_globs *globs, epp_command_data *cdata, char **result)
 		case EPP_UPDATE_DOMAIN:
 		case EPP_UPDATE_CONTACT:
 		case EPP_UPDATE_NSSET:
+		case EPP_TRANSFER_DOMAIN:
+		case EPP_TRANSFER_NSSET:
 			break;
 		/* commands with <msgQ> element */
 		case EPP_POLL_REQ:
@@ -2750,11 +2831,9 @@ epp_parse_command(
 		case EPP_RED_UPDATE:
 			parse_update(doc, xpathCtx, cdata);
 			break;
-			/*
 		case EPP_RED_TRANSFER:
 			parse_transfer(doc, xpathCtx, cdata);
 			break;
-			*/
 		case EPP_RED_UNKNOWN_CMD:
 		default:
 			cdata->rc = 2000;
@@ -3086,6 +3165,12 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			CL_FOREACH(cdata->in->update_nsset.rem_status);
 				free(CL_CONTENT(cdata->in->update_nsset.rem_status));
 			CL_PURGE(cdata->in->update_nsset.rem_status);
+			break;
+		case EPP_TRANSFER_NSSET:
+		case EPP_TRANSFER_DOMAIN:
+			assert(cdata->in != NULL);
+			free(cdata->in->transfer.id);
+			free(cdata->in->transfer.authInfo);
 			break;
 		case EPP_POLL_REQ:
 			if (cdata->out != NULL)
