@@ -286,7 +286,7 @@ static void get_rfc3339_date(long long date, char *str)
 		return;
 	}
 	snprintf(str, 25, "%04d-%02d-%02dT%02d:%02d:%02d.0Z",
-			1900 + t.tm_year, t.tm_mon, t.tm_mday,
+			1900 + t.tm_year, t.tm_mon + 1, t.tm_mday,
 			t.tm_hour, t.tm_min, t.tm_sec);
 }
 
@@ -2053,7 +2053,7 @@ parse_renew(
 	/* domain period handling is slightly more difficult */
 	XPATH_EVAL(xpathObj, xpathCtx, error_r,
 			"epp:renew/domain:renew/domain:period");
-	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
 		str = (char *) xmlNodeListGetString(doc, xmlXPathNodeSetItem(
 					xpathObj->nodesetval, 0)->xmlChildrenNode, 1);
 		assert(str != NULL && *str != '\0');
@@ -2957,7 +2957,6 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				CL_FOREACH(cdata->out->info_domain.status)
 					free(CL_CONTENT(cdata->out->info_domain.status));
 				CL_PURGE(cdata->out->info_domain.status);
-				free(cdata->out->info_domain.registrant);
 				/* admin contacts */
 				CL_RESET(cdata->out->info_domain.admin);
 				CL_FOREACH(cdata->out->info_domain.admin)

@@ -4,17 +4,22 @@
      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0
      epp-1.0.xsd">
   <command>
-    <transfer op="request">
-      <domain:transfer
+    <update>
+      <domain:update
        xmlns:domain="http://www.nic.cz/xml/epp/domain-1.0"
        xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.0
        domain-1.0.xsd">
         <domain:name>example.cz</domain:name>
+        <domain:add>
+		<domain:contact>jouda</domain:contact>
+	</domain:add>
+        <domain:chg>
 		<domain:authInfo>
-			<domain:pw>2fooBAR</domain:pw>
+		  <domain:pw>FfooBAR</domain:pw>
 		</domain:authInfo>
-      </domain:transfer>
-    </transfer>
+	</domain:chg>
+      </domain:update>
+    </update>
     <clTRID>ABC-12345</clTRID>
   </command>
 </epp>

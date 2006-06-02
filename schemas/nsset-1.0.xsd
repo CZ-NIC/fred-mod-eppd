@@ -27,10 +27,10 @@
   Child elements found in EPP commands.
   -->
     <element name="check" type="nsset:mNameType"/>
-    <element name="create" type="nsset:crupdType"/>
+    <element name="create" type="nsset:crType"/>
     <element name="delete" type="nsset:sIDType"/>
     <element name="info" type="nsset:sIDType"/>
-    <element name="update" type="nsset:crupdType"/>
+    <element name="update" type="nsset:updateType"/>
     <element name="transfer" type="nsset:transferType"/>
 
   <!--
@@ -45,9 +45,52 @@
     </complexType>
 
   <!--
-  Child elements of the <create> or <update> command.
+  Child elements of the <update> command.
   -->
-    <complexType name="crupdType">
+    <complexType name="updateType">
+      <sequence>
+        <element name="id" type="nsset:nssT"/>
+        <element name="add" type="nsset:addRemType"
+         minOccurs="0"/>
+        <element name="rem" type="nsset:addRemType"
+         minOccurs="0"/>
+        <element name="chg" type="nsset:chgType"
+         minOccurs="0"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="addRemType">
+      <sequence>
+        <element name="ns" type="nsset:nsT"
+		minOccurs="0" maxOccurs="9"/>
+        <element name="tech" type="eppcom:clIDType"
+         minOccurs="0" maxOccurs="unbounded"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="chgType">
+      <sequence>
+        <element name="authInfo" type="nsset:authInfoChgType"
+         minOccurs="0"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  Allow the authInfo value to be nullified by including an
+  empty element within the choice.
+  -->
+    <complexType name="authInfoChgType">
+      <choice>
+        <element name="pw" type="eppcom:pwAuthInfoType"/>
+        <element name="ext" type="eppcom:extAuthInfoType"/>
+        <element name="null"/>
+      </choice>
+    </complexType>
+
+  <!--
+  Child elements of the <create> command.
+  -->
+    <complexType name="crType">
       <sequence>
         <element name="id" type="nsset:nssT"/>
         <element name="ns" type="nsset:nsT" minOccurs="0" maxOccurs="9"/>

@@ -1,5 +1,5 @@
 /*
- * Copyright statement
+ * Copyright statement ;)
  */
 
 #include "httpd.h"
@@ -30,6 +30,8 @@
 #include "unixd.h"
 //#endif
 
+#include "mod_ssl.h"	/* ssl_var_lookup */
+
 /*
  * our header files
  */
@@ -42,6 +44,11 @@
 #define EPP_HEADER_LENGTH	4
 
 module AP_MODULE_DECLARE_DATA eppd_module;
+
+/*
+ * SSL variable lookup function
+ */
+static APR_OPTIONAL_FN_TYPE(ssl_var_lookup) *epp_ssl_lookup = NULL;
 
 /*
  * Log levels used for logging to eppd log file.
@@ -355,6 +362,11 @@ static int epp_process_connection(conn_rec *c)
 				cstat = epp_call_dummy(sc->corba_globs, session, &cdata);
 				break;
 			case EPP_LOGIN:
+				/*
+				 * corba login function is somewhat special
+				 *   - session is pointer (because it might be changed)
+				 *   - additional parameter ssl?
+				 */
 				cstat = epp_call_login(sc->corba_globs, &session, &cdata);
 				break;
 			case EPP_LOGOUT:
@@ -565,6 +577,18 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 {
 	eppd_server_conf *sc;
 	apr_status_t	rv;
+
+	/*
+	 * during authentication of epp client we need to get value of a
+	 * SSL variable. For that we need ssl_var_lookup function.
+	 */
+	epp_ssl_lookup = APR_RETRIEVE_OPTIONAL_FN(ssl_var_lookup);
+	if (epp_ssl_lookup == NULL) {
+        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+                     "mod_eppd: could not retrieve ssl_var_lookup function. "
+					 "Is mod_ssl loaded?");
+        return HTTP_INTERNAL_SERVER_ERROR;
+	}
 
     /* create the rewriting lockfiles in the parent */
     if ((rv = apr_global_mutex_create(&epp_log_lock, NULL,

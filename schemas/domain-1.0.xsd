@@ -177,8 +177,6 @@
   -->
     <complexType name="addRemType">
       <sequence>
-        <element name="nsset" type="eppcom:labelType"
-         minOccurs="0"/>
         <element name="contact" type="domain:contactType"
          minOccurs="0" maxOccurs="unbounded"/>
         <element name="status" type="domain:statusType"
@@ -192,6 +190,8 @@
 
     <complexType name="chgType">
       <sequence>
+        <element name="nsset" type="eppcom:labelType"
+         minOccurs="0"/>
         <element name="registrant" type="domain:clIDChgType"
          minOccurs="0"/>
         <element name="authInfo" type="domain:authInfoChgType"

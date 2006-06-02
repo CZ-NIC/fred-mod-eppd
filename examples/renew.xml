@@ -10,7 +10,7 @@
        xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.0
        domain-1.0.xsd">
         <domain:name>example.cz</domain:name>
-        <domain:curExpDate>2000-04-03</domain:curExpDate>
+        <domain:curExpDate>2009-06-02</domain:curExpDate>
         <domain:period unit="y">5</domain:period>
       </domain:renew>
     </renew>
