@@ -24,43 +24,6 @@ struct epp_corba_globs_t {
 	ccReg_EPP	service;
 };
 
-/**
- * Read string from stream.
- */
-static gchar*
-read_string_from_stream(FILE *stream)
-{
-	gulong length;
-	gchar *objref;
-	int c;
-	int i = 0;
-
-	length = 4 * 1024; /* should suffice ordinary IOR string */
-	objref = g_malloc0(length * sizeof (gchar));
-	if (objref == NULL) return NULL;
-
-	/* skip leading white space */
-	while ((c = fgetc(stream)) !=EOF && g_ascii_isspace(c));
-	/* POST: c==EOF or c=first character */
-
-	if (c != EOF) {
-		/* append c to string while more c exist and c not white space */
-		do {
-			/* check size */
-			if (i >= length - 1) {
-				length *= 2;
-				objref = g_realloc(objref, length);
-			}
-			objref[i++] = c;
-		}while ((c = fgetc(stream)) != EOF && !g_ascii_isspace(c));
-	}
-	/* terminate string with \0 */
-	objref[i] = '\0';
-
-	return objref;
-}
-
-
 epp_corba_globs *
 epp_corba_init(const char *ior)
 {
