@@ -576,7 +576,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 		apr_pool_t *ptemp, server_rec *s)
 {
 	eppd_server_conf *sc;
-	apr_status_t	rv;
+	apr_status_t	rv = 0;
 
 	/*
 	 * during authentication of epp client we need to get value of a
