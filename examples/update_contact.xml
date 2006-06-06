@@ -9,10 +9,10 @@
        xmlns:contact="http://www.nic.cz/xml/epp/contact-1.0"
        xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.0
        contact-1.0.xsd">
-	<contact:id>regcontact</contact:id>
+	<contact:id>jouda</contact:id>
         <contact:chg>
 		<contact:voice>+1.9999999999</contact:voice>
-		<contact:email>novy@example.com</contact:email>   
+		<contact:email>novyjouda@example.com</contact:email>   
 	</contact:chg>
       </contact:update>
     </update>

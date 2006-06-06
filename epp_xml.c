@@ -122,6 +122,7 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		if (obj == NULL) goto err_handler;                      \
 		assert(xmlXPathNodeSetGetLength(obj->nodesetval) == 1); \
 		(str) = (char *) xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
+		if ((str) == NULL) (str) = strdup("");                  \
 		xmlXPathFreeObject(obj);                                \
 	}while(0);
 
@@ -136,6 +137,7 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		if (obj == NULL) goto err_handler;                      \
 		if (xmlXPathNodeSetGetLength(obj->nodesetval) == 1) {   \
 			(str) = (char *) xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
+			if ((str) == NULL) (str) = strdup("");              \
 		}                                                       \
 		else (str) = strdup("");                                \
 		xmlXPathFreeObject(obj);                                \
@@ -157,6 +159,7 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		if (obj == NULL) goto err_handler;                      \
 		if (xmlXPathNodeSetGetLength(obj->nodesetval) == 1) {   \
 			(str) = (char *) xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, 0)->xmlChildrenNode, 1);\
+			if ((str) == NULL) (str) = strdup("");              \
 			if (*(str) == '\0') {                               \
 				free(str);                                      \
 				if ((str = malloc(2)) == NULL) {                \
@@ -187,6 +190,7 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 					goto err_handler;                           \
 				}                                               \
 				CL_CONTENT(item) = (void *) xmlNodeListGetString((doc), xmlXPathNodeSetItem(obj->nodesetval, i)->xmlChildrenNode, 1);\
+				if (CL_CONTENT(item) == NULL) CL_CONTENT(item) = strdup("");\
 				CL_ADD((list), item);                           \
 			}                                                   \
 		}                                                       \
@@ -209,6 +213,7 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 					goto err_handler;                           \
 				}                                               \
 				CL_CONTENT(item) = (void *) xmlGetProp(xmlXPathNodeSetItem(obj->nodesetval, i)->xmlChildrenNode, (xmlChar *) (attr));\
+				if (CL_CONTENT(item) == NULL) CL_CONTENT(item) = strdup("");\
 				CL_ADD((list), item);                           \
 			}                                                   \
 		}                                                       \
@@ -1486,9 +1491,9 @@ parse_update_domain(
 	XPATH_TAKE1_UPD(cdata->in->update_domain.nsset, doc, xpathCtx, error_ud,
 			"epp:update/domain:update/domain:chg"
 			"/domain:nsset");
-	XPATH_TAKE1(cdata->in->update_domain.authInfo, doc, xpathCtx, error_ud,
+	XPATH_TAKE1_UPD(cdata->in->update_domain.authInfo, doc, xpathCtx, error_ud,
 			"epp:update/domain:update/domain:chg"
-			"/domain:authInfo");
+			"/domain:authInfo/domain:pw");
 	/* add & rem data */
 	XPATH_TAKEN(cdata->in->update_domain.add_admin, doc, xpathCtx, error_ud,
 			"epp:update/domain:update/domain:add"
@@ -1515,6 +1520,7 @@ error_ud:
 	FREENULL(cdata->in->update_domain.registrant);
 	FREENULL(cdata->in->update_domain.nsset);
 	FREENULL(cdata->in->update_domain.authInfo);
+	/* free contact */
 	CL_FOREACH(cdata->in->update_domain.add_admin)
 		free(CL_CONTENT(cdata->in->update_domain.add_admin));
 	CL_PURGE(cdata->in->update_domain.add_admin);
@@ -1698,6 +1704,28 @@ parse_update_contact(
 			}
 			xmlXPathFreeObject(xpathObj);
 		}
+		else {
+			/* fill empty strings in address fields */
+			cdata->in->update_contact.postalInfo->street[0] = strdup("");
+			cdata->in->update_contact.postalInfo->street[1] = strdup("");
+			cdata->in->update_contact.postalInfo->street[2] = strdup("");
+			cdata->in->update_contact.postalInfo->city = strdup("");
+			cdata->in->update_contact.postalInfo->sp = strdup("");
+			cdata->in->update_contact.postalInfo->pc = strdup("");
+			cdata->in->update_contact.postalInfo->cc = strdup("");
+		}
+	}
+	else {
+		/* fill empty strings in postal info */
+		cdata->in->update_contact.postalInfo->name = strdup("");
+		cdata->in->update_contact.postalInfo->org = strdup("");
+		cdata->in->update_contact.postalInfo->street[0] = strdup("");
+		cdata->in->update_contact.postalInfo->street[1] = strdup("");
+		cdata->in->update_contact.postalInfo->street[2] = strdup("");
+		cdata->in->update_contact.postalInfo->city = strdup("");
+		cdata->in->update_contact.postalInfo->sp = strdup("");
+		cdata->in->update_contact.postalInfo->pc = strdup("");
+		cdata->in->update_contact.postalInfo->cc = strdup("");
 	}
 	/* add & rem data */
 	/* status (attrs) */
@@ -1837,8 +1865,8 @@ parse_update_nsset(
 	/* get the update-nsset data */
 	XPATH_REQ1(cdata->in->update_nsset.id, doc, xpathCtx, error_un, "nsset:id");
 	/* chg data */
-	XPATH_TAKE1(cdata->in->update_nsset.authInfo, doc, xpathCtx, error_un,
-			"nsset:chg/nsset:authInfo");
+	XPATH_TAKE1_UPD(cdata->in->update_nsset.authInfo, doc, xpathCtx, error_un,
+			"nsset:chg/nsset:authInfo/nsset:pw");
 	/* add & rem tech */
 	XPATH_TAKEN(cdata->in->update_nsset.add_tech, doc, xpathCtx, error_un,
 			"nsset:add/nsset:tech");
@@ -1849,7 +1877,11 @@ parse_update_nsset(
 			"nsset:add/nsset:status", "s");
 	XPATH_TAKEN_ATTR(cdata->in->update_nsset.rem_status, xpathCtx, error_un,
 			"nsset:rem/nsset:status", "s");
-	/* add & rem ns */
+	/* rem ns */
+	XPATH_TAKEN(cdata->in->update_nsset.rem_ns, doc, xpathCtx, error_un,
+			"nsset:rem/nsset:name");
+
+	/* add ns */
 	XPATH_EVAL(xpathObj, xpathCtx, error_un,
 			"nsset:add/nsset:ns");
 	/* backup current xpath context node */
@@ -1887,40 +1919,6 @@ parse_update_nsset(
 	xmlXPathFreeObject(xpathObj);
 	/* restore xpath context node */
 	node = xpathCtx->node;
-
-	XPATH_EVAL(xpathObj, xpathCtx, error_un,
-			"nsset:rem/nsset:ns");
-	/* memory leaks are possible with this scheme but not ussual */
-	for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++) {
-		epp_ns	*ns;
-		struct circ_list	*item;
-		/* allocate data structures */
-		if ((item = malloc(sizeof *item)) == NULL) {
-			xmlXPathFreeObject(xpathObj);
-			goto error_un;
-		}
-		CL_NEW(item);
-		if ((ns = malloc(sizeof *ns)) == NULL) {
-			free(item);
-			xmlXPathFreeObject(xpathObj);
-			goto error_un;
-		}
-		if ((ns->addr = malloc(sizeof *(ns->addr))) == NULL) {
-			free(item);
-			free(ns);
-			xmlXPathFreeObject(xpathObj);
-			goto error_un;
-		}
-		CL_NEW(ns->addr);
-		/* get data */
-		xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
-		XPATH_REQ1(ns->name, doc, xpathCtx, error_un, "nsset:name");
-		XPATH_TAKEN(ns->addr, doc, xpathCtx, error_un, "nsset:addr");
-		/* enqueue ns record */
-		CL_CONTENT(item) = ns;
-		CL_ADD(cdata->in->update_nsset.rem_ns, item);
-	}
-	xmlXPathFreeObject(xpathObj);
 
 	cdata->type = EPP_UPDATE_NSSET;
 	return;
@@ -2048,7 +2046,8 @@ parse_renew(
 		"epp:renew/domain:renew/domain:curExpDate");
 	bzero(&t, sizeof t);
 	strptime(str, "%Y-%m-%d", &t);
-	cdata->in->renew.exDate = mktime(&t);
+	/* XXX is gmtime_r thread-safe? */
+	cdata->in->renew.exDate = timegm(&t);
 	free(str);
 	/* domain period handling is slightly more difficult */
 	XPATH_EVAL(xpathObj, xpathCtx, error_r,
@@ -2349,8 +2348,8 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 		CL_FOREACH(ns->addr) {
 			WRITE_ELEMENT(writer, simple_err, "nsset:addr",
 					CL_CONTENT(ns->addr));
-			END_ELEMENT(writer, simple_err); /* ns */
 		}
+		END_ELEMENT(writer, simple_err); /* ns */
 	}
 	END_ELEMENT(writer, simple_err); /* infdata */
 	END_ELEMENT(writer, simple_err); /* resdata */
@@ -3071,20 +3070,20 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			free(cdata->in->update_domain.authInfo);
 			/* rem & add admin */
 			CL_RESET(cdata->in->update_domain.add_admin);
-			CL_FOREACH(cdata->in->update_domain.add_admin);
+			CL_FOREACH(cdata->in->update_domain.add_admin)
 				free(CL_CONTENT(cdata->in->update_domain.add_admin));
 			CL_PURGE(cdata->in->update_domain.add_admin);
 			CL_RESET(cdata->in->update_domain.rem_admin);
-			CL_FOREACH(cdata->in->update_domain.rem_admin);
+			CL_FOREACH(cdata->in->update_domain.rem_admin)
 				free(CL_CONTENT(cdata->in->update_domain.rem_admin));
 			CL_PURGE(cdata->in->update_domain.rem_admin);
 			/* rem & add status */
 			CL_RESET(cdata->in->update_domain.add_status);
-			CL_FOREACH(cdata->in->update_domain.add_status);
+			CL_FOREACH(cdata->in->update_domain.add_status)
 				free(CL_CONTENT(cdata->in->update_domain.add_status));
 			CL_PURGE(cdata->in->update_domain.add_status);
 			CL_RESET(cdata->in->update_domain.rem_status);
-			CL_FOREACH(cdata->in->update_domain.rem_status);
+			CL_FOREACH(cdata->in->update_domain.rem_status)
 				free(CL_CONTENT(cdata->in->update_domain.rem_status));
 			CL_PURGE(cdata->in->update_domain.rem_status);
 			break;
@@ -3116,11 +3115,11 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			free(cdata->in->update_contact.discl);
 			/* rem & add status */
 			CL_RESET(cdata->in->update_contact.add_status);
-			CL_FOREACH(cdata->in->update_contact.add_status);
+			CL_FOREACH(cdata->in->update_contact.add_status)
 				free(CL_CONTENT(cdata->in->update_contact.add_status));
 			CL_PURGE(cdata->in->update_contact.add_status);
 			CL_RESET(cdata->in->update_contact.rem_status);
-			CL_FOREACH(cdata->in->update_contact.rem_status);
+			CL_FOREACH(cdata->in->update_contact.rem_status)
 				free(CL_CONTENT(cdata->in->update_contact.rem_status));
 			CL_PURGE(cdata->in->update_contact.rem_status);
 			break;
@@ -3128,7 +3127,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			assert(cdata->in != NULL);
 			free(cdata->in->update_nsset.id);
 			free(cdata->in->update_nsset.authInfo);
-			/* rem & add ns */
+			/* add ns */
 			CL_FOREACH(cdata->in->update_nsset.add_ns) {
 				epp_ns	*ns = (epp_ns *)
 					CL_CONTENT(cdata->in->update_nsset.add_ns);
@@ -3138,31 +3137,27 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(ns);
 			}
 			CL_PURGE(cdata->in->update_nsset.add_ns);
-			CL_FOREACH(cdata->in->update_nsset.rem_ns) {
-				epp_ns	*ns = (epp_ns *)
-					CL_CONTENT(cdata->in->update_nsset.rem_ns);
-				free(ns->name);
-				CL_FOREACH(ns->addr) free(CL_CONTENT(ns->addr));
-				CL_PURGE(ns->addr);
-				free(ns);
-			}
+			/* rem ns */
+			CL_RESET(cdata->in->update_nsset.rem_ns);
+			CL_FOREACH(cdata->in->update_nsset.rem_ns)
+				free(CL_CONTENT(cdata->in->update_nsset.rem_ns));
 			CL_PURGE(cdata->in->update_nsset.rem_ns);
 			/* rem & add tech */
 			CL_RESET(cdata->in->update_nsset.add_tech);
-			CL_FOREACH(cdata->in->update_nsset.add_tech);
+			CL_FOREACH(cdata->in->update_nsset.add_tech)
 				free(CL_CONTENT(cdata->in->update_nsset.add_tech));
 			CL_PURGE(cdata->in->update_nsset.add_tech);
 			CL_RESET(cdata->in->update_nsset.rem_tech);
-			CL_FOREACH(cdata->in->update_nsset.rem_tech);
+			CL_FOREACH(cdata->in->update_nsset.rem_tech)
 				free(CL_CONTENT(cdata->in->update_nsset.rem_tech));
 			CL_PURGE(cdata->in->update_nsset.rem_tech);
 			/* rem & add status */
 			CL_RESET(cdata->in->update_nsset.add_status);
-			CL_FOREACH(cdata->in->update_nsset.add_status);
+			CL_FOREACH(cdata->in->update_nsset.add_status)
 				free(CL_CONTENT(cdata->in->update_nsset.add_status));
 			CL_PURGE(cdata->in->update_nsset.add_status);
 			CL_RESET(cdata->in->update_nsset.rem_status);
-			CL_FOREACH(cdata->in->update_nsset.rem_status);
+			CL_FOREACH(cdata->in->update_nsset.rem_status)
 				free(CL_CONTENT(cdata->in->update_nsset.rem_status));
 			CL_PURGE(cdata->in->update_nsset.rem_status);
 			break;

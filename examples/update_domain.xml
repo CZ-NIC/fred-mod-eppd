@@ -11,13 +11,13 @@
        domain-1.0.xsd">
         <domain:name>example.cz</domain:name>
         <domain:add>
-		<domain:contact>jouda</domain:contact>
-	</domain:add>
+			<domain:contact>jouda</domain:contact>
+		</domain:add>
         <domain:chg>
-		<domain:authInfo>
-		  <domain:pw>FfooBAR</domain:pw>
-		</domain:authInfo>
-	</domain:chg>
+			<domain:authInfo>
+			  <domain:pw>FfooBAR</domain:pw>
+			</domain:authInfo>
+		</domain:chg>
       </domain:update>
     </update>
     <clTRID>ABC-12345</clTRID>

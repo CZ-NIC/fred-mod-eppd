@@ -1088,6 +1088,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
+	ccReg_timestamp	c_exDate;
 
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
@@ -1096,6 +1097,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 			cdata->in->renew.name,
 			cdata->in->renew.exDate,
 			cdata->in->renew.period,
+			&c_exDate,
 			session,
 			cdata->clTRID,
 			ev);
@@ -1116,8 +1118,15 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->rc = response->errCode;
+	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+		CORBA_free(response);
+		return CORBA_INT_ERROR;
+	}
+	else {
+		cdata->out->renew.exDate = c_exDate;
+		cdata->svTRID = strdup(response->svTRID);
+		cdata->rc = response->errCode;
+	}
 
 	CORBA_free(response);
 	return CORBA_OK;
@@ -1408,15 +1417,8 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 	i = 0;
 	CL_FOREACH(cdata->in->update_nsset.rem_ns) {
 		/* alloc & init sequence of ns's addresses */
-		ns = (epp_ns *) CL_CONTENT(cdata->in->update_nsset.rem_ns);
-		CL_LENGTH(ns->addr, len);
-		c_dnshost_rem->_buffer[i].inet._buffer = ccReg_InetAddress_allocbuf(len);
-		c_dnshost_rem->_buffer[i].inet._length = len;
-		j = 0;
-		CL_FOREACH(ns->addr)
-			c_dnshost_rem->_buffer[i].inet._buffer[j] =
-					CORBA_string_dup(CL_CONTENT(ns->addr));
-		c_dnshost_rem->_buffer[i++].fqdn = CORBA_string_dup(ns->name);
+		c_dnshost_rem->_buffer[i++].fqdn =
+			CORBA_string_dup(CL_CONTENT(cdata->in->update_nsset.rem_ns));
 	}
 
 	response = ccReg_EPP_NSSetUpdate(globs->service,
@@ -1440,6 +1442,8 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 		CORBA_free(c_tech_rem);
 		CORBA_free(c_tech_add);
 		CORBA_free(c_dnshost_rem);
+		for (i = 0; i < c_dnshost_add->_length; i++)
+			CORBA_free(c_dnshost_add->_buffer[i].inet._buffer);
 		CORBA_free(c_dnshost_add);
 		return CORBA_ERROR;
 	}
@@ -1463,6 +1467,8 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 	CORBA_free(c_tech_rem);
 	CORBA_free(c_tech_add);
 	CORBA_free(c_dnshost_rem);
+	for (i = 0; i < c_dnshost_add->_length; i++)
+		CORBA_free(c_dnshost_add->_buffer[i].inet._buffer);
 	CORBA_free(c_dnshost_add);
 	CORBA_free(response);
 	return ret;

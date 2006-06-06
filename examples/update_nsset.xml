@@ -10,6 +10,7 @@
        xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.0
        nsset-1.0.xsd">
         <nsset:id>exampleNsset</nsset:id>
+		<!--
 	<nsset:add>
 		<nsset:ns>
 			<nsset:name>ns99.bazmek.net</nsset:name>
@@ -17,14 +18,12 @@
 		</nsset:ns>
 	</nsset:add>
 	<nsset:rem>
-		<nsset:ns>
-			<nsset:name>ns1.bazmek.net</nsset:name>
-			<nsset:addr>194.23.54.1</nsset:addr>
-		</nsset:ns>
+		<nsset:name>ns1.bazmek.net</nsset:name>
 	</nsset:rem>
+	-->
 	<nsset:chg>
 		<nsset:authInfo>
-			<nsset:pw/>
+			<nsset:pw>blebleble</nsset:pw>
 		</nsset:authInfo>
 	</nsset:chg>
       </nsset:update>

@@ -50,18 +50,27 @@
     <complexType name="updateType">
       <sequence>
         <element name="id" type="nsset:nssT"/>
-        <element name="add" type="nsset:addRemType"
+        <element name="add" type="nsset:addType"
          minOccurs="0"/>
-        <element name="rem" type="nsset:addRemType"
+        <element name="rem" type="nsset:remType"
          minOccurs="0"/>
         <element name="chg" type="nsset:chgType"
          minOccurs="0"/>
       </sequence>
     </complexType>
 
-    <complexType name="addRemType">
+    <complexType name="addType">
       <sequence>
         <element name="ns" type="nsset:nsT"
+		minOccurs="0" maxOccurs="9"/>
+        <element name="tech" type="eppcom:clIDType"
+         minOccurs="0" maxOccurs="unbounded"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="remType">
+      <sequence>
+        <element name="name" type="eppcom:labelType"
 		minOccurs="0" maxOccurs="9"/>
         <element name="tech" type="eppcom:clIDType"
          minOccurs="0" maxOccurs="unbounded"/>
