@@ -36,6 +36,8 @@ AP_INSTALLDIR	= $(shell $(APXS) -q LIBEXECDIR)
 CFLAGS	= -g -O0 -fPIC -Wall
 LDFLAGS	= -rpath $(AP_INSTALLDIR) -Bshareable
 
+all: build
+
 build: mod_eppd.so
 
 install: mod_eppd.so
