@@ -26,10 +26,14 @@
 #define NS_CONTACT	"http://www.nic.cz/xml/epp/contact-1.0"
 #define NS_DOMAIN	"http://www.nic.cz/xml/epp/domain-1.0"
 #define NS_NSSET	"http://www.nic.cz/xml/epp/nsset-1.0"
+#define NS_SECDNS	"urn:ietf:params:xml:ns:secDNS-1.0"
+#define NS_ENUMVAL	"http://www.nic.cz/xml/epp/enumval-1.0"
 #define LOC_EPP	NS_EPP " epp-1.0.xsd"
 #define LOC_CONTACT	NS_CONTACT " contact-1.0.xsd"
 #define LOC_DOMAIN	NS_DOMAIN " domain-1.0.xsd"
 #define LOC_NSSET	NS_NSSET " nsset-1.0.xsd"
+#define LOC_SECDNS	NS_SECDNS " secDNS-1.0.xsd"
+#define LOC_ENUMVAL	NS_ENUMVAL " enumval-1.0.xsd"
 /*
  * should be less than 255 since hash value is unsigned char.
  * applies to both hashes (message and command hash)
@@ -655,8 +659,10 @@ epp_gen_greeting(const char *svid, char **greeting)
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_CONTACT);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_DOMAIN);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_NSSET);
-	//START_ELEMENT(writer, greeting_err, "svcExtension");
-	//END_ELEMENT(writer, greeting_err); /* svcExtension */
+	START_ELEMENT(writer, greeting_err, "svcExtension");
+	WRITE_ELEMENT(writer, greeting_err, "extURI", NS_SECDNS);
+	WRITE_ELEMENT(writer, greeting_err, "extURI", NS_ENUMVAL);
+	END_ELEMENT(writer, greeting_err); /* svcExtension */
 	END_ELEMENT(writer, greeting_err); /* svcMenu */
 	/* dcp part */
 	START_ELEMENT(writer, greeting_err, "dcp");
@@ -1073,6 +1079,79 @@ error_cd:
 	cdata->type = EPP_DUMMY;
 }
 
+static void
+parse_create_dnssec(
+		xmlDocPtr doc,
+		xmlXPathContext xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+	struct circ_list	*item;
+
+	if ((cdata->in->create_domain.admin = malloc(sizeof *item)) == NULL) {
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	CL_NEW(cdata->in->create_domain.admin);
+
+	/* get the domain data */
+	XPATH_REQ1(cdata->in->create_domain.name, doc, xpathCtx, error_cd,
+			"domain:name");
+	XPATH_TAKE1(cdata->in->create_domain.registrant, doc, xpathCtx, error_cd,
+			"domain:registrant");
+	XPATH_TAKE1(cdata->in->create_domain.nsset, doc, xpathCtx, error_cd,
+			"domain:nsset");
+	XPATH_REQ1(cdata->in->create_domain.authInfo, doc, xpathCtx, error_cd,
+			"domain:authInfo/domain:pw");
+	/* domain period handling is slightly more difficult */
+	XPATH_EVAL(xpathObj, xpathCtx, error_cd,
+			"domain:period");
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
+		char	*str = (char *) xmlNodeListGetString(doc,
+				xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->xmlChildrenNode,
+				1);
+		assert(str != NULL && *str != '\0');
+		cdata->in->create_domain.period = atoi(str);
+		xmlFree(str);
+		/* correct period value if given in years and not months */
+		str = (char *) xmlGetProp(xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
+				BAD_CAST "unit");
+		assert(str != NULL && *str != '\0');
+		if (*str == 'y') cdata->in->create_domain.period *= 12;
+		xmlFree(str);
+	}
+	else cdata->in->create_domain.period = 0;
+	xmlXPathFreeObject(xpathObj);
+	/* process "unbounded" number of admin contacts */
+	XPATH_TAKEN(cdata->in->create_domain.admin, doc, xpathCtx, error_cd,
+			"domain:contact");
+
+	cdata->type = EPP_CREATE_DOMAIN;
+	return;
+
+	/*
+	 * nasty error's epilog
+	 * Used in case of internal critical failure. It is not terribly
+	 * effecient but this case should not occure very often.
+	 */
+error_cd:
+	FREENULL(cdata->in->create_domain.name);
+	FREENULL(cdata->in->create_domain.registrant);
+	FREENULL(cdata->in->create_domain.admin);
+	FREENULL(cdata->in->create_domain.nsset);
+	FREENULL(cdata->in->create_domain.authInfo);
+	CL_FOREACH(cdata->in->create_domain.admin)
+		free(CL_CONTENT(cdata->in->create_domain.admin));
+	CL_PURGE(cdata->in->create_domain.admin);
+	free(cdata->in);
+	cdata->in = NULL;
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
 /**
  * Assistant procedure for parsing <create> contact
  */
@@ -1335,10 +1414,19 @@ parse_create(
 
 	XPATH_EVAL(xpathObj, xpathCtx, error_c, "epp:create/domain:create");
 	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
-		/* change relative path prefix */
+		xmlNodePtr	node;
+
+		/* change relative path prefix and backup old one */
+		node = xpathCtx->node;
 		xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
 		xmlXPathFreeObject(xpathObj);
 		parse_create_domain(doc, xpathCtx, cdata);
+		/* if ok then parse domain extensions */
+		if (cdata->type == EPP_CREATE_DOMAIN) {
+			xpathCtx->node = node;
+			parse_create_dnssec(doc, xpathCtx, cdata);
+			parse_create_enumval(doc, xpathCtx, cdata);
+		}
 		return;
 	}
 	xmlXPathFreeObject(xpathObj);
@@ -2707,6 +2795,16 @@ epp_parse_command(
 		return PARSER_EINTERNAL;
 	}
 	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "nsset", BAD_CAST NS_NSSET)) {
+		xmlXPathFreeContext(xpathCtx);
+		xmlFreeDoc(doc);
+		return PARSER_EINTERNAL;
+	}
+	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "secdns", BAD_CAST NS_SECDNS)) {
+		xmlXPathFreeContext(xpathCtx);
+		xmlFreeDoc(doc);
+		return PARSER_EINTERNAL;
+	}
+	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "enumval", BAD_CAST NS_ENUMVAL)) {
 		xmlXPathFreeContext(xpathCtx);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;

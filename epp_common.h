@@ -2,6 +2,18 @@
 #define EPP_COMMON_H
 
 /**
+ * Extensions might be teoreticaly combined together. By now we support
+ * only dnssec and enum validation extesions, both applies to domain object
+ * and cannot be used together, but for the sake of clean design we implement
+ * extension identificator as 'define' rather than 'enum'.
+ */
+#define EXT_DNSSEC	1
+#define EXT_ENUMVAL	2
+
+#define is_dnssec(ident)	(ident & EXT_DNSSEC)
+#define is_enumval(ident)	(ident & EXT_ENUMVAL)
+
+/**
  * Enumeration of all commands this software is able to handle.
  * The object specific commands are expanded (EPP_{command}_{object}.
  */
@@ -154,6 +166,22 @@ typedef struct {
 }epp_ns;
 
 /**
+ * Delegation signer information, together with public key information.
+ */
+typedef struct {
+	unsigned short	keytag;
+	unsigned char	alg;
+	unsigned char	digestType;
+	char	*digest;
+	int	maxSigLife;
+	/* optional dns rr */
+	unsigned short	flags;
+	unsigned char	protocol;
+	unsigned char	key_alg;
+	unsigned char	pubkey;
+}epp_ds;
+
+/**
  * This structure gathers outputs of parsing stage and serves as input
  * for corba function call stage and after that as input for response
  * generation stage. Structure fits for all kinds of commands. And is
@@ -165,7 +193,13 @@ typedef struct {
 	char	*svTRID;	/* server TRID, must not be null at the end */
 	int	rc;	/* epp return code */
 
-	epp_command_type type;
+	/*
+	 * following two fields fully describe type of structure. Beware that
+	 * not all combinations of theese fields have to be valid.
+	 */
+	epp_command_type type;	/* identifies epp command and object */
+	epp_ext_flag	ext;	/* identifies extensions used for the object */
+
 	/* logout and dummy have no additional parameters */
 	/*
 	 * input parameters
@@ -271,6 +305,18 @@ typedef struct {
 			char	*id;
 			char	*authInfo;
 		}transfer;
+		/*
+		 * now follow possible extensions
+		 */
+		/* dnssec extension */
+		struct {
+			struct circ_list	*ds;	/* used for create, update chg&rem */
+			struct circ_list	*rem_ds;	/* used for update-rem */
+		}dnssec;
+		/* enum validation extension */
+		struct {
+			long long	exDate;
+		}enumval;
 	}*in;
 	/*
 	 * output parameters
@@ -351,6 +397,13 @@ typedef struct {
 		struct {
 			long long	exDate;
 		}renew;
+		/*
+		 * now follow possible extensions
+		 */
+		/* dnssec extension */
+		struct {
+			struct circ_list	*ds;	/* used for info */
+		}dnssec;
 	}*out;
 }epp_command_data;
 
