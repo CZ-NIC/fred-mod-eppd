@@ -186,11 +186,12 @@ int main(int argc, char *argv[])
 			continue;
 		}
 		else {
+			char fp[] = "34:45:11:11:11:11:11:11:11:11:11:11:11:11:11:11";
 
 		switch (cdata.type) {
 			case EPP_LOGIN:
 				/* API: call login */
-				cstat = epp_call_login(corba_globs, &session, &cdata);
+				cstat = epp_call_login(corba_globs, &session, &cdata, fp);
 				break;
 			case EPP_LOGOUT:
 				/* API: call logout */

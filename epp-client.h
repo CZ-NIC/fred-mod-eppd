@@ -51,10 +51,11 @@ epp_call_dummy(epp_corba_globs *corba_globs, int session, epp_command_data *cdat
  * @par corba_globs Corba global-like variables
  * @par session Session identifier
  * @par cdata Necessary input data
+ * @par certID String identifing client's certificate
  * @ret CORBA_OK if succesful
  */
 corba_status
-epp_call_login(epp_corba_globs *corba_globs, int *session, epp_command_data *cdata);
+epp_call_login(epp_corba_globs *corba_globs, int *session, epp_command_data *cdata, char *certID);
 
 /**
  * Call corba logout function.

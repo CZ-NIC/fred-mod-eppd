@@ -125,7 +125,8 @@ epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 }
 
 corba_status
-epp_call_login(epp_corba_globs *globs, int *session, epp_command_data *cdata)
+epp_call_login(epp_corba_globs *globs, int *session, epp_command_data *cdata,
+		char *certID)
 {
 	CORBA_long	c_session;
 	CORBA_Environment ev[1];
@@ -138,6 +139,7 @@ epp_call_login(epp_corba_globs *globs, int *session, epp_command_data *cdata)
 			cdata->in->login.newPW,
 			cdata->clTRID,
 			&c_session,
+			certID,
 			ev);
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */

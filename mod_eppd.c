@@ -33,6 +33,13 @@
 #include "mod_ssl.h"	/* ssl_var_lookup */
 
 /*
+ * openssl header files
+ */
+#include <openssl/ssl.h>
+#include <openssl/bio.h>
+#include <openssl/x509.h>
+
+/*
  * our header files
  */
 #include "epp_common.h"
@@ -269,6 +276,42 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 		return 1;
 }
 
+static int get_md5(char *cert_md5, char *pem)
+{
+	X509	*x;
+    BIO	*bio;
+    int j, n;
+	unsigned char	md5[60];
+
+	if ((bio = BIO_new(BIO_s_mem())) == NULL) return 0;
+
+	/* convert PEM to x509 struct */
+	if (BIO_write(bio, pem, strlen(pem)) <= 0) {
+		BIO_free(bio);
+		return 0;
+	}
+
+	x = PEM_read_bio_X509_AUX(bio, NULL, NULL, NULL);
+	if (x == NULL) {
+		BIO_free(bio);
+		return 0;
+	}
+
+	/* compute md5 hash */
+	if (!X509_digest(x, EVP_md5(), md5, &n)) { 
+		return 0;
+	}
+	for (j = 0; j < n; j++) {
+		sprintf(cert_md5, "%02X%c", md5[j], (j + 1 == n) ? '\0' : ':');
+		cert_md5 += 3;
+	}
+
+	BIO_free_all(bio);
+	X509_free(x);
+
+    return 1;
+}
+
 /**
  * EPP Connection handler.
  *
@@ -356,6 +399,9 @@ static int epp_process_connection(conn_rec *c)
 		}
 		/* is it a command? */
 		else if (pstat == PARSER_OK) {
+			char	cert_md5[50];	/* should be enough for md5 hash of cert */
+			char	*pem;	/* pem encoded client's certificate */
+
 			/* go ahead to corba function call */
 			switch (cdata.type) {
 			case EPP_DUMMY:
@@ -365,9 +411,28 @@ static int epp_process_connection(conn_rec *c)
 				/*
 				 * corba login function is somewhat special
 				 *   - session is pointer (because it might be changed)
-				 *   - additional parameter ssl?
+				 *   - there is additional parameter identifing ssl certificate
+				 *     in order to match login name with used certificate on
+				 *     side of central repository. The identifing parameter
+				 *     is md5 digest of client's certificate.
 				 */
-				cstat = epp_call_login(sc->corba_globs, &session, &cdata);
+				bzero(cert_md5, 50);
+				pem = epp_ssl_lookup(rpool, c->base_server, c, NULL,
+						"SSL_CLIENT_CERT");
+				if ((pem != NULL) && (*pem != '\0') && get_md5(cert_md5, pem)) {
+					epplog(c, rpool, session, EPP_DEBUG,
+							"Fingerprint is: %s", cert_md5);
+					cstat = epp_call_login(sc->corba_globs, &session, &cdata,
+							cert_md5);
+				}
+				else {
+					epplog(c, rpool, session, EPP_ERROR,
+							"Error when getting client's PEM certificate. "
+							"Did you forget \"SSLVerifyClient require\" "
+							"directive in apache's conf?");
+					epp_command_data_cleanup(&cdata);
+					return HTTP_INTERNAL_SERVER_ERROR;
+				}
 				break;
 			case EPP_LOGOUT:
 				cstat = epp_call_logout(sc->corba_globs, session, &cdata);
@@ -902,7 +967,8 @@ static void register_hooks(apr_pool_t *p)
 {
 	ap_hook_child_init(epp_init_child_hook, NULL, NULL, APR_HOOK_MIDDLE);
 	ap_hook_post_config(epp_postconfig_hook, NULL, NULL, APR_HOOK_MIDDLE);
-	ap_hook_process_connection(epp_process_connection, NULL, NULL, APR_HOOK_MIDDLE);
+	ap_hook_process_connection(epp_process_connection, NULL, NULL,
+			APR_HOOK_MIDDLE);
 
 	/* register epp filters */
 	ap_register_output_filter("EPP_OUTPUT_FILTER", epp_output_filter, NULL,

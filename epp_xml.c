@@ -652,12 +652,12 @@ epp_gen_greeting(const char *svid, char **greeting)
 	START_ELEMENT(writer, greeting_err, "svcMenu");
 	WRITE_ELEMENT(writer, greeting_err, "version", "1.0");
 	WRITE_ELEMENT(writer, greeting_err, "lang", "en");
-	END_ELEMENT(writer, greeting_err); /* svcMenu */
-	START_ELEMENT(writer, greeting_err, "svcs");
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_CONTACT);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_DOMAIN);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_NSSET);
-	END_ELEMENT(writer, greeting_err); /* svcs */
+	//START_ELEMENT(writer, greeting_err, "svcExtension");
+	//END_ELEMENT(writer, greeting_err); /* svcExtension */
+	END_ELEMENT(writer, greeting_err); /* svcMenu */
 	/* dcp part */
 	START_ELEMENT(writer, greeting_err, "dcp");
 	START_ELEMENT(writer, greeting_err, "access");
@@ -2211,8 +2211,10 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "contact:crDate", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "contact:upID",
 			cdata->out->info_contact.upID);
-	get_rfc3339_date(cdata->out->info_contact.upDate, strbuf);
-	WRITE_ELEMENT(writer, simple_err, "contact:upDate", strbuf);
+	if (cdata->out->info_contact.upDate > 0) {
+		get_rfc3339_date(cdata->out->info_contact.upDate, strbuf);
+		WRITE_ELEMENT(writer, simple_err, "contact:upDate", strbuf);
+	}
 	/* disclose section */
 	discl = cdata->out->info_contact.discl;
 	START_ELEMENT(writer, simple_err, "contact:disclose");
@@ -2291,10 +2293,14 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "domain:exDate", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "domain:upID",
 			cdata->out->info_domain.upID);
-	get_rfc3339_date(cdata->out->info_domain.upDate, strbuf);
-	WRITE_ELEMENT(writer, simple_err, "domain:upDate", strbuf);
-	get_rfc3339_date(cdata->out->info_domain.trDate, strbuf);
-	WRITE_ELEMENT(writer, simple_err, "domain:trDate", strbuf);
+	if (cdata->out->info_domain.upDate > 0) {
+		get_rfc3339_date(cdata->out->info_domain.upDate, strbuf);
+		WRITE_ELEMENT(writer, simple_err, "domain:upDate", strbuf);
+	}
+	if (cdata->out->info_domain.trDate > 0) {
+		get_rfc3339_date(cdata->out->info_domain.trDate, strbuf);
+		WRITE_ELEMENT(writer, simple_err, "domain:trDate", strbuf);
+	}
 	START_ELEMENT(writer, simple_err, "domain:authInfo");
 	WRITE_ELEMENT(writer, simple_err, "domain:pw",
 			cdata->out->info_domain.authInfo);
@@ -2331,10 +2337,14 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 	get_rfc3339_date(cdata->out->info_nsset.crDate, strbuf);
 	WRITE_ELEMENT(writer, simple_err, "nsset:crDate", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "nsset:upID", cdata->out->info_nsset.upID);
-	get_rfc3339_date(cdata->out->info_nsset.upDate, strbuf);
-	WRITE_ELEMENT(writer, simple_err, "nsset:upDate", strbuf);
-	get_rfc3339_date(cdata->out->info_nsset.trDate, strbuf);
-	WRITE_ELEMENT(writer, simple_err, "nsset:trDate", strbuf);
+	if (cdata->out->info_nsset.upDate > 0) {
+		get_rfc3339_date(cdata->out->info_nsset.upDate, strbuf);
+		WRITE_ELEMENT(writer, simple_err, "nsset:upDate", strbuf);
+	}
+	if (cdata->out->info_nsset.trDate > 0) {
+		get_rfc3339_date(cdata->out->info_nsset.trDate, strbuf);
+		WRITE_ELEMENT(writer, simple_err, "nsset:trDate", strbuf);
+	}
 	WRITE_ELEMENT(writer, simple_err, "nsset:authInfo",
 			cdata->out->info_nsset.authInfo);
 	CL_RESET(cdata->out->info_nsset.ns);
