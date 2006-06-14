@@ -348,18 +348,18 @@
     <simpleType name="statusValueType">
       <restriction base="token">
         <enumeration value="clientDeleteProhibited"/>
-        <enumeration value="clientTransferProhibited"/>
         <enumeration value="clientUpdateProhibited"/>
         <enumeration value="linked"/>
         <enumeration value="ok"/>
 	<!--
+        <enumeration value="clientTransferProhibited"/>
         <enumeration value="pendingCreate"/>
         <enumeration value="pendingDelete"/>
         <enumeration value="pendingTransfer"/>
         <enumeration value="pendingUpdate"/>
+        <enumeration value="serverTransferProhibited"/>
 	-->
         <enumeration value="serverDeleteProhibited"/>
-        <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
       </restriction>
     </simpleType>

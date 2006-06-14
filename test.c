@@ -111,6 +111,7 @@ int main(int argc, char *argv[])
 	char	*result;
 	char	ior[1000];
 	int	session;
+	epp_lang	lang;
 	epp_command_data cdata;
 	char text[MAX_LENGTH];
 	char quit = 0;
@@ -146,6 +147,7 @@ int main(int argc, char *argv[])
 	}
 
 	session = 0;
+	lang = LANG_EN;
 
 	while (1) {
 		int dofree;
@@ -191,7 +193,7 @@ int main(int argc, char *argv[])
 		switch (cdata.type) {
 			case EPP_LOGIN:
 				/* API: call login */
-				cstat = epp_call_login(corba_globs, &session, &cdata, fp);
+				cstat = epp_call_login(corba_globs, &session, &lang, &cdata, fp);
 				break;
 			case EPP_LOGOUT:
 				/* API: call logout */
@@ -288,7 +290,7 @@ int main(int argc, char *argv[])
 		}
 		if (cstat == CORBA_OK) {
 			/* API: generate response */
-			gstat = epp_gen_response(xml_globs, &cdata, &result);
+			gstat = epp_gen_response(xml_globs, lang, &cdata, &result);
 			if (gstat == GEN_OK) {
 				puts(result);
 				epp_free_genstring(result);

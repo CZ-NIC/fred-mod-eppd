@@ -1,6 +1,8 @@
 #ifndef EPP_PARSER_H
 #define EPP_PARSER_H
 
+#include "epp_common.h"
+
 /**
  * EPP parser status values (part of mod_eppd - epp_parser interface).
  */
@@ -100,8 +102,8 @@ epp_gen_greeting(const char *svid, char **greeting);
  * @ret GEN_OK if success
  */
 gen_status
-epp_gen_response(epp_xml_globs *xml_globs, epp_command_data *cdata,
-		char **result);
+epp_gen_response(epp_xml_globs *xml_globs, epp_lang lang,
+		epp_command_data *cdata, char **result);
 
 /**
  * free string allocated by generate functions.

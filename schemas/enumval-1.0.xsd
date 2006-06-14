@@ -24,7 +24,7 @@ Child elements of the <create> command.
 -->
   <complexType name="exValType">
     <sequence>
-      <element name="enumvalExDate" type="dateTime"/>
+      <element name="valExDate" type="date"/>
     </sequence>
   </complexType>
 

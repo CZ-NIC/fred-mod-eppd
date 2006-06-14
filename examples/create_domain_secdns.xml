@@ -21,19 +21,19 @@
     </create>
     <extension>
       <secdns:create
-       xmlns:secdns="http://www.nic.cz/xml/epp/secDNS-1.0"
-       xsi:schemaLocation="http://www.nic.cz/xml/epp/secDNS-1.0
+       xmlns:secdns="urn:ietf:params:xml:ns:secDNS-1.0"
+       xsi:schemaLocation="urn:ietf:params:xml:ns:secDNS-1.0
        secDNS-1.0.xsd">
          <secdns:dsData>
 		 <secdns:keyTag>1</secdns:keyTag>
 		 <secdns:alg>1</secdns:alg>
 		 <secdns:digestType>1</secdns:digestType>
-		 <secdns:digest>ahj12409fsdfg098</secdns:digest>
+		 <secdns:digest>aaa12409aaaaa098</secdns:digest>
 		 <secdns:keyData>
 			 <secdns:flags>1</secdns:flags>
 			 <secdns:protocol>1</secdns:protocol>
 			 <secdns:alg>1</secdns:alg>
-			 <secdns:pubKey>123g1h235jh3g15kj31h</secdns:pubKey>
+			 <secdns:pubKey>123a1a235aa3a15aa31a</secdns:pubKey>
 		 </secdns:keyData>
 	 </secdns:dsData>
       </secdns:create>

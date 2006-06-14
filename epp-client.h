@@ -1,6 +1,8 @@
 #ifndef EPP_CLIENT_H
 #define EPP_CLIENT_H
 
+#include "epp_common.h"
+
 /* possible return values from corba wrapper functions */
 typedef enum {
 	CORBA_OK,
@@ -55,7 +57,8 @@ epp_call_dummy(epp_corba_globs *corba_globs, int session, epp_command_data *cdat
  * @ret CORBA_OK if succesful
  */
 corba_status
-epp_call_login(epp_corba_globs *corba_globs, int *session, epp_command_data *cdata, char *certID);
+epp_call_login(epp_corba_globs *corba_globs, int *session, epp_lang *lang,
+		epp_command_data *cdata, char *certID);
 
 /**
  * Call corba logout function.

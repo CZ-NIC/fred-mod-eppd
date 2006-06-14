@@ -9,7 +9,7 @@
 		<pw>123456789</pw>
 		<options>
 			<version>1.0</version>
-			<lang>en</lang>
+			<lang>cs</lang>
 		</options>
 		<svcs>
 			<objURI>urn:ietf:params:xml:ns:obj1</objURI>

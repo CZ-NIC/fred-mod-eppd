@@ -322,6 +322,7 @@ static int epp_process_connection(conn_rec *c)
 {
 	char	*genstring;
 	int	session;	/* session = 0 when not autenticated yet */
+	unsigned	lang;	/* session's language */
 	int	rc;
 	int	logout;	/* if true, terminate request loop */
 	int	firsttime;	/* if true, generate greeting in request loop */
@@ -344,6 +345,7 @@ static int epp_process_connection(conn_rec *c)
 	bb = apr_brigade_create(c->pool, c->bucket_alloc);
 	/* session value 0 means that the user is not logged in yet */
 	session = 0;
+	lang = LANG_EN;
 
 	/*
 	 * process requests loop
@@ -411,6 +413,7 @@ static int epp_process_connection(conn_rec *c)
 				/*
 				 * corba login function is somewhat special
 				 *   - session is pointer (because it might be changed)
+				 *   - lang is pointer for the same reason as above
 				 *   - there is additional parameter identifing ssl certificate
 				 *     in order to match login name with used certificate on
 				 *     side of central repository. The identifing parameter
@@ -422,8 +425,8 @@ static int epp_process_connection(conn_rec *c)
 				if ((pem != NULL) && (*pem != '\0') && get_md5(cert_md5, pem)) {
 					epplog(c, rpool, session, EPP_DEBUG,
 							"Fingerprint is: %s", cert_md5);
-					cstat = epp_call_login(sc->corba_globs, &session, &cdata,
-							cert_md5);
+					cstat = epp_call_login(sc->corba_globs, &session, &lang,
+							&cdata, cert_md5);
 				}
 				else {
 					epplog(c, rpool, session, EPP_ERROR,
@@ -522,7 +525,7 @@ static int epp_process_connection(conn_rec *c)
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 			else {
-				gstat = epp_gen_response(sc->xml_globs, &cdata, &genstring);
+				gstat = epp_gen_response(sc->xml_globs, lang, &cdata,&genstring);
 				if (gstat != GEN_OK) {
 					/* catch xml generator failures */
 					epp_command_data_cleanup(&cdata);

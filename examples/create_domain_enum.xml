@@ -9,7 +9,7 @@
        xmlns:domain="http://www.nic.cz/xml/epp/domain-1.0"
        xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.0
        domain-1.0.xsd">
-        <domain:name>example.cz</domain:name>
+        <domain:name>+1233455676</domain:name>
         <domain:period unit="y">2</domain:period>
         <domain:nsset>exampleNsset</domain:nsset>
         <domain:registrant>jouda</domain:registrant>
@@ -24,7 +24,7 @@
        xmlns:enumval="http://www.nic.cz/xml/epp/enumval-1.0"
        xsi:schemaLocation="http://www.nic.cz/xml/epp/enumval-1.0
        enumval-1.0.xsd">
-         <enumval:enumvalExDate>2008-04-03T22:00:00.0Z</enumval:enumvalExDate>
+         <enumval:valExDate>2008-04-03</enumval:valExDate>
       </enumval:create>
     </extension>
     <clTRID>ABC-12345</clTRID>

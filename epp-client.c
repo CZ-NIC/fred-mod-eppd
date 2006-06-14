@@ -125,8 +125,8 @@ epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 }
 
 corba_status
-epp_call_login(epp_corba_globs *globs, int *session, epp_command_data *cdata,
-		char *certID)
+epp_call_login(epp_corba_globs *globs, int *session, epp_lang *lang,
+		epp_command_data *cdata, char *certID)
 {
 	CORBA_long	c_session;
 	CORBA_Environment ev[1];
@@ -159,7 +159,10 @@ epp_call_login(epp_corba_globs *globs, int *session, epp_command_data *cdata,
 
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->rc = response->errCode;
-	if (cdata->rc == 1000) *session = c_session;
+	if (cdata->rc == 1000) {
+		*session = c_session;
+		*lang = cdata->in->login.lang;
+	}
 
 	CORBA_free(response);
 	return CORBA_OK;
