@@ -2439,8 +2439,8 @@ parse_transfer(
 	 * we process only transfer requests (not approves, cancels, queries, ..)
 	 * though all transfer commands are valid according to xml schemas
 	 * because we don't want to be incompatible with epp-1.0 schema.
-	 * If there is another command than transfer request we return
-	 * 2101 "Unimplemented command" response.
+	 * If there is another command than "transfer request" we return
+	 * 2102 "Unimplemented option" response.
 	 */
 
 	/* get object type - domain or nsset */
@@ -2455,7 +2455,7 @@ parse_transfer(
 			xmlXPathFreeObject(xpathObj);
 			free(cdata->in);
 			cdata->in = NULL;
-			cdata->rc = 2101;
+			cdata->rc = 2102;
 			cdata->type = EPP_DUMMY;
 			return;
 		}
@@ -3065,13 +3065,33 @@ epp_parse_command(
 	}
 	rc = xmlSchemaValidateDoc(svctx, doc);
 	if (rc < 0) {
+		/* -1 is validator internal error */
 		xmlSchemaFreeValidCtxt(svctx);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
+	/*
+	 * validation errors are further classified in 2 categories:
+	 * 	hard - no response is sent back and connection is closed
+	 * 	soft - response identifing the problem is sent to client, the
+	 * 	       connection persists
+	 */
 	if (rc > 0) {
 		xmlSchemaFreeValidCtxt(svctx);
 		xmlFreeDoc(doc);
+		/*
+		 * soft errors:
+		 *    unknown command (2000)
+		 *    command syntax error (2001)
+		 *    required parameter missing (2003)
+		 *    Parameter value range error (2004)
+		 *    Parameter value syntax error (2005)
+		 *    Unimplemented extension (2103)
+		 *    ???Unimplemented command (2101)???
+		 *    ???Unimplemented option (2102)???
+		 *
+		 *    XXX
+		 */
 		return PARSER_NOT_VALID;
 	}
 	xmlSchemaFreeValidCtxt(svctx);

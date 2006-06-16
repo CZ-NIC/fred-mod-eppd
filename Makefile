@@ -82,3 +82,9 @@ distclean: clean
 
 .PHONY: clean distclean install build
 
+# corba dummy
+test_cd: test.o epp_xml.o epp-client_stub.o
+	gcc -o test -g -Wall test.o epp_xml.o epp-client.o $(XML_LIBS)
+
+epp-client_stub.o: epp-client_stub.c
+	gcc $(CFLAGS) -c epp-client_stub.c

@@ -769,6 +769,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	ccReg_timestamp	c_exDate;
 	ccReg_Response *response;
 	ccReg_AdminContact	*c_admin;
+	ccReg_ExtensionList	*ext_list;
 	int	len, i;
 
 	assert(cdata->in != NULL);
@@ -778,6 +779,8 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	CL_LENGTH(cdata->in->create_domain.admin, len);
 	c_admin->_buffer = ccReg_AdminContact_allocbuf(len);
 	c_admin->_length = len;
+	ext_list = ccReg_ExtensionList__alloc();
+	/* XXX fill extension list if needed */
 	i = 0;
 	CL_FOREACH(cdata->in->create_domain.admin)
 		c_admin->_buffer[i++] = CORBA_string_dup(
@@ -794,6 +797,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 			&c_exDate,
 			session,
 			cdata->clTRID,
+			ext_list,
 			ev);
 
 	if (raised_exception(ev)) {
@@ -874,7 +878,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 		CORBA_string_dup(cdata->in->create_contact.postalInfo->sp);
 	c_contact->PostalCode =
 		CORBA_string_dup(cdata->in->create_contact.postalInfo->pc);
-	c_contact->Country =
+	c_contact->CC =
 		CORBA_string_dup(cdata->in->create_contact.postalInfo->cc);
 
 	response = ccReg_EPP_ContactCreate(globs->service,
@@ -1201,6 +1205,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 			c_status_rem,
 			session,
 			cdata->clTRID,
+			ext_list,
 			ev);
 
 	if (raised_exception(ev)) {
@@ -1286,7 +1291,7 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 		CORBA_string_dup(cdata->in->update_contact.postalInfo->sp);
 	c_contact->PostalCode =
 		CORBA_string_dup(cdata->in->update_contact.postalInfo->pc);
-	c_contact->Country =
+	c_contact->CC =
 		CORBA_string_dup(cdata->in->update_contact.postalInfo->cc);
 	c_contact->Telephone = CORBA_string_dup(cdata->in->update_contact.voice);
 	c_contact->Fax = CORBA_string_dup(cdata->in->update_contact.fax);
