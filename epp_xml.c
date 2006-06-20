@@ -885,8 +885,6 @@ parse_create_domain(
 	XPATH_TAKEN(cdata->in->create_domain.admin, doc, xpathCtx, error_cd,
 			"domain:contact");
 
-	cdata->type = EPP_CREATE_DOMAIN;
-
 	/* now look for optional extensions (extension tag is 2 layers upwards) */
 	xpathCtx->node = xpathCtx->node->parent->parent;
 
@@ -959,6 +957,7 @@ parse_create_domain(
 	}
 	xmlXPathFreeObject(xpathObj);
 
+	cdata->type = EPP_CREATE_DOMAIN;
 	return;
 
 	/*
@@ -1462,8 +1461,6 @@ parse_update_domain(
 	XPATH_TAKEN_ATTR(cdata->in->update_domain.rem_status, xpathCtx, error_ud,
 			"domain:rem/domain:status", "s");
 
-	cdata->type = EPP_UPDATE_DOMAIN;
-
 	/* now look for optional extensions (extension tag is 2 layers upwards) */
 	xpathCtx->node = xpathCtx->node->parent->parent;
 
@@ -1603,6 +1600,7 @@ parse_update_domain(
 	}
 	xmlXPathFreeObject(xpathObj);
 
+	cdata->type = EPP_UPDATE_DOMAIN;
 	return;
 
 	/*
@@ -2173,6 +2171,20 @@ parse_renew(
 	else cdata->in->renew.period = 0;
 
 	xmlXPathFreeObject(xpathObj);
+
+	/* enumval extension */
+	XPATH_TAKE1(str, doc, xpathCtx, error_r,
+			"epp:extension/enumval:renew/enumval:valExDate");
+	if (*str != '\0') {
+		struct tm t;
+
+		bzero(&t, sizeof t);
+		strptime(str, "%Y-%m-%d", &t);
+		/* XXX is timegm thread-safe? */
+		cdata->in->renew.valExDate = timegm(&t);
+	}
+	free(str);
+
 	cdata->type = EPP_RENEW_DOMAIN;
 	return;
 

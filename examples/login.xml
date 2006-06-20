@@ -7,13 +7,20 @@
 	<login>
 		<clID>REG-LRR</clID>
 		<pw>123456789</pw>
-		<newPW>789</newPW>
+		<newPW>123456789</newPW>
 		<options>
 			<version>1.0</version>
 			<lang>cs</lang>
 		</options>
 		<svcs>
+			<!--
+			tyto parametry jsou zparsovany ale ignorovany
+			muzes zadat co chces
+			-->
 			<objURI>urn:ietf:params:xml:ns:obj1</objURI>
+			<svcExtension>
+				<extURI>urn:ietf:params:xml:ns:obj2</extURI>
+		    </svcExtension>
 		</svcs>
 	</login>
 	<clTRID>sample1trid</clTRID>

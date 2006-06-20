@@ -4,7 +4,18 @@
      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0
      epp-1.0.xsd">
 <command>
-	<poll op="req" />
-	<clTRID>poll1trid</clTRID>
+	<login>
+		<clID>REG-LRR</clID>
+		<pw>123456789</pw>
+		<newPW>789</newPW>
+		<options>
+			<version>1.0</version>
+			<lang>cs</lang>
+		</options>
+		<svcs>
+			<objURI>urn:ietf:params:xml:ns:obj1</objURI>
+		</svcs>
+	</login>
+	<clTRID>sample1trid</clTRID>
 </command>
 </epp>

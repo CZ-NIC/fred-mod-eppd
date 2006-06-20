@@ -202,7 +202,7 @@
     <complexType name="addRemType">
       <sequence>
         <element name="status" type="contact:statusType"
-         maxOccurs="7"/>
+         maxOccurs="5"/>
       </sequence>
     </complexType>
 
@@ -226,9 +226,11 @@
         <element name="disclose" type="contact:discloseType"
          minOccurs="0"/>
         <element name="vat" type="contact:vatT"
-	minOccurs="0"/>
+		minOccurs="0"/>
         <element name="ssn" type="contact:ssnT"
-	minOccurs="0"/>
+		minOccurs="0"/>
+        <element name="notifyEmail" type="eppcom:minTokenType"
+         minOccurs="0"/>
       </sequence>
     </complexType>
 
@@ -298,7 +300,7 @@
         <element name="id" type="eppcom:clIDType"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="contact:statusType"
-         maxOccurs="7"/>
+         maxOccurs="5"/>
         <element name="postalInfo" type="contact:postalInfoType"
          maxOccurs="2"/>
         <element name="voice" type="contact:e164StringType"

@@ -7,13 +7,12 @@
     <nsset:check xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.0"
 	    xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.0
 	    nsset-1.0.xsd">
-        <nsset:id>example1</nsset:id>
-        <nsset:id>example2</nsset:id>
-        <nsset:id>example3</nsset:id>
+        <nsset:id>exampleNsset</nsset:id>
+        <nsset:id>necocz</nsset:id>
+        <nsset:id>xxxx</nsset:id>
       </nsset:check>
     </check>
     <clTRID>ABC-12346</clTRID>
   </command>
 </epp>
-
 

@@ -11,13 +11,21 @@
        domain-1.0.xsd">
         <domain:name>example.cz</domain:name>
         <domain:add>
-			<domain:contact>jouda</domain:contact>
-		</domain:add>
+		<domain:contact>jouda</domain:contact>
+		<domain:contact>regcontact2</domain:contact>
+		<domain:status s="clientRenewProhibited" />
+	</domain:add>
+        <domain:rem>
+		<domain:contact>regcontact</domain:contact>
+		<domain:status s="clientUpdateProhibited" />
+	</domain:rem>
         <domain:chg>
-			<domain:authInfo>
-			  <domain:pw>FfooBAR</domain:pw>
-			</domain:authInfo>
-		</domain:chg>
+		<domain:nsset>exampleNsset</domain:nsset>
+		<domain:registrant>jouda</domain:registrant>
+		<domain:authInfo>
+			<domain:pw>FfooBAR</domain:pw>
+		</domain:authInfo>
+	</domain:chg>
       </domain:update>
     </update>
     <clTRID>ABC-12345</clTRID>

@@ -1,0 +1,29 @@
+check_contact.xml		...ok
+check_domain.xml		...ok
+check_nsset.xml			...ok
+create_contact1.xml
+create_contact2.xml
+create_contact3.xml
+create_domain_enum.xml	...ok
+create_domain_secdns.xml
+create_domain.xml		...ok
+create_nsset.xml		...ok
+delete_contact.xml		xxx
+delete_domain.xml		...ok
+delete_nsset.xml		xxx
+info_contact.xml		...ok
+info_domain.xml			xxx
+info_nsset.xml			...ok
+login.xml			...ok
+logout.xml			...ok
+poll_ack.xml			???
+poll_req.xml			...ok
+renew_enum.xml
+renew.xml
+transfer_domain.xml		???
+transfer_nsset.xml		???
+update_contact.xml		...ok
+update_domain_enum.xml
+update_domain_secdns.xml
+update_domain.xml
+update_nsset.xml		xxx

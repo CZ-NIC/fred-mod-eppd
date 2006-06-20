@@ -4,7 +4,7 @@
      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0
      epp-1.0.xsd">
 <command>
-	<poll op="req" />
-	<clTRID>poll1trid</clTRID>
+	<poll op="ack" msgID="1" />
+	<clTRID>poll2trid</clTRID>
 </command>
 </epp>

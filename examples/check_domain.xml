@@ -7,9 +7,9 @@
     <domain:check xmlns:domain="http://www.nic.cz/xml/epp/domain-1.0"
 	    xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.0
 	    domain-1.0.xsd">
-        <domain:name>example1</domain:name>
-        <domain:name>example2</domain:name>
-        <domain:name>example3</domain:name>
+        <domain:name>example.cz</domain:name>
+        <domain:name>example2.cz</domain:name>
+        <domain:name>1.1.1.1.1.1.1.1.1.0.2.4.e164.arpa</domain:name>
       </domain:check>
     </check>
     <clTRID>ABC-12346</clTRID>

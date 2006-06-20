@@ -65,6 +65,8 @@
 		minOccurs="0" maxOccurs="9"/>
         <element name="tech" type="eppcom:clIDType"
          minOccurs="0" maxOccurs="unbounded"/>
+        <element name="status" type="nsset:statusType"
+         minOccurs="0" maxOccurs="6"/>
       </sequence>
     </complexType>
 
@@ -74,6 +76,8 @@
 		minOccurs="0" maxOccurs="9"/>
         <element name="tech" type="eppcom:clIDType"
          minOccurs="0" maxOccurs="unbounded"/>
+        <element name="status" type="nsset:statusType"
+         minOccurs="0" maxOccurs="6"/>
       </sequence>
     </complexType>
 
@@ -224,7 +228,7 @@
         <element name="id" type="nsset:nssT"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="nsset:statusType"
-         minOccurs="0" maxOccurs="11"/>
+         minOccurs="0" maxOccurs="7"/>
         <element name="clID" type="eppcom:clIDType"/>
         <element name="crID" type="eppcom:clIDType"
          minOccurs="0"/>

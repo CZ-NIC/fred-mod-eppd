@@ -11,8 +11,8 @@
        nsset-1.0.xsd">
         <nsset:id>exampleNsset</nsset:id>
         <nsset:authInfo>
-			<nsset:pw>2fooBAR</nsset:pw>
-		</nsset:authInfo>
+		<nsset:pw>2fooBAR</nsset:pw>
+	</nsset:authInfo>
       </nsset:transfer>
     </transfer>
     <clTRID>ABC-12345</clTRID>

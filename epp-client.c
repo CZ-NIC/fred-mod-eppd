@@ -132,8 +132,10 @@ epp_call_login(epp_corba_globs *globs, int *session, epp_lang *lang,
 	CORBA_long	c_session;
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
+	ccReg_Languages	c_lang;
 	CORBA_exception_init(ev);
 
+	c_lang = (cdata->in->login.lang == LANG_EN) ? ccReg_EN : ccReg_CS;
 	response = ccReg_EPP_ClientLogin(globs->service,
 			cdata->in->login.clID,
 			cdata->in->login.pw,
@@ -141,7 +143,7 @@ epp_call_login(epp_corba_globs *globs, int *session, epp_lang *lang,
 			cdata->clTRID,
 			&c_session,
 			certID,
-			(*lang == LANG_EN) ? 0 : 1,
+			c_lang,
 			ev);
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
@@ -226,7 +228,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	/* get number of contacts */
 	CL_LENGTH(cdata->in->check.ids, len);
 	ids->_buffer = ccReg_Check_allocbuf(len);
-	ids->_length = len;
+	ids->_maximum = ids->_length = len;
 
 	i = 0;
 	CL_FOREACH(cdata->in->check.ids)
@@ -285,8 +287,13 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 			else {
 				CL_NEW(cdata->out->check.bools);
 				assert(len == bools->_length);
-				for (i = 0; i < bools->_length; i++) {
-					item = malloc(sizeof *item);
+				/*
+				 * circular list stores items in reversed order.
+				 * Therefore we have reverse processing order of items in
+				 * bools->_buffer array
+				 */
+				for (i = bools->_length - 1; i >= 0; i--) {
+					if ((item = malloc(sizeof *item)) == NULL) break;
 					/*
 					 * note that we cannot use zero value for false value
 					 * since value zero of content pointer denotes that
@@ -296,7 +303,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 					CL_CONTENT(item) = (void *) (bools->_buffer[i] ? 1 : 2);
 					CL_ADD(cdata->out->check.bools, item);
 				}
-				if (i != bools->_length) ret = CORBA_INT_ERROR;
+				if (i > 0) ret = CORBA_INT_ERROR;
 				else {
 					cdata->svTRID = strdup(response->svTRID);
 					cdata->msg = strdup(response->errMsg);
@@ -449,7 +456,8 @@ epp_call_info_contact(epp_corba_globs *globs, int session, epp_command_data *cda
 }
 
 corba_status
-epp_call_info_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
+epp_call_info_domain(epp_corba_globs *globs, int session,
+		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	corba_status	ret;
@@ -497,6 +505,14 @@ epp_call_info_domain(epp_corba_globs *globs, int session, epp_command_data *cdat
 			cdata->out = NULL;
 			ret = CORBA_INT_ERROR;
 		}
+		else if ((cdata->out->info_domain.ds = malloc(sizeof *item)) == NULL)
+		{
+			free(cdata->out->info_domain.admin);
+			free(cdata->out->info_domain.status);
+			free(cdata->out);
+			cdata->out = NULL;
+			ret = CORBA_INT_ERROR;
+		}
 		/* ok, now everything was successfully allocated */
 		else {
 			int i;
@@ -517,6 +533,7 @@ epp_call_info_domain(epp_corba_globs *globs, int session, epp_command_data *cdat
 			/* allocate and initialize status, admin lists */
 			CL_NEW(cdata->out->info_domain.status);
 			CL_NEW(cdata->out->info_domain.admin);
+			CL_NEW(cdata->out->info_domain.ds);
 			for (i = 0; i < c_domain->stat._length; i++) {
 				item = malloc(sizeof *item);
 				CL_CONTENT(item) = (void *) strdup(c_domain->stat._buffer[i]);
@@ -526,6 +543,17 @@ epp_call_info_domain(epp_corba_globs *globs, int session, epp_command_data *cdat
 				item = malloc(sizeof *item);
 				CL_CONTENT(item) = (void *) strdup(c_domain->admin._buffer[i]);
 				CL_ADD(cdata->out->info_domain.admin, item);
+			}
+
+			/* look for extensions */
+			for (i = 0; i < c_domain->ext._length; i++) {
+				/* is it enumval extension? */
+				if (c_domain->ext._buffer[i]._type ==
+						TC_ccReg_ENUMValidationExtension) {
+					ccReg_ENUMValidationExtension	*c_enumval =
+						c_domain->ext._buffer[i]._value;
+					cdata->out->info_domain.valExDate = c_enumval->valExDate;
+				}
 			}
 
 			cdata->svTRID = strdup(response->svTRID);
@@ -779,7 +807,9 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	ccReg_timestamp	c_exDate;
 	ccReg_Response *response;
 	ccReg_AdminContact	*c_admin;
-	ccReg_ExtensionList	*ext_list;
+	ccReg_ExtensionList	*c_ext_list;
+	ccReg_ENUMValidationExtension	*c_enumval = NULL;
+	corba_status	ret = CORBA_OK;
 	int	len, i;
 
 	assert(cdata->in != NULL);
@@ -789,12 +819,20 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	CL_LENGTH(cdata->in->create_domain.admin, len);
 	c_admin->_buffer = ccReg_AdminContact_allocbuf(len);
 	c_admin->_length = len;
-	ext_list = ccReg_ExtensionList__alloc();
-	/* XXX fill extension list if needed */
 	i = 0;
 	CL_FOREACH(cdata->in->create_domain.admin)
 		c_admin->_buffer[i++] = CORBA_string_dup(
 				CL_CONTENT(cdata->in->create_domain.admin));
+	c_ext_list = ccReg_ExtensionList__alloc();
+	/* fill extension list if needed */
+	if (cdata->in->create_domain.valExDate != 0) {
+		c_enumval = ccReg_ENUMValidationExtension__alloc();
+		c_enumval->valExDate = cdata->in->create_domain.valExDate;
+		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
+		c_ext_list->_length = 1;
+		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
+		c_ext_list->_buffer[0]._value = c_enumval;
+	}
 
 	response = ccReg_EPP_DomainCreate(globs->service,
 			cdata->in->create_domain.name,
@@ -807,14 +845,15 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 			&c_exDate,
 			session,
 			cdata->clTRID,
-			ext_list,
+			c_ext_list,
 			ev);
 
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		CORBA_free(c_admin);
-		CORBA_free(ext_list);
+		if (c_enumval != NULL) CORBA_free(c_enumval);
+		CORBA_free(c_ext_list);
 		return CORBA_ERROR;
 	}
 	CORBA_exception_free(ev);
@@ -824,16 +863,13 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	 * empty string
 	 */
 	if (*response->svTRID == '\0') {
-		CORBA_free(c_admin);
-		CORBA_free(response);
-		CORBA_free(ext_list);
-		return CORBA_REMOTE_ERROR;
+		ret = CORBA_REMOTE_ERROR;
+		goto end;
 	}
 
 	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(c_admin);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
+		ret = CORBA_INT_ERROR;
+		goto end;
 	}
 
 	cdata->out->create.crDate = c_crDate;
@@ -843,10 +879,12 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
 
+end:
 	CORBA_free(c_admin);
-	CORBA_free(ext_list);
+	if (c_enumval != NULL) CORBA_free(c_enumval);
+	CORBA_free(c_ext_list);
 	CORBA_free(response);
-	return CORBA_OK;
+	return ret;
 }
 
 corba_status
@@ -1534,7 +1572,6 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 				cdata->in->transfer.authInfo,
 				session,
 				cdata->clTRID,
-				ext_list,
 				ev);
 
 		CORBA_free(ext_list);

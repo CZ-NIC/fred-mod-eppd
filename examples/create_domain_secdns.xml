@@ -36,6 +36,12 @@
 			 <secdns:pubKey>123a1a235aa3a15aa31a</secdns:pubKey>
 		 </secdns:keyData>
 	 </secdns:dsData>
+         <secdns:dsData>
+		 <secdns:keyTag>2</secdns:keyTag>
+		 <secdns:alg>2</secdns:alg>
+		 <secdns:digestType>2</secdns:digestType>
+		 <secdns:digest>aaa12409aaaaa098</secdns:digest>
+	 </secdns:dsData>
       </secdns:create>
     </extension>
     <clTRID>ABC-12345</clTRID>

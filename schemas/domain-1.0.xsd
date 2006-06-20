@@ -38,7 +38,7 @@
   -->
     <complexType name="createType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
         <element name="period" type="domain:periodType"
          minOccurs="0"/>
         <element name="nsset" type="eppcom:labelType"
@@ -51,11 +51,13 @@
       </sequence>
     </complexType>
 
+  <!-- Zavrhnuto
     <simpleType name="domainOrEnumNameType">
       <restriction base="token">
-	<pattern value="([a-z0-9\-]{1,61}\.cz)|(\+\d{1,20})"/>
+		<pattern value="([a-z0-9\-]{1,61}\.cz)|(\+420\d{1,15})"/>
       </restriction>
     </simpleType>
+	-->
 
     <complexType name="periodType">
       <simpleContent>
@@ -112,7 +114,7 @@
   -->
     <complexType name="sNameType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
       </sequence>
     </complexType>
   <!--
@@ -120,7 +122,7 @@
   -->
     <complexType name="mNameType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"
+        <element name="name" type="eppcom:labelType"
          maxOccurs="unbounded"/>
       </sequence>
     </complexType>
@@ -130,7 +132,7 @@
   -->
     <complexType name="infoType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
         <element name="authInfo" type="domain:authInfoType"
          minOccurs="0"/>
       </sequence>
@@ -141,7 +143,7 @@
   -->
     <complexType name="renewType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
         <element name="curExpDate" type="date"/>
         <element name="period" type="domain:periodType"
          minOccurs="0"/>
@@ -153,7 +155,7 @@
   -->
     <complexType name="transferType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
 	<!--
         <element name="period" type="domain:periodType"
          minOccurs="0"/>
@@ -168,7 +170,7 @@
   -->
     <complexType name="updateType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
         <element name="add" type="domain:addRemType"
          minOccurs="0"/>
         <element name="rem" type="domain:addRemType"
@@ -186,7 +188,7 @@
         <element name="contact" type="domain:contactType"
          minOccurs="0" maxOccurs="unbounded"/>
         <element name="status" type="domain:statusType"
-         minOccurs="0" maxOccurs="11"/>
+         minOccurs="0" maxOccurs="8"/>
       </sequence>
     </complexType>
 
@@ -252,7 +254,7 @@
 
     <complexType name="checkType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
         <element name="reason" type="eppcom:reasonType"
          minOccurs="0"/>
       </sequence>
@@ -272,7 +274,7 @@
   -->
     <complexType name="creDataType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
         <element name="crDate" type="dateTime"/>
         <element name="exDate" type="dateTime"
          minOccurs="0"/>
@@ -284,10 +286,10 @@
   -->
     <complexType name="infDataType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="domain:statusType"
-         minOccurs="0" maxOccurs="11"/>
+         minOccurs="0" maxOccurs="8"/>
         <element name="registrant" type="eppcom:clIDType"
          minOccurs="0"/>
         <element name="contact" type="domain:contactType"
@@ -378,7 +380,7 @@
   -->
     <complexType name="renDataType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
         <element name="exDate" type="dateTime"
          minOccurs="0"/>
       </sequence>
@@ -390,7 +392,7 @@
   <!--
     <complexType name="trnDataType">
       <sequence>
-        <element name="name" type="domain:domainOrEnumNameType"/>
+        <element name="name" type="eppcom:labelType"/>
         <element name="trStatus" type="eppcom:trStatusType"/>
         <element name="reID" type="eppcom:clIDType"/>
         <element name="reDate" type="dateTime"/>

@@ -18,8 +18,12 @@
 		<nsset:name>ns2.bazmek.net</nsset:name>
 		<nsset:addr>194.23.54.2</nsset:addr>
 		<nsset:addr>194.23.54.3</nsset:addr>
+		<nsset:addr>194.23.54.4</nsset:addr>
+		<nsset:addr>194.23.54.5</nsset:addr>
 	</nsset:ns>
 	<nsset:tech>regcontact</nsset:tech>
+	<nsset:tech>regcontact2</nsset:tech>
+	<nsset:tech>jouda</nsset:tech>
         <nsset:authInfo>
           <nsset:pw>2fooBAR</nsset:pw>               
         </nsset:authInfo>

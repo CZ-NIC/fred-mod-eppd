@@ -16,6 +16,7 @@
           <contact:addr>
             <contact:street>123 Example Dr.</contact:street>
             <contact:street>Suite 100</contact:street>
+            <contact:street>jeste neco</contact:street>
             <contact:city>Dulles</contact:city>
             <contact:sp>VA</contact:sp>
             <contact:pc>20166-6503</contact:pc>
@@ -26,9 +27,16 @@
         <contact:fax>+1.7035555556</contact:fax>
         <contact:email>jdoe@example.com</contact:email>   
         <contact:disclose flag="0">
+          <contact:name/>
+          <contact:org/>
+          <contact:addr/>
           <contact:voice/>
+          <contact:fax/>
           <contact:email/>
         </contact:disclose>
+        <contact:vat>7035555556</contact:vat>
+        <contact:ssn>8888888856</contact:ssn>
+        <contact:notifyEmail>jdoe.notify@example.com</contact:notifyEmail>   
       </contact:create>
     </create>
     <clTRID>ABC-12345</clTRID>

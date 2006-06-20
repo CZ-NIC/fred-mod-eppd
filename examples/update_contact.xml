@@ -9,12 +9,37 @@
        xmlns:contact="http://www.nic.cz/xml/epp/contact-1.0"
        xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.0
        contact-1.0.xsd">
-	<contact:id>jouda</contact:id>
-        <contact:chg>
-		<contact:voice>+1.9999999999</contact:voice>
-		<contact:email>novyjouda@example.com</contact:email>   
-	</contact:chg>
-      </contact:update>
+		<contact:id>jouda</contact:id>
+		<contact:add>
+			<contact:status s="clientDeleteProhibited" />
+		</contact:add>
+		<contact:rem>
+			<contact:status s="clientUpdateProhibited" />
+		</contact:rem>
+		<contact:chg>
+		  <contact:postalInfo>
+			<contact:name>John Doe</contact:name>
+			<contact:org>Example Inc.</contact:org>
+			<contact:addr>
+			  <contact:street>123 Example Dr.</contact:street>
+			  <contact:street>Suite 100</contact:street>
+			  <contact:street>jeste neco</contact:street>
+			  <contact:city>Dulles</contact:city>
+			  <contact:sp>VA</contact:sp>
+			  <contact:pc>20166-6503</contact:pc>
+			  <contact:cc>US</contact:cc> 
+			</contact:addr>
+		  </contact:postalInfo>
+		  <contact:voice>+1.9999999999</contact:voice>
+		  <contact:fax>+1.9999999999</contact:fax>
+		  <contact:email>novyjouda@example.com</contact:email>
+		  <contact:disclose flag="0">
+		  </contact:disclose>
+		  <contact:vat>7035555556</contact:vat>
+		  <contact:ssn>8888888856</contact:ssn>
+		  <contact:notifyEmail>novyjouda@example.com</contact:notifyEmail>
+		</contact:chg>
+	  </contact:update>
     </update>
     <clTRID>ABC-12345</clTRID>
   </command> 

@@ -266,6 +266,8 @@ typedef struct {
 			char	*name;
 			long long	exDate;
 			int	period;
+			/* enum validation extension */
+			long long	valExDate;
 		}renew;
 		/* additional update domain parameters */
 		struct {
