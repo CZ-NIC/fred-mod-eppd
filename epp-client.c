@@ -119,6 +119,7 @@ epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	}
 
 	cdata->svTRID = strdup(response->svTRID);
+	cdata->msg = strdup(response->errMsg);
 
 	CORBA_free(response);
 	return CORBA_OK;
@@ -140,6 +141,7 @@ epp_call_login(epp_corba_globs *globs, int *session, epp_lang *lang,
 			cdata->clTRID,
 			&c_session,
 			certID,
+			(*lang == LANG_EN) ? 0 : 1,
 			ev);
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
@@ -158,6 +160,7 @@ epp_call_login(epp_corba_globs *globs, int *session, epp_lang *lang,
 	}
 
 	cdata->svTRID = strdup(response->svTRID);
+	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
 	if (cdata->rc == 1000) {
 		*session = c_session;
@@ -196,6 +199,7 @@ epp_call_logout(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	}
 
 	cdata->svTRID = strdup(response->svTRID);
+	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -295,6 +299,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 				if (i != bools->_length) ret = CORBA_INT_ERROR;
 				else {
 					cdata->svTRID = strdup(response->svTRID);
+					cdata->msg = strdup(response->errMsg);
 					cdata->rc = response->errCode;
 				}
 			}
@@ -431,6 +436,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session, epp_command_data *cda
 			discl->email = c_contact->DiscloseEmail;
 
 			cdata->svTRID = strdup(response->svTRID);
+			cdata->msg = strdup(response->errMsg);
 			cdata->rc = response->errCode;
 			ret = CORBA_OK;
 		}
@@ -523,6 +529,7 @@ epp_call_info_domain(epp_corba_globs *globs, int session, epp_command_data *cdat
 			}
 
 			cdata->svTRID = strdup(response->svTRID);
+			cdata->msg = strdup(response->errMsg);
 			cdata->rc = response->errCode;
 			ret = CORBA_OK;
 		}
@@ -643,6 +650,7 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 			}
 
 			cdata->svTRID = strdup(response->svTRID);
+			cdata->msg = strdup(response->errMsg);
 			cdata->rc = response->errCode;
 			ret = CORBA_OK;
 		}
@@ -702,6 +710,7 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 		cdata->out->poll_req.msg = strdup(c_msg);
 
 		cdata->svTRID = strdup(response->svTRID);
+		cdata->msg = strdup(response->errMsg);
 		cdata->rc = response->errCode;
 	}
 
@@ -753,6 +762,7 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 		cdata->out->poll_ack.msgid = c_msgID;
 
 		cdata->svTRID = strdup(response->svTRID);
+		cdata->msg = strdup(response->errMsg);
 		cdata->rc = response->errCode;
 	}
 
@@ -804,6 +814,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		CORBA_free(c_admin);
+		CORBA_free(ext_list);
 		return CORBA_ERROR;
 	}
 	CORBA_exception_free(ev);
@@ -815,6 +826,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	if (*response->svTRID == '\0') {
 		CORBA_free(c_admin);
 		CORBA_free(response);
+		CORBA_free(ext_list);
 		return CORBA_REMOTE_ERROR;
 	}
 
@@ -828,9 +840,11 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	cdata->out->create.exDate = c_exDate;
 
 	cdata->svTRID = strdup(response->svTRID);
+	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(c_admin);
+	CORBA_free(ext_list);
 	CORBA_free(response);
 	return CORBA_OK;
 }
@@ -915,6 +929,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 
 	cdata->out->create.crDate = c_crDate;
 	cdata->svTRID = strdup(response->svTRID);
+	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(c_contact);
@@ -1001,6 +1016,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 		else {
 			cdata->out->create.crDate = c_crDate;
 			cdata->svTRID = strdup(response->svTRID);
+			cdata->msg = strdup(response->errMsg);
 			cdata->rc = response->errCode;
 			ret = CORBA_OK;
 		}
@@ -1061,6 +1077,7 @@ epp_call_delete(epp_corba_globs *globs, int session,
 	}
 
 	cdata->svTRID = strdup(response->svTRID);
+	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -1098,9 +1115,11 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
 	ccReg_timestamp	c_exDate;
+	ccReg_ExtensionList	*ext_list;
 
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
+	ext_list = ccReg_ExtensionList__alloc();
 
 	response = ccReg_EPP_DomainRenew(globs->service,
 			cdata->in->renew.name,
@@ -1109,11 +1128,13 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 			&c_exDate,
 			session,
 			cdata->clTRID,
+			ext_list,
 			ev);
 
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
+		CORBA_free(ext_list);
 		return CORBA_ERROR;
 	}
 	CORBA_exception_free(ev);
@@ -1123,20 +1144,24 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 	 * empty string
 	 */
 	if (*response->svTRID == '\0') {
+		CORBA_free(ext_list);
 		CORBA_free(response);
 		return CORBA_REMOTE_ERROR;
 	}
 
 	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+		CORBA_free(ext_list);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 	else {
 		cdata->out->renew.exDate = c_exDate;
 		cdata->svTRID = strdup(response->svTRID);
+		cdata->msg = strdup(response->errMsg);
 		cdata->rc = response->errCode;
 	}
 
+	CORBA_free(ext_list);
 	CORBA_free(response);
 	return CORBA_OK;
 }
@@ -1151,12 +1176,14 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 	ccReg_AdminContact	*c_admin_rem;
 	ccReg_Status	*c_status_add;
 	ccReg_Status	*c_status_rem;
+	ccReg_ExtensionList	*ext_list;
 	corba_status	ret;
 	int	i, len;
 
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
 
+	ext_list = ccReg_ExtensionList__alloc();
 	/* admin add */
 	c_admin_add = ccReg_AdminContact__alloc();
 	CL_LENGTH(cdata->in->update_domain.add_admin, len);
@@ -1215,6 +1242,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 		CORBA_free(c_status_add);
 		CORBA_free(c_admin_rem);
 		CORBA_free(c_admin_add);
+		CORBA_free(ext_list);
 		return CORBA_ERROR;
 	}
 	CORBA_exception_free(ev);
@@ -1228,6 +1256,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 	}
 	else {
 		cdata->svTRID = strdup(response->svTRID);
+		cdata->msg = strdup(response->errMsg);
 		cdata->rc = response->errCode;
 		ret = CORBA_OK;
 	}
@@ -1236,6 +1265,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 	CORBA_free(c_status_add);
 	CORBA_free(c_admin_rem);
 	CORBA_free(c_admin_add);
+	CORBA_free(ext_list);
 	CORBA_free(response);
 	return ret;
 }
@@ -1335,6 +1365,7 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 	}
 	else {
 		cdata->svTRID = strdup(response->svTRID);
+		cdata->msg = strdup(response->errMsg);
 		cdata->rc = response->errCode;
 		ret = CORBA_OK;
 	}
@@ -1468,6 +1499,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 	}
 	else {
 		cdata->svTRID = strdup(response->svTRID);
+		cdata->msg = strdup(response->errMsg);
 		cdata->rc = response->errCode;
 		ret = CORBA_OK;
 	}
@@ -1493,13 +1525,20 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 
 	CORBA_exception_init(ev);
 
-	if (obj == EPP_DOMAIN)
+	if (obj == EPP_DOMAIN) {
+		ccReg_ExtensionList	*ext_list;
+		ext_list = ccReg_ExtensionList__alloc();
+
 		response = ccReg_EPP_DomainTransfer(globs->service,
 				cdata->in->transfer.id,
 				cdata->in->transfer.authInfo,
 				session,
 				cdata->clTRID,
+				ext_list,
 				ev);
+
+		CORBA_free(ext_list);
+	}
 	else {
 		assert(obj == EPP_NSSET);
 		response = ccReg_EPP_NSSetTransfer(globs->service,
@@ -1527,6 +1566,7 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 	}
 
 	cdata->svTRID = strdup(response->svTRID);
+	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
 	CORBA_free(response);
 	return CORBA_OK;

@@ -13,15 +13,17 @@ typedef enum {
 	 * this indicates that greeting should be generated
 	 */
 	PARSER_HELLO,
+	/* request does not validate */
+	PARSER_NOT_VALID,
+	/* request is not a command */
+	PARSER_NOT_COMMAND,
 	/*
 	 * when following status values are returned, connection is closed
 	 */
 	/* request is not valid xml */
 	PARSER_NOT_XML,
-	/* request does not validate */
-	PARSER_NOT_VALID,
-	/* request is not a command */
-	PARSER_NOT_COMMAND,
+	/* error when parsing xml schemas */
+	PARSER_ESCHEMA,
 	/*
 	 * internal parser error (e.g. malloc failed). This error is
 	 * esspecialy serious, therefor its log severity SHOULD be higher

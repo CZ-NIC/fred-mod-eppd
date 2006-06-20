@@ -36,9 +36,7 @@
 #define LOC_ENUMVAL	NS_ENUMVAL " enumval-1.0.xsd"
 /*
  * should be less than 255 since hash value is unsigned char.
- * applies to both hashes (message and command hash)
  */
-#define HASH_SIZE_MSG	60
 #define HASH_SIZE_CMD	30
 
 /*
@@ -247,14 +245,6 @@ typedef enum {
 	EPP_RED_UPDATE
 }epp_red_command_type;
 
-/* item of message hash table */
-typedef struct msg_hash_item_t msg_hash_item;
-struct msg_hash_item_t {
-	msg_hash_item	*next;
-	int	rc;	/* hash key (return code) */
-	char	*msg[2];	/* message for the rc */
-};
-
 /* item of command hash table */
 typedef struct cmd_hash_item_t cmd_hash_item;
 struct cmd_hash_item_t {
@@ -270,13 +260,16 @@ struct cmd_hash_item_t {
  * struct.
  */
 struct epp_xml_globs_t {
-	xmlSchemaPtr schema; /* schema against which are validated requests */
-	/* hash table for mapping return codes to textual messages */
-	msg_hash_item	*hash_msg[HASH_SIZE_MSG];
+	char	*url_schema; /* schema against which are validated requests */
 	/* hash table for quick command lookup */
 	cmd_hash_item	*hash_cmd[HASH_SIZE_CMD];
 };
 
+typedef struct {
+	int	code;
+	char	*msg;
+	char	*node;
+}validator_err;
 
 /**
  * Function for converting number of seconds from 1970 ... to string
@@ -300,22 +293,6 @@ static void get_rfc3339_date(long long date, char *str)
 }
 
 /**
- * Function counts simple hash value from given 4 bytes.
- * @par rc input number to hash function
- * @ret hash value
- */
-static unsigned char get_rc_hash(int rc)
-{
-	int	i;
-	unsigned char	hash = 0;
-	char	*rc_bytes = (char *) &rc;
-
-	/* return code has 4 digits */
-	for (i = 0; i < 4; i++) hash ^= rc_bytes[i];
-	return hash % HASH_SIZE_MSG;
-}
-
-/**
  * Function makes xor of first 4 bytes of command name.
  * We assume that command names are at least 4 bytes long and that there
  * are no 2 command with the same first four letters - that's true for
@@ -331,41 +308,6 @@ static unsigned char get_cmd_hash(const char *key)
 	/* return code has 4 digits */
 	for (i = 0; i < 4; i++) hash ^= key[i];
 	return hash % HASH_SIZE_CMD;
-}
-
-/**
- * Function inserts item in message hash table.
- * @par key Input key for hash algorithm
- * @par msg1 Message associated with key (first language)
- * @par msg2 Message associated with key (second language)
- * @ret Zero in case of success, one in case of failure
- */
-static char msg_hash_insert(msg_hash_item *hash_msg[], int key,
-		const char *msg1, const char *msg2)
-{
-	msg_hash_item	*hi;
-	int	index;
-
-	assert(hash_msg != NULL);
-	assert(msg1 != NULL);
-	assert(msg2 != NULL);
-
-	if ((hi = malloc(sizeof *hi)) == NULL) return 0;
-	hi->rc = key;
-	if ((hi->msg[0] = strdup(msg1)) == NULL) {
-		free(hi);
-		return 1;
-	}
-	if ((hi->msg[1] = strdup(msg2)) == NULL) {
-		free(hi->msg[0]);
-		free(hi);
-		return 1;
-	}
-	index = get_rc_hash(key);
-	hi->next = hash_msg[index];
-	hash_msg[index] = hi;
-
-	return 0;
 }
 
 /**
@@ -399,28 +341,6 @@ static char cmd_hash_insert(
 }
 
 /**
- * This Routine does traditional hash lookup on message hash.
- * @par rc Result code (key) which is going to be translated
- * @ret Appropriate message (value)
- */
-static char *msg_hash_lookup(msg_hash_item *hash_msg[], int rc, unsigned index)
-{
-	msg_hash_item	*hi;
-
-	assert(hash_msg != NULL);
-
-	/* iterate through hash chain */
-	for (hi = hash_msg[get_rc_hash(rc)]; hi != NULL; hi = hi->next) {
-		if (hi->rc == rc) break;
-	}
-
-	/* did we find anything? */
-	if (hi) return hi->msg[index];
-
-	return NULL;
-}
-
-/**
  * This Routine does traditional hash lookup on command hash table.
  * @par key Command name
  * @ret Command type
@@ -441,28 +361,6 @@ cmd_hash_lookup(cmd_hash_item *hash_cmd[], const char *key)
 	if (hi) return hi->val;
 
 	return EPP_UNKNOWN_CMD;
-}
-
-/**
- * Function frees all items in message hash table.
- */
-static void
-msg_hash_clean(msg_hash_item *hash_msg[])
-{
-	msg_hash_item	*tmp;
-	int	i;
-
-	assert(hash_msg != NULL);
-
-	for (i = 0; i < HASH_SIZE_MSG; i++) {
-		while (hash_msg[i]) {
-			tmp = hash_msg[i]->next;
-			free(hash_msg[i]->msg[0]);
-			free(hash_msg[i]->msg[1]);
-			free(hash_msg[i]);
-			hash_msg[i] = tmp;
-		}
-	}
 }
 
 /**
@@ -488,7 +386,6 @@ cmd_hash_clean(cmd_hash_item *hash_cmd[])
 
 epp_xml_globs *epp_xml_init(const char *url_schema)
 {
-	xmlSchemaParserCtxtPtr spctx;
 	epp_xml_globs	*globs;
 	char rc;
 
@@ -496,130 +393,8 @@ epp_xml_globs *epp_xml_init(const char *url_schema)
 	globs = calloc(1, sizeof *globs);
 	if (globs == NULL) return NULL;
 
-	/* parse epp schema */
-	spctx = xmlSchemaNewParserCtxt(url_schema);
-	if (spctx == NULL) {
-		free(globs);
-		return NULL;
-	}
-	globs->schema = xmlSchemaParse(spctx);
-	xmlSchemaFreeParserCtxt(spctx);
-	/* schemas might be corrupted though it is unlikely */
-	if (globs->schema == NULL) {
-		free(globs);
-		return NULL;
-	}
-
-	/* initialize message hash table */
-	rc = 0;
-	rc |= msg_hash_insert(globs->hash_msg, 1000,
-			"Command completed successfully",
-			"Příkaz úspěšně proveden");
-	rc |= msg_hash_insert(globs->hash_msg, 1001,
-			"Command completed successfully; action pending",
-			"Příkaz úspěšně proveden; vykonání akce odloženo");
-	rc |= msg_hash_insert(globs->hash_msg, 1300,
-			"Command completed successfully; no messages",
-			"Příkaz úspěšně proveden; žádné nové zprávy");
-	rc |= msg_hash_insert(globs->hash_msg, 1301,
-			"Command completed successfully; ack to dequeue",
-			"Příkaz úspěšně proveden; potvrď za účelem vyřazení z fronty");
-	rc |= msg_hash_insert(globs->hash_msg, 1500,
-			"Command completed successfully; ending session",
-			"Příkaz úspěšně proveden; konec relace");
-	rc |= msg_hash_insert(globs->hash_msg, 2000,
-			"Unknown command",
-			"Neznámý příkaz");
-	rc |= msg_hash_insert(globs->hash_msg, 2001,
-			"Command syntax error",
-			"Chybná syntaxe příkazu");
-	rc |= msg_hash_insert(globs->hash_msg, 2002,
-			"Command use error",
-			"Chybné použití příkazu");
-	rc |= msg_hash_insert(globs->hash_msg, 2003,
-			"Required parameter missing",
-			"Požadovaný parametr neuveden");
-	rc |= msg_hash_insert(globs->hash_msg, 2004,
-			"Parameter value range error",
-			"Chybný rozsah parametru");
-	rc |= msg_hash_insert(globs->hash_msg, 2005,
-			"Parameter value syntax error",
-			"Chybná syntaxe hodnoty parametru");
-	rc |= msg_hash_insert(globs->hash_msg, 2100,
-			"Unimplemented protocol version",
-			"Neimplementovaná verze protokolu");
-	rc |= msg_hash_insert(globs->hash_msg, 2101,
-			"Unimplemented command",
-			"Neimplementovaný příkaz");
-	rc |= msg_hash_insert(globs->hash_msg, 2102,
-			"Unimplemented option",
-			"Neimplementovaná volba");
-	rc |= msg_hash_insert(globs->hash_msg, 2103,
-			"Unimplemented extension",
-			"Neimplementované rozšíření");
-	rc |= msg_hash_insert(globs->hash_msg, 2104,
-			"Billing failure",
-			"Účetní selhání");
-	rc |= msg_hash_insert(globs->hash_msg, 2105,
-			"Object is not eligible for renewal",
-			"Objekt je nezpůsobilý pro obnovení");
-	rc |= msg_hash_insert(globs->hash_msg, 2106,
-			"Object is not eligible for transfer",
-			"Objekt je nezpůsobilý pro transfer");
-	rc |= msg_hash_insert(globs->hash_msg, 2200,
-			"Authentication error",
-			"Chyba ověření identity");
-	rc |= msg_hash_insert(globs->hash_msg, 2201,
-			"Authorization error",
-			"Chyba oprávnění");
-	rc |= msg_hash_insert(globs->hash_msg, 2202,
-			"Invalid authorization information",
-			"Chybná autorizační informace");
-	rc |= msg_hash_insert(globs->hash_msg, 2300,
-			"Object pending transfer",
-			"Objekt čeká na transfer");
-	rc |= msg_hash_insert(globs->hash_msg, 2301,
-			"Object not pending transfer",
-			"Objekt nečeká na transfer");
-	rc |= msg_hash_insert(globs->hash_msg, 2302,
-			"Object exists",
-			"Objekt existuje");
-	rc |= msg_hash_insert(globs->hash_msg, 2303,
-			"Object does not exist",
-			"Objekt neexistuje");
-	rc |= msg_hash_insert(globs->hash_msg, 2304,
-			"Object status prohibits operation",
-			"Status objektu nedovoluje operaci");
-	rc |= msg_hash_insert(globs->hash_msg, 2305,
-			"Object association prohibits operation",
-			"Asociace objektu nedovoluje operaci");
-	rc |= msg_hash_insert(globs->hash_msg, 2306,
-			"Parameter value policy error",
-			"Chyba zásady pro hodnotu parametru");
-	rc |= msg_hash_insert(globs->hash_msg, 2307,
-			"Unimplemented object service",
-			"Neimplementovaná služba objektu");
-	rc |= msg_hash_insert(globs->hash_msg, 2308,
-			"Data management policy violation",
-			"Porušení zásady pro správu dat");
-	rc |= msg_hash_insert(globs->hash_msg, 2400,
-			"Command failed",
-			"Příkaz selhal");
-	rc |= msg_hash_insert(globs->hash_msg, 2500,
-			"Command failed; server closing connection",
-			"Příkaz selhal; server uzavírá spojení");
-	rc |= msg_hash_insert(globs->hash_msg, 2501,
-			"Authentication error; server closing connection",
-			"Chyba ověření identity; server uzavírá spojení");
-	rc |= msg_hash_insert(globs->hash_msg, 2502,
-			"Session limit exceeded; server closing connection",
-			"Limit na počet relací překročen; server uzavírá spojení");
-	if (rc) {
-		/* error has been spotted */
-		msg_hash_clean(globs->hash_msg);
-		free(globs);
-		return NULL;
-	}
+	assert(url_schema != NULL);
+	globs->url_schema = strdup(url_schema);
 
 	/* initialize command hash table */
 	rc = 0;
@@ -635,7 +410,6 @@ epp_xml_globs *epp_xml_init(const char *url_schema)
 	rc |= cmd_hash_insert(globs->hash_cmd, "update", EPP_RED_UPDATE);
 	if (rc) {
 		/* error has been spotted */
-		msg_hash_clean(globs->hash_msg);
 		cmd_hash_clean(globs->hash_cmd);
 		free(globs);
 		return NULL;
@@ -652,13 +426,11 @@ void epp_xml_init_cleanup(epp_xml_globs *par)
 	epp_xml_globs	*globs = (epp_xml_globs *) par;
 
 	assert(globs != NULL);
-	assert(globs->schema != NULL);
-	assert(globs->hash_msg != NULL);
+	assert(globs->url_schema != NULL);
 	assert(globs->hash_cmd != NULL);
 
-	xmlSchemaFree(globs->schema);
-	msg_hash_clean(globs->hash_msg);
 	cmd_hash_clean(globs->hash_cmd);
+	free(globs->url_schema);
 	free(globs);
 	xmlCleanupParser();
 }
@@ -2764,11 +2536,9 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
-	char	*str;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	res_code[5];
 	char	error_seen = 1;
-	msg_hash_item **hash_msg = globs->hash_msg;
 
 	assert(globs != NULL);
 	assert(cdata != NULL);
@@ -2796,13 +2566,25 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 	START_ELEMENT(writer, simple_err, "response");
 	START_ELEMENT(writer, simple_err, "result");
 	snprintf(res_code, 5, "%d", cdata->rc);
-	str = msg_hash_lookup(hash_msg, cdata->rc, lang);
 	WRITE_ATTRIBUTE(writer, simple_err, "code", res_code);
 	START_ELEMENT(writer, simple_err, "msg");
 	if (lang != LANG_EN)
 		WRITE_ATTRIBUTE(writer, simple_err, "lang", "cs");
-	WRITE_STRING(writer, simple_err, str);
+	WRITE_STRING(writer, simple_err, cdata->msg);
 	END_ELEMENT(writer, simple_err); /* msg */
+	CL_FOREACH(cdata->errors) {
+		validator_err	*ve = (validator_err *) CL_CONTENT(cdata->errors);
+		if (ve->node == NULL) {
+			/* TODO what to do? */
+			//WRITE_ELEMENT(writer, simple_err, "value", ve->msg);
+		}
+		else {
+			START_ELEMENT(writer, simple_err, "extValue");
+			WRITE_ELEMENT(writer, simple_err, "value", ve->node);
+			WRITE_ELEMENT(writer, simple_err, "reason", ve->msg);
+			END_ELEMENT(writer, simple_err); /* extValue */
+		}
+	}
 	END_ELEMENT(writer, simple_err); /* result */
 
 	/*
@@ -3030,6 +2812,50 @@ void epp_free_genstring(char *genstring)
 	free(genstring);
 }
 
+/**
+ * This is a callback for xml validator errors. Purpose is to cumulate
+ * all encountered errors in a list, which is further processed after
+ * the validation is done.
+ */
+static void
+validerr_callback(void *ctx, xmlErrorPtr error)
+{
+	struct circ_list	*error_list = (struct circ_list *) ctx;
+	struct circ_list	*new_item;
+	validator_err	*valerr;
+	xmlNodePtr	node;
+	int	len;
+
+	/* in case of allocation failure simply don't log the error and exit */
+	if ((valerr = malloc(sizeof *valerr)) == NULL) return;
+	if ((new_item = malloc(sizeof *new_item)) == NULL) {
+		free(valerr);
+		return;
+	}
+
+	/*
+	 * xmlError has quite a lot of fields, we are interested only in 3
+	 * of them: code, message, node.
+	 */
+	valerr->code = error->code;
+	len = strlen(error->message);
+	if ((valerr->msg = malloc(len)) == NULL) {
+		free(valerr);
+		free(new_item);
+		return;
+	}
+	strncpy(valerr->msg, error->message, --len); /* truncate trailing \n */
+	(valerr->msg)[len] = '\0';
+	node = (xmlNodePtr) error->node;
+	if (node->type == XML_ELEMENT_NODE)
+		valerr->node = strdup(node->name);
+	else
+		valerr->node = NULL;
+
+	CL_CONTENT(new_item) = (void *) valerr;
+	CL_ADD(error_list, new_item);
+}
+
 parser_status
 epp_parse_command(
 		int session,
@@ -3040,10 +2866,12 @@ epp_parse_command(
 {
 	int	rc;
 	xmlDocPtr	doc;
-	xmlSchemaValidCtxtPtr	svctx;
 	xmlXPathContextPtr	xpathCtx;
 	xmlXPathObjectPtr	xpathObj;
 	xmlNodeSetPtr	nodeset;
+	xmlSchemaPtr schema; /* schema against which are validated requests */
+	xmlSchemaParserCtxtPtr spctx;	/* schema parser context */
+	xmlSchemaValidCtxtPtr	svctx;	/* schema validator context */
 	epp_red_command_type	cmd;
 
 	/* check input parameters */
@@ -3057,44 +2885,82 @@ epp_parse_command(
 		return PARSER_NOT_XML;
 	}
 
-	/* validate request against schema */
-	svctx = xmlSchemaNewValidCtxt(globs->schema);
+	/* parse epp schema */
+	spctx = xmlSchemaNewParserCtxt(globs->url_schema);
+	if (spctx == NULL) {
+		xmlFreeDoc(doc);
+		return PARSER_ESCHEMA;
+	}
+	schema = xmlSchemaParse(spctx);
+	xmlSchemaFreeParserCtxt(spctx);
+	/* schemas might be corrupted though it is unlikely */
+	if (schema == NULL) {
+		xmlFreeDoc(doc);
+		return PARSER_ESCHEMA;
+	}
+
+	svctx = xmlSchemaNewValidCtxt(schema);
 	if (svctx == NULL) {
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
+	/*
+	 * create validation error callback and initialize list which is used
+	 * for error cumulation.
+	 */
+	if ((cdata->errors = malloc(sizeof (*cdata->errors))) == NULL) {
+		xmlSchemaFreeValidCtxt(svctx);
+		xmlFreeDoc(doc);
+		return PARSER_EINTERNAL;
+	}
+	CL_NEW(cdata->errors);
+	xmlSchemaSetValidStructuredErrors(svctx, validerr_callback, cdata->errors);
+	/* validate request against schema */
 	rc = xmlSchemaValidateDoc(svctx, doc);
 	if (rc < 0) {
+		/* free error messages if there are any */
+		CL_FOREACH(cdata->errors) {
+			validator_err	*ve = (validator_err *) CL_CONTENT(cdata->errors);
+			free(ve->msg);
+			FREENULL(ve->node);
+			free(ve);
+		}
+		CL_PURGE(cdata->errors);
 		/* -1 is validator internal error */
 		xmlSchemaFreeValidCtxt(svctx);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
 	/*
-	 * validation errors are further classified in 2 categories:
-	 * 	hard - no response is sent back and connection is closed
-	 * 	soft - response identifing the problem is sent to client, the
-	 * 	       connection persists
+	 * validation error consequence: response identifing the problem is sent
+	 * to client, the connection persists.
 	 */
 	if (rc > 0) {
-		xmlSchemaFreeValidCtxt(svctx);
-		xmlFreeDoc(doc);
 		/*
-		 * soft errors:
+		 * recognized errors:
 		 *    unknown command (2000)
-		 *    command syntax error (2001)
 		 *    required parameter missing (2003)
 		 *    Parameter value range error (2004)
 		 *    Parameter value syntax error (2005)
 		 *    Unimplemented extension (2103)
 		 *    ???Unimplemented command (2101)???
 		 *    ???Unimplemented option (2102)???
-		 *
-		 *    XXX
+		 * all other errors are reported as:
+		 *    command syntax error (2001)
 		 */
+
+		/* TODO set rc value more thorougly */
+		cdata->clTRID = strdup(""); /* must be set becauseof corba */
+		cdata->rc = 2001;
+		cdata->type = EPP_DUMMY;
+		xmlSchemaFreeValidCtxt(svctx);
+		xmlFreeDoc(doc);
 		return PARSER_NOT_VALID;
 	}
 	xmlSchemaFreeValidCtxt(svctx);
+	xmlSchemaFree(schema);
+	/* there should not be any error messages in the list */
+	assert(CL_EMPTY(cdata->errors));
 
 	/* create XPath context */
 	xpathCtx = xmlXPathNewContext(doc);
@@ -3292,15 +3158,22 @@ epp_parse_command(
 void epp_command_data_cleanup(epp_command_data *cdata)
 {
 	assert(cdata != NULL);
-
 	assert(cdata->clTRID != NULL);
 	free(cdata->clTRID);
+	/* free error messages if there are any */
+	CL_FOREACH(cdata->errors) {
+		validator_err	*ve = (validator_err *) CL_CONTENT(cdata->errors);
+		free(ve->msg);
+		FREENULL(ve->node);
+		free(ve);
+	}
+	CL_PURGE(cdata->errors);
 	/*
 	 * corba function might not be called and therefore svTRID might be
-	 * still NULL.
+	 * still NULL (msg too)
 	 */
-	if (cdata->svTRID != NULL)
-		free(cdata->svTRID);
+	FREENULL(cdata->svTRID);
+	FREENULL(cdata->msg);
 
 	switch (cdata->type) {
 		case EPP_LOGIN:

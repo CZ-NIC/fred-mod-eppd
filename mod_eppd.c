@@ -399,10 +399,19 @@ static int epp_process_connection(conn_rec *c)
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 		}
-		/* is it a command? */
-		else if (pstat == PARSER_OK) {
+		/*
+		 * we generate response for valid commands and requests which
+		 * doesn't validate.
+		 */
+		else if (pstat == PARSER_OK || pstat == PARSER_NOT_VALID) {
 			char	cert_md5[50];	/* should be enough for md5 hash of cert */
 			char	*pem;	/* pem encoded client's certificate */
+
+			/* we will drop a line for requests which don't validate in log */
+			if (pstat == PARSER_NOT_VALID) {
+				epplog(c, rpool, session, EPP_WARNING,
+						"Request doest not validate");
+			}
 
 			/* go ahead to corba function call */
 			switch (cdata.type) {
@@ -536,7 +545,6 @@ static int epp_process_connection(conn_rec *c)
 			}
 			epp_command_data_cleanup(&cdata);
 
-
 		}
 		/* parser error - failure which will close connection */
 		else {
@@ -546,15 +554,15 @@ static int epp_process_connection(conn_rec *c)
 							"Request is not XML");
 					rc = HTTP_BAD_REQUEST;
 					break;
-				case PARSER_NOT_VALID:
-					epplog(c, rpool, session, EPP_WARNING,
-							"Request doest not validate");
-					rc = HTTP_BAD_REQUEST;
-					break;
 				case PARSER_NOT_COMMAND:
 					epplog(c, rpool, session, EPP_WARNING,
 							"Request is neither a command nor hello");
 					rc = HTTP_BAD_REQUEST;
+					break;
+				case PARSER_ESCHEMA:
+					epplog(c, rpool, session, EPP_WARNING,
+						"Schema's parser error - check correctness of schema");
+					rc = HTTP_INTERNAL_SERVER_ERROR;
 					break;
 				case PARSER_EINTERNAL:
 					epplog(c, rpool, session, EPP_FATAL,

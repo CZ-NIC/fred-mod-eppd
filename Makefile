@@ -17,21 +17,21 @@ OBJS	= mod_eppd.o epp_xml.o epp-client.o ccReg-common.o ccReg-stubs.o
 ORB_LDFLAGS	= $(shell $(ORBIT2-CONFIG) --libs | sed -e s/-Wl,//g -e s/-pthread/-lpthread/g)
 ORB_CFLAGS	= $(shell $(ORBIT2-CONFIG) --cflags)
 
-XML_CFLAGS   =$(shell $(PKG-CONFIG) --cflags libxml-2.0)
-XML_LIBS     =$(shell $(PKG-CONFIG) --libs libxml-2.0)
+XML_CFLAGS  =$(shell $(PKG-CONFIG) --cflags libxml-2.0)
+XML_LIBS    =$(shell $(PKG-CONFIG) --libs libxml-2.0)
 
-AP_CFLAGS	 =$(shell $(APXS) -q CFLAGS)
+AP_CFLAGS	=$(shell $(APXS) -q CFLAGS)
 AP_CFLAGS	+=$(shell $(APXS) -q CFLAGS_SHLIB)
 AP_CFLAGS	+=$(shell $(APR-CONFIG) --cppflags)
 AP_CFLAGS	+=$(shell $(APR-CONFIG) --cflags)
-AP_INCLUDE	 =-I$(shell $(APXS) -q INCLUDEDIR)
+AP_INCLUDE	=-I$(shell $(APXS) -q INCLUDEDIR)
 AP_INCLUDE	+=$(shell $(APR-CONFIG) --includes)
 
-AP_LDFLAGS	 =$(shell $(APXS) -q LDFLAGS_SHLIB)
+AP_LDFLAGS	=$(shell $(APXS) -q LDFLAGS_SHLIB)
 AP_LDFLAGS	+=$(shell $(APR-CONFIG) --ldflags)
 AP_LIBS	+=$(shell $(APR-CONFIG) --libs)
 
-AP_INSTALLDIR	= $(shell $(APXS) -q LIBEXECDIR)
+AP_INSTALLDIR	:= $(shell $(APXS) -q LIBEXECDIR)
 
 CFLAGS	= -g -O0 -fPIC -Wall
 LDFLAGS	= -rpath $(AP_INSTALLDIR) -Bshareable
@@ -84,7 +84,7 @@ distclean: clean
 
 # corba dummy
 test_cd: test.o epp_xml.o epp-client_stub.o
-	gcc -o test -g -Wall test.o epp_xml.o epp-client.o $(XML_LIBS)
+	gcc -o test -g -Wall test.o epp_xml.o epp-client_stub.o $(XML_LIBS)
 
 epp-client_stub.o: epp-client_stub.c
 	gcc $(CFLAGS) -c epp-client_stub.c

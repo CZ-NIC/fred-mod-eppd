@@ -183,7 +183,7 @@ int main(int argc, char *argv[])
 			}
 			puts(greeting);
 		}
-		else if (pstat != PARSER_OK) {
+		else if (pstat != PARSER_OK && pstat != PARSER_NOT_VALID) {
 			fputs("Parser error\n", stderr);
 			continue;
 		}

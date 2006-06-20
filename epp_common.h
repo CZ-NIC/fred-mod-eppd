@@ -87,7 +87,7 @@ struct circ_list {
 
 /*
  * caller must be sure that the list pointer is at the beginning when using
- * this macro
+ * this macro - use CL_RESET for that.
  */
 #define CL_FOREACH(cl)	\
 	for ((cl) = (cl)->next; (cl)->content != NULL; (cl) = (cl)->next)
@@ -121,6 +121,9 @@ struct circ_list {
 /* count the number of items in the list */
 #define CL_LENGTH(cl, i)	\
 	for ((cl) = (cl)->next, i = 0; (cl)->content != NULL; (cl) = (cl)->next, i++)
+
+/* if the list is empty return value is 1, otherwise 0 */
+#define CL_EMPTY(cl)	((cl) == (cl)->next)
 
 
 /**
@@ -189,6 +192,8 @@ typedef struct {
 	char	*clTRID;	/* client TRID - may be null */
 	char	*svTRID;	/* server TRID, must not be null at the end */
 	int	rc;	/* epp return code */
+	char	*msg;	/* text message coresponding to rc */
+	struct circ_list	*errors;	/* list of validation errors */
 
 	epp_command_type type;	/* identifies epp command and object */
 
