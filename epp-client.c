@@ -1153,11 +1153,22 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
 	ccReg_timestamp	c_exDate;
-	ccReg_ExtensionList	*ext_list;
+	ccReg_ExtensionList	*c_ext_list;
+	ccReg_ENUMValidationExtension	*c_enumval = NULL;
+	corba_status	ret = CORBA_OK;
 
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
-	ext_list = ccReg_ExtensionList__alloc();
+	c_ext_list = ccReg_ExtensionList__alloc();
+	/* fill extension list if needed */
+	if (cdata->in->renew.valExDate != 0) {
+		c_enumval = ccReg_ENUMValidationExtension__alloc();
+		c_enumval->valExDate = cdata->in->renew.valExDate;
+		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
+		c_ext_list->_length = 1;
+		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
+		c_ext_list->_buffer[0]._value = c_enumval;
+	}
 
 	response = ccReg_EPP_DomainRenew(globs->service,
 			cdata->in->renew.name,
@@ -1166,13 +1177,14 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 			&c_exDate,
 			session,
 			cdata->clTRID,
-			ext_list,
+			c_ext_list,
 			ev);
 
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
-		CORBA_free(ext_list);
+		if (c_enumval != NULL) CORBA_free(c_enumval);
+		CORBA_free(c_ext_list);
 		return CORBA_ERROR;
 	}
 	CORBA_exception_free(ev);
@@ -1182,26 +1194,25 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 	 * empty string
 	 */
 	if (*response->svTRID == '\0') {
-		CORBA_free(ext_list);
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		ret = CORBA_REMOTE_ERROR;
+		goto end;
 	}
 
 	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(ext_list);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	else {
-		cdata->out->renew.exDate = c_exDate;
-		cdata->svTRID = strdup(response->svTRID);
-		cdata->msg = strdup(response->errMsg);
-		cdata->rc = response->errCode;
+		ret = CORBA_INT_ERROR;
+		goto end;
 	}
 
-	CORBA_free(ext_list);
+	cdata->out->renew.exDate = c_exDate;
+	cdata->svTRID = strdup(response->svTRID);
+	cdata->msg = strdup(response->errMsg);
+	cdata->rc = response->errCode;
+
+end:
+	if (c_enumval != NULL) CORBA_free(c_enumval);
+	CORBA_free(c_ext_list);
 	CORBA_free(response);
-	return CORBA_OK;
+	return ret;
 }
 
 corba_status
@@ -1214,14 +1225,14 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 	ccReg_AdminContact	*c_admin_rem;
 	ccReg_Status	*c_status_add;
 	ccReg_Status	*c_status_rem;
-	ccReg_ExtensionList	*ext_list;
-	corba_status	ret;
+	ccReg_ExtensionList	*c_ext_list;
+	ccReg_ENUMValidationExtension	*c_enumval = NULL;
+	corba_status	ret = CORBA_OK;
 	int	i, len;
 
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
 
-	ext_list = ccReg_ExtensionList__alloc();
 	/* admin add */
 	c_admin_add = ccReg_AdminContact__alloc();
 	CL_LENGTH(cdata->in->update_domain.add_admin, len);
@@ -1258,6 +1269,16 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 	CL_FOREACH(cdata->in->update_domain.rem_status)
 		c_status_rem->_buffer[i++] =
 				CL_CONTENT(cdata->in->update_domain.rem_status);
+	c_ext_list = ccReg_ExtensionList__alloc();
+	/* fill extension list if needed */
+	if (cdata->in->create_domain.valExDate != 0) {
+		c_enumval = ccReg_ENUMValidationExtension__alloc();
+		c_enumval->valExDate = cdata->in->create_domain.valExDate;
+		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
+		c_ext_list->_length = 1;
+		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
+		c_ext_list->_buffer[0]._value = c_enumval;
+	}
 
 	response = ccReg_EPP_DomainUpdate(globs->service,
 			cdata->in->update_domain.name,
@@ -1270,7 +1291,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 			c_status_rem,
 			session,
 			cdata->clTRID,
-			ext_list,
+			c_ext_list,
 			ev);
 
 	if (raised_exception(ev)) {
@@ -1280,7 +1301,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 		CORBA_free(c_status_add);
 		CORBA_free(c_admin_rem);
 		CORBA_free(c_admin_add);
-		CORBA_free(ext_list);
+		CORBA_free(c_ext_list);
 		return CORBA_ERROR;
 	}
 	CORBA_exception_free(ev);
@@ -1291,19 +1312,20 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 	 */
 	if (*response->svTRID == '\0') {
 		ret = CORBA_REMOTE_ERROR;
-	}
-	else {
-		cdata->svTRID = strdup(response->svTRID);
-		cdata->msg = strdup(response->errMsg);
-		cdata->rc = response->errCode;
-		ret = CORBA_OK;
+		goto end;
 	}
 
+	cdata->svTRID = strdup(response->svTRID);
+	cdata->msg = strdup(response->errMsg);
+	cdata->rc = response->errCode;
+
+end:
 	CORBA_free(c_status_rem);
 	CORBA_free(c_status_add);
 	CORBA_free(c_admin_rem);
 	CORBA_free(c_admin_add);
-	CORBA_free(ext_list);
+	if (c_enumval != NULL) CORBA_free(c_enumval);
+	CORBA_free(c_ext_list);
 	CORBA_free(response);
 	return ret;
 }
@@ -1564,17 +1586,12 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 	CORBA_exception_init(ev);
 
 	if (obj == EPP_DOMAIN) {
-		ccReg_ExtensionList	*ext_list;
-		ext_list = ccReg_ExtensionList__alloc();
-
 		response = ccReg_EPP_DomainTransfer(globs->service,
 				cdata->in->transfer.id,
 				cdata->in->transfer.authInfo,
 				session,
 				cdata->clTRID,
 				ev);
-
-		CORBA_free(ext_list);
 	}
 	else {
 		assert(obj == EPP_NSSET);

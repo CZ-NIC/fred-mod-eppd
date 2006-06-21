@@ -20,7 +20,7 @@
 		</nsset:add>
 		<nsset:rem>
 			<nsset:name>ns1.bazmek.net</nsset:name>
-			<nsset:tech>contactreg</nsset:tech>
+			<nsset:tech>regcontact2</nsset:tech>
 			<nsset:status s="clientUpdateProhibited" />
 		</nsset:rem>
 		<nsset:chg>

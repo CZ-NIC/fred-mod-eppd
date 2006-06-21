@@ -8,9 +8,10 @@
     <contact:check xmlns:contact="http://www.nic.cz/xml/epp/contact-1.0"
 	    xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.0
 	    contact-1.0.xsd">
-        <contact:id>example1</contact:id>
-        <contact:id>NECOCZ-PETR</contact:id>
-        <contact:id>example3</contact:id>
+        <contact:id>jouda</contact:id>
+        <contact:id>regcontact</contact:id>
+        <contact:id>neex</contact:id>
+        <contact:id>regcontact2</contact:id>
       </contact:check>
     </check>
     <clTRID>ABC-12346</clTRID>
