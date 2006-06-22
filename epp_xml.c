@@ -562,7 +562,7 @@ parse_login(
 			"epp:login/epp:options/epp:lang");
 	if (xmlStrEqual((xmlChar *) str, BAD_CAST "en"))
 		cdata->in->login.lang = LANG_EN;
-	else if (xmlStrEqual((xmlChar *) str, BAD_CAST "cs"))
+	else if (xmlStrEqual((xmlChar *) str, BAD_CAST "cz"))
 		cdata->in->login.lang = LANG_CS;
 	else {
 		xmlFree(str);
@@ -2581,7 +2581,7 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 	WRITE_ATTRIBUTE(writer, simple_err, "code", res_code);
 	START_ELEMENT(writer, simple_err, "msg");
 	if (lang != LANG_EN)
-		WRITE_ATTRIBUTE(writer, simple_err, "lang", "cs");
+		WRITE_ATTRIBUTE(writer, simple_err, "lang", "cz");
 	WRITE_STRING(writer, simple_err, cdata->msg);
 	END_ELEMENT(writer, simple_err); /* msg */
 	CL_FOREACH(cdata->errors) {
