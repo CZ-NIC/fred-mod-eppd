@@ -6,6 +6,7 @@
 #include "epp-client.h"
 
 #define MAX_LENGTH	10000
+#define MAX_FILE_NAME   256
 
 typedef enum {
 	CMD_UNKNOWN,
@@ -55,11 +56,11 @@ int readfile(char *text)
 {
 	int c;
 	int i;
-	char filename[50];
+	char filename[MAX_FILE_NAME];
 	FILE *f;
 
 	fputs("type filename: ", stderr);
-	for (i = 0; (c = getchar()) != '\n' && i < 49; i++) {
+	for (i = 0; (c = getchar()) != '\n' && i < MAX_FILE_NAME-1; i++) {
 		filename[i] = c;
 	}
 	filename[i] = 0;
@@ -68,6 +69,34 @@ int readfile(char *text)
 		fprintf(stderr, "Could not open file %s\n", filename);
 		return 0;
 	}
+	for (i = 0; (c = fgetc(f)) != EOF && i < MAX_LENGTH - 1; i++) {
+		text[i] = c;
+	}
+	if (i == MAX_LENGTH - 1) {
+		fputs("Maximal allowed text lenght exceeded", stderr);
+	}
+	text[i] = 0;
+	fclose(f);
+
+	return 1;
+}
+
+
+
+int openfile(char *text , char *filename )
+{
+	int c;
+	int i;
+	FILE *f;
+
+
+	if ((f = fopen(filename, "r")) == NULL) {
+		fprintf(stderr, "Could not open file %s\n", filename);
+		return 0;
+	}
+        else   fprintf(stderr, "Open file  %s\n", filename);
+
+
 	for (i = 0; (c = fgetc(f)) != EOF && i < MAX_LENGTH - 1; i++) {
 		text[i] = c;
 	}
@@ -115,6 +144,7 @@ int main(int argc, char *argv[])
 	epp_command_data cdata;
 	char text[MAX_LENGTH];
 	char quit = 0;
+        int ar = 1; 
 	cmd_t cmd;
 	parser_status	pstat;
 	corba_status	cstat;
@@ -153,8 +183,13 @@ int main(int argc, char *argv[])
 		int dofree;
 
 		dofree = 1;
+
+           if( argc == 1 ) /* interaktivni rezim */
+             {
+
 		fputs("Command: ", stderr);
-		switch (cmd = getcmd()) {
+		switch (cmd = getcmd()) 
+                {
 			case CMD_CUSTOM:
 				readinput(text);
 				break;
@@ -171,8 +206,30 @@ int main(int argc, char *argv[])
 		}
 		if (quit) break;
 
+              }
+               else
+                { 
+                  
+                  cmd = CMD_FILE;
+                  if( ar < argc ) 
+                    {
+                      openfile(text , argv[ar] );
+                      ar ++ ; 
+                     } 
+                  else {  quit = 1; break;   } 
+
+                }
+
 		bzero(&cdata, sizeof cdata);
 		/* API: process command */
+
+                // show file
+                if( argc > 1 )
+                  {
+                      fprintf( stderr ,  "epp_parse_command\n" );
+                      printf("\n%s\n" ,   text );
+                  } 
+
 		pstat = epp_parse_command(session, xml_globs, text, strlen(text),
 				&cdata);
 		if (pstat == PARSER_HELLO) {
