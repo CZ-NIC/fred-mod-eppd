@@ -174,6 +174,9 @@ int main(int argc, char *argv[])
 	}
 	else {
 		puts(greeting);
+
+		/* API: free greeting data */
+		epp_free_genstring(greeting);
 	}
 
 	session = 0;
@@ -239,6 +242,9 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 			puts(greeting);
+
+			/* API: free greeting data */
+			epp_free_genstring(greeting);
 		}
 		else if (pstat != PARSER_OK && pstat != PARSER_NOT_VALID) {
 			fputs("Parser error\n", stderr);
@@ -360,9 +366,6 @@ int main(int argc, char *argv[])
 		if (dofree) epp_command_data_cleanup(&cdata);
 	}
 	}
-
-	/* API: free greeting data */
-	epp_free_genstring(greeting);
 
 	/* API: clean up globs */
 	epp_xml_init_cleanup(xml_globs);

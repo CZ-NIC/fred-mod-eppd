@@ -765,7 +765,9 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	cdata->out->poll_req.count = c_count;
 	cdata->out->poll_req.msgid = c_msgID;
 	cdata->out->poll_req.qdate = c_qdate;
-	cdata->out->poll_req.msg = (char *) c_msg; /* avoiding unnecesary dup */
+	cdata->out->poll_req.msg = strdup(c_msg);
+
+	CORBA_free(c_msg);
 
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
@@ -861,6 +863,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		c_ext_list->_release = CORBA_TRUE;
 		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
 		c_ext_list->_buffer[0]._value = c_enumval;
+		c_ext_list->_buffer[0]._release = CORBA_TRUE;
 	}
 
 	response = ccReg_EPP_DomainCreate(globs->service,
@@ -1188,6 +1191,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 		c_ext_list->_release = CORBA_TRUE;
 		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
 		c_ext_list->_buffer[0]._value = c_enumval;
+		c_ext_list->_buffer[0]._release = CORBA_TRUE;
 	}
 
 	response = ccReg_EPP_DomainRenew(globs->service,
@@ -1293,12 +1297,13 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();
-		c_enumval->valExDate = cdata->in->create_domain.valExDate;
+		c_enumval->valExDate = cdata->in->update_domain.valExDate;
 		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
 		c_ext_list->_maximum = c_ext_list->_length = 1;
 		c_ext_list->_release = CORBA_TRUE;
 		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
 		c_ext_list->_buffer[0]._value = c_enumval;
+		c_ext_list->_buffer[0]._release = CORBA_TRUE;
 	}
 
 	response = ccReg_EPP_DomainUpdate(globs->service,

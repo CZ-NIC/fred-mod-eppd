@@ -506,7 +506,7 @@ epp_gen_greeting(const char *svid, char **greeting)
 greeting_err:
 	xmlFreeTextWriter(writer);
 	if (!error_seen) {
-		/* succesfull end */
+		/* successful end */
 		*greeting = strdup((char *) buf->content);
 		xmlBufferFree(buf);
 		return GEN_OK;
@@ -2885,6 +2885,7 @@ epp_parse_command(
 	xmlSchemaParserCtxtPtr spctx;	/* schema parser context */
 	xmlSchemaValidCtxtPtr	svctx;	/* schema validator context */
 	epp_red_command_type	cmd;
+	int	error_seen;	/* used for error detection when registering namespaces */
 
 	/* check input parameters */
 	assert(globs != NULL);
@@ -2913,6 +2914,7 @@ epp_parse_command(
 
 	svctx = xmlSchemaNewValidCtxt(schema);
 	if (svctx == NULL) {
+		xmlSchemaFree(schema);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -2922,6 +2924,7 @@ epp_parse_command(
 	 */
 	if ((cdata->errors = malloc(sizeof (*cdata->errors))) == NULL) {
 		xmlSchemaFreeValidCtxt(svctx);
+		xmlSchemaFree(schema);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -2940,6 +2943,7 @@ epp_parse_command(
 		CL_PURGE(cdata->errors);
 		/* -1 is validator internal error */
 		xmlSchemaFreeValidCtxt(svctx);
+		xmlSchemaFree(schema);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -2966,53 +2970,41 @@ epp_parse_command(
 		cdata->rc = 2001;
 		cdata->type = EPP_DUMMY;
 		xmlSchemaFreeValidCtxt(svctx);
+		xmlSchemaFree(schema);
 		xmlFreeDoc(doc);
 		return PARSER_NOT_VALID;
 	}
 	xmlSchemaFreeValidCtxt(svctx);
 	xmlSchemaFree(schema);
-	/* there should not be any error messages in the list */
+	/*
+	 * there should not be any error messages in the list
+	 * This doesn't mean we don't have to free the cdata->errors element (see
+	 * implementation of circ_list).
+	 */
 	assert(CL_EMPTY(cdata->errors));
 
 	/* create XPath context */
 	xpathCtx = xmlXPathNewContext(doc);
 	if (xpathCtx == NULL) {
+		free(cdata->errors);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
-	/* register namespaces and their prefixes in XPath context */
-	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "epp", BAD_CAST NS_EPP)) {
+
+	/*
+	 * register namespaces and their prefixes in XPath context
+	 * Error handling is same for all xmlXPathRegisterNs calls.
+	 */
+	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "epp", BAD_CAST NS_EPP) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "eppcom", BAD_CAST NS_EPPCOM) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "contact", BAD_CAST NS_CONTACT) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "domain", BAD_CAST NS_DOMAIN) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "nsset", BAD_CAST NS_NSSET) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "secdns", BAD_CAST NS_SECDNS) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "enumval", BAD_CAST NS_ENUMVAL))
+	{
 		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
-	}
-	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "eppcom", BAD_CAST NS_EPPCOM)) {
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
-	}
-	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "contact", BAD_CAST NS_CONTACT)) {
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
-	}
-	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "domain", BAD_CAST NS_DOMAIN)) {
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
-	}
-	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "nsset", BAD_CAST NS_NSSET)) {
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
-	}
-	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "secdns", BAD_CAST NS_SECDNS)) {
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
-	}
-	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "enumval", BAD_CAST NS_ENUMVAL)) {
-		xmlXPathFreeContext(xpathCtx);
+		free(cdata->errors);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -3021,26 +3013,37 @@ epp_parse_command(
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:hello", xpathCtx);
 	if (xpathObj == NULL) {
 		xmlXPathFreeContext(xpathCtx);
+		free(cdata->errors);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
 	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
 		xmlXPathFreeObject(xpathObj);
+		xmlXPathFreeContext(xpathCtx);
+		free(cdata->errors);
 		xmlFreeDoc(doc);
 		return PARSER_HELLO;
 	}
 	xmlXPathFreeObject(xpathObj);
 
 	/* is it a command? */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:command",
-				xpathCtx);
+	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:command", xpathCtx);
 	if (xpathObj == NULL) {
 		xmlXPathFreeContext(xpathCtx);
+		free(cdata->errors);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
 	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
+		/*
+		 * not all documents which are valid are commands (e.g. greeting,
+		 * response, extension). EPP standard does not describe any error
+		 * which should be returned in that case. There for we will silently
+		 * close connection in that case.
+		 */
 		xmlXPathFreeObject(xpathObj);
+		xmlXPathFreeContext(xpathCtx);
+		free(cdata->errors);
 		xmlFreeDoc(doc);
 		return PARSER_NOT_COMMAND;
 	}
@@ -3049,10 +3052,10 @@ epp_parse_command(
 	xmlXPathFreeObject(xpathObj);
 
 	/* it is a command, get clTRID if there is any */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST
-			"epp:clTRID", xpathCtx);
+	xpathObj = xmlXPathEvalExpression(BAD_CAST "epp:clTRID", xpathCtx);
 	if (xpathObj == NULL) {
 		xmlXPathFreeContext(xpathCtx);
+		free(cdata->errors);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -3070,11 +3073,11 @@ epp_parse_command(
 	 * XXX We shouldn't do any assumtions about order of nodes in
 	 * nodeset, currently we do :(
 	 */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST "*",
-					xpathCtx);
+	xpathObj = xmlXPathEvalExpression(BAD_CAST "*", xpathCtx);
 	if (xpathObj == NULL) {
 		xmlFree(cdata->clTRID);
 		xmlXPathFreeContext(xpathCtx);
+		free(cdata->errors);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
