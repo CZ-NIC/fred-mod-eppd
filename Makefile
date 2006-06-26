@@ -12,7 +12,7 @@ IDL	= ../cr/idl/ccReg.idl
 # Nasledujici cast by nemela vyzadovat zadne zasahy
 #
 IDLOUT	= ccReg.h ccReg-common.c ccReg-stubs.c
-OBJS	= mod_eppd.o epp_xml.o epp-client.o ccReg-common.o ccReg-stubs.o
+OBJS	= mod_eppd.o epp_xml.o epp_common.o epp-client.o ccReg-common.o ccReg-stubs.o
 
 ORB_LDFLAGS	= $(shell $(ORBIT2-CONFIG) --libs | sed -e s/-Wl,//g -e s/-pthread/-lpthread/g)
 ORB_CFLAGS	= $(shell $(ORBIT2-CONFIG) --cflags)
@@ -55,14 +55,17 @@ epp_xml.o: epp_xml.c epp_xml.h epp_common.h
 epp-client.o: epp-client.c epp-client.h epp_common.h ccReg.h
 	gcc $(CFLAGS) $(ORB_CFLAGS) -c epp-client.c
 
+epp_common.o: epp_common.c epp_common.h
+	gcc $(CFLAGS) -c epp_common.c
+
 ccReg-common.o: ccReg-common.c ccReg.h
 	gcc $(CFLAGS) $(ORB_CFLAGS) -c ccReg-common.c
 
 ccReg-stubs.o: ccReg-stubs.c ccReg.h
 	gcc $(CFLAGS) $(ORB_CFLAGS) -c ccReg-stubs.c
 
-test: test.o epp_xml.o epp-client.o ccReg-common.o ccReg-stubs.o
-	gcc -o test -g -Wall $(ORB_LDFLAGS) test.o epp_xml.o epp-client.o ccReg-common.o ccReg-stubs.o $(XML_LIBS)
+test: test.o epp_xml.o epp-client.o ccReg-common.o ccReg-stubs.o epp_common.o
+	gcc -o test -g -Wall $(ORB_LDFLAGS) test.o epp_xml.o epp-client.o ccReg-common.o ccReg-stubs.o epp_common.o $(XML_LIBS)
 
 test.o: test.c epp_common.h epp_xml.h epp-client.h
 	gcc -c -g -O0 -Wall -c test.c
@@ -83,8 +86,8 @@ distclean: clean
 .PHONY: clean distclean install build
 
 # corba dummy
-test_cd: test.o epp_xml.o epp-client_stub.o
+test_cd: test.o epp_xml.o epp-client_stub.o epp_common.o
 	gcc -o test -g -Wall test.o epp_xml.o epp-client_stub.o $(XML_LIBS)
 
-epp-client_stub.o: epp-client_stub.c
+epp-client_stub.o: epp-client_stub.c epp_common.h
 	gcc $(CFLAGS) -c epp-client_stub.c

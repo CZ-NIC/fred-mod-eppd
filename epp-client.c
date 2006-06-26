@@ -90,6 +90,30 @@ epp_corba_init_cleanup(epp_corba_globs *globs)
 	free(globs);
 }
 
+static void
+get_errors(struct circ_list *errors, ccReg_Error *c_errors)
+{
+	struct circ_list	*item;
+	epp_error	*err_item;
+	int	i;
+
+	for (i = 0; i < c_errors->_length; i++) {
+		if ((item = malloc(sizeof *item)) == NULL) break;
+		if ((err_item = malloc(sizeof *err_item)) == NULL) {
+			free(item);
+			break;
+		}
+		err_item->value = strdup(c_errors->_buffer[i].value);
+		err_item->reason = strdup(c_errors->_buffer[i].reason);
+		CL_CONTENT(item) = (void *) err_item;
+		CL_ADD(errors, item);
+	}
+
+	if (i < c_errors->_length) {
+		/* XXX what should we do? */
+	}
+}
+
 corba_status
 epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
@@ -120,6 +144,7 @@ epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 		return CORBA_REMOTE_ERROR;
 	}
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	/* rc is known */
@@ -166,6 +191,7 @@ epp_call_login(epp_corba_globs *globs, int *session, epp_lang *lang,
 		return CORBA_REMOTE_ERROR;
 	}
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -208,6 +234,7 @@ epp_call_logout(epp_corba_globs *globs, int session, epp_command_data *cdata)
 		return CORBA_REMOTE_ERROR;
 	}
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -235,7 +262,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	CORBA_exception_init(ev);
 
 	/* get number of contacts */
-	CL_LENGTH(cdata->in->check.ids, len);
+	len = cl_length(cdata->in->check.ids);
 	c_ids = ccReg_Check__alloc();
 	c_ids->_buffer = ccReg_Check_allocbuf(len);
 	c_ids->_maximum = c_ids->_length = len;
@@ -320,17 +347,18 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 		CL_CONTENT(item) = (void *) (c_bools->_buffer[i] ? 1 : 2);
 		CL_ADD(cdata->out->check.bools, item);
 	}
+	CORBA_free(c_bools);
 
+	/* handle situation when item allocation above failed */
 	if (i > 0) {
-		/* XXX memory leak - we don't free bools list */
+		cl_purge(cdata->out->check.bools);
 		free(cdata->out);
 		cdata->out = NULL;
-		CORBA_free(c_bools);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
-	CORBA_free(c_bools);
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -467,6 +495,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session, epp_command_data *cda
 
 	CORBA_free(c_contact);
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -575,8 +604,9 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 	/* look for extensions */
 	for (i = 0; i < c_domain->ext._length; i++) {
 		/* is it enumval extension? */
-		if (c_domain->ext._buffer[i]._type ==
-				TC_ccReg_ENUMValidationExtension) {
+		if (!strcmp(c_domain->ext._buffer[i]._type->name,
+				"ENUMValidationExtension"))
+		{
 			ccReg_ENUMValidationExtension	*c_enumval =
 				c_domain->ext._buffer[i]._value;
 			cdata->out->info_domain.valExDate = c_enumval->valExDate;
@@ -585,6 +615,7 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 
 	CORBA_free(c_domain);
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -710,6 +741,7 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 
 	CORBA_free(c_nsset);
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -769,6 +801,7 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 
 	CORBA_free(c_msg);
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -819,6 +852,8 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 
 	cdata->out->poll_ack.count = c_count;
 	cdata->out->poll_ack.msgid = c_msgID;
+
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -843,7 +878,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	CORBA_exception_init(ev);
 
 	c_admin = ccReg_AdminContact__alloc();
-	CL_LENGTH(cdata->in->create_domain.admin, len);
+	len = cl_length(cdata->in->create_domain.admin);
 	c_admin->_buffer = ccReg_AdminContact_allocbuf(len);
 	c_admin->_maximum = c_admin->_length = len;
 	c_admin->_release = CORBA_TRUE;
@@ -906,6 +941,8 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 
 	cdata->out->create.crDate = c_crDate;
 	cdata->out->create.exDate = c_exDate;
+
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -993,6 +1030,8 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	}
 
 	cdata->out->create.crDate = c_crDate;
+
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -1017,7 +1056,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 
 	/* alloc & init sequence of nameservers */
 	c_dnshost = ccReg_DNSHost__alloc();
-	CL_LENGTH(cdata->in->create_nsset.ns, len);
+	len = cl_length(cdata->in->create_nsset.ns);
 	c_dnshost->_buffer = ccReg_DNSHost_allocbuf(len);
 	c_dnshost->_maximum = c_dnshost->_length = len;
 	c_dnshost->_release = CORBA_TRUE;
@@ -1025,7 +1064,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 	CL_FOREACH(cdata->in->create_nsset.ns) {
 		/* alloc & init sequence of ns's addresses */
 		epp_ns *ns = (epp_ns *) CL_CONTENT(cdata->in->create_nsset.ns);
-		CL_LENGTH(ns->addr, len);
+		len = cl_length(ns->addr);
 		c_dnshost->_buffer[i].inet._buffer = ccReg_InetAddress_allocbuf(len);
 		c_dnshost->_buffer[i].inet._maximum =
 			c_dnshost->_buffer[i].inet._length = len;
@@ -1038,7 +1077,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 	}
 	/* alloc & init sequence of tech contacts */
 	c_tech = ccReg_TechContact__alloc();
-	CL_LENGTH(cdata->in->create_nsset.tech, len);
+	len = cl_length(cdata->in->create_nsset.tech);
 	c_tech->_buffer = ccReg_TechContact_allocbuf(len);
 	c_tech->_maximum = c_tech->_length = len;
 	c_tech->_release = CORBA_TRUE;
@@ -1082,6 +1121,8 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 	}
 
 	cdata->out->create.crDate = c_crDate;
+
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -1136,6 +1177,7 @@ epp_call_delete(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -1227,6 +1269,8 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 		return CORBA_INT_ERROR;
 	}
 	cdata->out->renew.exDate = c_exDate;
+
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -1253,7 +1297,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 
 	/* admin add */
 	c_admin_add = ccReg_AdminContact__alloc();
-	CL_LENGTH(cdata->in->update_domain.add_admin, len);
+	len = cl_length(cdata->in->update_domain.add_admin);
 	c_admin_add->_buffer = ccReg_AdminContact_allocbuf(len);
 	c_admin_add->_maximum = c_admin_add->_length = len;
 	c_admin_add->_release = CORBA_TRUE;
@@ -1263,7 +1307,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_domain.add_admin));
 	/* admin rem */
 	c_admin_rem = ccReg_AdminContact__alloc();
-	CL_LENGTH(cdata->in->update_domain.rem_admin, len);
+	len = cl_length(cdata->in->update_domain.rem_admin);
 	c_admin_rem->_buffer = ccReg_AdminContact_allocbuf(len);
 	c_admin_rem->_maximum = c_admin_rem->_length = len;
 	c_admin_rem->_release = CORBA_TRUE;
@@ -1273,7 +1317,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_domain.rem_admin));
 	/* status add */
 	c_status_add = ccReg_Status__alloc();
-	CL_LENGTH(cdata->in->update_domain.add_status, len);
+	len = cl_length(cdata->in->update_domain.add_status);
 	c_status_add->_buffer = ccReg_Status_allocbuf(len);
 	c_status_add->_maximum = c_status_add->_length = len;
 	c_status_add->_release = CORBA_TRUE;
@@ -1283,7 +1327,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_domain.add_status));
 	/* status rem */
 	c_status_rem = ccReg_Status__alloc();
-	CL_LENGTH(cdata->in->update_domain.rem_status, len);
+	len = cl_length(cdata->in->update_domain.rem_status);
 	c_status_rem->_buffer = ccReg_Status_allocbuf(len);
 	c_status_rem->_maximum = c_status_rem->_length = len;
 	c_status_rem->_release = CORBA_TRUE;
@@ -1342,6 +1386,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -1366,7 +1411,7 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 
 	/* status add */
 	c_status_add = ccReg_Status__alloc();
-	CL_LENGTH(cdata->in->update_contact.add_status, len);
+	len = cl_length(cdata->in->update_contact.add_status);
 	c_status_add->_buffer = ccReg_Status_allocbuf(len);
 	c_status_add->_maximum = c_status_add->_length = len;
 	c_status_add->_release = CORBA_TRUE;
@@ -1376,7 +1421,7 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_contact.add_status));
 	/* status rem */
 	c_status_rem = ccReg_Status__alloc();
-	CL_LENGTH(cdata->in->update_contact.rem_status, len);
+	len = cl_length(cdata->in->update_contact.rem_status);
 	c_status_rem->_buffer = ccReg_Status_allocbuf(len);
 	c_status_rem->_maximum = c_status_rem->_length = len;
 	c_status_rem->_release = CORBA_TRUE;
@@ -1447,6 +1492,7 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -1475,7 +1521,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 
 	/* tech add */
 	c_tech_add = ccReg_TechContact__alloc();
-	CL_LENGTH(cdata->in->update_nsset.add_tech, len);
+	len = cl_length(cdata->in->update_nsset.add_tech);
 	c_tech_add->_buffer = ccReg_TechContact_allocbuf(len);
 	c_tech_add->_maximum = c_tech_add->_length = len;
 	c_tech_add->_release = CORBA_TRUE;
@@ -1485,7 +1531,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_nsset.add_tech));
 	/* Tech rem */
 	c_tech_rem = ccReg_TechContact__alloc();
-	CL_LENGTH(cdata->in->update_nsset.rem_tech, len);
+	len = cl_length(cdata->in->update_nsset.rem_tech);
 	c_tech_rem->_buffer = ccReg_TechContact_allocbuf(len);
 	c_tech_rem->_maximum = c_tech_rem->_length = len;
 	c_tech_rem->_release = CORBA_TRUE;
@@ -1495,7 +1541,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_nsset.rem_tech));
 	/* status add */
 	c_status_add = ccReg_Status__alloc();
-	CL_LENGTH(cdata->in->update_nsset.add_status, len);
+	len = cl_length(cdata->in->update_nsset.add_status);
 	c_status_add->_buffer = ccReg_Status_allocbuf(len);
 	c_status_add->_maximum = c_status_add->_length = len;
 	c_status_add->_release = CORBA_TRUE;
@@ -1505,7 +1551,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_nsset.add_status));
 	/* status rem */
 	c_status_rem = ccReg_Status__alloc();
-	CL_LENGTH(cdata->in->update_nsset.rem_status, len);
+	len = cl_length(cdata->in->update_nsset.rem_status);
 	c_status_rem->_buffer = ccReg_Status_allocbuf(len);
 	c_status_rem->_maximum = c_status_rem->_length = len;
 	c_status_rem->_release = CORBA_TRUE;
@@ -1515,7 +1561,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_nsset.rem_status));
 	/* name servers add */
 	c_dnshost_add = ccReg_DNSHost__alloc();
-	CL_LENGTH(cdata->in->update_nsset.add_ns, len);
+	len = cl_length(cdata->in->update_nsset.add_ns);
 	c_dnshost_add->_buffer = ccReg_DNSHost_allocbuf(len);
 	c_dnshost_add->_maximum = c_dnshost_add->_length = len;
 	c_dnshost_add->_release = CORBA_TRUE;
@@ -1523,7 +1569,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 	CL_FOREACH(cdata->in->update_nsset.add_ns) {
 		/* alloc & init sequence of ns's addresses */
 		ns = (epp_ns *) CL_CONTENT(cdata->in->update_nsset.add_ns);
-		CL_LENGTH(ns->addr, len);
+		len = cl_length(ns->addr);
 		c_dnshost_add->_buffer[i].inet._buffer = ccReg_InetAddress_allocbuf(len);
 		c_dnshost_add->_buffer[i].inet._maximum =
 			c_dnshost_add->_buffer[i].inet._length = len;
@@ -1536,7 +1582,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 	}
 	/* name servers rem */
 	c_dnshost_rem = ccReg_DNSHost__alloc();
-	CL_LENGTH(cdata->in->update_nsset.rem_ns, len);
+	len = cl_length(cdata->in->update_nsset.rem_ns);
 	c_dnshost_rem->_buffer = ccReg_DNSHost_allocbuf(len);
 	c_dnshost_rem->_maximum = c_dnshost_rem->_length = len;
 	c_dnshost_rem->_release = CORBA_TRUE;
@@ -1583,6 +1629,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;
@@ -1634,6 +1681,7 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
+	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
 	cdata->msg = strdup(response->errMsg);
 	cdata->rc = response->errCode;

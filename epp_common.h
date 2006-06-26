@@ -58,6 +58,14 @@ typedef enum {
 	LANG_CS,
 }epp_lang;
 
+/*
+ * this struct represents one epp error in ExtValue element
+ */
+typedef struct {
+	char	*value;
+	char	*reason;
+}epp_error;
+
 /**
  * circular list of void pointers
  * sentinel has content == NULL
@@ -92,9 +100,6 @@ struct circ_list {
 #define CL_FOREACH(cl)	\
 	for ((cl) = (cl)->next; (cl)->content != NULL; (cl) = (cl)->next)
 
-/* shift and get content of item in circular list. */
-#define CL_SHIFTGET(cl)	(((cl) = (cl)->next)->content)
-
 /* move pointer to the beginning */
 #define CL_RESET(cl)	\
 	do { 				\
@@ -102,29 +107,18 @@ struct circ_list {
 		while (((cl) = (cl)->next)->content != NULL);	\
 	} while(0)
 
-/*
- * purge circular list, note that all content must be freed upon using
- * this macro. List pointer must be at the beginning upon start.
- */
-#define CL_PURGE(cl)	\
-	do { 				\
-		struct circ_list	*temp;			\
-		(cl) = (cl)->next;					\
-		while ((cl)->content != NULL) {		\
-			temp = cl->next;				\
-			free(cl);						\
-			cl = temp;						\
-		}									\
-		free(cl);							\
-	} while(0)
 
 /* count the number of items in the list */
-#define CL_LENGTH(cl, i)	\
-	for ((cl) = (cl)->next, i = 0; (cl)->content != NULL; (cl) = (cl)->next, i++)
+inline unsigned cl_length(struct circ_list *cl);
 
 /* if the list is empty return value is 1, otherwise 0 */
 #define CL_EMPTY(cl)	((cl) == (cl)->next)
 
+/*
+ * purge circular list, note that all content must be freed upon using
+ * this inline. List pointer must be at the beginning upon start.
+ */
+inline void cl_purge(struct circ_list *cl);
 
 /**
  * Structure gathers postal info about contact. Can be used for both -

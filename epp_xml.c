@@ -48,16 +48,6 @@
  *    err_handler parameter is the place where to jump when error occurs
  *    writer is is initialized and it is xml writer
  */
-#define START_DOCUMENT(writer, err_handler)		\
-	do {										\
-		if (xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL) < 0) goto err_handler;					\
-	}while(0)
-
-#define END_DOCUMENT(writer, err_handler)		\
-	do {										\
-		if (xmlTextWriterEndDocument(writer) < 0)  goto err_handler; \
-	}while(0)
-
 #define START_ELEMENT(writer, err_handler, elem)	\
 	do {										\
 		if (xmlTextWriterStartElement(writer, BAD_CAST (elem)) < 0) goto err_handler;	\
@@ -265,12 +255,6 @@ struct epp_xml_globs_t {
 	cmd_hash_item	*hash_cmd[HASH_SIZE_CMD];
 };
 
-typedef struct {
-	int	code;
-	char	*msg;
-	char	*node;
-}validator_err;
-
 /**
  * Function for converting number of seconds from 1970 ... to string
  * formated in rfc 3339 way. This is required by EPP protocol.
@@ -455,7 +439,8 @@ epp_gen_greeting(const char *svid, char **greeting)
 		return GEN_EWRITER;
 	}
 
-	START_DOCUMENT(writer, greeting_err);
+	if (xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL) < 0)
+		goto greeting_err;
 
 	/* epp header */
 	START_ELEMENT(writer, greeting_err, "epp");
@@ -471,6 +456,7 @@ epp_gen_greeting(const char *svid, char **greeting)
 	START_ELEMENT(writer, greeting_err, "svcMenu");
 	WRITE_ELEMENT(writer, greeting_err, "version", "1.0");
 	WRITE_ELEMENT(writer, greeting_err, "lang", "en");
+	WRITE_ELEMENT(writer, greeting_err, "lang", "cs");
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_CONTACT);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_DOMAIN);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_NSSET);
@@ -499,7 +485,8 @@ epp_gen_greeting(const char *svid, char **greeting)
 	START_ELEMENT(writer, greeting_err, "retention");
 	START_ELEMENT(writer, greeting_err, "stated");
 
-	END_DOCUMENT(writer, greeting_err);
+	/* this has side effect of flushing document to buffer */
+	if (xmlTextWriterEndDocument(writer) < 0)  goto greeting_err;
 
 	error_seen = 0;
 
@@ -562,7 +549,7 @@ parse_login(
 			"epp:login/epp:options/epp:lang");
 	if (xmlStrEqual((xmlChar *) str, BAD_CAST "en"))
 		cdata->in->login.lang = LANG_EN;
-	else if (xmlStrEqual((xmlChar *) str, BAD_CAST "cz"))
+	else if (xmlStrEqual((xmlChar *) str, BAD_CAST "cs"))
 		cdata->in->login.lang = LANG_CS;
 	else {
 		xmlFree(str);
@@ -609,10 +596,10 @@ error_l:
 	FREENULL(cdata->in->login.newPW);
 	CL_FOREACH(cdata->in->login.objuri)
 		free(CL_CONTENT(cdata->in->login.objuri));
-	CL_PURGE(cdata->in->login.objuri);
+	cl_purge(cdata->in->login.objuri);
 	CL_FOREACH(cdata->in->login.exturi)
 		free(CL_CONTENT(cdata->in->login.exturi));
-	CL_PURGE(cdata->in->login.exturi);
+	cl_purge(cdata->in->login.exturi);
 	free(cdata->in);
 	cdata->in = NULL;
 	cdata->rc = 2400;
@@ -691,7 +678,7 @@ parse_check(
 error_ch:
 	CL_FOREACH(cdata->in->check.ids)
 		free(CL_CONTENT(cdata->in->check.ids));
-	CL_PURGE(cdata->in->check.ids);
+	cl_purge(cdata->in->check.ids);
 	free(cdata->in);
 	cdata->in = NULL;
 	cdata->rc = 2400;
@@ -973,14 +960,14 @@ error_cd:
 	FREENULL(cdata->in->create_domain.authInfo);
 	CL_FOREACH(cdata->in->create_domain.admin)
 		free(CL_CONTENT(cdata->in->create_domain.admin));
-	CL_PURGE(cdata->in->create_domain.admin);
+	cl_purge(cdata->in->create_domain.admin);
 	/* clear the extensions */
 	CL_FOREACH(cdata->in->create_domain.ds) {
 		FREENULL(((epp_ds *) CL_CONTENT(cdata->in->create_domain.ds))->digest);
 		FREENULL(((epp_ds *) CL_CONTENT(cdata->in->create_domain.ds))->pubkey);
 		free(CL_CONTENT(cdata->in->create_domain.ds));
 	}
-	CL_PURGE(cdata->in->create_domain.ds);
+	cl_purge(cdata->in->create_domain.ds);
 
 	free(cdata->in);
 	cdata->in = NULL;
@@ -1211,15 +1198,15 @@ error_cn:
 	FREENULL(cdata->in->create_nsset.authInfo);
 	CL_FOREACH(cdata->in->create_nsset.tech)
 		free(CL_CONTENT(cdata->in->create_nsset.tech));
-	CL_PURGE(cdata->in->create_nsset.tech);
+	cl_purge(cdata->in->create_nsset.tech);
 	CL_FOREACH(cdata->in->create_nsset.ns) {
 		epp_ns	*ns = (epp_ns *) CL_CONTENT(cdata->in->create_nsset.ns);
 		FREENULL(ns->name);
 		CL_FOREACH(ns->addr) free(CL_CONTENT(ns->addr));
-		CL_PURGE(ns->addr);
+		cl_purge(ns->addr);
 		free(ns);
 	}
-	CL_PURGE(cdata->in->create_nsset.ns);
+	cl_purge(cdata->in->create_nsset.ns);
 	free(cdata->in);
 	cdata->in = NULL;
 	cdata->rc = 2400;
@@ -1616,17 +1603,17 @@ error_ud:
 	/* free contact */
 	CL_FOREACH(cdata->in->update_domain.add_admin)
 		free(CL_CONTENT(cdata->in->update_domain.add_admin));
-	CL_PURGE(cdata->in->update_domain.add_admin);
+	cl_purge(cdata->in->update_domain.add_admin);
 	CL_FOREACH(cdata->in->update_domain.rem_admin)
 		free(CL_CONTENT(cdata->in->update_domain.rem_admin));
-	CL_PURGE(cdata->in->update_domain.rem_admin);
+	cl_purge(cdata->in->update_domain.rem_admin);
 	/* free status */
 	CL_FOREACH(cdata->in->update_domain.add_status)
 		free(CL_CONTENT(cdata->in->update_domain.add_status));
-	CL_PURGE(cdata->in->update_domain.add_status);
+	cl_purge(cdata->in->update_domain.add_status);
 	CL_FOREACH(cdata->in->update_domain.rem_status)
 		free(CL_CONTENT(cdata->in->update_domain.rem_status));
-	CL_PURGE(cdata->in->update_domain.rem_status);
+	cl_purge(cdata->in->update_domain.rem_status);
 
 	/* clear the extensions */
 	CL_FOREACH(cdata->in->update_domain.chg_ds) {
@@ -1636,7 +1623,7 @@ error_ud:
 					CL_CONTENT(cdata->in->update_domain.chg_ds))->pubkey);
 		free(CL_CONTENT(cdata->in->update_domain.chg_ds));
 	}
-	CL_PURGE(cdata->in->update_domain.chg_ds);
+	cl_purge(cdata->in->update_domain.chg_ds);
 	CL_FOREACH(cdata->in->update_domain.add_ds) {
 		FREENULL(((epp_ds *)
 					CL_CONTENT(cdata->in->update_domain.add_ds))->digest);
@@ -1644,10 +1631,10 @@ error_ud:
 					CL_CONTENT(cdata->in->update_domain.add_ds))->pubkey);
 		free(CL_CONTENT(cdata->in->update_domain.add_ds));
 	}
-	CL_PURGE(cdata->in->update_domain.add_ds);
+	cl_purge(cdata->in->update_domain.add_ds);
 	CL_FOREACH(cdata->in->update_domain.rem_ds)
 		free(CL_CONTENT(cdata->in->update_domain.rem_ds));
-	CL_PURGE(cdata->in->update_domain.rem_ds);
+	cl_purge(cdata->in->update_domain.rem_ds);
 
 	free(cdata->in);
 	cdata->in = NULL;
@@ -1858,10 +1845,10 @@ error_uc:
 	/* free status */
 	CL_FOREACH(cdata->in->update_contact.add_status)
 		free(CL_CONTENT(cdata->in->update_contact.add_status));
-	CL_PURGE(cdata->in->update_contact.add_status);
+	cl_purge(cdata->in->update_contact.add_status);
 	CL_FOREACH(cdata->in->update_contact.rem_status)
 		free(CL_CONTENT(cdata->in->update_contact.rem_status));
-	CL_PURGE(cdata->in->update_contact.rem_status);
+	cl_purge(cdata->in->update_contact.rem_status);
 	free(cdata->in);
 	cdata->in = NULL;
 	cdata->rc = 2400;
@@ -2023,34 +2010,34 @@ error_un:
 	FREENULL(cdata->in->update_nsset.authInfo);
 	CL_FOREACH(cdata->in->update_nsset.add_tech)
 		free(CL_CONTENT(cdata->in->update_nsset.add_tech));
-	CL_PURGE(cdata->in->update_nsset.add_tech);
+	cl_purge(cdata->in->update_nsset.add_tech);
 	CL_FOREACH(cdata->in->update_nsset.rem_tech)
 		free(CL_CONTENT(cdata->in->update_nsset.rem_tech));
-	CL_PURGE(cdata->in->update_nsset.rem_tech);
+	cl_purge(cdata->in->update_nsset.rem_tech);
 	/* free ns sets */
 	CL_FOREACH(cdata->in->update_nsset.add_ns) {
 		epp_ns	*ns = (epp_ns *) CL_CONTENT(cdata->in->update_nsset.add_ns);
 		FREENULL(ns->name);
 		CL_FOREACH(ns->addr) free(CL_CONTENT(ns->addr));
-		CL_PURGE(ns->addr);
+		cl_purge(ns->addr);
 		free(ns);
 	}
-	CL_PURGE(cdata->in->update_nsset.rem_ns);
+	cl_purge(cdata->in->update_nsset.rem_ns);
 	CL_FOREACH(cdata->in->update_nsset.rem_ns) {
 		epp_ns	*ns = (epp_ns *) CL_CONTENT(cdata->in->update_nsset.rem_ns);
 		FREENULL(ns->name);
 		CL_FOREACH(ns->addr) free(CL_CONTENT(ns->addr));
-		CL_PURGE(ns->addr);
+		cl_purge(ns->addr);
 		free(ns);
 	}
-	CL_PURGE(cdata->in->update_nsset.rem_ns);
+	cl_purge(cdata->in->update_nsset.rem_ns);
 	/* free status */
 	CL_FOREACH(cdata->in->update_nsset.add_status)
 		free(CL_CONTENT(cdata->in->update_nsset.add_status));
-	CL_PURGE(cdata->in->update_nsset.add_status);
+	cl_purge(cdata->in->update_nsset.add_status);
 	CL_FOREACH(cdata->in->update_nsset.rem_status)
 		free(CL_CONTENT(cdata->in->update_nsset.rem_status));
-	CL_PURGE(cdata->in->update_nsset.rem_status);
+	cl_purge(cdata->in->update_nsset.rem_status);
 	free(cdata->in);
 	cdata->in = NULL;
 	cdata->rc = 2400;
@@ -2372,7 +2359,6 @@ static char
 gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
-	int	len;
 
 	START_ELEMENT(writer, simple_err, "resData");
 	START_ELEMENT(writer, simple_err, "domain:infData");
@@ -2425,8 +2411,10 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 	END_ELEMENT(writer, simple_err); /* infdata */
 	END_ELEMENT(writer, simple_err); /* resdata */
 	/* optional extensions */
-	CL_LENGTH(cdata->out->info_domain.ds, len);
-	if ((cdata->out->info_domain.valExDate > 0) || len > 0) {
+	if (cdata->out->info_domain.valExDate > 0) {
+			/*
+			... || cl_length(cdata->out->info_domain.ds) > 0) {
+			*/
 		START_ELEMENT(writer, simple_err, "extension");
 		if (cdata->out->info_domain.valExDate > 0) {
 			START_ELEMENT(writer, simple_err, "enumval:infData");
@@ -2437,7 +2425,8 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 			WRITE_ELEMENT(writer, simple_err, "enumval:valExDate", strbuf);
 			END_ELEMENT(writer, simple_err); /* infdata (enumval) */
 		}
-		if (len > 0) {
+		/*
+		if (cl_length(cdata->out->info_domain.ds) > 0) {
 			START_ELEMENT(writer, simple_err, "secdns:infData");
 			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:secdns", NS_SECDNS);
 			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
@@ -2458,10 +2447,10 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 					WRITE_ELEMENT(writer, simple_err, "secdns:maxSigLife",
 							strbuf);
 				}
-				/*
+				 *
 				 * all fields of keyData should be filled in or none of them.
 				 * We test value of pubkey and decide according to its value.
-				 */
+				 *
 				if (*ds->pubkey != '\0') {
 					START_ELEMENT(writer, simple_err, "secdns:keyData");
 					snprintf(strbuf, 24, "%u", ds->flags);
@@ -2472,12 +2461,13 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 					WRITE_ELEMENT(writer, simple_err, "secdns:alg", strbuf);
 					WRITE_ELEMENT(writer, simple_err, "secdns:pubKey",
 							ds->pubkey);
-					END_ELEMENT(writer, simple_err); /* keyData */
+					END_ELEMENT(writer, simple_err); // keyData
 				}
-				END_ELEMENT(writer, simple_err); /* dsData */
+				END_ELEMENT(writer, simple_err); // dsData
 			}
-			END_ELEMENT(writer, simple_err); /* infdata (secdns) */
+			END_ELEMENT(writer, simple_err); // infdata (secdns)
 		}
+		*/
 		END_ELEMENT(writer, simple_err); /* extension */
 	}
 	return 1;
@@ -2566,7 +2556,8 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 		return GEN_EWRITER;
 	}
 
-	START_DOCUMENT(writer, simple_err);
+	if (xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL) < 0)
+		goto simple_err;
 
 	// epp header
 	START_ELEMENT(writer, simple_err, "epp");
@@ -2581,21 +2572,15 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 	WRITE_ATTRIBUTE(writer, simple_err, "code", res_code);
 	START_ELEMENT(writer, simple_err, "msg");
 	if (lang != LANG_EN)
-		WRITE_ATTRIBUTE(writer, simple_err, "lang", "cz");
+		WRITE_ATTRIBUTE(writer, simple_err, "lang", "cs");
 	WRITE_STRING(writer, simple_err, cdata->msg);
 	END_ELEMENT(writer, simple_err); /* msg */
 	CL_FOREACH(cdata->errors) {
-		validator_err	*ve = (validator_err *) CL_CONTENT(cdata->errors);
-		if (ve->node == NULL) {
-			/* TODO what to do? */
-			//WRITE_ELEMENT(writer, simple_err, "value", ve->msg);
-		}
-		else {
-			START_ELEMENT(writer, simple_err, "extValue");
-			WRITE_ELEMENT(writer, simple_err, "value", ve->node);
-			WRITE_ELEMENT(writer, simple_err, "reason", ve->msg);
-			END_ELEMENT(writer, simple_err); /* extValue */
-		}
+		epp_error	*e = (epp_error *) CL_CONTENT(cdata->errors);
+		START_ELEMENT(writer, simple_err, "extValue");
+		WRITE_ELEMENT(writer, simple_err, "value", e->value);
+		WRITE_ELEMENT(writer, simple_err, "reason", e->reason);
+		END_ELEMENT(writer, simple_err); /* extValue */
 	}
 	END_ELEMENT(writer, simple_err); /* result */
 
@@ -2802,7 +2787,9 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 	START_ELEMENT(writer, simple_err, "trID");
 	WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
 	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
-	END_DOCUMENT(writer, simple_err);
+
+	/* this has side effect of flushing document to buffer */
+	if (xmlTextWriterEndDocument(writer) < 0)  goto simple_err;
 
 	error_seen = 0;
 
@@ -2834,7 +2821,7 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 {
 	struct circ_list	*error_list = (struct circ_list *) ctx;
 	struct circ_list	*new_item;
-	validator_err	*valerr;
+	epp_error	*valerr;
 	xmlNodePtr	node;
 	int	len;
 
@@ -2849,20 +2836,24 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 	 * xmlError has quite a lot of fields, we are interested only in 3
 	 * of them: code, message, node.
 	 */
-	valerr->code = error->code;
+	/*
+	 * XXX error code must be further examined in order to get
+	 * more detailed error
+	 * valerr->code = error->code;
+	 */
 	len = strlen(error->message);
-	if ((valerr->msg = malloc(len)) == NULL) {
+	if ((valerr->reason = malloc(len)) == NULL) {
 		free(valerr);
 		free(new_item);
 		return;
 	}
-	strncpy(valerr->msg, error->message, --len); /* truncate trailing \n */
-	(valerr->msg)[len] = '\0';
+	strncpy(valerr->reason, error->message, --len); /* truncate trailing \n */
+	(valerr->reason)[len] = '\0';
 	node = (xmlNodePtr) error->node;
 	if (node->type == XML_ELEMENT_NODE)
-		valerr->node = strdup(node->name);
+		valerr->value = strdup(node->name);
 	else
-		valerr->node = NULL;
+		valerr->value = strdup("");
 
 	CL_CONTENT(new_item) = (void *) valerr;
 	CL_ADD(error_list, new_item);
@@ -2885,7 +2876,6 @@ epp_parse_command(
 	xmlSchemaParserCtxtPtr spctx;	/* schema parser context */
 	xmlSchemaValidCtxtPtr	svctx;	/* schema validator context */
 	epp_red_command_type	cmd;
-	int	error_seen;	/* used for error detection when registering namespaces */
 
 	/* check input parameters */
 	assert(globs != NULL);
@@ -2935,12 +2925,12 @@ epp_parse_command(
 	if (rc < 0) {
 		/* free error messages if there are any */
 		CL_FOREACH(cdata->errors) {
-			validator_err	*ve = (validator_err *) CL_CONTENT(cdata->errors);
-			free(ve->msg);
-			FREENULL(ve->node);
-			free(ve);
+			epp_error	*e = (epp_error *) CL_CONTENT(cdata->errors);
+			free(e->value);
+			free(e->reason);
+			free(e);
 		}
-		CL_PURGE(cdata->errors);
+		cl_purge(cdata->errors);
 		/* -1 is validator internal error */
 		xmlSchemaFreeValidCtxt(svctx);
 		xmlSchemaFree(schema);
@@ -3177,12 +3167,12 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 	free(cdata->clTRID);
 	/* free error messages if there are any */
 	CL_FOREACH(cdata->errors) {
-		validator_err	*ve = (validator_err *) CL_CONTENT(cdata->errors);
-		free(ve->msg);
-		FREENULL(ve->node);
-		free(ve);
+		epp_error	*e = (epp_error *) CL_CONTENT(cdata->errors);
+		free(e->value);
+		free(e->reason);
+		free(e);
 	}
-	CL_PURGE(cdata->errors);
+	cl_purge(cdata->errors);
 	/*
 	 * corba function might not be called and therefore svTRID might be
 	 * still NULL (msg too)
@@ -3201,12 +3191,12 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			CL_RESET(cdata->in->login.objuri);
 			CL_FOREACH(cdata->in->login.objuri)
 				free(CL_CONTENT(cdata->in->login.objuri));
-			CL_PURGE(cdata->in->login.objuri);
+			cl_purge(cdata->in->login.objuri);
 			/* destroy exturi list */
 			CL_RESET(cdata->in->login.exturi);
 			CL_FOREACH(cdata->in->login.exturi)
 				free(CL_CONTENT(cdata->in->login.exturi));
-			CL_PURGE(cdata->in->login.exturi);
+			cl_purge(cdata->in->login.exturi);
 			break;
 		case EPP_CHECK_CONTACT:
 		case EPP_CHECK_DOMAIN:
@@ -3217,12 +3207,12 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			CL_FOREACH(cdata->in->check.ids) {
 				free(CL_CONTENT(cdata->in->check.ids));
 			}
-			CL_PURGE(cdata->in->check.ids);
+			cl_purge(cdata->in->check.ids);
 			/* destroy bools */
 			if (cdata->out != NULL) {
 				CL_RESET(cdata->out->check.bools);
 				/* there is no content to be freed for bools */
-				CL_PURGE(cdata->out->check.bools);
+				cl_purge(cdata->out->check.bools);
 			}
 			break;
 		case EPP_INFO_CONTACT:
@@ -3245,7 +3235,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				CL_RESET(cdata->out->info_contact.status);
 				CL_FOREACH(cdata->out->info_contact.status)
 					free(CL_CONTENT(cdata->out->info_contact.status));
-				CL_PURGE(cdata->out->info_contact.status);
+				cl_purge(cdata->out->info_contact.status);
 				/* postal info */
 				pi = cdata->out->info_contact.postalInfo;
 				assert(pi != NULL);
@@ -3280,12 +3270,12 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				CL_RESET(cdata->out->info_domain.status);
 				CL_FOREACH(cdata->out->info_domain.status)
 					free(CL_CONTENT(cdata->out->info_domain.status));
-				CL_PURGE(cdata->out->info_domain.status);
+				cl_purge(cdata->out->info_domain.status);
 				/* admin contacts */
 				CL_RESET(cdata->out->info_domain.admin);
 				CL_FOREACH(cdata->out->info_domain.admin)
 					free(CL_CONTENT(cdata->out->info_domain.admin));
-				CL_PURGE(cdata->out->info_domain.admin);
+				cl_purge(cdata->out->info_domain.admin);
 				/* clear extensions */
 				CL_FOREACH(cdata->out->info_domain.ds) {
 					FREENULL(((epp_ds *)
@@ -3294,7 +3284,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 								CL_CONTENT(cdata->out->info_domain.ds))->pubkey);
 					free(CL_CONTENT(cdata->out->info_domain.ds));
 				}
-				CL_PURGE(cdata->out->info_domain.ds);
+				cl_purge(cdata->out->info_domain.ds);
 			}
 			break;
 		case EPP_INFO_NSSET:
@@ -3315,20 +3305,20 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 					/* addr */
 					CL_RESET(ns->addr);
 					CL_FOREACH(ns->addr) free(CL_CONTENT(ns->addr));
-					CL_PURGE(ns->addr);
+					cl_purge(ns->addr);
 					free(CL_CONTENT(cdata->out->info_nsset.ns));
 				}
-				CL_PURGE(cdata->out->info_nsset.ns);
+				cl_purge(cdata->out->info_nsset.ns);
 				/* tech */
 				CL_RESET(cdata->out->info_nsset.tech);
 				CL_FOREACH(cdata->out->info_nsset.tech)
 					free(CL_CONTENT(cdata->out->info_nsset.tech));
-				CL_PURGE(cdata->out->info_nsset.tech);
+				cl_purge(cdata->out->info_nsset.tech);
 				/* status */
 				CL_RESET(cdata->out->info_nsset.status);
 				CL_FOREACH(cdata->out->info_nsset.status)
 					free(CL_CONTENT(cdata->out->info_nsset.status));
-				CL_PURGE(cdata->out->info_nsset.status);
+				cl_purge(cdata->out->info_nsset.status);
 			}
 			break;
 		case EPP_CREATE_DOMAIN:
@@ -3341,7 +3331,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			CL_RESET(cdata->in->create_domain.admin);
 			CL_FOREACH(cdata->in->create_domain.admin)
 				free(CL_CONTENT(cdata->in->create_domain.admin));
-			CL_PURGE(cdata->in->create_domain.admin);
+			cl_purge(cdata->in->create_domain.admin);
 			/* clear the extensions */
 			assert(cdata->in->create_domain.ds != NULL);
 			CL_FOREACH(cdata->in->create_domain.ds) {
@@ -3349,7 +3339,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				FREENULL(((epp_ds *) CL_CONTENT(cdata->in->create_domain.ds))->pubkey);
 				free(CL_CONTENT(cdata->in->create_domain.ds));
 			}
-			CL_PURGE(cdata->in->create_domain.ds);
+			cl_purge(cdata->in->create_domain.ds);
 			break;
 		case EPP_CREATE_CONTACT:
 			assert(cdata->in != NULL);
@@ -3384,15 +3374,15 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			CL_RESET(cdata->in->create_nsset.tech);
 			CL_FOREACH(cdata->in->create_nsset.tech)
 				free(CL_CONTENT(cdata->in->create_nsset.tech));
-			CL_PURGE(cdata->in->create_nsset.tech);
+			cl_purge(cdata->in->create_nsset.tech);
 			CL_FOREACH(cdata->in->create_nsset.ns) {
 				epp_ns	*ns = (epp_ns *) CL_CONTENT(cdata->in->create_nsset.ns);
 				FREENULL(ns->name);
 				CL_FOREACH(ns->addr) free(CL_CONTENT(ns->addr));
-				CL_PURGE(ns->addr);
+				cl_purge(ns->addr);
 				free(ns);
 			}
-			CL_PURGE(cdata->in->create_nsset.ns);
+			cl_purge(cdata->in->create_nsset.ns);
 			break;
 		case EPP_DELETE_DOMAIN:
 		case EPP_DELETE_CONTACT:
@@ -3414,20 +3404,20 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			CL_RESET(cdata->in->update_domain.add_admin);
 			CL_FOREACH(cdata->in->update_domain.add_admin)
 				free(CL_CONTENT(cdata->in->update_domain.add_admin));
-			CL_PURGE(cdata->in->update_domain.add_admin);
+			cl_purge(cdata->in->update_domain.add_admin);
 			CL_RESET(cdata->in->update_domain.rem_admin);
 			CL_FOREACH(cdata->in->update_domain.rem_admin)
 				free(CL_CONTENT(cdata->in->update_domain.rem_admin));
-			CL_PURGE(cdata->in->update_domain.rem_admin);
+			cl_purge(cdata->in->update_domain.rem_admin);
 			/* rem & add status */
 			CL_RESET(cdata->in->update_domain.add_status);
 			CL_FOREACH(cdata->in->update_domain.add_status)
 				free(CL_CONTENT(cdata->in->update_domain.add_status));
-			CL_PURGE(cdata->in->update_domain.add_status);
+			cl_purge(cdata->in->update_domain.add_status);
 			CL_RESET(cdata->in->update_domain.rem_status);
 			CL_FOREACH(cdata->in->update_domain.rem_status)
 				free(CL_CONTENT(cdata->in->update_domain.rem_status));
-			CL_PURGE(cdata->in->update_domain.rem_status);
+			cl_purge(cdata->in->update_domain.rem_status);
 			/* clear the extensions */
 			assert(cdata->in->update_domain.chg_ds != NULL);
 			assert(cdata->in->update_domain.add_ds != NULL);
@@ -3439,7 +3429,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 						CL_CONTENT(cdata->in->update_domain.chg_ds))->pubkey);
 				free(CL_CONTENT(cdata->in->update_domain.chg_ds));
 			}
-			CL_PURGE(cdata->in->update_domain.chg_ds);
+			cl_purge(cdata->in->update_domain.chg_ds);
 			CL_FOREACH(cdata->in->update_domain.add_ds) {
 				FREENULL(((epp_ds *)
 						CL_CONTENT(cdata->in->update_domain.add_ds))->digest);
@@ -3447,10 +3437,10 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 						CL_CONTENT(cdata->in->update_domain.add_ds))->pubkey);
 				free(CL_CONTENT(cdata->in->update_domain.add_ds));
 			}
-			CL_PURGE(cdata->in->update_domain.add_ds);
+			cl_purge(cdata->in->update_domain.add_ds);
 			CL_FOREACH(cdata->in->update_domain.rem_ds)
 				free(CL_CONTENT(cdata->in->update_domain.rem_ds));
-			CL_PURGE(cdata->in->update_domain.rem_ds);
+			cl_purge(cdata->in->update_domain.rem_ds);
 			break;
 		case EPP_UPDATE_CONTACT:
 			assert(cdata->in != NULL);
@@ -3482,11 +3472,11 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			CL_RESET(cdata->in->update_contact.add_status);
 			CL_FOREACH(cdata->in->update_contact.add_status)
 				free(CL_CONTENT(cdata->in->update_contact.add_status));
-			CL_PURGE(cdata->in->update_contact.add_status);
+			cl_purge(cdata->in->update_contact.add_status);
 			CL_RESET(cdata->in->update_contact.rem_status);
 			CL_FOREACH(cdata->in->update_contact.rem_status)
 				free(CL_CONTENT(cdata->in->update_contact.rem_status));
-			CL_PURGE(cdata->in->update_contact.rem_status);
+			cl_purge(cdata->in->update_contact.rem_status);
 			break;
 		case EPP_UPDATE_NSSET:
 			assert(cdata->in != NULL);
@@ -3498,33 +3488,33 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 					CL_CONTENT(cdata->in->update_nsset.add_ns);
 				free(ns->name);
 				CL_FOREACH(ns->addr) free(CL_CONTENT(ns->addr));
-				CL_PURGE(ns->addr);
+				cl_purge(ns->addr);
 				free(ns);
 			}
-			CL_PURGE(cdata->in->update_nsset.add_ns);
+			cl_purge(cdata->in->update_nsset.add_ns);
 			/* rem ns */
 			CL_RESET(cdata->in->update_nsset.rem_ns);
 			CL_FOREACH(cdata->in->update_nsset.rem_ns)
 				free(CL_CONTENT(cdata->in->update_nsset.rem_ns));
-			CL_PURGE(cdata->in->update_nsset.rem_ns);
+			cl_purge(cdata->in->update_nsset.rem_ns);
 			/* rem & add tech */
 			CL_RESET(cdata->in->update_nsset.add_tech);
 			CL_FOREACH(cdata->in->update_nsset.add_tech)
 				free(CL_CONTENT(cdata->in->update_nsset.add_tech));
-			CL_PURGE(cdata->in->update_nsset.add_tech);
+			cl_purge(cdata->in->update_nsset.add_tech);
 			CL_RESET(cdata->in->update_nsset.rem_tech);
 			CL_FOREACH(cdata->in->update_nsset.rem_tech)
 				free(CL_CONTENT(cdata->in->update_nsset.rem_tech));
-			CL_PURGE(cdata->in->update_nsset.rem_tech);
+			cl_purge(cdata->in->update_nsset.rem_tech);
 			/* rem & add status */
 			CL_RESET(cdata->in->update_nsset.add_status);
 			CL_FOREACH(cdata->in->update_nsset.add_status)
 				free(CL_CONTENT(cdata->in->update_nsset.add_status));
-			CL_PURGE(cdata->in->update_nsset.add_status);
+			cl_purge(cdata->in->update_nsset.add_status);
 			CL_RESET(cdata->in->update_nsset.rem_status);
 			CL_FOREACH(cdata->in->update_nsset.rem_status)
 				free(CL_CONTENT(cdata->in->update_nsset.rem_status));
-			CL_PURGE(cdata->in->update_nsset.rem_status);
+			cl_purge(cdata->in->update_nsset.rem_status);
 			break;
 		case EPP_TRANSFER_NSSET:
 		case EPP_TRANSFER_DOMAIN:
