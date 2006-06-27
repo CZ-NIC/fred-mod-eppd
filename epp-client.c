@@ -95,7 +95,8 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 {
 	struct circ_list	*item;
 	epp_error	*err_item;
-	int	i;
+	int	i, len;
+	char	*newstr;
 
 	for (i = 0; i < c_errors->_length; i++) {
 		if ((item = malloc(sizeof *item)) == NULL) break;
@@ -105,6 +106,139 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 		}
 		err_item->value = strdup(c_errors->_buffer[i].value);
 		err_item->reason = strdup(c_errors->_buffer[i].reason);
+		len = strlen(c_errors->_buffer[i].value);
+		switch (c_errors->_buffer[i].code) {
+			case ccReg_pollAck_msgID:
+				len += strlen("<poll op=\"ack\" msgID=\"");
+				len += strlen("\"/>");
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<poll op=\"ack\" msgID=\"");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "\"/>");
+				break;
+			case ccReg_contactUpdate_status_add:
+			case ccReg_contactUpdate_status_rem:
+			case ccReg_nssetUpdate_status_add:
+			case ccReg_nssetUpdate_status_rem:
+			case ccReg_domainUpdate_status_add:
+			case ccReg_domainUpdate_status_rem:
+				len += strlen("<status s=\"");
+				len += strlen("\"/>");
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<status s=\"");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "\"/>");
+				break;
+			case ccReg_nssetCreate_tech:
+			case ccReg_nssetUpdate_tech_add:
+			case ccReg_nssetUpdate_tech_rem:
+				len += 2 * strlen("<tech>") + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<tech>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</tech>");
+				break;
+			case ccReg_nssetCreate_ns_name:
+			case ccReg_nssetUpdate_ns_name_add:
+			case ccReg_nssetUpdate_ns_name_rem:
+				len += 2 * strlen("<name>") + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<name>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</name>");
+				break;
+			case ccReg_nssetCreate_ns_addr:
+			case ccReg_nssetUpdate_ns_addr_add:
+			case ccReg_nssetUpdate_ns_addr_rem:
+				len += 2 * strlen("<addr>") + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<addr>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</addr>");
+				break;
+			case ccReg_domainCreate_registrant:
+			case ccReg_domainUpdate_registrant:
+				len += strlen("<registrant>");
+				len = len * 2 + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<registrant>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</registrant>");
+				break;
+			case ccReg_domainCreate_nsset:
+			case ccReg_domainUpdate_nsset:
+				len += strlen("<nsset>");
+				len = len * 2 + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<nsset>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</nsset>");
+				break;
+			case ccReg_domainCreate_period:
+			case ccReg_domainRenew_period:
+				len += strlen("<period>");
+				len = len * 2 + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<period>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</period>");
+				break;
+			case ccReg_domainCreate_admin:
+			case ccReg_domainUpdate_admin_add:
+			case ccReg_domainUpdate_admin_rem:
+				len += strlen("<contact>");
+				len = len * 2 + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<contact>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</contact>");
+				break;
+			case ccReg_domainCreate_ext_valdate:
+			case ccReg_domainUpdate_ext_valdate:
+				len += strlen("<valExDate>");
+				len = len * 2 + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<valExDate>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</valExDate>");
+				break;
+			case ccReg_domainRenew_curExpDate:
+				len += strlen("<curExpDate>");
+				len = len * 2 + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<curExpDate>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</curExpDate>");
+				break;
+			case ccReg_domainRenew_ext_valDate:
+				break;
+			default:
+				continue;
+		}
+		free(err_item->value);
+		err_item->value = newstr;
 		CL_CONTENT(item) = (void *) err_item;
 		CL_ADD(errors, item);
 	}
