@@ -1059,7 +1059,7 @@ parse_create_contact(
 								xpathObj->nodesetval, i)->xmlChildrenNode, 1);
 		/* the rest must be empty strings */
 		for (j = i; j < 3; j++)
-			cdata->in->create_contact.postalInfo->street[i] = strdup("");
+			cdata->in->create_contact.postalInfo->street[j] = strdup("");
 	}
 	xmlXPathFreeObject(xpathObj);
 	XPATH_REQ1(cdata->in->create_contact.postalInfo->city, doc, xpathCtx,
