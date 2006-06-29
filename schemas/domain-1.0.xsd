@@ -254,7 +254,7 @@
 
     <complexType name="checkType">
       <sequence>
-        <element name="name" type="eppcom:labelType"/>
+        <element name="name" type="domain:checkNameType"/>
         <element name="reason" type="eppcom:reasonType"
          minOccurs="0"/>
       </sequence>

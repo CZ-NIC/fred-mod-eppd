@@ -1,0 +1,25 @@
+
+Example configuration of mod_eppd module in apache's conf:
+
+#
+# mod_eppd
+#
+Listen 700
+LoadModule eppd_module modules/mod_eppd.so
+<VirtualHost *:700>
+  EPPprotocol   On
+  EPPiorfile    "/tmp/ccReg.ref"
+  EPPschema     "/home/loo/apache.org/chroot/conf/schemas/all-1.0.xsd"
+  EPPservername "EPP server of cz.nic"
+  EPPlog        "/home/loo/apache.org/chroot/logs/epp.log"
+  EPPloglevel   debug
+  EPPvalidResponse	On
+  SSLEngine on
+  SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP:+eNULL
+  SSLCertificateFile /home/loo/apache.org/chroot/conf/server.crt
+  SSLCertificateKeyFile /home/loo/apache.org/chroot/conf/server.key
+  SSLVerifyClient require
+  SSLCACertificateFile /home/loo/apache.org/chroot/conf/certs/server.crt
+#  SSLVerifyDepth 1
+  CustomLog /home/loo/apache.org/chroot/logs/ssl_log "%t %{cipher}c %{clientcert}c %{errcode}c %{errstr}c %{version}c"
+</VirtualHost>

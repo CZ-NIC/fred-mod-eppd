@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
 	gen_status	gstat;
 
 	/* API: check libxml */
-	if ((xml_globs = epp_xml_init("schemas/all-1.0.xsd")) == NULL) {
+	if ((xml_globs = epp_xml_init("schemas/all-1.0.xsd", 1)) == NULL) {
 		fputs("Error in xml initialization\n", stderr);
 		return 1;
 	}
@@ -352,13 +352,59 @@ int main(int argc, char *argv[])
 				break;
 		}
 		if (cstat == CORBA_OK) {
+			struct circ_list	*val_errors;
 			/* API: generate response */
-			gstat = epp_gen_response(xml_globs, lang, &cdata, &result);
-			if (gstat == GEN_OK) {
-				puts(result);
-				epp_free_genstring(result);
+			gstat = epp_gen_response(xml_globs, lang, &cdata, &result,
+					&val_errors);
+			switch (gstat) {
+				/*
+				 * following errors are serious and response cannot be sent
+				 * to client when any of them appears
+				 */
+				case GEN_EBUFFER:
+				case GEN_EWRITER:
+				case GEN_EBUILD:
+					fputs("XML Generator failed - terminating session\n",stderr);
+					break;
+				/*
+				 * following errors are only informative though serious.
+				 * The connection persists and response is sent back to
+				 * client.
+				 */
+				case GEN_NOT_XML:
+					fputs("Response is not XML!!\n", stderr);
+					puts(result);
+					epp_free_genstring(result);
+					break;
+				case GEN_EINTERNAL:
+					fputs("Internal error when validating response\n", stderr);
+					puts(result);
+					epp_free_genstring(result);
+					break;
+				case GEN_ESCHEMA:
+					fputs("Error when parsing schema\n", stderr);
+					puts(result);
+					epp_free_genstring(result);
+					break;
+				case GEN_NOT_VALID:
+					fputs("Server response does not validate\n", stderr);
+					if (val_errors != NULL) {
+						CL_FOREACH(val_errors) {
+							epp_error	*e = CL_CONTENT(val_errors);
+							fprintf(stderr, "\tElement: %s\n", e->value);
+							fprintf(stderr, "\tReason: %s\n", e->reason);
+						}
+						epp_free_valid_errors(val_errors); /* free errors */
+					}
+					puts(result);
+					epp_free_genstring(result);
+					break;
+				default:
+					/* GEN_OK */
+					puts(result);
+					epp_free_genstring(result);
+					break;
 			}
-			else fputs("Generator error\n", stderr);
 		}
 		else fputs("Corba call failed\n", stderr);
 

@@ -253,7 +253,16 @@ struct epp_xml_globs_t {
 	char	*url_schema; /* schema against which are validated requests */
 	/* hash table for quick command lookup */
 	cmd_hash_item	*hash_cmd[HASH_SIZE_CMD];
+	int	valid_resp;
 };
+
+/**
+ * This struct gathers context parameters to validator error handler
+ */
+typedef struct {
+	struct circ_list	*err_list;
+	xmlDocPtr	doc;
+}valerr_ctx;
 
 /**
  * Function for converting number of seconds from 1970 ... to string
@@ -368,7 +377,7 @@ cmd_hash_clean(cmd_hash_item *hash_cmd[])
 	}
 }
 
-epp_xml_globs *epp_xml_init(const char *url_schema)
+epp_xml_globs *epp_xml_init(const char *url_schema, int valid_resp)
 {
 	epp_xml_globs	*globs;
 	char rc;
@@ -379,6 +388,7 @@ epp_xml_globs *epp_xml_init(const char *url_schema)
 
 	assert(url_schema != NULL);
 	globs->url_schema = strdup(url_schema);
+	globs->valid_resp = valid_resp;
 
 	/* initialize command hash table */
 	rc = 0;
@@ -2266,6 +2276,161 @@ error_t:
 	cdata->type = EPP_DUMMY;
 }
 
+/*
+static char *
+strdup_tag_replace(const char * muster)
+{
+	char	*res;
+	char	*iter;
+
+	if (muster == NULL) return NULL;
+	if ((iter = res = malloc(strlen(muster))) == NULL) return NULL;
+	while (*muster != '\0') {
+		if (*muster == '&') {
+			if (!strncmp(muster, "&lt;", 4)) {
+				*iter++ = '<';
+				muster += 4;
+				continue;
+			}
+			else if (!strncmp(muster, "&gt;", 4)) {
+				*iter++ = '>';
+				muster += 4;
+				continue;
+			}
+		}
+		*iter++ = *muster++;
+	}
+	iter = '\0';
+
+	return res;
+}
+*/
+
+/**
+ * This is a callback for xml validator errors. Purpose is to cumulate
+ * all encountered errors in a list, which is further processed after
+ * the validation is done.
+ */
+static void
+validerr_callback(void *ctx, xmlErrorPtr error)
+{
+	struct circ_list	*new_item;
+	epp_error	*valerr;
+	xmlNodePtr	node;
+	int	len;
+	xmlBufferPtr	buf;
+	struct circ_list	*error_list = ((valerr_ctx *) ctx)->err_list;
+	xmlDocPtr	doc = ((valerr_ctx *) ctx)->doc;
+
+	/* in case of allocation failure simply don't log the error and exit */
+	if ((valerr = malloc(sizeof *valerr)) == NULL) return;
+	if ((new_item = malloc(sizeof *new_item)) == NULL) {
+		free(valerr);
+		return;
+	}
+
+	/*
+	 * xmlError has quite a lot of fields, we are interested only in 3
+	 * of them: code, message, node.
+	 */
+	/*
+	 * XXX error code must be further examined in order to get
+	 * more detailed error
+	 * valerr->code = error->code;
+	 */
+	len = strlen(error->message);
+	if ((valerr->reason = malloc(len)) == NULL) {
+		free(valerr);
+		free(new_item);
+		return;
+	}
+	strncpy(valerr->reason, error->message, --len); /* truncate trailing \n */
+	(valerr->reason)[len] = '\0';
+	node = (xmlNodePtr) error->node;
+	/* XXX this needs to be done better way */
+		/*
+		 * recognized errors:
+		 *    unknown command (2000)
+		 *    required parameter missing (2003)
+		 *    Parameter value range error (2004)
+		 *    Parameter value syntax error (2005)
+		 *    Unimplemented extension (2103)
+		 *    ???Unimplemented command (2101)???
+		 *    ???Unimplemented option (2102)???
+		 * all other errors are reported as:
+		 *    command syntax error (2001)
+		 */
+
+	buf = xmlBufferCreate();
+	if (buf == NULL)
+		valerr->value = strdup("unknown");
+	else {
+		if (xmlNodeDump(buf, doc, node, 0, 0) < 0)
+			valerr->value = strdup("unknown");
+		else {
+			valerr->value = strdup((char *) buf->content);
+		}
+		xmlBufferFree(buf);
+	}
+
+	CL_CONTENT(new_item) = (void *) valerr;
+	CL_ADD(error_list, new_item);
+}
+
+static parser_status
+validate_doc(char *url_schema, xmlDocPtr doc, struct circ_list *err_list)
+{
+	xmlSchemaParserCtxtPtr	spctx;	/* schema parser context */
+	xmlSchemaValidCtxtPtr	svctx;	/* schema validator context */
+	xmlSchemaPtr	schema; /* schema against which are validated requests */
+	valerr_ctx	ctx;
+	int	rc;
+
+	/* parse epp schema */
+	spctx = xmlSchemaNewParserCtxt(url_schema);
+	if (spctx == NULL) return PARSER_ESCHEMA;
+
+	schema = xmlSchemaParse(spctx);
+	xmlSchemaFreeParserCtxt(spctx);
+	/* schemas might be corrupted though it is unlikely */
+	if (schema == NULL) return PARSER_ESCHEMA;
+
+	svctx = xmlSchemaNewValidCtxt(schema);
+	if (svctx == NULL) {
+		xmlSchemaFree(schema);
+		return PARSER_EINTERNAL;
+	}
+
+	ctx.err_list = err_list;
+	ctx.doc = doc;
+	xmlSchemaSetValidStructuredErrors(svctx, validerr_callback, &ctx);
+	/* validate request against schema */
+	rc = xmlSchemaValidateDoc(svctx, doc);
+	if (rc < 0) {	/* -1 is validator's internal error */
+		/* free error messages if there are any */
+		CL_FOREACH(err_list) {
+			epp_error	*e = (epp_error *) CL_CONTENT(err_list);
+			free(e->value);
+			free(e->reason);
+			free(e);
+		}
+		cl_purge(err_list);
+		xmlSchemaFreeValidCtxt(svctx);
+		xmlSchemaFree(schema);
+		return PARSER_EINTERNAL;
+	}
+	if (rc > 0) {	/* the doc does not validate */
+		xmlSchemaFreeValidCtxt(svctx);
+		xmlSchemaFree(schema);
+		return PARSER_NOT_VALID;
+	}
+	xmlSchemaFreeValidCtxt(svctx);
+	xmlSchemaFree(schema);
+
+	assert(CL_EMPTY(err_list));
+	return PARSER_OK;
+}
+
 static char
 gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
@@ -2534,7 +2699,7 @@ simple_err:
 
 gen_status
 epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
-		char **result)
+		char **result, struct circ_list **val_errors)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -2544,6 +2709,7 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 
 	assert(globs != NULL);
 	assert(cdata != NULL);
+	*val_errors = NULL;
 
 	// make up response
 	buf = xmlBufferCreate();
@@ -2575,10 +2741,18 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 		WRITE_ATTRIBUTE(writer, simple_err, "lang", "cs");
 	WRITE_STRING(writer, simple_err, cdata->msg);
 	END_ELEMENT(writer, simple_err); /* msg */
+	CL_RESET(cdata->errors);
 	CL_FOREACH(cdata->errors) {
 		epp_error	*e = (epp_error *) CL_CONTENT(cdata->errors);
 		START_ELEMENT(writer, simple_err, "extValue");
-		WRITE_ELEMENT(writer, simple_err, "value", e->value);
+		/*
+		 * we cannot use standard macro WRITE_ELEMENT because we want
+		 * to preserve <,> chars, otherwise they would be substituted
+		 * by &lt;, &gt; respectively.
+		 */
+		START_ELEMENT(writer, simple_err, "value");
+		if (xmlTextWriterWriteRaw(writer, e->value) < 0) goto simple_err;
+		END_ELEMENT(writer, simple_err); /* value */
 		WRITE_ELEMENT(writer, simple_err, "reason", e->reason);
 		END_ELEMENT(writer, simple_err); /* extValue */
 	}
@@ -2726,7 +2900,7 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 			if (cdata->rc != 1000) break;
 			START_ELEMENT(writer, simple_err, "resData");
 			START_ELEMENT(writer, simple_err, "domain:creData");
-			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
 			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
 					LOC_DOMAIN);
 			WRITE_ELEMENT(writer, simple_err, "domain:name",
@@ -2742,7 +2916,7 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 			if (cdata->rc != 1000) break;
 			START_ELEMENT(writer, simple_err, "resData");
 			START_ELEMENT(writer, simple_err, "contact:creData");
-			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_CONTACT);
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
 			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
 					LOC_CONTACT);
 			WRITE_ELEMENT(writer, simple_err, "contact:id",
@@ -2757,7 +2931,7 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 			START_ELEMENT(writer, simple_err, "resData");
 			START_ELEMENT(writer, simple_err, "nsset:creData");
 			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
-			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",LOC_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_NSSET);
 			WRITE_ELEMENT(writer, simple_err, "nsset:id",
 					cdata->in->create_nsset.id);
 			get_rfc3339_date(cdata->out->create.crDate, strbuf);
@@ -2769,7 +2943,7 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 			if (cdata->rc != 1000) break;
 			START_ELEMENT(writer, simple_err, "resData");
 			START_ELEMENT(writer, simple_err, "domain:renData");
-			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
 			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
 					LOC_DOMAIN);
 			WRITE_ELEMENT(writer, simple_err, "domain:name",
@@ -2791,6 +2965,7 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 	/* this has side effect of flushing document to buffer */
 	if (xmlTextWriterEndDocument(writer) < 0)  goto simple_err;
 
+	/* we don't take into account validation errors */
 	error_seen = 0;
 
 simple_err:
@@ -2802,6 +2977,45 @@ simple_err:
 
 	*result = strdup((char *) buf->content);
 	xmlBufferFree(buf);
+
+	/* optional add on - response validation */
+	if (globs->valid_resp) {
+		xmlDocPtr	doc;
+		parser_status	val_ret;
+
+		/* parse xml request */
+		doc = xmlParseMemory(*result, strlen(*result));
+		if (doc == NULL) return GEN_NOT_XML;
+
+		/*
+		 * create validation error callback and initialize list which is used
+		 * for error cumulation.
+		 */
+		if ((*val_errors = malloc(sizeof (**val_errors))) == NULL) {
+			xmlFreeDoc(doc);
+			return GEN_EINTERNAL;
+		}
+		CL_NEW(*val_errors);
+
+		val_ret = validate_doc(globs->url_schema, doc, *val_errors);
+		if (val_ret == PARSER_ESCHEMA || val_ret == PARSER_EINTERNAL) {
+			/* val_errors is already released */
+			xmlFreeDoc(doc);
+			return (val_ret == PARSER_ESCHEMA) ? GEN_ESCHEMA: GEN_EINTERNAL;
+		}
+		else if (val_ret == PARSER_NOT_VALID) {
+			/*
+			 * error consequence: we silently log the error in epp log and
+			 * send the response to client as we normaly would do.
+			 */
+			xmlFreeDoc(doc);
+			return GEN_NOT_VALID;
+		}
+
+		/* response is ok */
+		xmlFreeDoc(doc);
+	}
+
 	return GEN_OK;
 }
 
@@ -2809,54 +3023,6 @@ void epp_free_genstring(char *genstring)
 {
 	assert(genstring != NULL);
 	free(genstring);
-}
-
-/**
- * This is a callback for xml validator errors. Purpose is to cumulate
- * all encountered errors in a list, which is further processed after
- * the validation is done.
- */
-static void
-validerr_callback(void *ctx, xmlErrorPtr error)
-{
-	struct circ_list	*error_list = (struct circ_list *) ctx;
-	struct circ_list	*new_item;
-	epp_error	*valerr;
-	xmlNodePtr	node;
-	int	len;
-
-	/* in case of allocation failure simply don't log the error and exit */
-	if ((valerr = malloc(sizeof *valerr)) == NULL) return;
-	if ((new_item = malloc(sizeof *new_item)) == NULL) {
-		free(valerr);
-		return;
-	}
-
-	/*
-	 * xmlError has quite a lot of fields, we are interested only in 3
-	 * of them: code, message, node.
-	 */
-	/*
-	 * XXX error code must be further examined in order to get
-	 * more detailed error
-	 * valerr->code = error->code;
-	 */
-	len = strlen(error->message);
-	if ((valerr->reason = malloc(len)) == NULL) {
-		free(valerr);
-		free(new_item);
-		return;
-	}
-	strncpy(valerr->reason, error->message, --len); /* truncate trailing \n */
-	(valerr->reason)[len] = '\0';
-	node = (xmlNodePtr) error->node;
-	if (node->type == XML_ELEMENT_NODE)
-		valerr->value = strdup(node->name);
-	else
-		valerr->value = strdup("");
-
-	CL_CONTENT(new_item) = (void *) valerr;
-	CL_ADD(error_list, new_item);
 }
 
 parser_status
@@ -2867,15 +3033,12 @@ epp_parse_command(
 		unsigned bytes,
 		epp_command_data *cdata)
 {
-	int	rc;
 	xmlDocPtr	doc;
 	xmlXPathContextPtr	xpathCtx;
 	xmlXPathObjectPtr	xpathObj;
 	xmlNodeSetPtr	nodeset;
-	xmlSchemaPtr schema; /* schema against which are validated requests */
-	xmlSchemaParserCtxtPtr spctx;	/* schema parser context */
-	xmlSchemaValidCtxtPtr	svctx;	/* schema validator context */
 	epp_red_command_type	cmd;
+	parser_status	val_ret;
 
 	/* check input parameters */
 	assert(globs != NULL);
@@ -2888,90 +3051,35 @@ epp_parse_command(
 		return PARSER_NOT_XML;
 	}
 
-	/* parse epp schema */
-	spctx = xmlSchemaNewParserCtxt(globs->url_schema);
-	if (spctx == NULL) {
-		xmlFreeDoc(doc);
-		return PARSER_ESCHEMA;
-	}
-	schema = xmlSchemaParse(spctx);
-	xmlSchemaFreeParserCtxt(spctx);
-	/* schemas might be corrupted though it is unlikely */
-	if (schema == NULL) {
-		xmlFreeDoc(doc);
-		return PARSER_ESCHEMA;
-	}
-
-	svctx = xmlSchemaNewValidCtxt(schema);
-	if (svctx == NULL) {
-		xmlSchemaFree(schema);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
-	}
 	/*
 	 * create validation error callback and initialize list which is used
 	 * for error cumulation.
 	 */
 	if ((cdata->errors = malloc(sizeof (*cdata->errors))) == NULL) {
-		xmlSchemaFreeValidCtxt(svctx);
-		xmlSchemaFree(schema);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
 	CL_NEW(cdata->errors);
-	xmlSchemaSetValidStructuredErrors(svctx, validerr_callback, cdata->errors);
-	/* validate request against schema */
-	rc = xmlSchemaValidateDoc(svctx, doc);
-	if (rc < 0) {
-		/* free error messages if there are any */
-		CL_FOREACH(cdata->errors) {
-			epp_error	*e = (epp_error *) CL_CONTENT(cdata->errors);
-			free(e->value);
-			free(e->reason);
-			free(e);
-		}
-		cl_purge(cdata->errors);
-		/* -1 is validator internal error */
-		xmlSchemaFreeValidCtxt(svctx);
-		xmlSchemaFree(schema);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
-	}
-	/*
-	 * validation error consequence: response identifing the problem is sent
-	 * to client, the connection persists.
-	 */
-	if (rc > 0) {
-		/*
-		 * recognized errors:
-		 *    unknown command (2000)
-		 *    required parameter missing (2003)
-		 *    Parameter value range error (2004)
-		 *    Parameter value syntax error (2005)
-		 *    Unimplemented extension (2103)
-		 *    ???Unimplemented command (2101)???
-		 *    ???Unimplemented option (2102)???
-		 * all other errors are reported as:
-		 *    command syntax error (2001)
-		 */
 
+	/* validate the doc */
+	val_ret = validate_doc(globs->url_schema, doc, cdata->errors);
+	if (val_ret == PARSER_ESCHEMA || val_ret == PARSER_EINTERNAL) {
+		/* cdata->errors is already released */
+		xmlFreeDoc(doc);
+		return val_ret;
+	}
+	else if (val_ret == PARSER_NOT_VALID) {
+		/*
+		 * validation error consequence: response identifing the problem is sent
+		 * to client, the connection persists.
+		 */
 		/* TODO set rc value more thorougly */
 		cdata->clTRID = strdup(""); /* must be set becauseof corba */
 		cdata->rc = 2001;
 		cdata->type = EPP_DUMMY;
-		xmlSchemaFreeValidCtxt(svctx);
-		xmlSchemaFree(schema);
 		xmlFreeDoc(doc);
-		return PARSER_NOT_VALID;
+		return val_ret;
 	}
-	xmlSchemaFreeValidCtxt(svctx);
-	xmlSchemaFree(schema);
-	/*
-	 * there should not be any error messages in the list
-	 * This doesn't mean we don't have to free the cdata->errors element (see
-	 * implementation of circ_list).
-	 */
-	assert(CL_EMPTY(cdata->errors));
 
 	/* create XPath context */
 	xpathCtx = xmlXPathNewContext(doc);
@@ -3542,4 +3650,18 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 	/* same for all */
 	if (cdata->in != NULL) free(cdata->in);
 	if (cdata->out != NULL) free(cdata->out);
+}
+
+void
+epp_free_valid_errors(struct circ_list *val_errors)
+{
+	if (val_errors != NULL) {
+		CL_FOREACH(val_errors) {
+			epp_error	*e = CL_CONTENT(val_errors);
+			free(e->value);
+			free(e->reason);
+			free(e);
+		}
+		cl_purge(val_errors);
+	}
 }

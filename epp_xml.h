@@ -42,7 +42,18 @@ typedef enum {
 	/* could not create xml writer */
 	GEN_EWRITER,
 	/* error when building xml document */
-	GEN_EBUILD
+	GEN_EBUILD,
+	/*
+	 * following errors may appear only if response validation is turned on
+	 */
+	/* this should be impossible !! - generating something what is not xml */
+	GEN_NOT_XML,
+	/* malloc failure during response validation */
+	GEN_EINTERNAL,
+	/* error when parsing schema */
+	GEN_ESCHEMA,
+	/* response does not validate */
+	GEN_NOT_VALID
 } gen_status;
 
 /**
@@ -58,7 +69,7 @@ typedef struct epp_xml_globs_t epp_xml_globs;
  * @par url_schema URL of schema
  * @ret Opaque server context
  */
-epp_xml_globs *epp_xml_init(const char *url_schema);
+epp_xml_globs *epp_xml_init(const char *url_schema, int valid_resp);
 
 /**
  * This will clean up preprocessed epp schema and message hash table.
@@ -101,11 +112,13 @@ epp_gen_greeting(const char *svid, char **greeting);
  * @par xml_globs Used to lookup message in hash table
  * @par cdata Input values
  * @par result Generated string
+ * @par val_errors If validation of responses is turned on and response does
+ *                 not validate, then this is the place where to look for errors.
  * @ret GEN_OK if success
  */
 gen_status
 epp_gen_response(epp_xml_globs *xml_globs, epp_lang lang,
-		epp_command_data *cdata, char **result);
+		epp_command_data *cdata, char **result, struct circ_list **val_errors);
 
 /**
  * free string allocated by generate functions.
@@ -116,5 +129,10 @@ void epp_free_genstring(char *genstring);
 /**
  */
 void epp_command_data_cleanup(epp_command_data *cdata);
+
+/**
+ * free validator errors
+ */
+void epp_free_valid_errors(struct circ_list *val_errors);
 
 #endif /* EPP_PARSER_H */

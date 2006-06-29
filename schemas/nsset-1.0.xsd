@@ -196,6 +196,7 @@
   Child response elements.
   -->
     <element name="chkData" type="nsset:chkDataType"/>
+    <element name="creData" type="nsset:creDataType"/>
     <element name="infData" type="nsset:infDataType"/>
 
   <!--
@@ -222,6 +223,16 @@
           <attribute name="avail" type="boolean" use="required"/>
         </extension>
       </simpleContent>
+    </complexType>
+
+  <!--
+  <create> response elements.
+  -->
+    <complexType name="creDataType">
+      <sequence>
+        <element name="id" type="nsset:nssT"/>
+        <element name="crDate" type="dateTime"/>
+      </sequence>
     </complexType>
 
     <complexType name="infDataType">

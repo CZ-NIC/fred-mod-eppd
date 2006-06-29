@@ -77,6 +77,7 @@ typedef struct {
 	char	*iorfile;	/* file with corba object ref */
 	char	*ior;	/* object reference */
 	char	*schema;	/* URL of EPP schema */
+	int	valid_resp;	/* validate responses */
 	epp_xml_globs *xml_globs; /* variables needed for xml parser and generator */
 	epp_corba_globs	*corba_globs;	/* variables needed for corba part */
 	char	*epplog;	/* epp log file name */
@@ -276,6 +277,9 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 		return 1;
 }
 
+/**
+ * Get md5 signiture of given PEM encoded certificate.
+ */
 static int get_md5(char *cert_md5, char *pem)
 {
 	X509	*x;
@@ -534,13 +538,57 @@ static int epp_process_connection(conn_rec *c)
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 			else {
-				gstat = epp_gen_response(sc->xml_globs, lang, &cdata,&genstring);
-				if (gstat != GEN_OK) {
-					/* catch xml generator failures */
-					epp_command_data_cleanup(&cdata);
-					epplog(c, rpool, session, EPP_FATAL,
-							"XML Generator failed - terminating session");
-					return HTTP_INTERNAL_SERVER_ERROR;
+				struct circ_list	*val_errors;
+
+				gstat = epp_gen_response(sc->xml_globs, lang, &cdata,
+						&genstring, &val_errors);
+
+				switch (gstat) {
+					/*
+					 * following errors are serious and response cannot be sent
+					 * to client when any of them appears
+					 */
+					case GEN_EBUFFER:
+					case GEN_EWRITER:
+					case GEN_EBUILD:
+						epp_command_data_cleanup(&cdata);
+						epplog(c, rpool, session, EPP_FATAL,
+								"XML Generator failed - terminating session");
+						return HTTP_INTERNAL_SERVER_ERROR;
+					/*
+					 * following errors are only informative though serious.
+					 * The connection persists and response is sent back to
+					 * client.
+					 */
+					case GEN_NOT_XML:
+						epplog(c, rpool, session, EPP_ERROR,
+								"Response is not XML!!");
+						break;
+					case GEN_EINTERNAL:
+						epplog(c, rpool, session, EPP_ERROR,
+								"Internal error when validating response");
+						break;
+					case GEN_ESCHEMA:
+						epplog(c, rpool, session, EPP_ERROR,
+								"Error when parsing schema");
+						break;
+					case GEN_NOT_VALID:
+						epplog(c, rpool, session, EPP_ERROR,
+								"Server response does not validate");
+						if (val_errors != NULL) {
+							CL_FOREACH(val_errors) {
+								epp_error	*e = CL_CONTENT(val_errors);
+								epplog(c, rpool, session, EPP_ERROR,
+										"Element: %s", e->value);
+								epplog(c, rpool, session, EPP_ERROR,
+										"Reason: %s", e->reason);
+							}
+							epp_free_valid_errors(val_errors); /* free errors */
+						}
+						break;
+					default:
+						/* GEN_OK */
+						break;
 				}
 			}
 			epp_command_data_cleanup(&cdata);
@@ -715,7 +763,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 			/*
 			 * do initialization of xml
 			 */
-			xml_globs = epp_xml_init(sc->schema);
+			xml_globs = epp_xml_init(sc->schema, sc->valid_resp);
 			if (xml_globs == NULL) {
 				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
 						"Could not initialize xml part");
@@ -950,19 +998,39 @@ static const char *set_loglevel(cmd_parms *cmd, void *dummy,
     return NULL;
 }
 
+static const char *set_valid_resp(cmd_parms *cmd, void *dummy, int flag)
+{
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(s->module_config, &eppd_module);
+
+	const char *err = ap_check_cmd_context(cmd,
+			NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    if (err) {
+        return err;
+    }
+
+    sc->valid_resp = flag;
+    return NULL;
+}
+
 static const command_rec eppd_cmds[] = {
     AP_INIT_FLAG("EPPprotocol", set_epp_protocol, NULL, RSRC_CONF,
 			 "Whether this server is serving the epp protocol"),
 	AP_INIT_TAKE1("EPPiorfile", set_iorfile, NULL, RSRC_CONF,
-		 "File where is stored IOR of EPP service"),
+			 "File where is stored IOR of EPP service"),
 	AP_INIT_TAKE1("EPPschema", set_schema, NULL, RSRC_CONF,
-		 "URL of XML schema of EPP protocol"),
+			 "URL of XML schema of EPP protocol"),
 	AP_INIT_TAKE1("EPPservername", set_servername, NULL, RSRC_CONF,
-		 "Name of server sent in EPP greeting"),
+			 "Name of server sent in EPP greeting"),
 	AP_INIT_TAKE1("EPPlog", set_epplog, NULL, RSRC_CONF,
-		 "The file where come all log messages from mod_eppd"),
+			 "The file where come all log messages from mod_eppd"),
 	AP_INIT_TAKE1("EPPloglevel", set_loglevel, NULL, RSRC_CONF,
 		 "Log level setting for epp log (fatal, error, warning, info, debug)"),
+    AP_INIT_FLAG("EPPvalidResponse", set_valid_resp, NULL, RSRC_CONF,
+			 "Set to on, to validate every outcomming response."
+			 "This will slow down the server and should be used only for"
+			 " debugging purposes."),
     { NULL }
 };
 
