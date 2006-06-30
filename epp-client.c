@@ -118,6 +118,16 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 				strcat(newstr, c_errors->_buffer[i].value);
 				strcat(newstr, "\"/>");
 				break;
+			case ccReg_contactUpdate_cc:
+			case ccReg_contactCreate_cc:
+				len += 2 * strlen("<cc>") + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<cc>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</cc>");
+				break;
 			case ccReg_contactUpdate_status_add:
 			case ccReg_contactUpdate_status_rem:
 			case ccReg_nssetUpdate_status_add:
@@ -235,6 +245,15 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 			case ccReg_domainRenew_ext_valDate:
 				break;
 			default:
+				len += strlen("<unknown>");
+				len = len * 2 + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<unknown>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</unknown>");
+				break;
 				continue;
 		}
 		free(err_item->value);

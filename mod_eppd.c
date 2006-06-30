@@ -284,7 +284,8 @@ static int get_md5(char *cert_md5, char *pem)
 {
 	X509	*x;
     BIO	*bio;
-    int j, n;
+    int j;
+	unsigned n;
 	unsigned char	md5[60];
 
 	if ((bio = BIO_new(BIO_s_mem())) == NULL) return 0;

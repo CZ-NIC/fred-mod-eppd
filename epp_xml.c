@@ -1790,7 +1790,7 @@ parse_update_contact(
 								xpathObj->nodesetval, i)->xmlChildrenNode, 1);
 				/* the rest must be empty strings */
 				for (j = i; j < 3; j++)
-					cdata->in->update_contact.postalInfo->street[i] = strdup("");
+					cdata->in->update_contact.postalInfo->street[j] = strdup("");
 			}
 			xmlXPathFreeObject(xpathObj);
 		}
@@ -2673,8 +2673,10 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 		get_rfc3339_date(cdata->out->info_nsset.trDate, strbuf);
 		WRITE_ELEMENT(writer, simple_err, "nsset:trDate", strbuf);
 	}
-	WRITE_ELEMENT(writer, simple_err, "nsset:authInfo",
+	START_ELEMENT(writer, simple_err, "nsset:authInfo");
+	WRITE_ELEMENT(writer, simple_err, "nsset:pw",
 			cdata->out->info_nsset.authInfo);
+	END_ELEMENT(writer, simple_err); /* authInfo */
 	CL_RESET(cdata->out->info_nsset.ns);
 	/* print nameservers */
 	CL_FOREACH(cdata->out->info_nsset.ns) {
@@ -2688,6 +2690,11 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 					CL_CONTENT(ns->addr));
 		}
 		END_ELEMENT(writer, simple_err); /* ns */
+	}
+	/* print tech contacts */
+	CL_FOREACH(cdata->out->info_nsset.tech) {
+		WRITE_ELEMENT(writer, simple_err, "nsset:tech",
+				CL_CONTENT(cdata->out->info_nsset.tech));
 	}
 	END_ELEMENT(writer, simple_err); /* infdata */
 	END_ELEMENT(writer, simple_err); /* resdata */
