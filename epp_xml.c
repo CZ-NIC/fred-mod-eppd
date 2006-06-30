@@ -2583,10 +2583,12 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 		get_rfc3339_date(cdata->out->info_domain.trDate, strbuf);
 		WRITE_ELEMENT(writer, simple_err, "domain:trDate", strbuf);
 	}
-	START_ELEMENT(writer, simple_err, "domain:authInfo");
-	WRITE_ELEMENT(writer, simple_err, "domain:pw",
-			cdata->out->info_domain.authInfo);
-	END_ELEMENT(writer, simple_err); /* auth info */
+	if (*cdata->out->info_domain.authInfo != '\0') {
+		START_ELEMENT(writer, simple_err, "domain:authInfo");
+		WRITE_ELEMENT(writer, simple_err, "domain:pw",
+				cdata->out->info_domain.authInfo);
+		END_ELEMENT(writer, simple_err); /* auth info */
+	}
 	END_ELEMENT(writer, simple_err); /* infdata */
 	END_ELEMENT(writer, simple_err); /* resdata */
 	/* optional extensions */
@@ -2687,10 +2689,12 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 		get_rfc3339_date(cdata->out->info_nsset.trDate, strbuf);
 		WRITE_ELEMENT(writer, simple_err, "nsset:trDate", strbuf);
 	}
-	START_ELEMENT(writer, simple_err, "nsset:authInfo");
-	WRITE_ELEMENT(writer, simple_err, "nsset:pw",
-			cdata->out->info_nsset.authInfo);
-	END_ELEMENT(writer, simple_err); /* authInfo */
+	if (*cdata->out->info_domain.authInfo != '\0') {
+		START_ELEMENT(writer, simple_err, "nsset:authInfo");
+		WRITE_ELEMENT(writer, simple_err, "nsset:pw",
+				cdata->out->info_nsset.authInfo);
+		END_ELEMENT(writer, simple_err); /* authInfo */
+	}
 	CL_RESET(cdata->out->info_nsset.ns);
 	/* print nameservers */
 	CL_FOREACH(cdata->out->info_nsset.ns) {

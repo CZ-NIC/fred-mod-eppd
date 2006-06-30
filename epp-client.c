@@ -628,7 +628,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session, epp_command_data *cda
 	pi->city = strdup(c_contact->City);
 	pi->sp = strdup(c_contact->StateOrProvince);
 	pi->pc = strdup(c_contact->PostalCode);
-	pi->cc = strdup(c_contact->Country);
+	pi->cc = strdup(c_contact->CountryCode);
 	/* others */
 	cdata->out->info_contact.voice = strdup(c_contact->Telephone);
 	cdata->out->info_contact.fax = strdup(c_contact->Fax);
