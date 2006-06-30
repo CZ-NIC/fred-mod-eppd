@@ -230,7 +230,7 @@ typedef struct {
 			/* dnssec extension */
 			struct circ_list	*ds;
 			/* enum validation extension */
-			long long	valExDate;
+			unsigned long long	valExDate;
 		}create_domain;
 		/* additional create contact parameters */
 		struct {
@@ -258,10 +258,10 @@ typedef struct {
 		/* additional renew domain parameters */
 		struct {
 			char	*name;
-			long long	exDate;
+			unsigned long long	exDate;
 			int	period;
 			/* enum validation extension */
-			long long	valExDate;
+			unsigned long long	valExDate;
 		}renew;
 		/* additional update domain parameters */
 		struct {
@@ -278,7 +278,7 @@ typedef struct {
 			struct circ_list	*add_ds;
 			struct circ_list	*rem_ds;
 			/* enum validation extension */
-			long long	valExDate;
+			unsigned long long	valExDate;
 		}update_domain;
 		/* additional update contact parameters */
 		struct {
@@ -331,9 +331,9 @@ typedef struct {
 			char	*fax;
 			char	*email;
 			char	*crID;
-			long long	crDate;
+			unsigned long long	crDate;
 			char	*upID;
-			long long	upDate;
+			unsigned long long	upDate;
 			char	*notify_email;
 			char	*vat;
 			char	*ssn;
@@ -348,16 +348,16 @@ typedef struct {
 			char	*nsset;
 			char	*clID;
 			char	*crID;
-			long long	crDate;
-			long long	exDate;
+			unsigned long long	crDate;
+			unsigned long long	exDate;
 			char	*upID;
-			long long	upDate;
-			long long	trDate;
+			unsigned long long	upDate;
+			unsigned long long	trDate;
 			char	*authInfo;
 			/* dnssec extension */
 			struct circ_list	*ds;
 			/* enum validation extension */
-			long long	valExDate;
+			unsigned long long	valExDate;
 		}info_domain;
 		/* additional info nsset parameters */
 		struct {
@@ -366,9 +366,9 @@ typedef struct {
 			char	*clID;
 			char	*crID;
 			char	*upID;
-			long long	crDate;
-			long long	upDate;
-			long long	trDate;
+			unsigned long long	crDate;
+			unsigned long long	upDate;
+			unsigned long long	trDate;
 			char	*authInfo;
 			struct circ_list	*ns;
 			struct circ_list	*tech;
@@ -377,7 +377,7 @@ typedef struct {
 		struct {
 			int	count;
 			int	msgid;
-			long long	qdate;
+			unsigned long long	qdate;
 			char	*msg;
 		}poll_req;
 		/* additional poll acknoledge parameters */
@@ -387,12 +387,12 @@ typedef struct {
 		}poll_ack;
 		/* additional create contact, nsset or domain parameters */
 		struct {
-			long long	crDate;
-			long long	exDate; /* used only in domain object */
+			unsigned long long	crDate;
+			unsigned long long	exDate; /* used only in domain object */
 		}create;
 		/* additional renew domain parameters */
 		struct {
-			long long	exDate;
+			unsigned long long	exDate;
 		}renew;
 	}*out;
 }epp_command_data;

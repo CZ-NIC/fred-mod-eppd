@@ -286,6 +286,26 @@ static void get_rfc3339_date(long long date, char *str)
 }
 
 /**
+ * Same as above but only the date portion is returned. The time
+ * is omitted.
+ * @par date Number of seconds since ...
+ * @par str buffer allocated for date (should be at least 11 bytes long)
+ */
+static void get_stripped_date(long long date, char *str)
+{
+	struct tm t;
+	time_t	time = date;
+
+	/* we will leave empty buffer if gmtime failes */
+	if (gmtime_r(&time, &t) == NULL) {
+		str[0] = '\0';
+		return;
+	}
+	snprintf(str, 25, "%04d-%02d-%02d",
+			1900 + t.tm_year, t.tm_mon + 1, t.tm_mday);
+}
+
+/**
  * Function makes xor of first 4 bytes of command name.
  * We assume that command names are at least 4 bytes long and that there
  * are no 2 command with the same first four letters - that's true for
@@ -471,7 +491,9 @@ epp_gen_greeting(const char *svid, char **greeting)
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_DOMAIN);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_NSSET);
 	START_ELEMENT(writer, greeting_err, "svcExtension");
+	/* not yet
 	WRITE_ELEMENT(writer, greeting_err, "extURI", NS_SECDNS);
+	*/
 	WRITE_ELEMENT(writer, greeting_err, "extURI", NS_ENUMVAL);
 	END_ELEMENT(writer, greeting_err); /* svcExtension */
 	END_ELEMENT(writer, greeting_err); /* svcMenu */
@@ -2407,14 +2429,6 @@ validate_doc(char *url_schema, xmlDocPtr doc, struct circ_list *err_list)
 	/* validate request against schema */
 	rc = xmlSchemaValidateDoc(svctx, doc);
 	if (rc < 0) {	/* -1 is validator's internal error */
-		/* free error messages if there are any */
-		CL_FOREACH(err_list) {
-			epp_error	*e = (epp_error *) CL_CONTENT(err_list);
-			free(e->value);
-			free(e->reason);
-			free(e);
-		}
-		cl_purge(err_list);
 		xmlSchemaFreeValidCtxt(svctx);
 		xmlSchemaFree(schema);
 		return PARSER_EINTERNAL;
@@ -2557,14 +2571,14 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 			cdata->out->info_domain.crID);
 	get_rfc3339_date(cdata->out->info_domain.crDate, strbuf);
 	WRITE_ELEMENT(writer, simple_err, "domain:crDate", strbuf);
-	get_rfc3339_date(cdata->out->info_domain.exDate, strbuf);
-	WRITE_ELEMENT(writer, simple_err, "domain:exDate", strbuf);
 	WRITE_ELEMENT(writer, simple_err, "domain:upID",
 			cdata->out->info_domain.upID);
 	if (cdata->out->info_domain.upDate > 0) {
 		get_rfc3339_date(cdata->out->info_domain.upDate, strbuf);
 		WRITE_ELEMENT(writer, simple_err, "domain:upDate", strbuf);
 	}
+	get_rfc3339_date(cdata->out->info_domain.exDate, strbuf);
+	WRITE_ELEMENT(writer, simple_err, "domain:exDate", strbuf);
 	if (cdata->out->info_domain.trDate > 0) {
 		get_rfc3339_date(cdata->out->info_domain.trDate, strbuf);
 		WRITE_ELEMENT(writer, simple_err, "domain:trDate", strbuf);
@@ -2586,7 +2600,7 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:enumval", NS_ENUMVAL);
 			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
 					LOC_ENUMVAL);
-			get_rfc3339_date(cdata->out->info_domain.valExDate, strbuf);
+			get_stripped_date(cdata->out->info_domain.valExDate, strbuf);
 			WRITE_ELEMENT(writer, simple_err, "enumval:valExDate", strbuf);
 			END_ELEMENT(writer, simple_err); /* infdata (enumval) */
 		}
@@ -3005,12 +3019,24 @@ simple_err:
 		CL_NEW(*val_errors);
 
 		val_ret = validate_doc(globs->url_schema, doc, *val_errors);
-		if (val_ret == PARSER_ESCHEMA || val_ret == PARSER_EINTERNAL) {
-			/* val_errors is already released */
+		if (val_ret != PARSER_NOT_VALID) {
+			/* free error messages if there are any */
+			CL_FOREACH(*val_errors) {
+				epp_error	*e = (epp_error *) CL_CONTENT(*val_errors);
+				free(e->value);
+				free(e->reason);
+				free(e);
+			}
+			cl_purge(*val_errors);
+			*val_errors = NULL;
 			xmlFreeDoc(doc);
-			return (val_ret == PARSER_ESCHEMA) ? GEN_ESCHEMA: GEN_EINTERNAL;
+
+			if (val_ret == PARSER_ESCHEMA || val_ret == PARSER_EINTERNAL)
+				return (val_ret == PARSER_ESCHEMA) ? GEN_ESCHEMA: GEN_EINTERNAL;
+			else
+				return GEN_OK;
 		}
-		else if (val_ret == PARSER_NOT_VALID) {
+		else {
 			/*
 			 * error consequence: we silently log the error in epp log and
 			 * send the response to client as we normaly would do.
@@ -3018,9 +3044,6 @@ simple_err:
 			xmlFreeDoc(doc);
 			return GEN_NOT_VALID;
 		}
-
-		/* response is ok */
-		xmlFreeDoc(doc);
 	}
 
 	return GEN_OK;
@@ -3070,8 +3093,16 @@ epp_parse_command(
 
 	/* validate the doc */
 	val_ret = validate_doc(globs->url_schema, doc, cdata->errors);
+
 	if (val_ret == PARSER_ESCHEMA || val_ret == PARSER_EINTERNAL) {
-		/* cdata->errors is already released */
+		/* free error messages if there are any */
+		CL_FOREACH(cdata->errors) {
+			epp_error	*e = (epp_error *) CL_CONTENT(cdata->errors);
+			free(e->value);
+			free(e->reason);
+			free(e);
+		}
+		cl_purge(cdata->errors);
 		xmlFreeDoc(doc);
 		return val_ret;
 	}

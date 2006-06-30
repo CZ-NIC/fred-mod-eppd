@@ -308,7 +308,9 @@
         <element name="fax" type="contact:e164StringType"
          minOccurs="0"/>
         <element name="email" type="eppcom:minTokenType"/>
+	<!--
         <element name="clID" type="eppcom:clIDType"/>
+	-->
         <element name="crID" type="eppcom:clIDType"/>
         <element name="crDate" type="dateTime"/>
         <element name="upID" type="eppcom:clIDType"
