@@ -296,7 +296,7 @@ int main(int argc, char *argv[])
 				break;
 			case EPP_POLL_ACK:
 				/* API: call info nsset */
-				cstat = epp_call_poll_req(corba_globs, session, &cdata);
+				cstat = epp_call_poll_ack(corba_globs, session, &cdata);
 				break;
 			case EPP_CREATE_CONTACT:
 				/* API: call create contact */

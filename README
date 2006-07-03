@@ -1,25 +1,90 @@
 
-Example configuration of mod_eppd module in apache's conf:
+CONTENT:
+  1. Apache server configuration
+
+
+1. Apache server configuration
+-------------------------------
+
+1.2 List of configuration directives recognized by mod_eppd
+
+  name:	EPPprotocol
+  value:	On, Off
+  default:	Off
+  context:	global config, virtual host
+  description:
+  	Activates epp module.
+
+  name:	EPPiorfile
+  value:	path
+  default:	none
+  context:	global config, virtual host
+  description:
+  	A location of a file containing corba object's reference (IOR).
+	When IOR is changed, the apache needs to be restarted. Otherwise
+	you will see in epp log file message "Corba call failed".
+
+  name:	EPPschema
+  value:	path
+  default:	none
+  context:	global config, virtual host
+  description:
+  	A location of xsd file (xml schema) describing EPP protocol. It is
+	used for validation of incomming and outcomming messages.
+
+  name:	EPPservername
+  value:	quoted string
+  default:	none
+  context:	global config, virtual host
+  description:
+  	Name of the server used in EPP greeting frame.
+
+  name:	EPPlog
+  value:	path
+  default:	none
+  context:	global config, virtual host
+  description:
+  	Log file of mod_eppd. It is not an error not to set log file, but
+	all log messages will be lost in that case.
+
+  name:	EPPloglevel
+  value:	fatal, error, warning, info, debug
+  default:	none
+  context:	global config, virtual host
+  description:
+  	Log verbosity. If you do not set loglevel, no messages will be logged.
+
+  name:	EPPvalidResponse
+  value:	On, Off
+  default:	Off
+  context:	global config, virtual host
+  description:
+  	Whether to validate responses from the mod_eppd. The line is dropped
+	in log file if response does not validate, but otherwise the response
+	proceeds as normaly. This is very handy for verifing good operation
+	of the server. On the other hand it will slow down server a little bit.
+
+
+1.3 Example of configuration of mod_eppd module
 
 #
 # mod_eppd
 #
-Listen 700
+Listen 700	# EPP port assigned by IANA
 LoadModule eppd_module modules/mod_eppd.so
-<VirtualHost *:700>
+<VirtualHost 192.168.2.1:700>
   EPPprotocol   On
   EPPiorfile    "/tmp/ccReg.ref"
-  EPPschema     "/home/loo/apache.org/chroot/conf/schemas/all-1.0.xsd"
-  EPPservername "EPP server of cz.nic"
-  EPPlog        "/home/loo/apache.org/chroot/logs/epp.log"
+  EPPschema     "/etc/apache2/schemas/all-1.0.xsd"
+  EPPservername "EPP server's default name"
+  EPPlog        "/var/log/apache2/epp.log"
   EPPloglevel   debug
   EPPvalidResponse	On
+
   SSLEngine on
   SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP:+eNULL
-  SSLCertificateFile /home/loo/apache.org/chroot/conf/server.crt
-  SSLCertificateKeyFile /home/loo/apache.org/chroot/conf/server.key
+  SSLCertificateFile /etc/apache2/server.crt
+  SSLCertificateKeyFile /etc/apache2/server.key
   SSLVerifyClient require
-  SSLCACertificateFile /home/loo/apache.org/chroot/conf/certs/server.crt
-#  SSLVerifyDepth 1
-  CustomLog /home/loo/apache.org/chroot/logs/ssl_log "%t %{cipher}c %{clientcert}c %{errcode}c %{errstr}c %{version}c"
+  SSLCACertificateFile /etc/apache2/certs/server.crt
 </VirtualHost>

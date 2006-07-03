@@ -128,6 +128,25 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 				strcat(newstr, c_errors->_buffer[i].value);
 				strcat(newstr, "</cc>");
 				break;
+			case ccReg_contactCreate_handle:
+			case ccReg_nssetCreate_handle:
+				len += 2 * strlen("<id>") + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<id>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</id>");
+				break;
+			case ccReg_domainCreate_fqdn:
+				len += 2 * strlen("<name>") + 1;
+				if ((newstr = malloc(len + 1)) == NULL)
+					continue;
+				*newstr = '\0';
+				strcat(newstr, "<name>");
+				strcat(newstr, c_errors->_buffer[i].value);
+				strcat(newstr, "</name>");
+				break;
 			case ccReg_contactUpdate_status_add:
 			case ccReg_contactUpdate_status_rem:
 			case ccReg_nssetUpdate_status_add:

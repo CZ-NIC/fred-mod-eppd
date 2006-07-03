@@ -2809,7 +2809,7 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 			snprintf(strbuf, 25, "%d", cdata->out->poll_req.count);
 			WRITE_ATTRIBUTE(writer, simple_err, "count", strbuf);
 			snprintf(strbuf, 25, "%d", cdata->out->poll_req.msgid);
-			WRITE_ATTRIBUTE(writer, simple_err, "msgid", strbuf);
+			WRITE_ATTRIBUTE(writer, simple_err, "id", strbuf);
 			get_rfc3339_date(cdata->out->poll_req.qdate, strbuf);
 			WRITE_ELEMENT(writer, simple_err, "qDate", strbuf);
 			WRITE_ELEMENT(writer, simple_err, "msg", cdata->out->poll_req.msg);
@@ -2821,7 +2821,7 @@ epp_gen_response(epp_xml_globs *globs, epp_lang lang, epp_command_data *cdata,
 			snprintf(strbuf, 25, "%d", cdata->out->poll_ack.count);
 			WRITE_ATTRIBUTE(writer, simple_err, "count", strbuf);
 			snprintf(strbuf, 25, "%d", cdata->out->poll_ack.msgid);
-			WRITE_ATTRIBUTE(writer, simple_err, "msgid", strbuf);
+			WRITE_ATTRIBUTE(writer, simple_err, "id", strbuf);
 			END_ELEMENT(writer, simple_err); /* msgQ */
 			break;
 		/* query commands with <resData> element */
