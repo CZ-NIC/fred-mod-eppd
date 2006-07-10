@@ -2,7 +2,8 @@
 #include <string.h>
 
 #include "epp_common.h"
-#include "epp_xml.h"
+#include "epp_parser.h"
+#include "epp_gen.h"
 #include "epp-client.h"
 
 #define MAX_LENGTH	10000
@@ -134,10 +135,8 @@ read_ior (const char *filename, char *ior)
  
 int main(int argc, char *argv[])
 {
-	void	*xml_globs;
 	void	*corba_globs;
 	char	*greeting;
-	char	*result;
 	char	ior[1000];
 	int	session;
 	epp_lang	lang;
@@ -150,11 +149,8 @@ int main(int argc, char *argv[])
 	corba_status	cstat;
 	gen_status	gstat;
 
-	/* API: check libxml */
-	if ((xml_globs = epp_xml_init("schemas/all-1.0.xsd", 1)) == NULL) {
-		fputs("Error in xml initialization\n", stderr);
-		return 1;
-	}
+	/* API: init parser */
+	epp_parser_init();
 
 	/* API: init corba */
 	if (!read_ior("/tmp/ccReg.ref", ior)) {
@@ -176,19 +172,15 @@ int main(int argc, char *argv[])
 		puts(greeting);
 
 		/* API: free greeting data */
-		epp_free_genstring(greeting);
+		epp_free_greeting(greeting);
 	}
 
 	session = 0;
 	lang = LANG_EN;
 
 	while (1) {
-		int dofree;
-
-		dofree = 1;
-
-           if( argc == 1 ) /* interaktivni rezim */
-             {
+	   if( argc == 1 ) /* interaktivni rezim */
+		 {
 
 		fputs("Command: ", stderr);
 		switch (cmd = getcmd()) 
@@ -209,7 +201,7 @@ int main(int argc, char *argv[])
 		}
 		if (quit) break;
 
-              }
+		  }
                else
                 { 
                   
@@ -224,17 +216,16 @@ int main(int argc, char *argv[])
                 }
 
 		bzero(&cdata, sizeof cdata);
+
+		// show file
+		if( argc > 1 ) {
+			fprintf( stderr ,  "epp_parse_command\n" );
+			printf("\n%s\n" ,   text );
+		}
+
 		/* API: process command */
-
-                // show file
-                if( argc > 1 )
-                  {
-                      fprintf( stderr ,  "epp_parse_command\n" );
-                      printf("\n%s\n" ,   text );
-                  } 
-
-		pstat = epp_parse_command(session, xml_globs, text, strlen(text),
-				&cdata);
+		pstat = epp_parse_command(session, "schemas/all-1.0.xsd", text,
+				strlen(text), &cdata);
 		if (pstat == PARSER_HELLO) {
 			gstat = epp_gen_greeting("Server ID", &greeting);
 			if (gstat != GEN_OK) {
@@ -244,7 +235,7 @@ int main(int argc, char *argv[])
 			puts(greeting);
 
 			/* API: free greeting data */
-			epp_free_genstring(greeting);
+			epp_free_greeting(greeting);
 		}
 		else if (pstat != PARSER_OK && pstat != PARSER_NOT_VALID) {
 			fputs("Parser error\n", stderr);
@@ -253,168 +244,73 @@ int main(int argc, char *argv[])
 		else {
 			char fp[] = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
 
-		switch (cdata.type) {
-			case EPP_LOGIN:
-				/* API: call login */
-				cstat = epp_call_login(corba_globs, &session, &lang, &cdata, fp);
-				break;
-			case EPP_LOGOUT:
-				/* API: call logout */
-				cstat = epp_call_logout(corba_globs, session, &cdata);
-				break;
-			case EPP_DUMMY:
-				/* API: call dummy */
-				cstat = epp_call_dummy(corba_globs, session, &cdata);
-				break;
-			case EPP_CHECK_CONTACT:
-				/* API: call check contact */
-				cstat = epp_call_check_contact(corba_globs, session, &cdata);
-				break;
-			case EPP_CHECK_DOMAIN:
-				/* API: call check domain */
-				cstat = epp_call_check_domain(corba_globs, session, &cdata);
-				break;
-			case EPP_CHECK_NSSET:
-				/* API: call check nsset */
-				cstat = epp_call_check_nsset(corba_globs, session, &cdata);
-				break;
-			case EPP_INFO_CONTACT:
-				/* API: call info contact */
-				cstat = epp_call_info_contact(corba_globs, session, &cdata);
-				break;
-			case EPP_INFO_DOMAIN:
-				/* API: call info domain */
-				cstat = epp_call_info_domain(corba_globs, session, &cdata);
-				break;
-			case EPP_INFO_NSSET:
-				/* API: call info nsset */
-				cstat = epp_call_info_nsset(corba_globs, session, &cdata);
-				break;
-			case EPP_POLL_REQ:
-				/* API: call info nsset */
-				cstat = epp_call_poll_req(corba_globs, session, &cdata);
-				break;
-			case EPP_POLL_ACK:
-				/* API: call info nsset */
-				cstat = epp_call_poll_ack(corba_globs, session, &cdata);
-				break;
-			case EPP_CREATE_CONTACT:
-				/* API: call create contact */
-				cstat = epp_call_create_contact(corba_globs, session, &cdata);
-				break;
-			case EPP_CREATE_DOMAIN:
-				/* API: call create domain */
-				cstat = epp_call_create_domain(corba_globs, session, &cdata);
-				break;
-			case EPP_CREATE_NSSET:
-				/* API: call create nsset */
-				cstat = epp_call_create_nsset(corba_globs, session, &cdata);
-				break;
-			case EPP_DELETE_CONTACT:
-				/* API: call create contact */
-				cstat = epp_call_delete_contact(corba_globs, session, &cdata);
-				break;
-			case EPP_DELETE_DOMAIN:
-				/* API: call create contact */
-				cstat = epp_call_delete_domain(corba_globs, session, &cdata);
-				break;
-			case EPP_DELETE_NSSET:
-				/* API: call create contact */
-				cstat = epp_call_delete_nsset(corba_globs, session, &cdata);
-				break;
-			case EPP_RENEW_DOMAIN:
-				/* API: call create contact */
-				cstat = epp_call_renew_domain(corba_globs, session, &cdata);
-				break;
-			case EPP_UPDATE_DOMAIN:
-				/* API: call create contact */
-				cstat = epp_call_update_domain(corba_globs, session, &cdata);
-				break;
-			case EPP_UPDATE_CONTACT:
-				/* API: call create contact */
-				cstat = epp_call_update_contact(corba_globs, session, &cdata);
-				break;
-			case EPP_UPDATE_NSSET:
-				/* API: call create contact */
-				cstat = epp_call_update_nsset(corba_globs, session, &cdata);
-				break;
-			case EPP_TRANSFER_DOMAIN:
-				/* API: call transfer domain */
-				cstat = epp_call_transfer_domain(corba_globs, session, &cdata);
-				break;
-			case EPP_TRANSFER_NSSET:
-				/* API: call transfer nsset */
-				cstat = epp_call_transfer_nsset(corba_globs, session, &cdata);
-				break;
-			default:
-				fputs("Unknown epp frame type\n", stderr);
-				dofree = 0;
-				break;
-		}
-		if (cstat == CORBA_OK) {
-			struct circ_list	*val_errors;
-			/* API: generate response */
-			gstat = epp_gen_response(xml_globs, lang, &cdata, &result,
-					&val_errors);
-			switch (gstat) {
-				/*
-				 * following errors are serious and response cannot be sent
-				 * to client when any of them appears
-				 */
-				case GEN_EBUFFER:
-				case GEN_EWRITER:
-				case GEN_EBUILD:
-					fputs("XML Generator failed - terminating session\n",stderr);
-					break;
-				/*
-				 * following errors are only informative though serious.
-				 * The connection persists and response is sent back to
-				 * client.
-				 */
-				case GEN_NOT_XML:
-					fputs("Response is not XML!!\n", stderr);
-					puts(result);
-					epp_free_genstring(result);
-					break;
-				case GEN_EINTERNAL:
-					fputs("Internal error when validating response\n", stderr);
-					puts(result);
-					epp_free_genstring(result);
-					break;
-				case GEN_ESCHEMA:
-					fputs("Error when parsing schema\n", stderr);
-					puts(result);
-					epp_free_genstring(result);
-					break;
-				case GEN_NOT_VALID:
-					fputs("Server response does not validate\n", stderr);
-					if (val_errors != NULL) {
-						CL_FOREACH(val_errors) {
-							epp_error	*e = CL_CONTENT(val_errors);
-							fprintf(stderr, "\tElement: %s\n", e->value);
-							fprintf(stderr, "\tReason: %s\n", e->reason);
-						}
-						epp_free_valid_errors(val_errors); /* free errors */
-					}
-					puts(result);
-					epp_free_genstring(result);
-					break;
-				default:
-					/* GEN_OK */
-					puts(result);
-					epp_free_genstring(result);
-					break;
-			}
-		}
-		else fputs("Corba call failed\n", stderr);
+			/* API: corba call */
+			cstat = epp_corba_call(corba_globs, &session, &lang, fp, &cdata);
 
-		/* API: clean up command data */
-		if (dofree) epp_command_data_cleanup(&cdata);
-	}
+			if (cstat == CORBA_OK) {
+				epp_gen	gen;
+
+				/* API: generate response */
+				gstat = epp_gen_response(1, "schemas/all-1.0.xsd", lang, &cdata,
+						&gen);
+				switch (gstat) {
+					/*
+					 * following errors are serious and response cannot be sent
+					 * to client when any of them appears
+					 */
+					case GEN_EBUFFER:
+					case GEN_EWRITER:
+					case GEN_EBUILD:
+						fputs("XML Generator failed - terminating session\n",stderr);
+						break;
+					/*
+					 * following errors are only informative though serious.
+					 * The connection persists and response is sent back to
+					 * client.
+					 */
+					case GEN_NOT_XML:
+						fputs("Response is not XML!!\n", stderr);
+						puts(gen.response);
+						epp_free_gen(&gen);
+						break;
+					case GEN_EINTERNAL:
+						fputs("Internal error when validating response\n", stderr);
+						puts(gen.response);
+						epp_free_gen(&gen);
+						break;
+					case GEN_ESCHEMA:
+						fputs("Error when parsing schema\n", stderr);
+						puts(gen.response);
+						epp_free_gen(&gen);
+						break;
+					case GEN_NOT_VALID:
+						fputs("Server response does not validate\n", stderr);
+						if (gen.valerr != NULL) {
+							CL_FOREACH(gen.valerr) {
+								epp_error	*e = CL_CONTENT(gen.valerr);
+								fprintf(stderr, "\tElement: %s\n", e->value);
+								fprintf(stderr, "\tReason: %s\n", e->reason);
+							}
+						}
+						puts(gen.response);
+						epp_free_gen(&gen);
+						break;
+					default:
+						/* GEN_OK */
+						puts(gen.response);
+						epp_free_gen(&gen);
+						break;
+				}
+			}
+			else fputs("Corba call failed\n", stderr);
+
+			/* API: clean up command data */
+			epp_command_data_cleanup(&cdata);
+		}
 	}
 
 	/* API: clean up globs */
-	epp_xml_init_cleanup(xml_globs);
+	epp_parser_init_cleanup();
 	epp_corba_init_cleanup(corba_globs);
 
 	return 0;

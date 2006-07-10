@@ -286,7 +286,7 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 	}
 }
 
-corba_status
+static corba_status
 epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -325,7 +325,7 @@ epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_login(epp_corba_globs *globs, int *session, epp_lang *lang,
 		epp_command_data *cdata, char *certID)
 {
@@ -378,7 +378,7 @@ epp_call_login(epp_corba_globs *globs, int *session, epp_lang *lang,
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_logout(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -539,26 +539,9 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	return CORBA_OK;
 }
 
-corba_status
-epp_call_check_contact(epp_corba_globs *globs, int session, epp_command_data *cdata)
-{
-	return epp_call_check(globs, session, cdata, EPP_CONTACT);
-}
-
-corba_status
-epp_call_check_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
-{
-	return epp_call_check(globs, session, cdata, EPP_DOMAIN);
-}
-
-corba_status
-epp_call_check_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
-{
-	return epp_call_check(globs, session, cdata, EPP_NSSET);
-}
-
-corba_status
-epp_call_info_contact(epp_corba_globs *globs, int session, epp_command_data *cdata)
+static corba_status
+epp_call_info_contact(epp_corba_globs *globs, int session,
+		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_Contact	*c_contact;
@@ -676,7 +659,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session, epp_command_data *cda
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_info_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
@@ -796,7 +779,7 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -922,7 +905,7 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	ccReg_Response	*response;
@@ -982,7 +965,7 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -1034,7 +1017,7 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_create_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
@@ -1123,7 +1106,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_create_contact(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
@@ -1212,7 +1195,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_create_nsset(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
@@ -1310,6 +1293,8 @@ epp_call_delete(epp_corba_globs *globs, int session,
 	ccReg_Response *response;
 	CORBA_Environment ev[1];
 
+	assert(cdata->in != NULL);
+
 	CORBA_exception_init(ev);
 
 	if (obj == EPP_DOMAIN)
@@ -1358,31 +1343,7 @@ epp_call_delete(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
-corba_status
-epp_call_delete_domain(epp_corba_globs *globs, int session,
-		epp_command_data *cdata)
-{
-	assert(cdata->in != NULL);
-	return epp_call_delete(globs, session, cdata, EPP_DOMAIN);
-}
-
-corba_status
-epp_call_delete_contact(epp_corba_globs *globs, int session,
-		epp_command_data *cdata)
-{
-	assert(cdata->in != NULL);
-	return epp_call_delete(globs, session, cdata, EPP_CONTACT);
-}
-
-corba_status
-epp_call_delete_nsset(epp_corba_globs *globs, int session,
-		epp_command_data *cdata)
-{
-	assert(cdata->in != NULL);
-	return epp_call_delete(globs, session, cdata, EPP_NSSET);
-}
-
-corba_status
+static corba_status
 epp_call_renew_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
@@ -1451,7 +1412,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_update_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
@@ -1567,7 +1528,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_update_contact(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
@@ -1673,7 +1634,7 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
-corba_status
+static corba_status
 epp_call_update_nsset(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
@@ -1863,17 +1824,85 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 }
 
 corba_status
-epp_call_transfer_domain(epp_corba_globs *globs, int session,
-		epp_command_data *cdata)
+epp_corba_call(epp_corba_globs *globs, int *session, epp_lang *lang,
+		char *fingerprint, epp_command_data *cdata)
 {
-	assert(cdata->in != NULL);
-	return epp_call_transfer(globs, session, cdata, EPP_DOMAIN);
-}
+	corba_status	cstat;
 
-corba_status
-epp_call_transfer_nsset(epp_corba_globs *globs, int session,
-		epp_command_data *cdata)
-{
-	assert(cdata->in != NULL);
-	return epp_call_transfer(globs, session, cdata, EPP_NSSET);
+	switch (cdata->type) {
+		case EPP_LOGIN:
+			cstat = epp_call_login(globs, session, lang, cdata, fingerprint);
+			break;
+		case EPP_LOGOUT:
+			cstat = epp_call_logout(globs, *session, cdata);
+			break;
+		case EPP_DUMMY:
+			cstat = epp_call_dummy(globs, *session, cdata);
+			break;
+		case EPP_CHECK_CONTACT:
+			cstat = epp_call_check(globs, *session, cdata, EPP_CONTACT);
+			break;
+		case EPP_CHECK_DOMAIN:
+			cstat = epp_call_check(globs, *session, cdata, EPP_DOMAIN);
+			break;
+		case EPP_CHECK_NSSET:
+			cstat = epp_call_check(globs, *session, cdata, EPP_NSSET);
+			break;
+		case EPP_INFO_CONTACT:
+			cstat = epp_call_info_contact(globs, *session, cdata);
+			break;
+		case EPP_INFO_DOMAIN:
+			cstat = epp_call_info_domain(globs, *session, cdata);
+			break;
+		case EPP_INFO_NSSET:
+			cstat = epp_call_info_nsset(globs, *session, cdata);
+			break;
+		case EPP_POLL_REQ:
+			cstat = epp_call_poll_req(globs, *session, cdata);
+			break;
+		case EPP_POLL_ACK:
+			cstat = epp_call_poll_ack(globs, *session, cdata);
+			break;
+		case EPP_CREATE_CONTACT:
+			cstat = epp_call_create_contact(globs, *session, cdata);
+			break;
+		case EPP_CREATE_DOMAIN:
+			cstat = epp_call_create_domain(globs, *session, cdata);
+			break;
+		case EPP_CREATE_NSSET:
+			cstat = epp_call_create_nsset(globs, *session, cdata);
+			break;
+		case EPP_DELETE_CONTACT:
+			cstat = epp_call_delete(globs, *session, cdata, EPP_CONTACT);
+			break;
+		case EPP_DELETE_DOMAIN:
+			cstat = epp_call_delete(globs, *session, cdata, EPP_DOMAIN);
+			break;
+		case EPP_DELETE_NSSET:
+			cstat = epp_call_delete(globs, *session, cdata, EPP_NSSET);
+			break;
+		case EPP_RENEW_DOMAIN:
+			cstat = epp_call_renew_domain(globs, *session, cdata);
+			break;
+		case EPP_UPDATE_DOMAIN:
+			cstat = epp_call_update_domain(globs, *session, cdata);
+			break;
+		case EPP_UPDATE_CONTACT:
+			cstat = epp_call_update_contact(globs, *session, cdata);
+			break;
+		case EPP_UPDATE_NSSET:
+			cstat = epp_call_update_nsset(globs, *session, cdata);
+			break;
+		case EPP_TRANSFER_DOMAIN:
+			cstat = epp_call_transfer(globs, *session, cdata, EPP_DOMAIN);
+			break;
+		case EPP_TRANSFER_NSSET:
+			cstat = epp_call_transfer(globs, *session, cdata, EPP_NSSET);
+			break;
+		default:
+			cstat = CORBA_INT_ERROR;
+			break;
+	}
+
+	return cstat;
 }
