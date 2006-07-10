@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
 			continue;
 		}
 		else {
-			char fp[] = "34:45:11:11:11:11:11:11:11:11:11:11:11:11:11:11";
+			char fp[] = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
 
 		switch (cdata.type) {
 			case EPP_LOGIN:
