@@ -1,7 +1,7 @@
 #
 # Konfigurovatelna cast Makefilu
 #
-APXS	= apxs
+APXS	= apxs2
 APR-CONFIG	= apr-config
 ORBIT2-CONFIG	= orbit2-config
 ORBIT-IDL-2	= orbit-idl-2

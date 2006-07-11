@@ -384,7 +384,7 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 		get_rfc3339_date(cdata->out->info_nsset.trDate, strbuf);
 		WRITE_ELEMENT(writer, simple_err, "nsset:trDate", strbuf);
 	}
-	if (*cdata->out->info_domain.authInfo != '\0') {
+	if (*cdata->out->info_nsset.authInfo != '\0') {
 		START_ELEMENT(writer, simple_err, "nsset:authInfo");
 		WRITE_ELEMENT(writer, simple_err, "nsset:pw",
 				cdata->out->info_nsset.authInfo);
@@ -477,7 +477,8 @@ epp_gen_response(
 		 * by &lt;, &gt; respectively.
 		 */
 		START_ELEMENT(writer, simple_err, "value");
-		if (xmlTextWriterWriteRaw(writer, e->value) < 0) goto simple_err;
+		if (xmlTextWriterWriteRaw(writer, BAD_CAST e->value) < 0)
+			goto simple_err;
 		END_ELEMENT(writer, simple_err); /* value */
 		WRITE_ELEMENT(writer, simple_err, "reason", e->reason);
 		END_ELEMENT(writer, simple_err); /* extValue */

@@ -434,7 +434,7 @@ static int epp_process_connection(conn_rec *c)
 				bzero(cert_md5, 50);
 				pem = epp_ssl_lookup(rpool, c->base_server, c, NULL,
 						"SSL_CLIENT_CERT");
-				if ((pem == NULL) && (*pem == '\0') && get_md5(cert_md5, pem)) {
+				if ((pem == NULL) || (*pem == '\0') || !get_md5(cert_md5, pem)) {
 					epplog(c, rpool, session, EPP_ERROR,
 							"Error when getting client's PEM certificate. "
 							"Did you forget \"SSLVerifyClient require\" "

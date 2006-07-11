@@ -619,7 +619,19 @@ parse_poll(
 	str = xmlGetProp(xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
 			BAD_CAST "msgID");
 	xmlXPathFreeObject(xpathObj);
-	/* conversion is safe, if str in not a number, validator catches it */
+	/*
+	 * msgID attribute is not strictly required by xml schema so we
+	 * have to explicitly check if it is there
+	 */
+	if (str == NULL) {
+		free(cdata->in);
+		cdata->in = NULL;
+		cdata->rc = 2003;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+
+	/* conversion is safe, if str is not a number, validator catches it */
 	cdata->in->poll_ack.msgid = atoi((char *) str);
 	xmlFree(str);
 	cdata->type = EPP_POLL_ACK;
