@@ -58,6 +58,7 @@ epp_gen_greeting(const char *svid, char **greeting)
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
 	char	strdate[50];
+        char    version[64];   
 	int	error_seen = 1;
 
 	assert(svid != NULL);
@@ -87,7 +88,8 @@ epp_gen_greeting(const char *svid, char **greeting)
 	get_rfc3339_date(time(NULL), strdate);
 	WRITE_ELEMENT(writer, greeting_err, "svDate", strdate);
 	START_ELEMENT(writer, greeting_err, "svcMenu");
-	WRITE_ELEMENT(writer, greeting_err, "version", "1.0");
+        sprintf( version , "%s BUILD %s %s" , VERSION , __DATE__ , __TIME__ );
+	WRITE_ELEMENT(writer, greeting_err, "version" , version  );
 	WRITE_ELEMENT(writer, greeting_err, "lang", "en");
 	WRITE_ELEMENT(writer, greeting_err, "lang", "cs");
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_CONTACT);

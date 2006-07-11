@@ -33,7 +33,7 @@ AP_LIBS	+=$(shell $(APR-CONFIG) --libs)
 
 AP_INSTALLDIR	:= $(shell $(APXS) -q LIBEXECDIR)
 
-CFLAGS	= -g -O0 -fPIC -Wall
+CFLAGS	= -g -O0 -fPIC -Wall -DVERSION=\"1.0\"
 LDFLAGS	= -rpath $(AP_INSTALLDIR) -Bshareable
 
 all: build
