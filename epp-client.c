@@ -1825,16 +1825,18 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 
 corba_status
 epp_corba_call(epp_corba_globs *globs, int *session, epp_lang *lang,
-		char *fingerprint, epp_command_data *cdata)
+		char *fingerprint, epp_command_data *cdata, int *logout)
 {
 	corba_status	cstat;
 
+	*logout = 0;
 	switch (cdata->type) {
 		case EPP_LOGIN:
 			cstat = epp_call_login(globs, session, lang, cdata, fingerprint);
 			break;
 		case EPP_LOGOUT:
 			cstat = epp_call_logout(globs, *session, cdata);
+			if (cdata->rc == 1500) *logout = 1;
 			break;
 		case EPP_DUMMY:
 			cstat = epp_call_dummy(globs, *session, cdata);

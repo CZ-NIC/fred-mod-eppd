@@ -50,6 +50,7 @@ epp_corba_call(
 		int *session,
 		epp_lang *lang,
 		char *fingerprint,
-		epp_command_data *cdata);
+		epp_command_data *cdata,
+		int *logout);
 
 #endif /* EPP_CLIENT_H */

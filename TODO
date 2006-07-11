@@ -1,4 +1,3 @@
 *) Pri loginu je automaticky piggybacked zprava o poctu zprav ve fronte
-*) Rozdelit xml na parser a generator
 *) Presunout upravu extval z corby do generatoru
 *) Zdokumentovat zdrojak doxygenem

@@ -154,7 +154,7 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 					xmlXPathFreeObject(obj);                    \
 					goto err_handler;                           \
 				}                                               \
-				CL_CONTENT(item) = (void *) xmlGetProp(xmlXPathNodeSetItem(obj->nodesetval), i, (xmlChar *) (attr));\
+				CL_CONTENT(item) = (void *) xmlGetProp(xmlXPathNodeSetItem(obj->nodesetval, i), (xmlChar *) (attr));\
 				if (CL_CONTENT(item) == NULL) CL_CONTENT(item) = strdup("");\
 				CL_ADD((list), item);                           \
 			}                                                   \

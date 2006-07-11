@@ -243,9 +243,11 @@ int main(int argc, char *argv[])
 		}
 		else {
 			char fp[] = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
+			int logout; // not used
 
 			/* API: corba call */
-			cstat = epp_corba_call(corba_globs, &session, &lang, fp, &cdata);
+			cstat = epp_corba_call(corba_globs, &session, &lang, fp, &cdata,
+					&logout);
 
 			if (cstat == CORBA_OK) {
 				epp_gen	gen;

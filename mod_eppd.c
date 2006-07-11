@@ -43,7 +43,8 @@
  * our header files
  */
 #include "epp_common.h"
-#include "epp_xml.h"
+#include "epp_parser.h"
+#include "epp_gen.h"
 #include "epp-client.h"
 
 #define EPPD_VERSION	"testing"
@@ -78,7 +79,6 @@ typedef struct {
 	char	*ior;	/* object reference */
 	char	*schema;	/* URL of EPP schema */
 	int	valid_resp;	/* validate responses */
-	epp_xml_globs *xml_globs; /* variables needed for xml parser and generator */
 	epp_corba_globs	*corba_globs;	/* variables needed for corba part */
 	char	*epplog;	/* epp log file name */
 	apr_file_t	*epplogfp;	/* epp log file descriptor */
@@ -325,7 +325,6 @@ static int get_md5(char *cert_md5, char *pem)
  */
 static int epp_process_connection(conn_rec *c)
 {
-	char	*genstring;
 	int	session;	/* session = 0 when not autenticated yet */
 	unsigned	lang;	/* session's language */
 	int	rc;
@@ -367,6 +366,8 @@ static int epp_process_connection(conn_rec *c)
 		epp_command_data	cdata;
 		corba_status	cstat = CORBA_OK;
 		gen_status	gstat = GEN_OK;
+		char	*genstring;
+		epp_gen	gen;
 
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
@@ -382,7 +383,7 @@ static int epp_process_connection(conn_rec *c)
 			/* initialize cdata structure */
 			bzero(&cdata, sizeof cdata);
 			/* deliver request to XML parser */
-			pstat = epp_parse_command(session, sc->xml_globs, request, bytes,
+			pstat = epp_parse_command(session, sc->schema, request, bytes,
 					&cdata);
 		}
 		else {
@@ -403,6 +404,8 @@ static int epp_process_connection(conn_rec *c)
 					"Error when creating epp greeting");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
+			gen.response = genstring;
+			gen.valerr = NULL;
 		}
 		/*
 		 * we generate response for valid commands and requests which
@@ -418,12 +421,7 @@ static int epp_process_connection(conn_rec *c)
 						"Request doest not validate");
 			}
 
-			/* go ahead to corba function call */
-			switch (cdata.type) {
-			case EPP_DUMMY:
-				cstat = epp_call_dummy(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_LOGIN:
+			if (cdata.type == EPP_LOGIN) {
 				/*
 				 * corba login function is somewhat special
 				 *   - session is pointer (because it might be changed)
@@ -436,13 +434,7 @@ static int epp_process_connection(conn_rec *c)
 				bzero(cert_md5, 50);
 				pem = epp_ssl_lookup(rpool, c->base_server, c, NULL,
 						"SSL_CLIENT_CERT");
-				if ((pem != NULL) && (*pem != '\0') && get_md5(cert_md5, pem)) {
-					epplog(c, rpool, session, EPP_DEBUG,
-							"Fingerprint is: %s", cert_md5);
-					cstat = epp_call_login(sc->corba_globs, &session, &lang,
-							&cdata, cert_md5);
-				}
-				else {
+				if ((pem == NULL) && (*pem == '\0') && get_md5(cert_md5, pem)) {
 					epplog(c, rpool, session, EPP_ERROR,
 							"Error when getting client's PEM certificate. "
 							"Did you forget \"SSLVerifyClient require\" "
@@ -450,78 +442,18 @@ static int epp_process_connection(conn_rec *c)
 					epp_command_data_cleanup(&cdata);
 					return HTTP_INTERNAL_SERVER_ERROR;
 				}
-				break;
-			case EPP_LOGOUT:
-				cstat = epp_call_logout(sc->corba_globs, session, &cdata);
-				if (cstat == CORBA_OK)
-					if (cdata.rc == 1500) logout = 1;
-				break;
-			case EPP_CHECK_CONTACT:
-				cstat = epp_call_check_contact(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_CHECK_DOMAIN:
-				cstat = epp_call_check_domain(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_CHECK_NSSET:
-				cstat = epp_call_check_nsset(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_INFO_CONTACT:
-				cstat = epp_call_info_contact(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_INFO_DOMAIN:
-				cstat = epp_call_info_domain(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_INFO_NSSET:
-				cstat = epp_call_info_nsset(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_POLL_REQ:
-				cstat = epp_call_poll_req(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_POLL_ACK:
-				cstat = epp_call_poll_ack(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_CREATE_CONTACT:
-				cstat = epp_call_create_contact(sc->corba_globs, session,&cdata);
-				break;
-			case EPP_CREATE_DOMAIN:
-				cstat = epp_call_create_domain(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_CREATE_NSSET:
-				cstat = epp_call_create_nsset(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_DELETE_CONTACT:
-				cstat = epp_call_delete_contact(sc->corba_globs, session,&cdata);
-				break;
-			case EPP_DELETE_DOMAIN:
-				cstat = epp_call_delete_domain(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_DELETE_NSSET:
-				cstat = epp_call_delete_nsset(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_UPDATE_CONTACT:
-				cstat = epp_call_update_contact(sc->corba_globs, session,&cdata);
-				break;
-			case EPP_UPDATE_DOMAIN:
-				cstat = epp_call_update_domain(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_UPDATE_NSSET:
-				cstat = epp_call_update_nsset(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_RENEW_DOMAIN:
-				cstat = epp_call_renew_domain(sc->corba_globs, session, &cdata);
-				break;
-			case EPP_TRANSFER_DOMAIN:
-				cstat = epp_call_transfer_domain(sc->corba_globs, session,
-						&cdata);
-				break;
-			case EPP_TRANSFER_NSSET:
-				cstat = epp_call_transfer_nsset(sc->corba_globs, session,&cdata);
-				break;
-			default:
-				epplog(c, rpool, session, EPP_WARNING,
-						"Unknown epp frame type - terminating session");
-				epp_command_data_cleanup(&cdata);
-				return HTTP_INTERNAL_SERVER_ERROR;
+
+				epplog(c, rpool, session, EPP_DEBUG,
+						"Fingerprint is: %s", cert_md5);
+
+				/* go ahead to login corba call */
+				cstat = epp_corba_call(sc->corba_globs, &session, &lang,
+						cert_md5, &cdata, &logout);
+			}
+			else {
+				/* go ahead to generic corba function call */
+				cstat = epp_corba_call(sc->corba_globs, &session, NULL, NULL,
+						&cdata, &logout);
 			}
 
 			/* catch corba failures */
@@ -539,10 +471,8 @@ static int epp_process_connection(conn_rec *c)
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 			else {
-				struct circ_list	*val_errors;
-
-				gstat = epp_gen_response(sc->xml_globs, lang, &cdata,
-						&genstring, &val_errors);
+				gstat = epp_gen_response(sc->valid_resp, sc->schema,
+						lang, &cdata, &gen);
 
 				switch (gstat) {
 					/*
@@ -576,15 +506,14 @@ static int epp_process_connection(conn_rec *c)
 					case GEN_NOT_VALID:
 						epplog(c, rpool, session, EPP_ERROR,
 								"Server response does not validate");
-						if (val_errors != NULL) {
-							CL_FOREACH(val_errors) {
-								epp_error	*e = CL_CONTENT(val_errors);
+						if (gen.valerr != NULL) {
+							CL_FOREACH(gen.valerr) {
+								epp_error	*e = CL_CONTENT(gen.valerr);
 								epplog(c, rpool, session, EPP_ERROR,
 										"Element: %s", e->value);
 								epplog(c, rpool, session, EPP_ERROR,
 										"Reason: %s", e->reason);
 							}
-							epp_free_valid_errors(val_errors); /* free errors */
 						}
 						break;
 					default:
@@ -593,7 +522,6 @@ static int epp_process_connection(conn_rec *c)
 				}
 			}
 			epp_command_data_cleanup(&cdata);
-
 		}
 		/* parser error - failure which will close connection */
 		else {
@@ -628,18 +556,16 @@ static int epp_process_connection(conn_rec *c)
 		}
 
 		/* send response back to client */
-		apr_brigade_puts(bb, NULL, NULL, genstring);
+		apr_brigade_puts(bb, NULL, NULL, gen.response);
+		epplog(c, rpool, session, EPP_DEBUG, "Response content: %s",
+				gen.response);
 		status = ap_fflush(c->output_filters, bb);
+		epp_free_gen(&gen);
 		if (status != APR_SUCCESS) {
 			epplog(c, rpool, session, EPP_FATAL,
 				"Error when sending response to client");
-			epp_free_genstring(genstring);
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
-
-		epplog(c, rpool, session, EPP_DEBUG, "Response sent back to client");
-		epplog(c, rpool, session, EPP_DEBUG, "Response content: %s", genstring);
-		epp_free_genstring(genstring);
 
 		status = apr_brigade_cleanup(bb);
 		if (status != APR_SUCCESS) {
@@ -738,7 +664,6 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 	 * open epp log file and do further checking
 	 */
 	while (s != NULL) {
-		epp_xml_globs	*xml_globs;
 		epp_corba_globs	*corba_globs;
 		char	*fname;
 
@@ -764,12 +689,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 			/*
 			 * do initialization of xml
 			 */
-			xml_globs = epp_xml_init(sc->schema, sc->valid_resp);
-			if (xml_globs == NULL) {
-				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
-						"Could not initialize xml part");
-				return HTTP_INTERNAL_SERVER_ERROR;
-			}
+			epp_parser_init();
 			/*
 			 * do initialization of corba
 			 */
@@ -779,7 +699,6 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 						"Corba initialization failed");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-			sc->xml_globs = xml_globs;
 			sc->corba_globs = corba_globs;
 
 			/*
