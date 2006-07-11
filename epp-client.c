@@ -197,8 +197,7 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 				break;
 			case ccReg_domainCreate_registrant:
 			case ccReg_domainUpdate_registrant:
-				len += strlen("<registrant>");
-				len = len * 2 + 1;
+				len += 2 * strlen("<registrant>") + 1;
 				if ((newstr = malloc(len + 1)) == NULL)
 					continue;
 				*newstr = '\0';
@@ -208,8 +207,7 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 				break;
 			case ccReg_domainCreate_nsset:
 			case ccReg_domainUpdate_nsset:
-				len += strlen("<nsset>");
-				len = len * 2 + 1;
+				len += 2 * strlen("<nsset>") + 1;
 				if ((newstr = malloc(len + 1)) == NULL)
 					continue;
 				*newstr = '\0';
@@ -219,8 +217,7 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 				break;
 			case ccReg_domainCreate_period:
 			case ccReg_domainRenew_period:
-				len += strlen("<period>");
-				len = len * 2 + 1;
+				len += 2 * strlen("<period>") + 1;
 				if ((newstr = malloc(len + 1)) == NULL)
 					continue;
 				*newstr = '\0';
@@ -231,8 +228,7 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 			case ccReg_domainCreate_admin:
 			case ccReg_domainUpdate_admin_add:
 			case ccReg_domainUpdate_admin_rem:
-				len += strlen("<contact>");
-				len = len * 2 + 1;
+				len += 2 * strlen("<contact>") + 1;
 				if ((newstr = malloc(len + 1)) == NULL)
 					continue;
 				*newstr = '\0';
@@ -242,8 +238,8 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 				break;
 			case ccReg_domainCreate_ext_valdate:
 			case ccReg_domainUpdate_ext_valdate:
-				len += strlen("<valExDate>");
-				len = len * 2 + 1;
+			case ccReg_domainRenew_ext_valDate:
+				len += 2 * strlen("<valExDate>") + 1;
 				if ((newstr = malloc(len + 1)) == NULL)
 					continue;
 				*newstr = '\0';
@@ -252,8 +248,7 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 				strcat(newstr, "</valExDate>");
 				break;
 			case ccReg_domainRenew_curExpDate:
-				len += strlen("<curExpDate>");
-				len = len * 2 + 1;
+				len += 2 * strlen("<curExpDate>") + 1;
 				if ((newstr = malloc(len + 1)) == NULL)
 					continue;
 				*newstr = '\0';
@@ -261,11 +256,8 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 				strcat(newstr, c_errors->_buffer[i].value);
 				strcat(newstr, "</curExpDate>");
 				break;
-			case ccReg_domainRenew_ext_valDate:
-				break;
 			default:
-				len += strlen("<unknown>");
-				len = len * 2 + 1;
+				len += 2 * strlen("<unknown>") + 1;
 				if ((newstr = malloc(len + 1)) == NULL)
 					continue;
 				*newstr = '\0';

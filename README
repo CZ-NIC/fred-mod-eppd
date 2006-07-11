@@ -44,15 +44,15 @@ CONTENT:
   default:	none
   context:	global config, virtual host
   description:
-  	Log file of mod_eppd. It is not an error not to set log file, but
-	all log messages will be lost in that case.
+  	Log file of mod_eppd. It is not an error not to set log file,
+	in that case all messages will be logged to apache's error log.
 
   name:	EPPloglevel
   value:	fatal, error, warning, info, debug
-  default:	none
+  default:	info
   context:	global config, virtual host
   description:
-  	Log verbosity. If you do not set loglevel, no messages will be logged.
+  	Log verbosity.
 
   name:	EPPvalidResponse
   value:	On, Off

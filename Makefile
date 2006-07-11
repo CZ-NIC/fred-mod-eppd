@@ -1,7 +1,7 @@
 #
 # Konfigurovatelna cast Makefilu
 #
-APXS	= apxs2
+APXS	= apxs
 APR-CONFIG	= apr-config
 ORBIT2-CONFIG	= orbit2-config
 ORBIT-IDL-2	= orbit-idl-2
@@ -33,7 +33,7 @@ AP_LIBS	+=$(shell $(APR-CONFIG) --libs)
 
 AP_INSTALLDIR	:= $(shell $(APXS) -q LIBEXECDIR)
 
-CFLAGS	= -g -O0 -fPIC -Wall -DVERSION=\"1.0\"
+CFLAGS	= -g -O0 -fPIC -Wall
 LDFLAGS	= -rpath $(AP_INSTALLDIR) -Bshareable
 
 all: build
@@ -55,7 +55,7 @@ epp_xmlcommon.o: epp_xmlcommon.c epp_xmlcommon.h epp_common.h
 epp_parser.o: epp_parser.c epp_parser.h epp_common.h epp_xmlcommon.h
 	gcc $(CFLAGS) $(XML_CFLAGS) -c epp_parser.c
 
-epp_gen.o: epp_gen.c epp_gen.h epp_common.h epp_xmlcommon.h
+epp_gen.o: epp_gen.c epp_gen.h epp_common.h epp_xmlcommon.h epp_version.h
 	gcc $(CFLAGS) $(XML_CFLAGS) -c epp_gen.c
 
 epp-client.o: epp-client.c epp-client.h epp_common.h ccReg.h

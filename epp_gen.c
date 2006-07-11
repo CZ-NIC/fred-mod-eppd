@@ -15,6 +15,7 @@
 #include "epp_common.h"
 #include "epp_xmlcommon.h"
 #include "epp_gen.h"
+#include "epp_version.h"
 
 /*
  * Following macros are shortcuts used for document creation. So that
@@ -58,7 +59,7 @@ epp_gen_greeting(const char *svid, char **greeting)
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
 	char	strdate[50];
-        char    version[64];   
+	char    version[65];   
 	int	error_seen = 1;
 
 	assert(svid != NULL);
@@ -88,8 +89,8 @@ epp_gen_greeting(const char *svid, char **greeting)
 	get_rfc3339_date(time(NULL), strdate);
 	WRITE_ELEMENT(writer, greeting_err, "svDate", strdate);
 	START_ELEMENT(writer, greeting_err, "svcMenu");
-        sprintf( version , "%s BUILD %s %s" , VERSION , __DATE__ , __TIME__ );
-	WRITE_ELEMENT(writer, greeting_err, "version" , version  );
+	//snprintf(version, 64, "%s BUILD %s %s", MODEPPD_VERSION, __DATE__, __TIME__);
+	WRITE_ELEMENT(writer, greeting_err, "version" , MODEPPD_VERSION);
 	WRITE_ELEMENT(writer, greeting_err, "lang", "en");
 	WRITE_ELEMENT(writer, greeting_err, "lang", "cs");
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_CONTACT);

@@ -1,5 +1,36 @@
-/*
- * Copyright statement ;)
+/**
+ * @file mod_eppd.c
+ * This file is a true hearth of epp module which is called mod_eppd.
+ *
+ * The file contains typical apache-module-stuff (hooks, command table,
+ * configuration table, filters, ...) and manages other submodules which
+ * are used to parse/generate xml and call corba functions. The reason for
+ * parting the module in submodules (sometimes reffered to simply as modules)
+ * is:
+ * 	- to separate things which need to be linked with different libraries
+ * in separate files
+ * 	- to reduce overall complexity
+ * 	- to make part substitution and debugging easier
+ * 	- not to mangle apache pools and malloc()/free()
+ * 	.
+ * This file uses three interfaces in order to get work done:
+ * 	- xml parser interface defined in epp_parser.h
+ * 	- xml generator interface defined in epp_gen.h
+ * 	- corba submodule interface defined in epp-client.h
+ * 	.
+ * In addition the module uses openssl library to compute x509 certificate
+ * hash.
+ *
+ * The task of this module is to handle any incomming request if epp engine
+ * is turned on. It is a translator from xml to corba function calls. Request
+ * processing consists of three stages:
+ * 	- parsing of xml
+ * 	- corba call
+ * 	- xml response generation
+ * 	.
+ *
+ * 	General information concerning configuration and installation of mod_eppd
+ * 	module can be found in README file.
  */
 
 #include "httpd.h"
@@ -11,7 +42,7 @@
 #undef CORE_PRIVATE
 
 #define APR_WANT_BYTEFUNC
-#include "apr_want.h"
+#include "apr_want.h"	/* ntohl/htonl-like functions */
 #include "apr_buckets.h"
 #include "apr_file_io.h"
 #ifndef APR_FOPEN_READ
@@ -34,6 +65,7 @@
 
 /*
  * openssl header files
+ * used for fingerprint computation
  */
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
@@ -53,42 +85,43 @@
 
 module AP_MODULE_DECLARE_DATA eppd_module;
 
-/*
- * SSL variable lookup function
+/**
+ * SSL variable lookup function pointer used for client's PEM encoded
+ * certificate retrieval.
  */
 static APR_OPTIONAL_FN_TYPE(ssl_var_lookup) *epp_ssl_lookup = NULL;
 
-/*
+/**
  * Log levels used for logging to eppd log file.
  */
 typedef enum {
-	EPP_FATAL = 1,
-	EPP_ERROR,
-	EPP_WARNING,
-	EPP_INFO,
-	EPP_DEBUG
+	EPP_FATAL = 1,	/**< Serious error, the module is not in operational state.*/
+	EPP_ERROR,	/**< Error caused usually by client, module is operational. */
+	EPP_WARNING,	/**< Errors which are not serious but should be logged. */
+	EPP_INFO,	/**< This is the default log level. */
+	EPP_DEBUG	/**< Contents of requests and responses are logged. */
 }epp_loglevel;
 
 /**
  * Configuration structure of eppd module.
  */
 typedef struct {
-	int	epp_enabled;
-	char	*servername;	/* epp server name in <greeting> */
-	char	*iorfile;	/* file with corba object ref */
-	char	*ior;	/* object reference */
-	char	*schema;	/* URL of EPP schema */
-	int	valid_resp;	/* validate responses */
-	epp_corba_globs	*corba_globs;	/* variables needed for corba part */
-	char	*epplog;	/* epp log file name */
-	apr_file_t	*epplogfp;	/* epp log file descriptor */
-	epp_loglevel	loglevel;	/* epp log level */
+	int	epp_enabled;	/**< Decides whether mod_eppd is enabled for host. */
+	char	*servername;	/**< Epp server name used in <greeting> frame. */
+	char	*iorfile;	/**< File containing corba object's reference. */
+	char	*ior;	/**< Object's reference. */
+	char	*schema;	/**< URL of EPP schema (use just path). */
+	int	valid_resp;	/**< Validate responses before sending them to client. */
+	epp_corba_globs	*corba_globs;	/**< Variables needed for corba submodule. */
+	char	*epplog;	/**< Epp log filename. */
+	apr_file_t	*epplogfp;	/**< File descriptor of epp log file. */
+	epp_loglevel	loglevel;	/**< Epp log level #epp_loglevel. */
 }eppd_server_conf;
 
-/* used for epp log file */
+/** Used for access serialization to epp log file. */
 static apr_global_mutex_t *epp_log_lock;
 
-/**
+/*
  * This is wrapper function for compatibility reason. Apache 2.0 does
  * not have ap_log_cerror, instead we will use ap_log_error.
  */
@@ -98,7 +131,9 @@ static apr_global_mutex_t *epp_log_lock;
 #endif
 
 /**
- * Get well formated time for purposes of logging.
+ * Get well formatted time used in log file as a timestamp.
+ * @param buf Buffer to print time into.
+ * @param nbytes Size of the buffer.
  */
 static void current_logtime(char *buf, int nbytes)
 {
@@ -114,41 +149,72 @@ static void current_logtime(char *buf, int nbytes)
 }
 
 /**
- * Write a log message to eppd's dedicated log file.
- * @par c Connection record
- * @par p Pool from which to allocate strings for internal use
- * @par session Session ID of client
- * @par level Log level
+ * Write a log message to eppd log file.
+ * @param c Connection record.
+ * @param p A pool from which to allocate strings for internal use.
+ * @param session Session ID of the client.
+ * @param level Log level #epp_loglevel.
+ * @param fmt Printf-style format string.
  */
 static void epplog(conn_rec *c, apr_pool_t *p, int session, epp_loglevel level,
 						const char *fmt, ...)
 {
-    char *logline, *text;
-	char timestr[80];
-    const char *rhost;
-    apr_size_t nbytes;
-    apr_status_t rv;
-    va_list ap;
+    char	*logline;	/* the actual text written to log file */
+	char	*text;	/* log message as passed from client */
+	char	timestr[80];	/* buffer for timestamp */
+    const char	*rhost;	/* ip address of remote host */
+    apr_size_t	nbytes;	/* length of logline */
+    apr_status_t	rv;
+    va_list	ap;
     eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(c->base_server->module_config, &eppd_module);
  
-    if (!sc->epplogfp || level > sc->loglevel) {
-        return;
-    }
- 
-    rhost = ap_get_remote_host(c, NULL, REMOTE_NOLOOKUP, NULL);
- 
+	/* cancel out messages with lower priority than configured loglevel */
+    if (level > sc->loglevel) return;
+
     va_start(ap, fmt);
     text = apr_pvsprintf(p, fmt, ap);
     va_end(ap);
  
+	/* if epp log file is not configured, log messages to apache's error log */
+	if (!sc->epplogfp) {
+		int	ap_level; /* apache's log level equivalent to eppd loglevel */
+
+		/* convert between two scales */
+		switch (level) {
+			case EPP_FATAL:
+				ap_level = APLOG_CRIT;
+				break;
+			case EPP_ERROR:
+				ap_level = APLOG_ERR;
+				break;
+			case EPP_WARNING:
+				ap_level = APLOG_WARNING;
+				break;
+			case EPP_INFO:
+				ap_level = APLOG_INFO;
+				break;
+			case EPP_DEBUG:
+			default:
+				ap_level = APLOG_DEBUG;
+				break;
+		}
+		ap_log_cerror(APLOG_MARK, level, 0, c, text);
+		return;
+	}
+
+	/* get remote host's ip address - is not critical if it is not known */
+    rhost = ap_get_remote_host(c, NULL, REMOTE_NOLOOKUP, NULL);
+	/* get timestamp */
 	current_logtime(timestr, 79);
+	/* make up the whole log record */
     logline = apr_psprintf(p, "%s %s [sessionID %d] %s" APR_EOL_STR,
 						timestr,
 						rhost ? rhost : "UNKNOWN-HOST",
 						session,
 						text);
 
+	/* serialize access to log file */
     rv = apr_global_mutex_lock(epp_log_lock);
     if (rv != APR_SUCCESS) {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, c,
@@ -168,19 +234,21 @@ static void epplog(conn_rec *c, apr_pool_t *p, int session, epp_loglevel level,
 }
 
 /**
- * Reads epp request.
- * @par c Connection
- * @par p Pool from which to allocate memory
- * @par content The resulting message
- * @par bytes Number of bytes in message
- * @par session Session ID is passed only for logging purposes
- * @ret Status (1 = success, 0 = failure)
+ * Read epp request.
+ * Epp request consists of header, which contains frame length including
+ * the header itself (4 bytes) and the actual request which is xml document.
+ * @param p Pool from which to allocate memory.
+ * @param c Connection record.
+ * @param content The read request without header.
+ * @param bytes Length of request (excluding header length).
+ * @param session Session ID is used only for logging.
+ * @return Status 1 = success and 0 = failure.
  */
 static int
 epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 		int session)
 {
-		char *buf; /* buffer for user request */
+		char	*buf;	/* buffer for request */
 		uint32_t	hbo_size; /* size of request in host byte order */
 		uint32_t	nbo_size; /* size of request in network byte order */
 		apr_bucket_brigade *bb;
@@ -189,18 +257,27 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 
 		bb = apr_brigade_create(p, c->bucket_alloc);
 
-		/* blocking read of first 4 bytes (message size) */
+		/* blocking read of first 4 bytes (request's length) */
 		status = ap_get_brigade(c->input_filters, bb, AP_MODE_READBYTES,
 									APR_BLOCK_READ, EPP_HEADER_LENGTH);
 		if (status != APR_SUCCESS) {
-			epplog(c, p, session, EPP_FATAL, "Error when reading epp header");
+			/*
+			 * this used to be logged at EPP_FATAL level, but later was
+			 * changed to lower priority, because condition above catches also
+			 * cases, when client simply aborts the connection without
+			 * logging out first, which happens pretty often and is not
+			 * "fatal" at all.
+			 * TODO: the status should be further analysed in order to
+			 * distinguish between the two cases.
+			 */
+			epplog(c, p, session, EPP_INFO, "Error when reading epp header");
 			return 0;
 		}
 
 		/*
-		 * convert bucket brigade to string
+		 * convert bucket brigade into sequence of bytes
 		 * In most cases there is just one bucket of size 4, which
-		 * could be read directly. But we will do it more generally in case.
+		 * could be read directly. But we will not rely on it.
 		 */
 		len = EPP_HEADER_LENGTH;
 		status = apr_brigade_pflatten(bb, &buf, &len, p);
@@ -210,8 +287,11 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 			return 0;
 		}
 		if (len != EPP_HEADER_LENGTH) {
+			/* this should not ever happen */
 			epplog(c, p, session, EPP_ERROR,
-					"Weird EPP header size! (%u bytes)", (unsigned int) len);
+					"4 bytes of EPP header were read but after flatting of"
+					" bucket brigade only %u bytes remained?!",
+					(unsigned int) len);
 			apr_brigade_destroy(bb);
 			return 0;
 		}
@@ -220,13 +300,6 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 		for (len = 0; len < EPP_HEADER_LENGTH; len++)
 			((char *) &nbo_size)[len] = buf[len];
 		hbo_size = ntohl(nbo_size);
-
-		status = apr_brigade_cleanup(bb);
-		if (status != APR_SUCCESS) {
-			epplog(c, p, session, EPP_FATAL, "Could not cleanup brigade!");
-			apr_brigade_destroy(bb);
-			return 0;
-		}
 
 		/* exclude header length */
 		hbo_size -= EPP_HEADER_LENGTH;
@@ -241,6 +314,15 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 			apr_brigade_destroy(bb);
 			return 0;
 		}
+
+		/* we will reuse bucket brigade when reading the request */
+		status = apr_brigade_cleanup(bb);
+		if (status != APR_SUCCESS) {
+			epplog(c, p, session, EPP_FATAL, "Could not cleanup brigade!");
+			apr_brigade_destroy(bb);
+			return 0;
+		}
+
 		/* blocking read of request's body */
 		len = hbo_size;
 		status = ap_get_brigade(c->input_filters, bb, AP_MODE_READBYTES,
@@ -261,8 +343,8 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 		}
 		if (len != hbo_size) {
 			epplog(c, p, session, EPP_ERROR,
-					"EPP request's body size is other than claimed one:\n"
-					"\treal size is %4u bytes\n\tclaimed size is %4d bytes",
+				"EPP request's length (%u bytes) is other than the "
+				"claimed one in header (%u bytes)",
 					(unsigned) len, hbo_size);
 			apr_brigade_destroy(bb);
 			return 0;
@@ -686,6 +768,8 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 						"EPP Servername not configured");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
+			/* set default loglevel */
+			if (sc->loglevel == 0) sc->loglevel = EPP_INFO;
 			/*
 			 * do initialization of xml
 			 */
@@ -850,33 +934,6 @@ static const char *set_epplog(cmd_parms *cmd, void *dummy,
     return NULL;
 }
 
-static const char *set_servername(cmd_parms *cmd, void *dummy,
-		const char *a1)
-{
-	const char *err;
-	server_rec *s = cmd->server;
-	eppd_server_conf *sc = (eppd_server_conf *)
-		ap_get_module_config(s->module_config, &eppd_module);
-
-	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
-    if (err) return err;
-
-	/*
-	 * catch double definition of servername
-	 * that's not serious fault so we will just print message in log
-	 */
-	if (sc->servername != NULL) {
-		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-			"mod_eppd: more than one definition of servername. All but\
-			the first one will be ignored");
-		return NULL;
-	}
-
-	sc->servername = apr_pstrdup(cmd->pool, a1);
-
-    return NULL;
-}
-
 static const char *set_loglevel(cmd_parms *cmd, void *dummy,
 		const char *a1)
 {
@@ -914,6 +971,33 @@ static const char *set_loglevel(cmd_parms *cmd, void *dummy,
 		return "mod_eppd: log level must be one of "
 				"fatal, error, warning, info, debug";
 	}
+
+    return NULL;
+}
+
+static const char *set_servername(cmd_parms *cmd, void *dummy,
+		const char *a1)
+{
+	const char *err;
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(s->module_config, &eppd_module);
+
+	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
+    if (err) return err;
+
+	/*
+	 * catch double definition of servername
+	 * that's not serious fault so we will just print message in log
+	 */
+	if (sc->servername != NULL) {
+		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+			"mod_eppd: more than one definition of servername. All but\
+			the first one will be ignored");
+		return NULL;
+	}
+
+	sc->servername = apr_pstrdup(cmd->pool, a1);
 
     return NULL;
 }
