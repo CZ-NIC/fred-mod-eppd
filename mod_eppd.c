@@ -1,32 +1,32 @@
 /**
  * @file mod_eppd.c
- * This file is a true hearth of epp module which is called mod_eppd.
+ * mod_eppd.c is a true heart of the epp module which is called mod_eppd.
  *
  * The file contains typical apache-module-stuff (hooks, command table,
- * configuration table, filters, ...) and manages other submodules which
- * are used to parse/generate xml and call corba functions. The reason for
- * parting the module in submodules (sometimes reffered to simply as modules)
- * is:
- * 	- to separate things which need to be linked with different libraries
- * in separate files
- * 	- to reduce overall complexity
- * 	- to make part substitution and debugging easier
- * 	- not to mangle apache pools and malloc()/free()
+ * configuration table, filters, ...) and manages other components which
+ * are used to parse/generate xml and call corba functions. There are good
+ * reasons for parting the module in several components:
+ * 	- Reduction of overall complexity.
+ * 	- Component substitution and debugging is easier.
+ * 	- Separation of sources which need to be linked with different libraries.
+ * 	- Mangling apache memory pools and malloc()/free() used elsewhere is bad
+ * 	idea. Every component is responsible for freeing memory allocated by
+ * 	itself.
  * 	.
- * This file uses three interfaces in order to get work done:
- * 	- xml parser interface defined in epp_parser.h
- * 	- xml generator interface defined in epp_gen.h
- * 	- corba submodule interface defined in epp-client.h
+ * This file uses three interfaces in order to get work done.
+ * 	- xml parser interface defined in epp_parser.h.
+ * 	- xml generator interface defined in epp_gen.h.
+ * 	- corba submodule interface defined in epp-client.h.
  * 	.
  * In addition the module uses openssl library to compute x509 certificate
- * hash.
+ * fingerprint which is used when authenticating client.
  *
  * The task of this module is to handle any incomming request if epp engine
  * is turned on. It is a translator from xml to corba function calls. Request
  * processing consists of three stages:
- * 	- parsing of xml
- * 	- corba call
- * 	- xml response generation
+ * 	- parsing of xml request
+ * 	- actual corba call
+ * 	- generating of xml response
  * 	.
  *
  * 	General information concerning configuration and installation of mod_eppd
@@ -150,6 +150,7 @@ static void current_logtime(char *buf, int nbytes)
 
 /**
  * Write a log message to eppd log file.
+ *
  * @param c Connection record.
  * @param p A pool from which to allocate strings for internal use.
  * @param session Session ID of the client.
@@ -237,12 +238,13 @@ static void epplog(conn_rec *c, apr_pool_t *p, int session, epp_loglevel level,
  * Read epp request.
  * Epp request consists of header, which contains frame length including
  * the header itself (4 bytes) and the actual request which is xml document.
+ *
  * @param p Pool from which to allocate memory.
  * @param c Connection record.
  * @param content The read request without header.
  * @param bytes Length of request (excluding header length).
  * @param session Session ID is used only for logging.
- * @return Status 1 = success and 0 = failure.
+ * @return 1 if successful and 0 when error occured.
  */
 static int
 epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
@@ -361,35 +363,51 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 
 /**
  * Get md5 signiture of given PEM encoded certificate.
+ * The only function in module which uses openssl library.
+ *
+ * @param cert_md5 Allocated buffer for storing the resulting fingerprint
+ * (should be at least 50 bytes long).
+ * @param pem PEM encoded certificate in its string representation.
+ * @return 1 if successful and 0 when error occured.
  */
 static int get_md5(char *cert_md5, char *pem)
 {
-	X509	*x;
-    BIO	*bio;
-    int j;
-	unsigned n;
-	unsigned char	md5[60];
+	X509	*x;	/* openssl's struture for representing x509 certificate */
+    BIO	*bio;	/* openssl's basic input/output stream */
+	unsigned char	md5[20];	/* fingerprint in binary form */
+	unsigned len;	/* length of fingerprint in binary form */
+    int i;
 
+	/*
+	 * This function is rather overcomplicated, because the interface
+	 * of openssl library is somewhat cumbersome. At first we have to
+	 * get PEM encoded ceritificate in BIO stream, which is input for
+	 * routine which creates X509 struct. Only X509 struct can then be
+	 * fed to X509_digest() function, which computes the fingerprint.
+	 */
 	if ((bio = BIO_new(BIO_s_mem())) == NULL) return 0;
 
-	/* convert PEM to x509 struct */
 	if (BIO_write(bio, pem, strlen(pem)) <= 0) {
 		BIO_free(bio);
 		return 0;
 	}
 
+	/* convert PEM to x509 struct */
 	x = PEM_read_bio_X509_AUX(bio, NULL, NULL, NULL);
 	if (x == NULL) {
-		BIO_free(bio);
+		BIO_free_all(bio);
 		return 0;
 	}
 
-	/* compute md5 hash */
-	if (!X509_digest(x, EVP_md5(), md5, &n)) { 
+	/* compute md5 hash of certificate */
+	if (!X509_digest(x, EVP_md5(), md5, &len)) { 
+		BIO_free_all(bio);
+		X509_free(x);
 		return 0;
 	}
-	for (j = 0; j < n; j++) {
-		sprintf(cert_md5, "%02X%c", md5[j], (j + 1 == n) ? '\0' : ':');
+	/* convert binary representation to string representation of fingerprint */
+	for (i = 0; i < len; i++) {
+		sprintf(cert_md5, "%02X%c", md5[i], (i + 1 == len) ? '\0' : ':');
 		cert_md5 += 3;
 	}
 
@@ -401,20 +419,24 @@ static int get_md5(char *cert_md5, char *pem)
 
 /**
  * EPP Connection handler.
+ * When EPP engine is turn on for connection, this handler takes care
+ * of it for whole connection's lifetime duration. The connection is
+ * taken out of reach of other handlers, this is important, since
+ * EPP protocol and HTTP protocol are quite different and even if you
+ * make EPP request as much as possible similar to HTTP request,
+ * unexpectable influences from other modules occur.
  *
- * @param c Incoming connection
- * @ret Return code
+ * @param c Incoming connection.
+ * @return Return code
  */
 static int epp_process_connection(conn_rec *c)
 {
 	int	session;	/* session = 0 when not autenticated yet */
 	unsigned	lang;	/* session's language */
-	int	rc;
 	int	logout;	/* if true, terminate request loop */
 	int	firsttime;	/* if true, generate greeting in request loop */
-
 	apr_bucket_brigade	*bb;
-	apr_status_t	status;
+	apr_status_t	status;	/* used to store return code from apr functions */
 	server_rec	*s = c->base_server;
 	eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(s->module_config, &eppd_module);
@@ -423,79 +445,148 @@ static int epp_process_connection(conn_rec *c)
 	if (!sc->epp_enabled)
 		return DECLINED;
 
+	/* update scoreboard's information */
 	ap_update_child_status(c->sbh, SERVER_BUSY_READ, NULL);
 
-	/* add connection output filter */
+	/* add connection output filter, which constructs EPP header */
 	ap_add_output_filter("EPP_OUTPUT_FILTER", NULL, NULL, c);
 
+	/* create bucket brigade for transmition of responses */
 	bb = apr_brigade_create(c->pool, c->bucket_alloc);
-	/* session value 0 means that the user is not logged in yet */
-	session = 0;
-	lang = LANG_EN;
 
+	/* initialize variables used inside the loop */
+	session = 0;
+	lang = LANG_EN;	/* default language is english */
+	firsttime = 1;	/* this will cause automatic generation of greeting */
 	/*
-	 * process requests loop
-	 * termination conditions are embedded inside the loop
+	 * Loop in which are processed requests until client logs out or error
+	 * appears.
 	 */
-	rc = OK;
 	logout = 0;
-	firsttime = 1;
 	while (!logout) {
-		char *request;
-		unsigned	bytes;
-		apr_pool_t	*rpool;
-		parser_status	pstat;
-		epp_command_data	cdata;
-		corba_status	cstat = CORBA_OK;
-		gen_status	gstat = GEN_OK;
-		char	*genstring;
-		epp_gen	gen;
+		apr_pool_t	*rpool;	/* memory pool used for duration of a request */
+		epp_command_data	cdata;	/* self-descriptive data structure */
+		epp_gen	gen;	/* generated answer and possibly encountered errors */
+		parser_status	pstat;	/* parser's return code */
 
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
 		apr_pool_tag(rpool, "EPP_request");
 
-		if (!firsttime) {
+		if (firsttime) {
+			firsttime = 0;
+			/*
+			 * bogus branch in order to generate greeting when firsttime
+			 * in request loop. We don't have much to do, we will
+			 * just simulate <hello> frame arrival by setting pstat.
+			 */
+			pstat = PARSER_HELLO;
+			epplog(c, rpool, session, EPP_DEBUG, "Client connected");
+		}
+		else {
+			char *request;	/* raw request read from socket */
+			unsigned	bytes;	/* length of request */
+
 			/* read request */
 			if (!epp_read_request(rpool, c, &request, &bytes, session)) {
-				rc = HTTP_INTERNAL_SERVER_ERROR;
+				/*
+				 * we used to return HTTP_INTERNAL_SERVER_ERROR here, but
+				 * since epp_read_request is unsuccessfull each time client
+				 * disconnects without first logging out, which happens quite
+				 * often, we return OK.
+				 */
 				break;
 			}
 
 			/* initialize cdata structure */
 			bzero(&cdata, sizeof cdata);
-			/* deliver request to XML parser */
+
+			/*
+			 * deliver request to XML parser, the task of parser is to fill
+			 * cdata structure with data
+			 */
 			pstat = epp_parse_command(session, sc->schema, request, bytes,
 					&cdata);
 		}
-		else {
-			/*
-			 * bogus branch in order to generate greeting when firsttime
-			 * in request loop
-			 */
-			firsttime = 0;
-			pstat = PARSER_HELLO;
-			epplog(c, rpool, session, EPP_DEBUG, "Client connected");
+
+		switch (pstat) {
+			case PARSER_NOT_XML:
+				epplog(c, rpool, session, EPP_WARNING,
+						"Request is not XML");
+				return HTTP_BAD_REQUEST;
+			case PARSER_NOT_COMMAND:
+				epplog(c, rpool, session, EPP_WARNING,
+						"Request is neither a command nor hello");
+				return HTTP_BAD_REQUEST;
+			case PARSER_ESCHEMA:
+				epplog(c, rpool, session, EPP_WARNING,
+						"Schema's parser error - check correctness of schema");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			case PARSER_EINTERNAL:
+				epplog(c, rpool, session, EPP_FATAL,
+						"Internal parser error occured when processing request");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			case PARSER_HELLO:
+			case PARSER_NOT_VALID:
+			case PARSER_CMD_LOGIN:
+			case PARSER_CMD_LOGOUT:
+			case PARSER_CMD_OTHER:
+				/* theese return codes are ok - we can continue in processing */
+				break;
+			default:
+				epplog(c, rpool, session, EPP_FATAL,
+						"Unknown error occured during parsing stage");
+				return HTTP_BAD_REQUEST;
 		}
 
 		/* is it <hello> frame? */
 		if (pstat == PARSER_HELLO) {
-			gstat = epp_gen_greeting(sc->servername, &genstring);
-			if (gstat != GEN_OK) {
-				epplog(c, rpool, session, EPP_FATAL,
-					"Error when creating epp greeting");
+			int	rc;
+			char	version_buf[101];
+			gen_status	gstat;	/* generator's return code */
+
+			/* get info from CR used in <greeting> frame */
+			rc = epp_call_hello(sc->corba_globs, version_buf, 100);
+
+			if (rc == 0) {
+				epplog(c, rpool, session, EPP_ERROR,
+						"Could not obtain version string from CR");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-			gen.response = genstring;
+
+			/*
+			 * generate greeting (server name is concatenation of string
+			 * given in apache's configuration file and string retrieved
+			 * from corba server through version() function)
+			 */
+			gstat = epp_gen_greeting(
+					apr_pstrcat(
+						rpool,
+						sc->servername,
+						" (ccReg ",
+						version_buf,
+						") (mod_eppd SVN rev ",
+						SVN_REV,
+						" BUILT ", __DATE__," ",__TIME__,")",
+						NULL),
+					&gen.response);
+			if (gstat != GEN_OK) {
+				epplog(c, rpool, session, EPP_FATAL,
+						"Error when creating epp greeting");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
 			gen.valerr = NULL;
 		}
-		/*
-		 * we generate response for valid commands and requests which
-		 * doesn't validate.
-		 */
-		else if (pstat == PARSER_OK || pstat == PARSER_NOT_VALID) {
-			char	cert_md5[50];	/* should be enough for md5 hash of cert */
-			char	*pem;	/* pem encoded client's certificate */
+		/* it is a command */
+		else {
+			corba_status	cstat;	/* return code of corba component */
+			gen_status	gstat;	/* generator's return code */
+
+			/*
+			 * we generate response for valid commands and requests which
+			 * doesn't validate. Note that this is the only case in which
+			 * cdata structure is filled and therefore needs to be freed.
+			 */
 
 			/* we will drop a line for requests which don't validate in log */
 			if (pstat == PARSER_NOT_VALID) {
@@ -503,16 +594,11 @@ static int epp_process_connection(conn_rec *c)
 						"Request doest not validate");
 			}
 
-			if (cdata.type == EPP_LOGIN) {
-				/*
-				 * corba login function is somewhat special
-				 *   - session is pointer (because it might be changed)
-				 *   - lang is pointer for the same reason as above
-				 *   - there is additional parameter identifing ssl certificate
-				 *     in order to match login name with used certificate on
-				 *     side of central repository. The identifing parameter
-				 *     is md5 digest of client's certificate.
-				 */
+			if (pstat == PARSER_CMD_LOGIN) {
+				char	cert_md5[50]; /* should be enough for md5 hash of cert */
+				char	*pem;	/* pem encoded client's certificate */
+
+				/* we will compute fingerprint of client's certificate */
 				bzero(cert_md5, 50);
 				pem = epp_ssl_lookup(rpool, c->base_server, c, NULL,
 						"SSL_CLIENT_CERT");
@@ -528,127 +614,122 @@ static int epp_process_connection(conn_rec *c)
 				epplog(c, rpool, session, EPP_DEBUG,
 						"Fingerprint is: %s", cert_md5);
 
-				/* go ahead to login corba call */
-				cstat = epp_corba_call(sc->corba_globs, &session, &lang,
-						cert_md5, &cdata, &logout);
+				/*
+				 * corba login function is somewhat special
+				 *   - session might be changed
+				 *   - lang might be changed
+				 *   - there is additional parameter identifing ssl certificate
+				 *     in order to match login name with used certificate on
+				 *     side of central repository. The identifing parameter
+				 *     is md5 digest of client's certificate.
+				 */
+				cstat = epp_call_login(sc->corba_globs, &session, &lang,
+						cert_md5, &cdata);
+			}
+			else if (pstat == PARSER_CMD_LOGOUT) {
+				cstat = epp_call_logout(sc->corba_globs, session,
+						&cdata, &logout);
 			}
 			else {
 				/* go ahead to generic corba function call */
-				cstat = epp_corba_call(sc->corba_globs, &session, NULL, NULL,
-						&cdata, &logout);
+				cstat = epp_call_cmd(sc->corba_globs, session, &cdata);
 			}
 
 			/* catch corba failures */
 			if (cstat != CORBA_OK) {
 				epp_command_data_cleanup(&cdata);
-				if (cstat == CORBA_ERROR)
-					epplog(c, rpool, session, EPP_ERROR,
-							"Corba call failed - terminating session");
-				else if (cstat == CORBA_REMOTE_ERROR)
-					epplog(c, rpool, session, EPP_ERROR,
-							"Unqualified answer from server - terminating session");
-				else if (cstat == CORBA_INT_ERROR)
-					epplog(c, rpool, session, EPP_FATAL,
-							"Malloc in corba wrapper failed");
-				return HTTP_INTERNAL_SERVER_ERROR;
-			}
-			else {
-				gstat = epp_gen_response(sc->valid_resp, sc->schema,
-						lang, &cdata, &gen);
-
-				switch (gstat) {
-					/*
-					 * following errors are serious and response cannot be sent
-					 * to client when any of them appears
-					 */
-					case GEN_EBUFFER:
-					case GEN_EWRITER:
-					case GEN_EBUILD:
-						epp_command_data_cleanup(&cdata);
+				switch (cstat) {
+					case CORBA_ERROR:
+						epplog(c, rpool, session, EPP_ERROR,
+								"Corba call failed - terminating session");
+						break;
+					case CORBA_REMOTE_ERROR:
+						epplog(c, rpool, session, EPP_ERROR,
+								"Unqualified answer from server - "
+								"terminating session");
+						break;
+					case CORBA_INT_ERROR:
 						epplog(c, rpool, session, EPP_FATAL,
-								"XML Generator failed - terminating session");
-						return HTTP_INTERNAL_SERVER_ERROR;
-					/*
-					 * following errors are only informative though serious.
-					 * The connection persists and response is sent back to
-					 * client.
-					 */
-					case GEN_NOT_XML:
-						epplog(c, rpool, session, EPP_ERROR,
-								"Response is not XML!!");
-						break;
-					case GEN_EINTERNAL:
-						epplog(c, rpool, session, EPP_ERROR,
-								"Internal error when validating response");
-						break;
-					case GEN_ESCHEMA:
-						epplog(c, rpool, session, EPP_ERROR,
-								"Error when parsing schema");
-						break;
-					case GEN_NOT_VALID:
-						epplog(c, rpool, session, EPP_ERROR,
-								"Server response does not validate");
-						if (gen.valerr != NULL) {
-							CL_FOREACH(gen.valerr) {
-								epp_error	*e = CL_CONTENT(gen.valerr);
-								epplog(c, rpool, session, EPP_ERROR,
-										"Element: %s", e->value);
-								epplog(c, rpool, session, EPP_ERROR,
-										"Reason: %s", e->reason);
-							}
-						}
+								"Malloc in corba wrapper failed");
 						break;
 					default:
-						/* GEN_OK */
+						epplog(c, rpool, session, EPP_ERROR,
+								"Unknown return code from corba module");
 						break;
 				}
+				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-			epp_command_data_cleanup(&cdata);
-		}
-		/* parser error - failure which will close connection */
-		else {
-			switch (pstat) {
-				case PARSER_NOT_XML:
-					epplog(c, rpool, session, EPP_WARNING,
-							"Request is not XML");
-					rc = HTTP_BAD_REQUEST;
+
+			/* generate xml response */
+			gstat = epp_gen_response(sc->valid_resp, sc->schema,
+					lang, &cdata, &gen);
+
+			epp_command_data_cleanup(&cdata); /* not needed anymore */
+
+			switch (gstat) {
+				case GEN_OK:
 					break;
-				case PARSER_NOT_COMMAND:
-					epplog(c, rpool, session, EPP_WARNING,
-							"Request is neither a command nor hello");
-					rc = HTTP_BAD_REQUEST;
-					break;
-				case PARSER_ESCHEMA:
-					epplog(c, rpool, session, EPP_WARNING,
-						"Schema's parser error - check correctness of schema");
-					rc = HTTP_INTERNAL_SERVER_ERROR;
-					break;
-				case PARSER_EINTERNAL:
+				/*
+				 * following errors are serious and response cannot be sent
+				 * to client when any of them appears
+				 */
+				case GEN_EBUFFER:
+				case GEN_EWRITER:
+				case GEN_EBUILD:
 					epplog(c, rpool, session, EPP_FATAL,
-						"Internal parser error occured when processing request");
-					rc = HTTP_INTERNAL_SERVER_ERROR;
+							"XML generator failed - terminating session");
+					return HTTP_INTERNAL_SERVER_ERROR;
+				/*
+				 * following errors are only informative though serious.
+				 * The connection persists and response is sent back to
+				 * client.
+				 */
+				case GEN_NOT_XML:
+					epplog(c, rpool, session, EPP_ERROR,
+							"Generated response is not XML");
+					break;
+				case GEN_EINTERNAL:
+					epplog(c, rpool, session, EPP_ERROR,
+							"Malloc failure when validating response");
+					break;
+				case GEN_ESCHEMA:
+					epplog(c, rpool, session, EPP_ERROR,
+						"Error when parsing schema for validation of response");
+					break;
+				case GEN_NOT_VALID:
+					epplog(c, rpool, session, EPP_ERROR,
+							"Generated response does not validate");
+					/* print more detailed information about validation errors */
+					if (gen.valerr != NULL) {
+						CL_FOREACH(gen.valerr) {
+							epp_error	*e = CL_CONTENT(gen.valerr);
+							epplog(c, rpool, session, EPP_ERROR,
+									"Element: %s", e->value);
+							epplog(c, rpool, session, EPP_ERROR,
+									"Reason: %s", e->reason);
+						}
+					}
 					break;
 				default:
-					epplog(c, rpool, session, EPP_FATAL,
-							"Unknown error occured during parsing stage");
-					rc = HTTP_BAD_REQUEST;
+					epplog(c, rpool, session, EPP_ERROR,
+							"Unknown return code from generator module");
 					break;
 			}
-			return rc;
 		}
 
 		/* send response back to client */
 		apr_brigade_puts(bb, NULL, NULL, gen.response);
 		epplog(c, rpool, session, EPP_DEBUG, "Response content: %s",
 				gen.response);
-		status = ap_fflush(c->output_filters, bb);
 		epp_free_gen(&gen);
+		status = ap_fflush(c->output_filters, bb);
 		if (status != APR_SUCCESS) {
 			epplog(c, rpool, session, EPP_FATAL,
 				"Error when sending response to client");
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
+		/* prepare bucket brigade for reuse in next request */
 		status = apr_brigade_cleanup(bb);
 		if (status != APR_SUCCESS) {
 			epplog(c, rpool, session, EPP_FATAL,
@@ -659,23 +740,31 @@ static int epp_process_connection(conn_rec *c)
 		apr_pool_destroy(rpool);
 	}
 
-	epplog(c, c->pool, session, EPP_INFO, "Client logged out");
+	/* client logged out or disconnected from server */
+	epplog(c, c->pool, session, EPP_INFO, "Session ended");
 	return HTTP_OK;
 }
 
 /**
- * epp output filter.
- * compute message size and write the size in first two bytes of message
+ * epp output filter, which prefixes each response with length of the response.
+ * @param f Apache filter structure.
+ * @param bb Bucket brigade containing a response.
+ * @return Return code of next filter in chain.
  */
 static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
 {
 	apr_bucket	*b, *bnew;
 	apr_size_t	len;
-	uint32_t	nbo_size; /* size in network byte order */
+	uint32_t	nbo_size; /* response length in network byte order */
 
+	/*
+	 * iterate through buckets in bucket brigade and compute total length
+	 * of response.
+	 */
 	for (b = APR_BRIGADE_FIRST(bb), len = 0;
 		 b != APR_BRIGADE_SENTINEL(bb);
-		 b = APR_BUCKET_NEXT(b)) {
+		 b = APR_BUCKET_NEXT(b))
+	{
 
 		/* catch weird situation which will probably never happen */
 		if (b->length == -1)
@@ -687,13 +776,22 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
 
 	/* header size is included in total size */
 	nbo_size = htonl(len + EPP_HEADER_LENGTH);
+	/* create new bucket containing only length of request */
 	bnew = apr_bucket_heap_create((char *) &nbo_size, EPP_HEADER_LENGTH,
 			NULL, f->c->bucket_alloc);
+	/* insert the new bucket in front of the response */
 	APR_BUCKET_INSERT_BEFORE(APR_BRIGADE_FIRST(bb), bnew);
 
+	/* pass bucket brigade to next filter */
 	return ap_pass_brigade(f->next, bb);
 }
 
+/**
+ * Init child hook is run everytime a new thread (or process) is started.
+ * Task of the hook is to initialize a lock which protects epp log file.
+ * @param p Memory pool.
+ * @param s Server record.
+ */
 static void epp_init_child_hook(apr_pool_t *p, server_rec *s)
 {
 	apr_status_t	rv;
@@ -705,6 +803,16 @@ static void epp_init_child_hook(apr_pool_t *p, server_rec *s)
     }
 }
 
+/**
+ * In post config hook is check consistensy of configuration (required
+ * parameters, default values of parameters), components are initialized,
+ * log file is setted up ...
+ *
+ * @param p Memory pool.
+ * @param plog Memory pool used for logging.
+ * @param ptemp Memory pool destroyed right after postconfig phase.
+ * @param s Server record.
+ */
 static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 		apr_pool_t *ptemp, server_rec *s)
 {
@@ -743,7 +851,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 
 	/*
 	 * Iterate through available servers and if eppd is enabled
-	 * open epp log file and do further checking
+	 * open epp log file initialize components and do further checking
 	 */
 	while (s != NULL) {
 		epp_corba_globs	*corba_globs;

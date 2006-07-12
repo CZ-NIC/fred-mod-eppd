@@ -5,12 +5,17 @@
  * EPP parser status values (part of mod_eppd - epp_parser interface).
  */
 typedef enum {
-	PARSER_OK,
 	/*
 	 * request is not command but <hello> frame
 	 * this indicates that greeting should be generated
 	 */
 	PARSER_HELLO,
+	/* login command */
+	PARSER_CMD_LOGIN,
+	/* logout command */
+	PARSER_CMD_LOGOUT,
+	/* some other command than login, logout */
+	PARSER_CMD_OTHER,
 	/* request does not validate */
 	PARSER_NOT_VALID,
 	/* request is not a command */

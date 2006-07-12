@@ -36,6 +36,9 @@ epp_corba_globs *epp_corba_init(const char *iorfile);
  */
 void epp_corba_init_cleanup(epp_corba_globs *corba_globs);
 
+int
+epp_call_hello(epp_corba_globs *globs, char *buf, unsigned len);
+
 /**
  * Call corba getsvTRID function. This is mostly used for generating error
  * messages.
@@ -45,12 +48,37 @@ void epp_corba_init_cleanup(epp_corba_globs *corba_globs);
  * @ret CORBA_OK if succesful
  */
 corba_status
-epp_corba_call(
+epp_call_login(
 		epp_corba_globs *globs,
 		int *session,
 		epp_lang *lang,
 		char *fingerprint,
+		epp_command_data *cdata);
+
+/**
+ * Call corba getsvTRID function. This is mostly used for generating error
+ * messages.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_logout(
+		epp_corba_globs *globs,
+		int session,
 		epp_command_data *cdata,
 		int *logout);
+
+/**
+ * Call corba getsvTRID function. This is mostly used for generating error
+ * messages.
+ * @par corba_globs Corba global-like variables
+ * @par session Session identifier
+ * @par cdata Necessary input data
+ * @ret CORBA_OK if succesful
+ */
+corba_status
+epp_call_cmd(epp_corba_globs *globs, int session, epp_command_data *cdata);
 
 #endif /* EPP_CLIENT_H */

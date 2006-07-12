@@ -278,6 +278,30 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 	}
 }
 
+int
+epp_call_hello(epp_corba_globs *globs, char *buf, unsigned len)
+{
+	CORBA_Environment ev[1];
+	CORBA_char *version;
+
+	CORBA_exception_init(ev);
+
+	version = ccReg_EPP_version(globs->service, ev);
+
+	if (raised_exception(ev)) {
+		/* do NOT try to free version even if not NULL -> segfault */
+		CORBA_exception_free(ev);
+		return 0;
+	}
+	CORBA_exception_free(ev);
+
+	strncpy(buf, version, len - 1);
+	/* just want to be sure the string is NULL terminated in any case */
+	buf[len] = '\0';
+	CORBA_free(version);
+	return 1;
+}
+
 static corba_status
 epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
@@ -317,9 +341,13 @@ epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	return CORBA_OK;
 }
 
-static corba_status
-epp_call_login(epp_corba_globs *globs, int *session, epp_lang *lang,
-		epp_command_data *cdata, char *certID)
+corba_status
+epp_call_login(
+		epp_corba_globs *globs,
+		int *session,
+		epp_lang *lang,
+		char *certID,
+		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	CORBA_long	c_session;
@@ -370,13 +398,18 @@ epp_call_login(epp_corba_globs *globs, int *session, epp_lang *lang,
 	return CORBA_OK;
 }
 
-static corba_status
-epp_call_logout(epp_corba_globs *globs, int session, epp_command_data *cdata)
+corba_status
+epp_call_logout(
+		epp_corba_globs *globs,
+		int session,
+		epp_command_data *cdata,
+		int *logout)
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
 
 	CORBA_exception_init(ev);
+	*logout = 0;
 
 	response = ccReg_EPP_ClientLogout(globs->service,
 			session,
@@ -404,6 +437,10 @@ epp_call_logout(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
+
+	/* propagate information about logout upwards */
+	if (cdata->rc == 1500) *logout = 1;
+
 	return CORBA_OK;
 }
 
@@ -1816,82 +1853,73 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 }
 
 corba_status
-epp_corba_call(epp_corba_globs *globs, int *session, epp_lang *lang,
-		char *fingerprint, epp_command_data *cdata, int *logout)
+epp_call_cmd(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	corba_status	cstat;
 
-	*logout = 0;
 	switch (cdata->type) {
-		case EPP_LOGIN:
-			cstat = epp_call_login(globs, session, lang, cdata, fingerprint);
-			break;
-		case EPP_LOGOUT:
-			cstat = epp_call_logout(globs, *session, cdata);
-			if (cdata->rc == 1500) *logout = 1;
-			break;
 		case EPP_DUMMY:
-			cstat = epp_call_dummy(globs, *session, cdata);
+			cstat = epp_call_dummy(globs, session, cdata);
 			break;
 		case EPP_CHECK_CONTACT:
-			cstat = epp_call_check(globs, *session, cdata, EPP_CONTACT);
+			cstat = epp_call_check(globs, session, cdata, EPP_CONTACT);
 			break;
 		case EPP_CHECK_DOMAIN:
-			cstat = epp_call_check(globs, *session, cdata, EPP_DOMAIN);
+			cstat = epp_call_check(globs, session, cdata, EPP_DOMAIN);
 			break;
 		case EPP_CHECK_NSSET:
-			cstat = epp_call_check(globs, *session, cdata, EPP_NSSET);
+			cstat = epp_call_check(globs, session, cdata, EPP_NSSET);
 			break;
 		case EPP_INFO_CONTACT:
-			cstat = epp_call_info_contact(globs, *session, cdata);
+			cstat = epp_call_info_contact(globs, session, cdata);
 			break;
 		case EPP_INFO_DOMAIN:
-			cstat = epp_call_info_domain(globs, *session, cdata);
+			cstat = epp_call_info_domain(globs, session, cdata);
 			break;
 		case EPP_INFO_NSSET:
-			cstat = epp_call_info_nsset(globs, *session, cdata);
+			cstat = epp_call_info_nsset(globs, session, cdata);
 			break;
 		case EPP_POLL_REQ:
-			cstat = epp_call_poll_req(globs, *session, cdata);
+			cstat = epp_call_poll_req(globs, session, cdata);
 			break;
 		case EPP_POLL_ACK:
-			cstat = epp_call_poll_ack(globs, *session, cdata);
+			cstat = epp_call_poll_ack(globs, session, cdata);
 			break;
 		case EPP_CREATE_CONTACT:
-			cstat = epp_call_create_contact(globs, *session, cdata);
+			cstat = epp_call_create_contact(globs, session, cdata);
 			break;
 		case EPP_CREATE_DOMAIN:
-			cstat = epp_call_create_domain(globs, *session, cdata);
+			cstat = epp_call_create_domain(globs, session, cdata);
 			break;
 		case EPP_CREATE_NSSET:
-			cstat = epp_call_create_nsset(globs, *session, cdata);
+			cstat = epp_call_create_nsset(globs, session, cdata);
 			break;
 		case EPP_DELETE_CONTACT:
-			cstat = epp_call_delete(globs, *session, cdata, EPP_CONTACT);
+			cstat = epp_call_delete(globs, session, cdata, EPP_CONTACT);
 			break;
 		case EPP_DELETE_DOMAIN:
-			cstat = epp_call_delete(globs, *session, cdata, EPP_DOMAIN);
+			cstat = epp_call_delete(globs, session, cdata, EPP_DOMAIN);
 			break;
 		case EPP_DELETE_NSSET:
-			cstat = epp_call_delete(globs, *session, cdata, EPP_NSSET);
+			cstat = epp_call_delete(globs, session, cdata, EPP_NSSET);
 			break;
 		case EPP_RENEW_DOMAIN:
-			cstat = epp_call_renew_domain(globs, *session, cdata);
+			cstat = epp_call_renew_domain(globs, session, cdata);
 			break;
 		case EPP_UPDATE_DOMAIN:
-			cstat = epp_call_update_domain(globs, *session, cdata);
+			cstat = epp_call_update_domain(globs, session, cdata);
 			break;
 		case EPP_UPDATE_CONTACT:
-			cstat = epp_call_update_contact(globs, *session, cdata);
+			cstat = epp_call_update_contact(globs, session, cdata);
 			break;
 		case EPP_UPDATE_NSSET:
-			cstat = epp_call_update_nsset(globs, *session, cdata);
+			cstat = epp_call_update_nsset(globs, session, cdata);
 			break;
 		case EPP_TRANSFER_DOMAIN:
-			cstat = epp_call_transfer(globs, *session, cdata, EPP_DOMAIN);
+			cstat = epp_call_transfer(globs, session, cdata, EPP_DOMAIN);
 			break;
 		case EPP_TRANSFER_NSSET:
-			cstat = epp_call_transfer(globs, *session, cdata, EPP_NSSET);
+			cstat = epp_call_transfer(globs, session, cdata, EPP_NSSET);
 			break;
 		default:
 			cstat = CORBA_INT_ERROR;

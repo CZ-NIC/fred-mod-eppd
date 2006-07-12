@@ -1,6 +1,7 @@
-#ifndef EPP_VERSION_H
-#define EPP_VERSION_H
+#ifndef MODEPPD_VERSION
+#define MODEPPD_VERSION	"1.0.0"
+#endif
 
-#define MODEPPD_VERSION	"1.0"
-
+#ifndef SVN_REV
+#define SVN_REV	"unknown"
 #endif

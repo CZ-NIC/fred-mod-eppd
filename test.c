@@ -148,6 +148,8 @@ int main(int argc, char *argv[])
 	parser_status	pstat;
 	corba_status	cstat;
 	gen_status	gstat;
+	char version_buf[101];
+	char fp[] = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
 
 	/* API: init parser */
 	epp_parser_init();
@@ -163,7 +165,11 @@ int main(int argc, char *argv[])
 	}
 
 	/* API: greeting */
-	gstat = epp_gen_greeting("Server ID", &greeting);
+	if (epp_call_hello(corba_globs, version_buf, 100) == 0) {
+		fputs("Could not get version from CR\n", stderr);
+		return 1;
+	}
+	gstat = epp_gen_greeting(version_buf, &greeting);
 	if (gstat != GEN_OK) {
 		fputs("Error in greeting generator\n", stderr);
 		return 1;
@@ -179,41 +185,37 @@ int main(int argc, char *argv[])
 	lang = LANG_EN;
 
 	while (1) {
-	   if( argc == 1 ) /* interaktivni rezim */
+		 if( argc == 1 ) /* interaktivni rezim */
 		 {
 
-		fputs("Command: ", stderr);
-		switch (cmd = getcmd()) 
-                {
-			case CMD_CUSTOM:
-				readinput(text);
-				break;
-			case CMD_FILE:
-				if (!readfile(text)) continue;
-				puts(text);
-				break;
-			case CMD_EXIT:
-				quit = 1;
-				break;
-			default:
-				fputs("Unknown command\n", stderr);
-				continue;
-		}
-		if (quit) break;
-
+			fputs("Command: ", stderr);
+			switch (cmd = getcmd()) 
+					{
+				case CMD_CUSTOM:
+					readinput(text);
+					break;
+				case CMD_FILE:
+					if (!readfile(text)) continue;
+					puts(text);
+					break;
+				case CMD_EXIT:
+					quit = 1;
+					break;
+				default:
+					fputs("Unknown command\n", stderr);
+					continue;
+			}
+			if (quit) break;
 		  }
-               else
-                { 
-                  
-                  cmd = CMD_FILE;
-                  if( ar < argc ) 
-                    {
-                      openfile(text , argv[ar] );
-                      ar ++ ; 
-                     } 
-                  else {  quit = 1; break;   } 
-
-                }
+		  else { 
+			  cmd = CMD_FILE;
+			  if( ar < argc ) 
+				{
+				  openfile(text , argv[ar] );
+				  ar ++ ; 
+				 } 
+			  else {  quit = 1; break;   } 
+		  }
 
 		bzero(&cdata, sizeof cdata);
 
@@ -227,7 +229,12 @@ int main(int argc, char *argv[])
 		pstat = epp_parse_command(session, "schemas/all-1.0.xsd", text,
 				strlen(text), &cdata);
 		if (pstat == PARSER_HELLO) {
-			gstat = epp_gen_greeting("Server ID", &greeting);
+			/* API: greeting */
+			if (epp_call_hello(corba_globs, version_buf, 100) == 0) {
+				fputs("Could not get version from CR\n", stderr);
+				return 1;
+			}
+			gstat = epp_gen_greeting(version_buf, &greeting);
 			if (gstat != GEN_OK) {
 				fputs("Error when creating epp greeting\n", stderr);
 				return 1;
@@ -237,78 +244,84 @@ int main(int argc, char *argv[])
 			/* API: free greeting data */
 			epp_free_greeting(greeting);
 		}
-		else if (pstat != PARSER_OK && pstat != PARSER_NOT_VALID) {
-			fputs("Parser error\n", stderr);
-			continue;
-		}
-		else {
-			char fp[] = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
+		else if (pstat == PARSER_CMD_LOGOUT) {
 			int logout; // not used
 
 			/* API: corba call */
-			cstat = epp_corba_call(corba_globs, &session, &lang, fp, &cdata,
-					&logout);
-
-			if (cstat == CORBA_OK) {
-				epp_gen	gen;
-
-				/* API: generate response */
-				gstat = epp_gen_response(1, "schemas/all-1.0.xsd", lang, &cdata,
-						&gen);
-				switch (gstat) {
-					/*
-					 * following errors are serious and response cannot be sent
-					 * to client when any of them appears
-					 */
-					case GEN_EBUFFER:
-					case GEN_EWRITER:
-					case GEN_EBUILD:
-						fputs("XML Generator failed - terminating session\n",stderr);
-						break;
-					/*
-					 * following errors are only informative though serious.
-					 * The connection persists and response is sent back to
-					 * client.
-					 */
-					case GEN_NOT_XML:
-						fputs("Response is not XML!!\n", stderr);
-						puts(gen.response);
-						epp_free_gen(&gen);
-						break;
-					case GEN_EINTERNAL:
-						fputs("Internal error when validating response\n", stderr);
-						puts(gen.response);
-						epp_free_gen(&gen);
-						break;
-					case GEN_ESCHEMA:
-						fputs("Error when parsing schema\n", stderr);
-						puts(gen.response);
-						epp_free_gen(&gen);
-						break;
-					case GEN_NOT_VALID:
-						fputs("Server response does not validate\n", stderr);
-						if (gen.valerr != NULL) {
-							CL_FOREACH(gen.valerr) {
-								epp_error	*e = CL_CONTENT(gen.valerr);
-								fprintf(stderr, "\tElement: %s\n", e->value);
-								fprintf(stderr, "\tReason: %s\n", e->reason);
-							}
-						}
-						puts(gen.response);
-						epp_free_gen(&gen);
-						break;
-					default:
-						/* GEN_OK */
-						puts(gen.response);
-						epp_free_gen(&gen);
-						break;
-				}
-			}
-			else fputs("Corba call failed\n", stderr);
-
-			/* API: clean up command data */
-			epp_command_data_cleanup(&cdata);
+			cstat = epp_call_logout(corba_globs, session, &cdata, &logout);
 		}
+		else if (pstat == PARSER_CMD_LOGIN) {
+			/* API: corba call */
+			cstat = epp_call_login(corba_globs, &session, &lang, fp, &cdata);
+		}
+		else if (pstat == PARSER_CMD_OTHER) {
+			/* API: corba call */
+			cstat = epp_call_cmd(corba_globs, session, &cdata);
+		}
+		else {
+			fputs("XML PARSER error\n", stderr);
+			continue;
+		}
+
+		if (cstat == CORBA_OK) {
+			epp_gen	gen;
+
+			/* API: generate response */
+			gstat = epp_gen_response(1, "schemas/all-1.0.xsd", lang, &cdata,
+					&gen);
+			switch (gstat) {
+				/*
+				 * following errors are serious and response cannot be sent
+				 * to client when any of them appears
+				 */
+				case GEN_EBUFFER:
+				case GEN_EWRITER:
+				case GEN_EBUILD:
+					fputs("XML Generator failed - terminating session\n",stderr);
+					break;
+				/*
+				 * following errors are only informative though serious.
+				 * The connection persists and response is sent back to
+				 * client.
+				 */
+				case GEN_NOT_XML:
+					fputs("Response is not XML!!\n", stderr);
+					puts(gen.response);
+					epp_free_gen(&gen);
+					break;
+				case GEN_EINTERNAL:
+					fputs("Internal error when validating response\n", stderr);
+					puts(gen.response);
+					epp_free_gen(&gen);
+					break;
+				case GEN_ESCHEMA:
+					fputs("Error when parsing schema\n", stderr);
+					puts(gen.response);
+					epp_free_gen(&gen);
+					break;
+				case GEN_NOT_VALID:
+					fputs("Server response does not validate\n", stderr);
+					if (gen.valerr != NULL) {
+						CL_FOREACH(gen.valerr) {
+							epp_error	*e = CL_CONTENT(gen.valerr);
+							fprintf(stderr, "\tElement: %s\n", e->value);
+							fprintf(stderr, "\tReason: %s\n", e->reason);
+						}
+					}
+					puts(gen.response);
+					epp_free_gen(&gen);
+					break;
+				default:
+					/* GEN_OK */
+					puts(gen.response);
+					epp_free_gen(&gen);
+					break;
+			}
+		}
+		else fputs("Corba call failed\n", stderr);
+
+		/* API: clean up command data */
+		epp_command_data_cleanup(&cdata);
 	}
 
 	/* API: clean up globs */

@@ -2310,7 +2310,7 @@ epp_parse_command(
 			cdata->rc = 2002;
 			xmlXPathFreeContext(xpathCtx);
 			xmlFreeDoc(doc);
-			return PARSER_OK;
+			return PARSER_CMD_OTHER;
 		}
 	}
 	else {
@@ -2319,7 +2319,7 @@ epp_parse_command(
 			cdata->rc = 2002;
 			xmlXPathFreeContext(xpathCtx);
 			xmlFreeDoc(doc);
-			return PARSER_OK;
+			return PARSER_CMD_OTHER;
 		}
 	}
 
@@ -2374,7 +2374,9 @@ epp_parse_command(
 	xmlFreeDoc(doc);
 	xmlMemoryDump();
 
-	return PARSER_OK;
+	if (cdata->type == EPP_LOGIN) return PARSER_CMD_LOGIN;
+	if (cdata->type == EPP_LOGOUT) return PARSER_CMD_LOGOUT;
+	return PARSER_CMD_OTHER;
 }
 
 /**
