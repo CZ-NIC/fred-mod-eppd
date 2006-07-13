@@ -3,7 +3,6 @@
 #
 APXS	= apxs
 APR-CONFIG	= apr-config
-ORBIT2-CONFIG	= orbit2-config
 ORBIT-IDL-2	= orbit-idl-2
 PKG-CONFIG	= pkg-config
 IDL	= ../cr/idl/ccReg.idl
@@ -15,8 +14,8 @@ SVN_REV := $(shell svn info | grep Revision | cut -d ' ' -f 2)
 IDLOUT	= ccReg.h ccReg-common.c ccReg-stubs.c
 OBJS	= mod_eppd.o epp_common.o epp_xmlcommon.o epp_parser.o epp_gen.o epp-client.o ccReg-common.o ccReg-stubs.o
 
-ORB_LDFLAGS	= $(shell $(ORBIT2-CONFIG) --libs | sed -e s/-Wl,//g -e s/-pthread/-lpthread/g)
-ORB_CFLAGS	= $(shell $(ORBIT2-CONFIG) --cflags)
+ORB_LDFLAGS	= $(shell $(PKG-CONFIG) --libs ORBit-2.0 | sed -e s/-Wl,//g -e s/-pthread/-lpthread/g)
+ORB_CFLAGS	= $(shell $(PKG-CONFIG) --cflags ORBit-2.0)
 
 XML_CFLAGS  =$(shell $(PKG-CONFIG) --cflags libxml-2.0)
 XML_LIBS    =$(shell $(PKG-CONFIG) --libs libxml-2.0)
