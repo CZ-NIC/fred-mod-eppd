@@ -59,11 +59,54 @@ typedef enum {
 }epp_lang;
 
 /*
+ * error specification
+ */
+typedef enum {
+	errspec_unknow, 
+	errspec_pollAck_msgID,
+	errspec_contactCreate_handle,
+	errspec_contactCreate_cc,
+	errspec_contactUpdate_cc,
+	errspec_contactUpdate_status_add,
+	errspec_contactUpdate_status_rem,
+	errspec_nssetCreate_handle,
+	errspec_nssetCreate_tech,
+	errspec_nssetCreate_ns_name,
+	errspec_nssetCreate_ns_addr,
+	errspec_nssetUpdate_ns_name_add,
+	errspec_nssetUpdate_ns_addr_add,
+	errspec_nssetUpdate_ns_name_rem,
+	errspec_nssetUpdate_ns_addr_rem,
+	errspec_nssetUpdate_tech_add,
+	errspec_nssetUpdate_tech_rem,
+	errspec_nssetUpdate_status_add,
+	errspec_nssetUpdate_status_rem,
+	errspec_domainCreate_fqdn,
+	errspec_domainCreate_registrant,
+	errspec_domainCreate_nsset,
+	errspec_domainCreate_period,
+	errspec_domainCreate_admin,
+	errspec_domainCreate_ext_valdate,
+	errspec_domainUpdate_registrant,
+	errspec_domainUpdate_nsset,
+	errspec_domainUpdate_admin_add,
+	errspec_domainUpdate_admin_rem,
+	errspec_domainUpdate_status_add,
+	errspec_domainUpdate_status_rem,
+	errspec_domainUpdate_ext_valdate,
+	errspec_domainRenew_curExpDate,
+	errspec_domainRenew_period,
+	errspec_domainRenew_ext_valDate
+}epp_errorspec;
+
+/*
  * this struct represents one epp error in ExtValue element
  */
 typedef struct {
 	char	*value;
+	int	standalone;
 	char	*reason;
+	epp_errorspec	spec;
 }epp_error;
 
 /**
@@ -396,5 +439,8 @@ typedef struct {
 		}renew;
 	}*out;
 }epp_command_data;
+
+void get_rfc3339_date(long long date, char *str);
+void get_stripped_date(long long date, char *str);
 
 #endif

@@ -22,8 +22,6 @@ typedef enum {
 	VAL_EINTERNAL,
 }valid_status;
 
-void get_rfc3339_date(long long date, char *str);
-void get_stripped_date(long long date, char *str);
 valid_status validate_doc(
 		const char *url_schema,
 		xmlDocPtr doc,

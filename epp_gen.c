@@ -418,6 +418,162 @@ simple_err:
 	return 0;
 }
 
+static void
+complete_tags(epp_error	*e)
+{
+	char	*newstr;
+	int	len;
+
+	len = strlen(e->value);
+
+	switch (e->spec) {
+		case errspec_pollAck_msgID:
+			len += strlen("<poll op=\"ack\" msgID=\"");
+			len += strlen("\"/>");
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<poll op=\"ack\" msgID=\"");
+			strcat(newstr, e->value);
+			strcat(newstr, "\"/>");
+			break;
+		case errspec_contactUpdate_cc:
+		case errspec_contactCreate_cc:
+			len += 2 * strlen("<cc>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<cc>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</cc>");
+			break;
+		case errspec_contactCreate_handle:
+		case errspec_nssetCreate_handle:
+			len += 2 * strlen("<id>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<id>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</id>");
+			break;
+		case errspec_domainCreate_fqdn:
+			len += 2 * strlen("<name>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<name>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</name>");
+			break;
+		case errspec_contactUpdate_status_add:
+		case errspec_contactUpdate_status_rem:
+		case errspec_nssetUpdate_status_add:
+		case errspec_nssetUpdate_status_rem:
+		case errspec_domainUpdate_status_add:
+		case errspec_domainUpdate_status_rem:
+			len += strlen("<status s=\"");
+			len += strlen("\"/>");
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<status s=\"");
+			strcat(newstr, e->value);
+			strcat(newstr, "\"/>");
+			break;
+		case errspec_nssetCreate_tech:
+		case errspec_nssetUpdate_tech_add:
+		case errspec_nssetUpdate_tech_rem:
+			len += 2 * strlen("<tech>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<tech>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</tech>");
+			break;
+		case errspec_nssetCreate_ns_name:
+		case errspec_nssetUpdate_ns_name_add:
+		case errspec_nssetUpdate_ns_name_rem:
+			len += 2 * strlen("<name>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<name>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</name>");
+			break;
+		case errspec_nssetCreate_ns_addr:
+		case errspec_nssetUpdate_ns_addr_add:
+		case errspec_nssetUpdate_ns_addr_rem:
+			len += 2 * strlen("<addr>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<addr>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</addr>");
+			break;
+		case errspec_domainCreate_registrant:
+		case errspec_domainUpdate_registrant:
+			len += 2 * strlen("<registrant>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<registrant>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</registrant>");
+			break;
+		case errspec_domainCreate_nsset:
+		case errspec_domainUpdate_nsset:
+			len += 2 * strlen("<nsset>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<nsset>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</nsset>");
+			break;
+		case errspec_domainCreate_period:
+		case errspec_domainRenew_period:
+			len += 2 * strlen("<period>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<period>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</period>");
+			break;
+		case errspec_domainCreate_admin:
+		case errspec_domainUpdate_admin_add:
+		case errspec_domainUpdate_admin_rem:
+			len += 2 * strlen("<contact>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<contact>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</contact>");
+			break;
+		case errspec_domainCreate_ext_valdate:
+		case errspec_domainUpdate_ext_valdate:
+		case errspec_domainRenew_ext_valDate:
+			len += 2 * strlen("<valExDate>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<valExDate>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</valExDate>");
+			break;
+		case errspec_domainRenew_curExpDate:
+			len += 2 * strlen("<curExpDate>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<curExpDate>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</curExpDate>");
+			break;
+		default:
+			len += 2 * strlen("<unknown>") + 1;
+			newstr = malloc(len + 1);
+			*newstr = '\0';
+			strcat(newstr, "<unknown>");
+			strcat(newstr, e->value);
+			strcat(newstr, "</unknown>");
+			break;
+	}
+	free(e->value);
+	e->value = newstr;
+}
+
 gen_status
 epp_gen_response(
 		int validate,
@@ -478,6 +634,7 @@ epp_gen_response(
 		 * by &lt;, &gt; respectively.
 		 */
 		START_ELEMENT(writer, simple_err, "value");
+		if (!e->standalone) complete_tags(e);
 		if (xmlTextWriterWriteRaw(writer, BAD_CAST e->value) < 0)
 			goto simple_err;
 		END_ELEMENT(writer, simple_err); /* value */

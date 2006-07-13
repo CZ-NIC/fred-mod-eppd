@@ -95,8 +95,8 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 {
 	struct circ_list	*item;
 	epp_error	*err_item;
-	int	i, len;
-	char	*newstr;
+	int	i;
+	ccReg_Error_seq	*c_error;
 
 	for (i = 0; i < c_errors->_length; i++) {
 		if ((item = malloc(sizeof *item)) == NULL) break;
@@ -104,171 +104,133 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 			free(item);
 			break;
 		}
-		err_item->value = strdup(c_errors->_buffer[i].value);
-		err_item->reason = strdup(c_errors->_buffer[i].reason);
-		len = strlen(c_errors->_buffer[i].value);
-		switch (c_errors->_buffer[i].code) {
+		c_error = &c_errors->_buffer[i];
+		err_item->reason = strdup(c_error->reason);
+		err_item->standalone = 0;
+
+		/* convert "any" type to string */
+		if (!strcmp(c_error->value._type->name, "long")) {
+			err_item->value = malloc(10); /* should be enough for any number */
+			snprintf(err_item->value, 10, "%ld",
+					*((long *) c_error->value._value));
+		}
+		else if (!strcmp(c_error->value._type->name, "string"))
+			err_item->value = strdup((char *) c_error->value._value);
+		else if (!strcmp(c_error->value._type->name, "timestamp")) {
+			err_item->value = malloc(30);
+			get_rfc3339_date( *((unsigned long long *) c_error->value._value),
+					err_item->value);
+		}
+		else
+			err_item->value = strdup("Unknown value type");
+
+		switch (c_error->code) {
 			case ccReg_pollAck_msgID:
-				len += strlen("<poll op=\"ack\" msgID=\"");
-				len += strlen("\"/>");
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<poll op=\"ack\" msgID=\"");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "\"/>");
+				err_item->spec = errspec_pollAck_msgID;
 				break;
 			case ccReg_contactUpdate_cc:
+				err_item->spec = errspec_contactUpdate_cc;
+				break;
 			case ccReg_contactCreate_cc:
-				len += 2 * strlen("<cc>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<cc>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</cc>");
+				err_item->spec = errspec_contactCreate_cc;
 				break;
 			case ccReg_contactCreate_handle:
+				err_item->spec = errspec_contactCreate_handle;
+				break;
 			case ccReg_nssetCreate_handle:
-				len += 2 * strlen("<id>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<id>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</id>");
+				err_item->spec = errspec_nssetCreate_handle;
 				break;
 			case ccReg_domainCreate_fqdn:
-				len += 2 * strlen("<name>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<name>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</name>");
+				err_item->spec = errspec_domainCreate_fqdn;
 				break;
 			case ccReg_contactUpdate_status_add:
+				err_item->spec = errspec_contactUpdate_status_add;
+				break;
 			case ccReg_contactUpdate_status_rem:
+				err_item->spec = errspec_contactUpdate_status_rem;
+				break;
 			case ccReg_nssetUpdate_status_add:
+				err_item->spec = errspec_nssetUpdate_status_add;
+				break;
 			case ccReg_nssetUpdate_status_rem:
+				err_item->spec = errspec_nssetUpdate_status_rem;
+				break;
 			case ccReg_domainUpdate_status_add:
+				err_item->spec = errspec_domainUpdate_status_add;
+				break;
 			case ccReg_domainUpdate_status_rem:
-				len += strlen("<status s=\"");
-				len += strlen("\"/>");
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<status s=\"");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "\"/>");
+				err_item->spec = errspec_domainUpdate_status_rem;
 				break;
 			case ccReg_nssetCreate_tech:
+				err_item->spec = errspec_nssetCreate_tech;
+				break;
 			case ccReg_nssetUpdate_tech_add:
+				err_item->spec = errspec_nssetUpdate_tech_add;
+				break;
 			case ccReg_nssetUpdate_tech_rem:
-				len += 2 * strlen("<tech>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<tech>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</tech>");
+				err_item->spec = errspec_nssetUpdate_tech_rem;
 				break;
 			case ccReg_nssetCreate_ns_name:
+				err_item->spec = errspec_nssetCreate_ns_name;
+				break;
 			case ccReg_nssetUpdate_ns_name_add:
+				err_item->spec = errspec_nssetUpdate_ns_name_add;
+				break;
 			case ccReg_nssetUpdate_ns_name_rem:
-				len += 2 * strlen("<name>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<name>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</name>");
+				err_item->spec = errspec_nssetUpdate_ns_name_rem;
 				break;
 			case ccReg_nssetCreate_ns_addr:
+				err_item->spec = errspec_nssetCreate_ns_addr;
+				break;
 			case ccReg_nssetUpdate_ns_addr_add:
+				err_item->spec = errspec_nssetUpdate_ns_addr_add;
+				break;
 			case ccReg_nssetUpdate_ns_addr_rem:
-				len += 2 * strlen("<addr>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<addr>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</addr>");
+				err_item->spec = errspec_nssetUpdate_ns_addr_rem;
 				break;
 			case ccReg_domainCreate_registrant:
+				err_item->spec = errspec_domainCreate_registrant;
+				break;
 			case ccReg_domainUpdate_registrant:
-				len += 2 * strlen("<registrant>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<registrant>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</registrant>");
+				err_item->spec = errspec_domainUpdate_registrant;
 				break;
 			case ccReg_domainCreate_nsset:
+				err_item->spec = errspec_domainCreate_nsset;
+				break;
 			case ccReg_domainUpdate_nsset:
-				len += 2 * strlen("<nsset>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<nsset>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</nsset>");
+				err_item->spec = errspec_domainUpdate_nsset;
 				break;
 			case ccReg_domainCreate_period:
+				err_item->spec = errspec_domainCreate_period;
+				break;
 			case ccReg_domainRenew_period:
-				len += 2 * strlen("<period>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<period>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</period>");
+				err_item->spec = errspec_domainRenew_period;
 				break;
 			case ccReg_domainCreate_admin:
+				err_item->spec = errspec_domainCreate_admin;
+				break;
 			case ccReg_domainUpdate_admin_add:
+				err_item->spec = errspec_domainUpdate_admin_add;
+				break;
 			case ccReg_domainUpdate_admin_rem:
-				len += 2 * strlen("<contact>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<contact>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</contact>");
+				err_item->spec = errspec_domainUpdate_admin_rem;
 				break;
 			case ccReg_domainCreate_ext_valdate:
+				err_item->spec = errspec_domainCreate_ext_valdate;
+				break;
 			case ccReg_domainUpdate_ext_valdate:
+				err_item->spec = errspec_domainUpdate_ext_valdate;
+				break;
 			case ccReg_domainRenew_ext_valDate:
-				len += 2 * strlen("<valExDate>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<valExDate>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</valExDate>");
+				err_item->spec = errspec_domainRenew_ext_valDate;
 				break;
 			case ccReg_domainRenew_curExpDate:
-				len += 2 * strlen("<curExpDate>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<curExpDate>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</curExpDate>");
+				err_item->spec = errspec_domainRenew_curExpDate;
 				break;
 			default:
-				len += 2 * strlen("<unknown>") + 1;
-				if ((newstr = malloc(len + 1)) == NULL)
-					continue;
-				*newstr = '\0';
-				strcat(newstr, "<unknown>");
-				strcat(newstr, c_errors->_buffer[i].value);
-				strcat(newstr, "</unknown>");
+				err_item->spec = errspec_unknow;
 				break;
-				continue;
 		}
-		free(err_item->value);
-		err_item->value = newstr;
 		CL_CONTENT(item) = (void *) err_item;
 		CL_ADD(errors, item);
 	}
