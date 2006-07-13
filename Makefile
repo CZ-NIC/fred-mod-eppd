@@ -47,7 +47,7 @@ mod_eppd.so: $(OBJS)
 	ld -o mod_eppd.so $(LDFLAGS) $(AP_LDFLAGS) $(ORB_LDFLAGS) $(OBJS) $(AP_LIBS) $(XML_LIBS)
 
 mod_eppd.o:	mod_eppd.c epp_parser.h epp_gen.h epp_common.h epp-client.h
-	gcc $(CFLAGS) $(AP_CFLAGS) $(AP_INCLUDE) -D SVN_REV="${SVN_REV}" -c mod_eppd.c
+	gcc $(CFLAGS) $(AP_CFLAGS) $(AP_INCLUDE) -D SVN_REV=\"${SVN_REV}\" -c mod_eppd.c
 
 epp_xmlcommon.o: epp_xmlcommon.c epp_xmlcommon.h epp_common.h
 	gcc $(CFLAGS) $(XML_CFLAGS) -c epp_xmlcommon.c

@@ -567,7 +567,7 @@ static int epp_process_connection(conn_rec *c)
 						version_buf,
 						") (mod_eppd SVN rev ",
 						SVN_REV,
-						" BUILT ", __DATE__," ",__TIME__,")",
+						" BUILT ",__DATE__," ",__TIME__,")",
 						NULL),
 					&gen.response);
 			if (gstat != GEN_OK) {
