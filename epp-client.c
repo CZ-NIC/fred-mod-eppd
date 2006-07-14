@@ -221,10 +221,10 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 			case ccReg_domainUpdate_admin_rem:
 				err_item->spec = errspec_domainUpdate_admin_rem;
 				break;
-			case ccReg_domainCreate_ext_valdate:
+			case ccReg_domainCreate_ext_valDate:
 				err_item->spec = errspec_domainCreate_ext_valdate;
 				break;
-			case ccReg_domainUpdate_ext_valdate:
+			case ccReg_domainUpdate_ext_valDate:
 				err_item->spec = errspec_domainUpdate_ext_valdate;
 				break;
 			case ccReg_domainRenew_ext_valDate:
