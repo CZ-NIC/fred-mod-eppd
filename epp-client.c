@@ -1,5 +1,5 @@
 /**
- * Copyright statement ;)
+ * @file epp-client.c
  */
 
 #include <assert.h>
@@ -97,6 +97,9 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 	epp_error	*err_item;
 	int	i;
 	ccReg_Error_seq	*c_error;
+	CORBA_Environment ev[1];
+
+	CORBA_exception_init(ev);
 
 	for (i = 0; i < c_errors->_length; i++) {
 		if ((item = malloc(sizeof *item)) == NULL) break;
@@ -109,15 +112,17 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 		err_item->standalone = 0;
 
 		/* convert "any" type to string */
-		if (c_error->value._type->name == 0) {
+		if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_string, ev))
 			err_item->value = strdup(* ((char **) c_error->value._value));
-		}
-		else if (!strcmp(c_error->value._type->name, "long")) {
+		else if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_long, ev))
+		{
 			err_item->value = malloc(10); /* should be enough for any number */
 			snprintf(err_item->value, 10, "%ld",
 					*((long *) c_error->value._value));
 		}
-		else if (!strcmp(c_error->value._type->name, "timestamp")) {
+		else if (CORBA_TypeCode_equal(c_error->value._type,
+					TC_ccReg_timestamp, ev))
+		{
 			err_item->value = malloc(30);
 			get_rfc3339_date( *((unsigned long long *) c_error->value._value),
 					err_item->value);
@@ -757,8 +762,8 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 	/* look for extensions */
 	for (i = 0; i < c_domain->ext._length; i++) {
 		/* is it enumval extension? */
-		if (!strcmp(c_domain->ext._buffer[i]._type->name,
-				"ENUMValidationExtension"))
+		if (CORBA_TypeCode_equal(c_domain->ext._buffer[i]._type,
+				TC_ccReg_ENUMValidationExtension, ev))
 		{
 			ccReg_ENUMValidationExtension	*c_enumval =
 				c_domain->ext._buffer[i]._value;
