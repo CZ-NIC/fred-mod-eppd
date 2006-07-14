@@ -98,11 +98,6 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 	int	i;
 	ccReg_Error_seq	*c_error;
 
-	/* hack XXX */
-	CORBA_TypeCode type;
-	type = TC_CORBA_string;
-	type = TC_CORBA_long;
-
 	for (i = 0; i < c_errors->_length; i++) {
 		if ((item = malloc(sizeof *item)) == NULL) break;
 		if ((err_item = malloc(sizeof *err_item)) == NULL) {
@@ -114,13 +109,14 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 		err_item->standalone = 0;
 
 		/* convert "any" type to string */
-		if (!strcmp(c_error->value._type->name, "long")) {
+		if (c_error->value._type->name == 0) {
+			err_item->value = strdup(* ((char **) c_error->value._value));
+		}
+		else if (!strcmp(c_error->value._type->name, "long")) {
 			err_item->value = malloc(10); /* should be enough for any number */
 			snprintf(err_item->value, 10, "%ld",
 					*((long *) c_error->value._value));
 		}
-		else if (!strcmp(c_error->value._type->name, "string"))
-			err_item->value = strdup((char *) c_error->value._value);
 		else if (!strcmp(c_error->value._type->name, "timestamp")) {
 			err_item->value = malloc(30);
 			get_rfc3339_date( *((unsigned long long *) c_error->value._value),

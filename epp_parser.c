@@ -583,6 +583,7 @@ parse_poll(
 {
 	xmlXPathObjectPtr	xpathObj;
 	xmlChar	*str;
+	xmlNodePtr	node;
 
 	/* get poll type - request or acknoledge */
 	if (xpath_exists(xpathCtx, "epp:poll[@op='req']"))
@@ -616,20 +617,58 @@ parse_poll(
 		return;
 	}
 	/* get value of attr msgID */
-	str = xmlGetProp(xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
-			BAD_CAST "msgID");
-	xmlXPathFreeObject(xpathObj);
+	node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
+	str = xmlGetProp(node, BAD_CAST "msgID");
+
 	/*
 	 * msgID attribute is not strictly required by xml schema so we
 	 * have to explicitly check if it is there
 	 */
 	if (str == NULL) {
+		struct circ_list	*new_item;
+		xmlBufferPtr	buf;
+		epp_error	*valerr;
+
 		free(cdata->in);
 		cdata->in = NULL;
 		cdata->rc = 2003;
 		cdata->type = EPP_DUMMY;
+
+		/*
+		 * we will politely create error message which says which parameter is
+		 * missing.
+		 */
+		valerr = malloc(sizeof *valerr);
+		new_item = malloc(sizeof *new_item);
+
+		/* dump problematic node */
+		buf = xmlBufferCreate();
+		if (buf == NULL) {
+			free(valerr);
+			free(new_item);
+			xmlXPathFreeObject(xpathObj);
+			return;
+		}
+		if (xmlNodeDump(buf, doc, node, 0, 0) < 0) {
+			free(valerr);
+			free(new_item);
+			xmlBufferFree(buf);
+			xmlXPathFreeObject(xpathObj);
+			return;
+		}
+		valerr->value = strdup((char *) buf->content);
+		xmlBufferFree(buf);
+
+		valerr->reason = strdup("Required parameter msgID is missing");
+		valerr->standalone = 1;
+
+		CL_CONTENT(new_item) = (void *) valerr;
+		CL_ADD(cdata->errors, new_item);
+
+		xmlXPathFreeObject(xpathObj);
 		return;
 	}
+	xmlXPathFreeObject(xpathObj);
 
 	/* conversion is safe, if str is not a number, validator catches it */
 	cdata->in->poll_ack.msgid = atoi((char *) str);
