@@ -77,6 +77,7 @@
 #include "epp_common.h"
 #include "epp_parser.h"
 #include "epp_gen.h"
+#include "epp_version.h"
 #include "epp-client.h"
 
 #define EPPD_VERSION	"testing"
@@ -560,14 +561,8 @@ static int epp_process_connection(conn_rec *c)
 			 * from corba server through version() function)
 			 */
 			gstat = epp_gen_greeting(
-					apr_pstrcat(
-						rpool,
-						sc->servername,
-						" (ccReg ",
-						version_buf,
-						") (mod_eppd SVN rev ",
-						SVN_REV,
-						" BUILT ",__DATE__," ",__TIME__,")",
+					apr_pstrcat(rpool, sc->servername,
+						" (", version_buf, ")",
 						NULL),
 					&gen.response);
 			if (gstat != GEN_OK) {
@@ -916,6 +911,9 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 		}
 		s = s->next;
 	}
+	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+		"mod_eppd started (mod_eppd version %s, SVN revision %s, BUILT %s %s)",
+				MODEPPD_VERSION, SVN_REV, __DATE__, __TIME__);
 
 	return OK;
 }

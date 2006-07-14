@@ -98,6 +98,11 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 	int	i;
 	ccReg_Error_seq	*c_error;
 
+	/* hack XXX */
+	CORBA_TypeCode type;
+	type = TC_CORBA_string;
+	type = TC_CORBA_long;
+
 	for (i = 0; i < c_errors->_length; i++) {
 		if ((item = malloc(sizeof *item)) == NULL) break;
 		if ((err_item = malloc(sizeof *err_item)) == NULL) {

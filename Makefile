@@ -14,7 +14,7 @@ SVN_REV := $(shell svn info | grep Revision | cut -d ' ' -f 2)
 IDLOUT	= ccReg.h ccReg-common.c ccReg-stubs.c
 OBJS	= mod_eppd.o epp_common.o epp_xmlcommon.o epp_parser.o epp_gen.o epp-client.o ccReg-common.o ccReg-stubs.o
 
-ORB_LDFLAGS	= $(shell $(PKG-CONFIG) --libs ORBit-2.0 | sed -e s/-Wl,//g -e s/-pthread/-lpthread/g)
+ORB_LDFLAGS	= $(shell $(PKG-CONFIG) --libs ORBit-2.0)
 ORB_CFLAGS	= $(shell $(PKG-CONFIG) --cflags ORBit-2.0)
 
 XML_CFLAGS  =$(shell $(PKG-CONFIG) --cflags libxml-2.0)
@@ -34,7 +34,7 @@ AP_LIBS	+=$(shell $(APR-CONFIG) --libs)
 AP_INSTALLDIR	:= $(shell $(APXS) -q LIBEXECDIR)
 
 CFLAGS	= -g -O0 -fPIC -Wall
-LDFLAGS	= -rpath $(AP_INSTALLDIR) -Bshareable
+LDFLAGS	= -Wl,-rpath $(AP_INSTALLDIR) -Bshareable
 
 all: build
 
@@ -44,7 +44,7 @@ install: mod_eppd.so
 	cp -f mod_eppd.so $(AP_INSTALLDIR)
 
 mod_eppd.so: $(OBJS)
-	ld -o mod_eppd.so $(LDFLAGS) $(AP_LDFLAGS) $(ORB_LDFLAGS) $(OBJS) $(AP_LIBS) $(XML_LIBS)
+	gcc -shared -o mod_eppd.so $(LDFLAGS) $(AP_LDFLAGS) $(ORB_LDFLAGS) $(OBJS) $(AP_LIBS) $(XML_LIBS)
 
 mod_eppd.o:	mod_eppd.c epp_parser.h epp_gen.h epp_common.h epp-client.h
 	gcc $(CFLAGS) $(AP_CFLAGS) $(AP_INCLUDE) -D SVN_REV=\"${SVN_REV}\" -c mod_eppd.c

@@ -677,9 +677,9 @@ parse_create_domain(
 	/* get the domain data */
 	XPATH_REQ1(cdata->in->create_domain.name, doc, xpathCtx, error_cd,
 			"domain:name");
-	XPATH_TAKE1(cdata->in->create_domain.registrant, doc, xpathCtx, error_cd,
+	XPATH_REQ1(cdata->in->create_domain.registrant, doc, xpathCtx, error_cd,
 			"domain:registrant");
-	XPATH_TAKE1(cdata->in->create_domain.nsset, doc, xpathCtx, error_cd,
+	XPATH_REQ1(cdata->in->create_domain.nsset, doc, xpathCtx, error_cd,
 			"domain:nsset");
 	XPATH_REQ1(cdata->in->create_domain.authInfo, doc, xpathCtx, error_cd,
 			"domain:authInfo/domain:pw");
@@ -2178,9 +2178,9 @@ epp_parse_command(
 		}
 		cl_purge(cdata->errors);
 		xmlFreeDoc(doc);
-		return (val_ret == VAL_ESCHEMA) ? VAL_ESCHEMA : VAL_EINTERNAL;
+		return (val_ret == VAL_ESCHEMA) ? PARSER_ESCHEMA : PARSER_EINTERNAL;
 	}
-	else if (val_ret == PARSER_NOT_VALID) {
+	else if (val_ret == VAL_NOT_VALID) {
 		/*
 		 * validation error consequence: response identifing the problem is sent
 		 * to client, the connection persists.
@@ -2190,7 +2190,7 @@ epp_parse_command(
 		cdata->rc = 2001;
 		cdata->type = EPP_DUMMY;
 		xmlFreeDoc(doc);
-		return val_ret;
+		return PARSER_NOT_VALID;
 	}
 	/* ... VAL_OK */
 
