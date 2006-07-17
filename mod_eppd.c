@@ -46,6 +46,7 @@
 #include "apr_buckets.h"
 #include "apr_file_io.h"
 #ifndef APR_FOPEN_READ
+/** define which overcomes subtle difference between apache 2.0 and 2.2. */
 #define APR_FOPEN_READ	APR_READ
 #endif
 #include "apr_general.h"
@@ -80,10 +81,17 @@
 #include "epp_version.h"
 #include "epp-client.h"
 
-#define EPPD_VERSION	"testing"
-#define MAX_FRAME_LENGTH	16000
+/** Length of EPP header containing message size. */
 #define EPP_HEADER_LENGTH	4
+/**
+ * If client claims in EPP header that he is sending message which is longer
+ * than this number of bytes, the message is omitted.
+ */
+#define MAX_FRAME_LENGTH	16000
 
+/**
+ * eppd_module declaration.
+ */
 module AP_MODULE_DECLARE_DATA eppd_module;
 
 /**
@@ -122,17 +130,18 @@ typedef struct {
 /** Used for access serialization to epp log file. */
 static apr_global_mutex_t *epp_log_lock;
 
-/*
- * This is wrapper function for compatibility reason. Apache 2.0 does
- * not have ap_log_cerror, instead we will use ap_log_error.
- */
 #if AP_SERVER_MINORVERSION_NUMBER == 0
+/**
+ * ap_log_cerror is defined only if apache version is 2.0 because 2.0
+ * contrary to 2.2 does not have this function.
+ */
 #define ap_log_cerror(mark, level, status, c, ...) \
 	ap_log_error(mark, level, status, (c)->base_server, __VA_ARGS__)
 #endif
 
 /**
  * Get well formatted time used in log file as a timestamp.
+ *
  * @param buf Buffer to print time into.
  * @param nbytes Size of the buffer.
  */
@@ -741,7 +750,8 @@ static int epp_process_connection(conn_rec *c)
 }
 
 /**
- * epp output filter, which prefixes each response with length of the response.
+ * EPP output filter, which prefixes each response with length of the response.
+ *
  * @param f Apache filter structure.
  * @param bb Bucket brigade containing a response.
  * @return Return code of next filter in chain.
@@ -784,6 +794,7 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
 /**
  * Init child hook is run everytime a new thread (or process) is started.
  * Task of the hook is to initialize a lock which protects epp log file.
+ *
  * @param p Memory pool.
  * @param s Server record.
  */
@@ -918,6 +929,14 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 	return OK;
 }
 
+/**
+ * Handler for apache's configuration directive "EPPprotocol".
+ *
+ * @param cmd Command structure.
+ * @param dummy Not used parameter.
+ * @param flag 1 means EPPprotocol is turned on, 0 means turned off.
+ * @return Error string in case of failure otherwise NULL.
+ */
 static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
 {
     server_rec *s = cmd->server;
@@ -934,6 +953,14 @@ static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
     return NULL;
 }
 
+/**
+ * Handler for apache's configuration directive "EPPiorfile".
+ *
+ * @param cmd Command structure.
+ * @param dummy Not used parameter.
+ * @param a1 The filename with corba object reference.
+ * @return Error string in case of failure otherwise NULL.
+ */
 static const char *set_iorfile(cmd_parms *cmd, void *dummy,
 		const char *a1)
 {
@@ -986,6 +1013,14 @@ static const char *set_iorfile(cmd_parms *cmd, void *dummy,
     return NULL;
 }
 
+/**
+ * Handler for apache's configuration directive "EPPschema".
+ *
+ * @param cmd Command structure.
+ * @param dummy Not used parameter.
+ * @param a1 The file with xml schema of EPP protocol.
+ * @return Error string in case of failure otherwise NULL.
+ */
 static const char *set_schema(cmd_parms *cmd, void *dummy,
 		const char *a1)
 {
@@ -1013,6 +1048,14 @@ static const char *set_schema(cmd_parms *cmd, void *dummy,
     return NULL;
 }
 
+/**
+ * Handler for apache's configuration directive "EPPlog".
+ *
+ * @param cmd Command structure.
+ * @param dummy Not used parameter.
+ * @param a1 The file where log messages from mod_eppd should be logged.
+ * @return Error string in case of failure otherwise NULL.
+ */
 static const char *set_epplog(cmd_parms *cmd, void *dummy,
 		const char *a1)
 {
@@ -1040,6 +1083,14 @@ static const char *set_epplog(cmd_parms *cmd, void *dummy,
     return NULL;
 }
 
+/**
+ * Handler for apache's configuration directive "EPPloglevel".
+ *
+ * @param cmd Command structure.
+ * @param dummy Not used parameter.
+ * @param a1 Loglevel is one of fatal, error, warning, info, debug.
+ * @return Error string in case of failure otherwise NULL.
+ */
 static const char *set_loglevel(cmd_parms *cmd, void *dummy,
 		const char *a1)
 {
@@ -1081,6 +1132,14 @@ static const char *set_loglevel(cmd_parms *cmd, void *dummy,
     return NULL;
 }
 
+/**
+ * Handler for apache's configuration directive "EPPservername".
+ *
+ * @param cmd Command structure.
+ * @param dummy Not used parameter.
+ * @param a1 Server name of length less than 30 characters.
+ * @return Error string in case of failure otherwise NULL.
+ */
 static const char *set_servername(cmd_parms *cmd, void *dummy,
 		const char *a1)
 {
@@ -1103,11 +1162,20 @@ static const char *set_servername(cmd_parms *cmd, void *dummy,
 		return NULL;
 	}
 
-	sc->servername = apr_pstrdup(cmd->pool, a1);
+	/* because of xml schema, the server name's length is limited */
+	sc->servername = apr_pstrndup(cmd->pool, a1, 29);
 
     return NULL;
 }
 
+/**
+ * Handler for apache's configuration directive "EPPvalidResponse".
+ *
+ * @param cmd Command structure.
+ * @param dummy Not used parameter.
+ * @param flag 1 if mod_eppd's responses should be validated, otherwise 0.
+ * @return Error string in case of failure otherwise NULL.
+ */
 static const char *set_valid_resp(cmd_parms *cmd, void *dummy, int flag)
 {
     server_rec *s = cmd->server;
@@ -1124,6 +1192,10 @@ static const char *set_valid_resp(cmd_parms *cmd, void *dummy, int flag)
     return NULL;
 }
 
+/**
+ * Structure containing mod_eppd's configuration directives and their
+ * handler references.
+ */
 static const command_rec eppd_cmds[] = {
     AP_INIT_FLAG("EPPprotocol", set_epp_protocol, NULL, RSRC_CONF,
 			 "Whether this server is serving the epp protocol"),
@@ -1144,6 +1216,9 @@ static const command_rec eppd_cmds[] = {
     { NULL }
 };
 
+/**
+ * Initialization of of mod_eppd's configuration structure.
+ */
 static void *create_eppd_config(apr_pool_t *p, server_rec *s)
 {
 	eppd_server_conf *sc =
@@ -1152,6 +1227,9 @@ static void *create_eppd_config(apr_pool_t *p, server_rec *s)
 	return sc;
 }
 
+/**
+ * Registration of various hooks which the mod_eppd is interested in.
+ */
 static void register_hooks(apr_pool_t *p)
 {
 	ap_hook_child_init(epp_init_child_hook, NULL, NULL, APR_HOOK_MIDDLE);
@@ -1164,6 +1242,9 @@ static void register_hooks(apr_pool_t *p)
 				                              AP_FTYPE_CONNECTION);
 }
 
+/**
+ * eppd_module definition.
+ */
 module AP_MODULE_DECLARE_DATA eppd_module = {
     STANDARD20_MODULE_STUFF,
     NULL,                       /* create per-directory config structure */

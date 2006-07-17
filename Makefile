@@ -85,7 +85,10 @@ clean:
 	-rm -f test test.o epp-client_stub.o
 	-rm -f mod_eppd.so
 
-.PHONY: clean distclean install build
+doc: doxy.conf
+	doxygen doxy.conf
+
+.PHONY: all build install clean doc
 
 # corba dummy
 test_cd: test.o epp_xmlcommon.o epp_gen.o epp_parser.h epp-client_stub.o epp_common.o

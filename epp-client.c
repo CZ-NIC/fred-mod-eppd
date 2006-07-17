@@ -254,12 +254,6 @@ epp_call_hello(epp_corba_globs *globs, char *buf, unsigned len)
 
 	CORBA_exception_init(ev);
 
-	/* XXX temporary hack */
-	ccReg_Response *response;
-	response = ccReg_EPP_GetTransaction(globs->service, 0, "", 2000, ev);
-	CORBA_free(response);
-	/* XXX */
-
 	version = ccReg_EPP_version(globs->service, ev);
 
 	if (raised_exception(ev)) {
