@@ -1,7 +1,7 @@
 #
 # Konfigurovatelna cast Makefilu
 #
-APXS	= apxs
+APXS	= apxs2
 APR-CONFIG	= apr-config
 ORBIT-IDL-2	= orbit-idl-2
 PKG-CONFIG	= pkg-config
@@ -74,7 +74,7 @@ test: test.o epp_xmlcommon.o epp_parser.o epp_gen.o epp-client.o ccReg-common.o 
 	gcc -o test -g -Wall $(ORB_LDFLAGS) test.o epp_xmlcommon.o epp_parser.o epp_gen.o epp-client.o ccReg-common.o ccReg-stubs.o epp_common.o $(XML_LIBS)
 
 test.o: test.c epp_common.h epp_parser.h epp_gen.h epp-client.h
-	gcc -c -g -O0 -Wall -c test.c
+	gcc -c -g -O0 -Wall -c test.c -DSCHEMA=\"/etc/apache2/schemas/all-1.0.xsd\"
 
 $(IDLOUT): $(IDL)
 	$(ORBIT-IDL-2) --noskels $(IDL)

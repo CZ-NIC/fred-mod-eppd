@@ -226,7 +226,7 @@ int main(int argc, char *argv[])
 		}
 
 		/* API: process command */
-		pstat = epp_parse_command(session, "schemas/all-1.0.xsd", text,
+		pstat = epp_parse_command(session, SCHEMA , text,
 				strlen(text), &cdata);
 		if (pstat == PARSER_HELLO) {
 			/* API: greeting */
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
 			epp_gen	gen;
 
 			/* API: generate response */
-			gstat = epp_gen_response(1, "schemas/all-1.0.xsd", lang, &cdata,
+			gstat = epp_gen_response(1, SCHEMA , lang, &cdata,
 					&gen);
 			switch (gstat) {
 				/*
