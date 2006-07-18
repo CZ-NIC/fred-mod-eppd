@@ -1836,7 +1836,7 @@ parse_update_nsset(
 			"nsset:add/nsset:ns");
 	/* backup current xpath context node */
 	node = xpathCtx->node;
-	/* memory leaks are possible with this scheme but not ussual */
+	/* memory leaks are possible with this schema but not ussual */
 	for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++) {
 		epp_ns	*ns;
 		struct circ_list	*item;

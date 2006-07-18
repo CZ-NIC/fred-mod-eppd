@@ -1706,7 +1706,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 		c_dnshost_add->_buffer[i].inet._release = CORBA_TRUE;
 		j = 0;
 		CL_FOREACH(ns->addr)
-			c_dnshost_add->_buffer[i].inet._buffer[j] =
+			c_dnshost_add->_buffer[i].inet._buffer[j++] =
 					CORBA_string_dup(CL_CONTENT(ns->addr));
 		c_dnshost_add->_buffer[i++].fqdn = CORBA_string_dup(ns->name);
 	}
