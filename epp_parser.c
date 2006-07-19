@@ -2110,7 +2110,7 @@ parse_transfer(
 					"epp:transfer/nsset:transfer/nsset:id");
 			XPATH_TAKE1(cdata->in->transfer.authInfo, doc, xpathCtx,
 					error_t,
-					"epp:transfer/nsset:transfer/nsset:authInfo/domain:pw");
+					"epp:transfer/nsset:transfer/nsset:authInfo/nsset:pw");
 			cdata->type = EPP_TRANSFER_NSSET;
 		}
 	}
