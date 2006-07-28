@@ -1,12 +1,20 @@
+/**
+ * @file epp_common.h
+ * The most important structures, function definitions and routine declarations
+ * are found in this file. Since they are used by all components of mod_eppd,
+ * they are most important and should be read first when trying to understand
+ * to the module's code.
+ */
+
 #ifndef EPP_COMMON_H
 #define EPP_COMMON_H
 
 /**
- * Enumeration of all commands this software is able to handle.
- * The object specific commands are expanded (EPP_{command}_{object}.
+ * Enumeration of all EPP commands this module is able to handle.
+ * The object specific commands are expanded to (EPP_{command}_{object}.
  */
 typedef enum {
-	EPP_UNKNOWN_CMD,
+	EPP_UNKNOWN_CMD = 0,
 	/*
 	 * 'dummy' is not a command from point of view of epp client, but is
 	 * command from central repository's point of view
@@ -40,26 +48,30 @@ typedef enum {
 }epp_command_type;
 
 /**
- * Enumeration of objects this server operates on.
+ * Enumeration of EPP objects which this server operates on.
  */
 typedef enum {
-	EPP_UNKNOWN_OBJ,
+	EPP_UNKNOWN_OBJ = 0,
 	EPP_CONTACT,
 	EPP_DOMAIN,
 	EPP_NSSET
 }epp_object_type;
 
-/*
+/**
  * definition of languages (english is default)
- * it servers as an index in array of messages
  */
 typedef enum {
 	LANG_EN	= 0,
 	LANG_CS,
 }epp_lang;
 
-/*
- * error specification
+/**
+ * In case that central repository finds out that some parameter is bad,
+ * there has to be way how to propagate this information back to client.
+ * The standard requires that client provided value has to be surrounded
+ * with xml tags, of which the central repository is not aware. Therefore
+ * mod_eppd has to complete the tags and this error specification specifies
+ * which tags.
  */
 typedef enum {
 	errspec_unknow, 
@@ -99,27 +111,44 @@ typedef enum {
 	errspec_domainRenew_ext_valDate
 }epp_errorspec;
 
-/*
- * this struct represents one epp error in ExtValue element
+/**
+ * The struct represents one epp error in ExtValue element. It is either
+ * validation error (in that case surrounding tags are contained in value
+ * and standalone is set to 1) or error reported by central repository
+ * (in that case surrounding tags are missing and has to be completed
+ * according to #epp_errorspec value).
  */
 typedef struct {
-	char	*value;
-	int	standalone;
-	char	*reason;
-	epp_errorspec	spec;
+	char	*value; /**< Client provided input which caused the error. */
+	int	standalone;	/**< The surrounding tags are included (1) or not (0). */
+	char	*reason;	/**< Human readable reason of error. */
+	epp_errorspec	spec;	/**< Specification of surrounding XML tags */
 }epp_error;
 
 /**
- * circular list of void pointers
- * sentinel has content == NULL
+ * @defgroup circgroup Circular list structure and utilities
+ * @{
+ */
+
+/**
+ * Circular list structure used on countless places throughout the module.
+ * The understanding of how this implementation of circular list works
+ * is essential for understanding the module's code. It is one way linked
+ * list of items, which is never ending because the last item points to
+ * the first item of the list. The way how to recognize the so called
+ * sentinel, which is the first and last item of the list, is that its
+ * content is NULL.
  */
 struct circ_list {
-	struct circ_list	*next;
-	void	*content;
+	struct circ_list	*next;	/**< Link to next item in the list. */
+	void	*content;	/**< Pointer to content of item. */
 };
 
-/*
- * macros for manipulation with circ_list
+/**
+ * Macro for initialization of list. The item has to be already
+ * allocated. The item will become sentinel and stay so forever. You
+ * don't have to call this macro for item, which is going to be only
+ * added to existing list.
  */
 #define CL_NEW(cl)	\
 	do {				\
@@ -127,23 +156,28 @@ struct circ_list {
 		(cl)->content = NULL;	\
 	} while(0)
 
+/** Macro to add item to existing list. */
 #define CL_ADD(cl, newcl)	\
 	do { 				\
 		(newcl)->next = (cl)->next;	\
 		(cl)->next = (newcl);		\
 	} while(0)
 
+/** Get next item in a list. */
 #define CL_NEXT(cl)	((cl) = (cl)->next)
+/** Get content pointer of item. */
 #define CL_CONTENT(cl)	(cl)->content
 
-/*
- * caller must be sure that the list pointer is at the beginning when using
- * this macro - use CL_RESET for that.
+/**
+ * Iterate through items in a list. cl advances each round to next item in
+ * list, until the sentinel is encountered. Caller must be sure that the
+ * list pointer is at the beginning when using this macro - use CL_RESET
+ * for that.
  */
 #define CL_FOREACH(cl)	\
 	for ((cl) = (cl)->next; (cl)->content != NULL; (cl) = (cl)->next)
 
-/* move pointer to the beginning */
+/** Move pointer to the beginning of a list (it will point to sentinel) */
 #define CL_RESET(cl)	\
 	do { 				\
 		if ((cl)->content == NULL) break;	\
@@ -151,34 +185,34 @@ struct circ_list {
 	} while(0)
 
 
-/* count the number of items in the list */
+/** Return the number of items in the list */
 inline unsigned cl_length(struct circ_list *cl);
-
-/* if the list is empty return value is 1, otherwise 0 */
+/** If the list is empty return value is 1, otherwise 0 */
 #define CL_EMPTY(cl)	((cl) == (cl)->next)
 
-/*
- * purge circular list, note that all content must be freed upon using
- * this inline. List pointer must be at the beginning upon start.
+/**
+ * Free circular list, note that content of all items must be freed
+ * before using this function. List pointer must be at the beginning
+ * upon start (use CL_RESET for that if you are not sure).
  */
 inline void cl_purge(struct circ_list *cl);
+/** @} */
 
 /**
- * Structure gathers postal info about contact. Can be used for both -
- * international and local address.
+ * Structure gathers postal info about contact.
  */
 typedef struct {
 	char	*name;
-	char	*org;
+	char	*org;	/**< organization */
 	char	*street[3];
 	char	*city;
-	char	*sp;	/* state or province */
-	char	*pc;	/* postal code */
-	char	*cc;	/* country code */
+	char	*sp;	/**< state or province */
+	char	*pc;	/**< postal code */
+	char	*cc;	/**< country code */
 }epp_postalInfo;
 
 /**
- * Disclose information concerning contact.
+ * Disclose information of contact.
  * All items inside are treated as booleans.
  * Value 1 means it is an exception to data collection policy.
  * Example: if server data collection policy is "public"
@@ -195,7 +229,7 @@ typedef struct {
 }epp_discl;
 
 /**
- * Nameserver has a name and possibly more than one ip address
+ * Nameserver has a name and possibly more than one ip address.
  */
 typedef struct {
 	char	*name;
@@ -204,6 +238,8 @@ typedef struct {
 
 /**
  * Delegation signer information, together with public key information.
+ * For more detailed information about the individual fields see
+ * RFC 4310.
  */
 typedef struct {
 	unsigned short	keytag;
@@ -219,25 +255,34 @@ typedef struct {
 }epp_ds;
 
 /**
- * This structure gathers outputs of parsing stage and serves as input
+ * This structure is central to the concept of the whole module. The
+ * communication among module's components is done through this structure.
+ * It gathers outputs of parsing stage and serves as input/output
  * for corba function call stage and after that as input for response
- * generation stage. Structure fits for all kinds of commands. And is
- * self-identifing.
+ * generation stage. Structure fits for all kinds of possible commands and
+ * their extensions. The structure is self-identifing, which means, that
+ * it holds information about which command it holds.
  */
 typedef struct {
-	/* this part is same for all commands */
-	char	*clTRID;	/* client TRID - may be null */
-	char	*svTRID;	/* server TRID, must not be null at the end */
-	int	rc;	/* epp return code */
-	char	*msg;	/* text message coresponding to rc */
-	struct circ_list	*errors;	/* list of validation errors */
+	/* theese items are same for all possible epp commands */
+	char	*clTRID;	/**< client's TRID */
+	char	*svTRID;	/**< server's TRID */
+	int	rc;	/**< EPP return code defined in standard. */
+	char	*msg;	/**< Text message coresponding to return code. */
+	/** List of validation errors or errors from central repository. */
+	struct circ_list	*errors;
 
-	epp_command_type type;	/* identifies epp command and object */
+	/**
+	 * Identification of epp command. This value influences selection
+	 * from in and out union.
+	 */
+	epp_command_type type;
 
-	/* logout and dummy have no additional parameters */
-	/*
-	 * input parameters
-	 * are allocated and initialized during parsing stage
+	/* logout and dummy commands have no additional parameters */
+
+	/**
+	 * Input parameters for all possible epp commands.
+	 * This part is allocated and initialized during parsing stage.
 	 */
 	union {
 		/* additional login parameters */
@@ -354,10 +399,11 @@ typedef struct {
 			char	*authInfo;
 		}transfer;
 	}*in;
-	/*
-	 * output parameters
-	 * are allocated and initialized after corba function call and used
-	 * in response generator
+
+	/**
+	 * Output parameters for all possible epp commands.
+	 * They are allocated and initialized after corba function call
+	 * and used in response generator.
 	 */
 	union {
 		/* additional check contact and domain parameters */
@@ -440,7 +486,21 @@ typedef struct {
 	}*out;
 }epp_command_data;
 
+/**
+ * Function for converting number of seconds since 1970 ... to string
+ * formated in rfc 3339 way. This is required by EPP protocol.
+ * @par date Number of seconds since epoch.
+ * @par str Preallocated buffer for date (must be at least 25 bytes long).
+ */
 void get_rfc3339_date(long long date, char *str);
+
+/**
+ * Function for converting number of seconds since 1970 ... to string
+ * formated in rfc 3339 way. The time part is stripped, so that only
+ * date time remains.
+ * @par date Number of seconds since epoch.
+ * @par str Preallocated buffer for date (must be at least 11 bytes long).
+ */
 void get_stripped_date(long long date, char *str);
 
 #endif

@@ -1,5 +1,11 @@
 /**
  * @file epp-client.c
+ * Corba component is used for communication between apache module and
+ * central repository. Input are self-descriptive data stored in structure
+ * ussually called cdata. Output data are returned via the same structure.
+ * Purpose of this module is to hide the complexity of communication behind
+ * simple API defined in epp-client.h. The function names are analogical
+ * to names defined in EPP protocol standard.
  */
 
 #include <assert.h>
@@ -12,27 +18,27 @@
 #include "epp-client.h"
 #include "ccReg.h"
 
+/** Quick test if corba exception was raised. */
 #define raised_exception(ev)	((ev)->_major != CORBA_NO_EXCEPTION)
 
 /**
- * Needed for corba function calls.
- *   - corba is global corba object
- *   - service is ccReg object handle
+ * Persistent structure initialized at startup, needed for corba function calls.
  */
 struct epp_corba_globs_t {
-	CORBA_ORB	corba;
-	ccReg_EPP	service;
+	CORBA_ORB	corba;	/**< corba is global corba object. */
+	ccReg_EPP	service;	/**< service is ccReg object stub */
 };
 
 epp_corba_globs *
 epp_corba_init(const char *ior)
 {
-	CORBA_ORB  global_orb = CORBA_OBJECT_NIL; /* global orb */
-	ccReg_EPP e_service = CORBA_OBJECT_NIL;
-	epp_corba_globs	*globs;
+	CORBA_ORB  global_orb = CORBA_OBJECT_NIL;	/* global orb */
+	ccReg_EPP e_service = CORBA_OBJECT_NIL;	/* object's stub */
+	epp_corba_globs	*globs;	/* structure used to store global_orb and service */
 	CORBA_Environment ev[1];
 	CORBA_exception_init(ev);
  
+	/* create orb object */
 	global_orb = CORBA_ORB_init(0, NULL, "orbit-local-orb", ev);
 	if (raised_exception(ev)) {
 		CORBA_exception_free(ev);
@@ -41,6 +47,7 @@ epp_corba_init(const char *ior)
 		return NULL;
 	}
 
+	/* create object's stub */
 	e_service = (ccReg_EPP) CORBA_ORB_string_to_object(global_orb, ior, ev);
 	if (raised_exception(ev)) {
 		CORBA_exception_free(ev);
@@ -54,9 +61,9 @@ epp_corba_init(const char *ior)
 		}
 		return NULL;
 	}
+	CORBA_exception_free(ev);
 
 	if ((globs = malloc(sizeof *globs)) == NULL) {
-		CORBA_exception_free(ev);
 		/* releasing managed object */
 		CORBA_Object_release(e_service, ev);
 		CORBA_exception_free(ev);
@@ -70,7 +77,6 @@ epp_corba_init(const char *ior)
 
 	globs->corba = global_orb;
 	globs->service = e_service;
-	CORBA_exception_free(ev);
 	return globs;
 }
 
@@ -90,17 +96,21 @@ epp_corba_init_cleanup(epp_corba_globs *globs)
 	free(globs);
 }
 
-static void
-get_errors(struct circ_list *errors, ccReg_Error *c_errors)
-{
-	struct circ_list	*item;
-	epp_error	*err_item;
-	int	i;
-	ccReg_Error_seq	*c_error;
-	CORBA_Environment ev[1];
+/**
+ * This function helps to convert error codes for incorrect parameter location
+ * used in IDL to error codes understandable by the rest of the module.
+ *
+ * @param cerrors Buffer of errors used as input.
+ * @param errors List of errors
+ * converted errors (output).
+ */
+static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
+	struct circ_list	*item; epp_error	*err_item; int	i; ccReg_Error_seq
+		*c_error; CORBA_Environment ev[1];
 
 	CORBA_exception_init(ev);
 
+	/* process all errors one by one */
 	for (i = 0; i < c_errors->_length; i++) {
 		if ((item = malloc(sizeof *item)) == NULL) break;
 		if ((err_item = malloc(sizeof *err_item)) == NULL) {
@@ -109,9 +119,9 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 		}
 		c_error = &c_errors->_buffer[i];
 		err_item->reason = strdup(c_error->reason);
-		err_item->standalone = 0;
+		err_item->standalone = 0; /* the surrounding tags are missing */
 
-		/* convert "any" type to string */
+		/* convert "any" type (timestamp, long, string) to string */
 		if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_string, ev))
 			err_item->value = strdup(* ((char **) c_error->value._value));
 		else if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_long, ev))
@@ -130,6 +140,7 @@ get_errors(struct circ_list *errors, ccReg_Error *c_errors)
 		else
 			err_item->value = strdup("Unknown value type");
 
+		/* convert error code */
 		switch (c_error->code) {
 			case ccReg_pollAck_msgID:
 				err_item->spec = errspec_pollAck_msgID;
@@ -270,6 +281,17 @@ epp_call_hello(epp_corba_globs *globs, char *buf, unsigned len)
 	return 1;
 }
 
+/**
+ * "dummy" call is dummy because it only retrieves unique svTRID and
+ * error message from central repository and by this way informs repository
+ * about the error. This call is used for failures detected already on side
+ * of mod_eppd.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
@@ -413,9 +435,14 @@ epp_call_logout(
 }
 
 /**
- * <check> for different objects is so much similar that it is worth of
- * having the code in one function and create just wrappers for different
- * kinds of objects.
+ * EPP check for domain, nsset and contact is so similar that it is worth of
+ * having the code in one function and pass object type as parameter.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @param obj Object type (see #epp_object_type)
+ * @return status (see #corba_status).
  */
 static corba_status
 epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
@@ -437,6 +464,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	c_ids->_maximum = c_ids->_length = len;
 	c_ids->_release = CORBA_TRUE;
 
+	/* copy each requested object in corba buffer */
 	i = 0;
 	CL_FOREACH(cdata->in->check.ids)
 		c_ids->_buffer[i++] = CORBA_string_dup(CL_CONTENT(cdata->in->check.ids));
@@ -484,7 +512,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	/* alloc necesary structures */
+	/* alloc necessary structures */
 	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(c_bools);
 		CORBA_free(response);
@@ -499,6 +527,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	}
 	CL_NEW(cdata->out->check.bools);
 
+	/* length of results returned should be same as lenght of input objects */
 	assert(len == c_bools->_length);
 	/*
 	 * circular list stores items in reversed order.
@@ -510,8 +539,8 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 		/*
 		 * note that we cannot use zero value for false value
 		 * since value zero of content pointer denotes that
-		 * the item in list is a sentinel (first or last).
-		 * Therefore we will use value 2 as false value.
+		 * the item in list is a sentinel (first and last).
+		 * Therefore we will use value 2 for false (1 remains true).
 		 */
 		CL_CONTENT(item) = (void *) (c_bools->_buffer[i] ? 1 : 2);
 		CL_ADD(cdata->out->check.bools, item);
@@ -536,6 +565,14 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	return CORBA_OK;
 }
 
+/**
+ * EPP info contact.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_info_contact(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
@@ -550,6 +587,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 
 	CORBA_exception_init(ev);
 
+	/* get information about contact from central repository */
 	response = ccReg_EPP_ContactInfo(globs->service,
 			cdata->in->info.id,
 			&c_contact,
@@ -574,7 +612,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-
+	/* first allocate all necessary structures */
 	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(c_contact);
 		CORBA_free(response);
@@ -618,6 +656,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 		CL_CONTENT(item) =(void *) strdup(c_contact->stat._buffer[i]);
 		CL_ADD(cdata->out->info_contact.status, item);
 	}
+	/* postal info */
 	pi = cdata->out->info_contact.postalInfo;
 	pi->name = strdup(c_contact->Name);
 	pi->org = strdup(c_contact->Organization);
@@ -628,7 +667,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 	pi->sp = strdup(c_contact->StateOrProvince);
 	pi->pc = strdup(c_contact->PostalCode);
 	pi->cc = strdup(c_contact->CountryCode);
-	/* others */
+	/* other attributes */
 	cdata->out->info_contact.voice = strdup(c_contact->Telephone);
 	cdata->out->info_contact.fax = strdup(c_contact->Fax);
 	cdata->out->info_contact.email = strdup(c_contact->Email);
@@ -656,6 +695,14 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
+/**
+ * EPP info domain.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_info_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
@@ -663,10 +710,12 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 	CORBA_Environment ev[1];
 	ccReg_Response	*response;
 	ccReg_Domain	*c_domain;
+	struct circ_list	*item;
 	int i;
 
 	CORBA_exception_init(ev);
 
+	/* get information about domain */
 	response = ccReg_EPP_DomainInfo(globs->service,
 			cdata->in->info.id,
 			&c_domain,
@@ -691,8 +740,7 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	struct circ_list	*item;
-
+	/* allocate necessary structures */
 	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(c_domain);
 		CORBA_free(response);
@@ -750,7 +798,7 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 		CL_CONTENT(item) = (void *) strdup(c_domain->admin._buffer[i]);
 		CL_ADD(cdata->out->info_domain.admin, item);
 	}
-	/* temporary stub */
+	/* temporary stub until dnssec will be implemented */
 	CL_NEW(cdata->out->info_domain.ds);
 
 	/* look for extensions */
@@ -776,6 +824,14 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
+/**
+ * EPP info nsset.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
@@ -783,9 +839,11 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 	ccReg_NSSet	*c_nsset;
 	ccReg_Response	*response;
 	struct circ_list	*item;
+	int i, j;
 
 	CORBA_exception_init(ev);
 
+	/* get information about nsset */
 	response = ccReg_EPP_NSSetInfo(globs->service,
 			cdata->in->info.id,
 			&c_nsset,
@@ -810,7 +868,7 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 		return CORBA_REMOTE_ERROR;
 	}
 
-	/* allocate needed items */
+	/* allocate needed structures */
 	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(c_nsset);
 		CORBA_free(response);
@@ -842,8 +900,6 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 	}
 
 	/* ok, now alomost everything was successfully allocated */
-	int i, j;
-
 	cdata->out->info_nsset.roid = strdup(c_nsset->ROID);
 	cdata->out->info_nsset.clID = strdup(c_nsset->ClID);
 	cdata->out->info_nsset.crID = strdup(c_nsset->CrID);
@@ -902,6 +958,14 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 	return CORBA_OK;
 }
 
+/**
+ * EPP poll request.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
@@ -914,6 +978,7 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 
 	CORBA_exception_init(ev);
 
+	/* get message from repository */
 	response = ccReg_EPP_PollRequest(globs->service,
 			&c_msgID,
 			&c_count,
@@ -962,6 +1027,14 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	return CORBA_OK;
 }
 
+/**
+ * EPP poll acknoledge.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
@@ -973,6 +1046,7 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
 
+	/* send acknoledgement */
 	response = ccReg_EPP_PollAcknowledgement(globs->service,
 			cdata->in->poll_ack.msgid,
 			&c_count,
@@ -1014,6 +1088,14 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	return CORBA_OK;
 }
 
+/**
+ * EPP create domain.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_create_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
@@ -1029,6 +1111,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
 
+	/* fill in corba input parameters */
 	c_admin = ccReg_AdminContact__alloc();
 	len = cl_length(cdata->in->create_domain.admin);
 	c_admin->_buffer = ccReg_AdminContact_allocbuf(len);
@@ -1053,6 +1136,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		c_ext_list->_buffer[0]._release = CORBA_TRUE;
 	}
 
+	/* send new domain in central repository */
 	response = ccReg_EPP_DomainCreate(globs->service,
 			cdata->in->create_domain.name,
 			cdata->in->create_domain.registrant,
@@ -1103,6 +1187,14 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
+/**
+ * EPP create contact.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_create_contact(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
@@ -1115,6 +1207,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
 
+	/* fill in corba input values */
 	c_contact = ccReg_ContactChange__alloc();
 	c_contact->Telephone = CORBA_string_dup(cdata->in->create_contact.voice);
 	c_contact->Fax = CORBA_string_dup(cdata->in->create_contact.fax);
@@ -1150,6 +1243,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	c_contact->CC =
 		CORBA_string_dup(cdata->in->create_contact.postalInfo->cc);
 
+	/* send new contact in repository */
 	response = ccReg_EPP_ContactCreate(globs->service,
 			cdata->in->create_contact.id,
 			c_contact,
@@ -1192,6 +1286,14 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
+/**
+ * EPP create nsset.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_create_nsset(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
@@ -1238,6 +1340,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 		c_tech->_buffer[i++] = CORBA_string_dup(
 				CL_CONTENT(cdata->in->create_nsset.tech));
 
+	/* send new nsset to repository */
 	response = ccReg_EPP_NSSetCreate(globs->service,
 			cdata->in->create_nsset.id,
 			cdata->in->create_nsset.authInfo,
@@ -1283,6 +1386,16 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
+/**
+ * EPP delete for domain, nsset and contact is so similar that it is worth of
+ * having the code in one function and pass object type as parameter.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @param obj Object type (see #epp_object_type)
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_delete(epp_corba_globs *globs, int session,
 		epp_command_data *cdata, epp_object_type obj)
@@ -1340,6 +1453,14 @@ epp_call_delete(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
+/**
+ * EPP renew domain.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_renew_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
@@ -1366,6 +1487,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 		c_ext_list->_buffer[0]._release = CORBA_TRUE;
 	}
 
+	/* send renew request to repository */
 	response = ccReg_EPP_DomainRenew(globs->service,
 			cdata->in->renew.name,
 			cdata->in->renew.exDate,
@@ -1409,6 +1531,14 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
+/**
+ * EPP update domain.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_update_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
@@ -1480,6 +1610,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 		c_ext_list->_buffer[0]._release = CORBA_TRUE;
 	}
 
+	/* send the updates to repository */
 	response = ccReg_EPP_DomainUpdate(globs->service,
 			cdata->in->update_domain.name,
 			cdata->in->update_domain.registrant,
@@ -1525,6 +1656,14 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
+/**
+ * EPP update contact.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_update_contact(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
@@ -1593,6 +1732,7 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 	c_contact->DiscloseFax = cdata->in->update_contact.discl->fax;
 	c_contact->DiscloseEmail = cdata->in->update_contact.discl->email;
 
+	/* send the updates to repository */
 	response = ccReg_EPP_ContactUpdate(globs->service,
 			cdata->in->update_contact.id,
 			c_contact,
@@ -1631,6 +1771,14 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
+/**
+ * EPP update nsset.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_update_nsset(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
@@ -1723,6 +1871,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 			CORBA_string_dup(CL_CONTENT(cdata->in->update_nsset.rem_ns));
 	}
 
+	/* send the updates to repository */
 	response = ccReg_EPP_NSSetUpdate(globs->service,
 			cdata->in->update_nsset.id,
 			cdata->in->update_nsset.authInfo,
@@ -1768,6 +1917,16 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 	return CORBA_OK;
 }
 
+/**
+ * EPP transfer for domain and nsset is so similar that it is worth of
+ * having the code in one function and pass object type as parameter.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @param obj Object type (see #epp_object_type)
+ * @return status (see #corba_status).
+ */
 static corba_status
 epp_call_transfer(epp_corba_globs *globs, int session,
 		epp_command_data *cdata, epp_object_type obj)
