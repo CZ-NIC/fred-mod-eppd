@@ -10,13 +10,6 @@
 #define EPP_COMMON_H
 
 /**
- * If client claims in EPP header that he is sending message which is longer
- * than this number of bytes, the message is omitted. It is also a limit for
- * maximal xml document length sent to CR to be saved.
- */
-#define MAX_FRAME_LENGTH	16000
-
-/**
  * Enumeration of all EPP commands this module is able to handle.
  * The object specific commands are expanded to (EPP_{command}_{object}.
  */

@@ -85,6 +85,13 @@
 #define EPP_HEADER_LENGTH	4
 
 /**
+ * If client claims in EPP header that he is sending message which is longer
+ * than this number of bytes, the message is omitted. It is also a limit for
+ * maximal xml document length sent to CR to be saved.
+ */
+#define MAX_FRAME_LENGTH	16000
+
+/**
  * eppd_module declaration.
  */
 module AP_MODULE_DECLARE_DATA eppd_module;

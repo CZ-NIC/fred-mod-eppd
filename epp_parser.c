@@ -2196,10 +2196,9 @@ epp_parse_command(
 	CL_NEW(cdata->errors);
 
 	/* save input xml document */
-	cdata->xml_in = malloc( (strlen(request) > MAX_FRAME_LENGTH ?
-				MAX_FRAME_LENGTH+1 : strlen(request)+1) );
+	cdata->xml_in = malloc(bytes + 1);
 	if (request != NULL)
-		strncpy(cdata->xml_in, request, MAX_FRAME_LENGTH);
+		strncpy(cdata->xml_in, request, bytes);
 	else cdata->xml_in = strdup("");
 
 	/* validate the doc */
