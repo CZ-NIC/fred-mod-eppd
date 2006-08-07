@@ -352,6 +352,7 @@ epp_call_login(
 			cdata->in->login.pw,
 			cdata->in->login.newPW,
 			cdata->clTRID,
+			cdata->xml_in,
 			&c_session,
 			certID,
 			c_lang,
@@ -404,6 +405,7 @@ epp_call_logout(
 	response = ccReg_EPP_ClientLogout(globs->service,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			ev);
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
@@ -475,6 +477,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 				&c_bools,
 				session,
 				cdata->clTRID,
+				cdata->xml_in,
 				ev);
 	else if (obj == EPP_DOMAIN)
 		response = ccReg_EPP_DomainCheck(globs->service,
@@ -482,6 +485,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 				&c_bools,
 				session,
 				cdata->clTRID,
+				cdata->xml_in,
 				ev);
 	else {
 		assert(obj == EPP_NSSET);
@@ -490,6 +494,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 				&c_bools,
 				session,
 				cdata->clTRID,
+				cdata->xml_in,
 				ev);
 	}
 
@@ -593,6 +598,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 			&c_contact,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			ev);
 
 	if (raised_exception(ev)) {
@@ -721,6 +727,7 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 			&c_domain,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			ev);
 
 	if (raised_exception(ev)) {
@@ -849,6 +856,7 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 			&c_nsset,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			ev);
 
 	if (raised_exception(ev)) {
@@ -986,6 +994,7 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 			&c_msg,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			ev);
 
 	if (raised_exception(ev)) {
@@ -1053,6 +1062,7 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 			&c_msgID,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			ev);
 
 	if (raised_exception(ev)) {
@@ -1148,6 +1158,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 			&c_exDate,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			c_ext_list,
 			ev);
 
@@ -1250,6 +1261,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 			&c_crDate,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			ev);
 
 	CORBA_free(c_contact);
@@ -1349,6 +1361,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 			&c_crDate,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			ev);
 
 	CORBA_free(c_tech);
@@ -1412,12 +1425,14 @@ epp_call_delete(epp_corba_globs *globs, int session,
 				cdata->in->delete.id,
 				session,
 				cdata->clTRID,
+				cdata->xml_in,
 				ev);
 	else if (obj == EPP_CONTACT)
 		response = ccReg_EPP_ContactDelete(globs->service,
 				cdata->in->delete.id,
 				session,
 				cdata->clTRID,
+				cdata->xml_in,
 				ev);
 	else {
 		assert(obj == EPP_NSSET);
@@ -1425,6 +1440,7 @@ epp_call_delete(epp_corba_globs *globs, int session,
 				cdata->in->delete.id,
 				session,
 				cdata->clTRID,
+				cdata->xml_in,
 				ev);
 	}
 
@@ -1495,6 +1511,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 			&c_exDate,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			c_ext_list,
 			ev);
 
@@ -1622,6 +1639,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 			c_status_rem,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			c_ext_list,
 			ev);
 
@@ -1740,6 +1758,7 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 			c_status_rem,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			ev);
 
 	CORBA_free(c_status_rem);
@@ -1883,6 +1902,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 			c_status_rem,
 			session,
 			cdata->clTRID,
+			cdata->xml_in,
 			ev);
 
 	CORBA_free(c_status_rem);
@@ -1942,6 +1962,7 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 				cdata->in->transfer.authInfo,
 				session,
 				cdata->clTRID,
+				cdata->xml_in,
 				ev);
 	}
 	else {
@@ -1951,6 +1972,7 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 				cdata->in->transfer.authInfo,
 				session,
 				cdata->clTRID,
+				cdata->xml_in,
 				ev);
 	}
 

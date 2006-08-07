@@ -1,62 +1,55 @@
+/**
+ * @file epp_parser.h
+ * Interface to component which parses xml documents and returns document's
+ * content in form of a structure.
+ */
 #ifndef EPP_PARSER_H
 #define EPP_PARSER_H
 
-/**
- * EPP parser status values (part of mod_eppd - epp_parser interface).
- */
+/** EPP parser status values. */
 typedef enum {
-	/*
-	 * request is not command but <hello> frame
-	 * this indicates that greeting should be generated
+	/**
+	 * Request is not command but <hello> frame this indicates that greeting
+	 * should be generated.
 	 */
 	PARSER_HELLO,
-	/* login command */
-	PARSER_CMD_LOGIN,
-	/* logout command */
-	PARSER_CMD_LOGOUT,
-	/* some other command than login, logout */
-	PARSER_CMD_OTHER,
-	/* request does not validate */
-	PARSER_NOT_VALID,
-	/* request is not a command */
-	PARSER_NOT_COMMAND,
+	PARSER_CMD_LOGIN, /**< Login command */
+	PARSER_CMD_LOGOUT, /**< Logout command */
+	PARSER_CMD_OTHER, /**< A command other than login and logout. */
+	PARSER_NOT_VALID, /**< Request does not validate. */
+	PARSER_NOT_COMMAND, /**< Request is not a command nor hello frame. */
 	/*
 	 * when following status values are returned, connection is closed
 	 */
-	/* request is not valid xml */
-	PARSER_NOT_XML,
-	/* error when parsing xml schemas */
-	PARSER_ESCHEMA,
-	/*
-	 * internal parser error (e.g. malloc failed). This error is
+	PARSER_NOT_XML, /**< Request is not xml. */
+	PARSER_ESCHEMA, /**< Error when parsing xml schema. */
+	/**
+	 * Internal parser error (e.g. malloc failed). This error is
 	 * esspecialy serious, therefor its log severity SHOULD be higher
-	 * than of the others.
+	 * than of the other errors.
 	 */
 	PARSER_EINTERNAL
 }parser_status;
 
 /**
- * This routine should be called in postconfig phase.
- * This routine loads and checks validity of epp scheme.
- * Preprocessed schemes are returned for later use in epp request handler.
- * @par url_schema URL of schema
- * @ret Opaque server context
+ * This routine initializes libxml's parser and hash table for command
+ * recognition.
  */
 void epp_parser_init(void);
 
 /**
- * This will clean up command hash table.
- * @par par Opaque server context
+ * This will cleanup command hash table and libxml's parser.
  */
 void epp_parser_init_cleanup(void);
 
 /**
- * Parses request and gets structured data.
- * @par	session	Session ID
- * @par request	Request to be processed
- * @par bytes	Length of request
- * @par cdata 	Output of parsing
- * @ret	Status of parsing
+ * This is the main workhorse of parser component. It's task is to parse
+ * request and get data saved in structure.
+ * @param session	Client's session identifier.
+ * @param request	Request to be processed.
+ * @param bytes	Length of the request.
+ * @param cdata Output of parsing stage (xml converted to structure).
+ * @return Status of parsing.
  */
 parser_status
 epp_parse_command(
@@ -67,6 +60,10 @@ epp_parse_command(
 		epp_command_data *cdata);
 
 /**
+ * Cleanup routine taking care of releasing resources pointed by pointers
+ * inside cdata structure. All members except the output values (products
+ * of corba component) are expected to have value (to be non-NULL).
+ * @param cdata Structure containing resources which should be released.
  */
 void epp_command_data_cleanup(epp_command_data *cdata);
 

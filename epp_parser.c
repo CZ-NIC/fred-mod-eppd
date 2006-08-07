@@ -1,5 +1,10 @@
 /*
- * Copyright statement
+ * @file epp_parser.c
+ *
+ * Component for parsing EPP requests in form of xml documents.
+ * The product is a data structure which contains data from xml document.
+ * This file also contains routine which handles deallocation of this
+ * structure. Currently it is based on libxml library.
  */
 
 #include <string.h>
@@ -18,9 +23,11 @@
 #include "epp_xmlcommon.h"
 #include "epp_parser.h"
 
-#define BS_CHAR	8	/* backspace ASCII code */
-/*
- * should be less than 255 since hash value is unsigned char.
+#define BS_CHAR	8	/**< Backspace ASCII code. */
+/**
+ * Size of hash table used for hashing command names. The size is tradeof
+ * between size of hash table and lookup speed, it should be less than 255
+ * since hash value is unsigned char.
  */
 #define HASH_SIZE_CMD	30
 
@@ -1590,8 +1597,7 @@ parse_update_contact(
 	XPATH_TAKE1_UPD(cdata->in->update_contact.ssn, doc, xpathCtx, error_uc,
 			"contact:chg/contact:ssn");
 	/* is there disclose section ? */
-	if (xpath_exists(xpathCtx,
-			"contact:chg/contact:disclose"))
+	if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[flag=0]"))
 	{
 		cdata->in->update_contact.discl->name = xpath_exists(xpathCtx,
 				"contact:chg/contact:disclose/contact:name");
@@ -1604,6 +1610,21 @@ parse_update_contact(
 		cdata->in->update_contact.discl->fax = xpath_exists(xpathCtx,
 				"contact:chg/contact:disclose/contact:fax");
 		cdata->in->update_contact.discl->email = xpath_exists(xpathCtx,
+				"contact:chg/contact:disclose/contact:email");
+	}
+	else if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[flag=1]"))
+	{
+		cdata->in->update_contact.discl->name = 1 - xpath_exists(xpathCtx,
+				"contact:chg/contact:disclose/contact:name");
+		cdata->in->update_contact.discl->org = 1 - xpath_exists(xpathCtx,
+				"contact:chg/contact:disclose/contact:org");
+		cdata->in->update_contact.discl->addr = 1 - xpath_exists(xpathCtx,
+				"contact:chg/contact:disclose/contact:addr");
+		cdata->in->update_contact.discl->voice = 1 - xpath_exists(xpathCtx,
+				"contact:chg/contact:disclose/contact:voice");
+		cdata->in->update_contact.discl->fax = 1 - xpath_exists(xpathCtx,
+				"contact:chg/contact:disclose/contact:fax");
+		cdata->in->update_contact.discl->email = 1 - xpath_exists(xpathCtx,
 				"contact:chg/contact:disclose/contact:email");
 	}
 	else {
@@ -2139,36 +2160,6 @@ error_t:
 	cdata->type = EPP_DUMMY;
 }
 
-/*
-static char *
-strdup_tag_replace(const char * muster)
-{
-	char	*res;
-	char	*iter;
-
-	if (muster == NULL) return NULL;
-	if ((iter = res = malloc(strlen(muster))) == NULL) return NULL;
-	while (*muster != '\0') {
-		if (*muster == '&') {
-			if (!strncmp(muster, "&lt;", 4)) {
-				*iter++ = '<';
-				muster += 4;
-				continue;
-			}
-			else if (!strncmp(muster, "&gt;", 4)) {
-				*iter++ = '>';
-				muster += 4;
-				continue;
-			}
-		}
-		*iter++ = *muster++;
-	}
-	iter = '\0';
-
-	return res;
-}
-*/
-
 parser_status
 epp_parse_command(
 		int session,
@@ -2204,6 +2195,13 @@ epp_parse_command(
 	}
 	CL_NEW(cdata->errors);
 
+	/* save input xml document */
+	cdata->xml_in = malloc( (strlen(request) > MAX_FRAME_LENGTH ?
+				MAX_FRAME_LENGTH+1 : strlen(request)+1) );
+	if (request != NULL)
+		strncpy(cdata->xml_in, request, MAX_FRAME_LENGTH);
+	else cdata->xml_in = strdup("");
+
 	/* validate the doc */
 	val_ret = validate_doc(schema_url, doc, cdata->errors);
 
@@ -2216,6 +2214,7 @@ epp_parse_command(
 			free(e);
 		}
 		cl_purge(cdata->errors);
+		free(cdata->xml_in);
 		xmlFreeDoc(doc);
 		return (val_ret == VAL_ESCHEMA) ? PARSER_ESCHEMA : PARSER_EINTERNAL;
 	}
@@ -2237,6 +2236,7 @@ epp_parse_command(
 	xpathCtx = xmlXPathNewContext(doc);
 	if (xpathCtx == NULL) {
 		free(cdata->errors);
+		free(cdata->xml_in);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -2255,6 +2255,7 @@ epp_parse_command(
 	{
 		xmlXPathFreeContext(xpathCtx);
 		free(cdata->errors);
+		free(cdata->xml_in);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -2264,6 +2265,7 @@ epp_parse_command(
 	if (xpathObj == NULL) {
 		xmlXPathFreeContext(xpathCtx);
 		free(cdata->errors);
+		free(cdata->xml_in);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -2271,6 +2273,7 @@ epp_parse_command(
 		xmlXPathFreeObject(xpathObj);
 		xmlXPathFreeContext(xpathCtx);
 		free(cdata->errors);
+		free(cdata->xml_in);
 		xmlFreeDoc(doc);
 		return PARSER_HELLO;
 	}
@@ -2281,6 +2284,7 @@ epp_parse_command(
 	if (xpathObj == NULL) {
 		xmlXPathFreeContext(xpathCtx);
 		free(cdata->errors);
+		free(cdata->xml_in);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -2294,6 +2298,7 @@ epp_parse_command(
 		xmlXPathFreeObject(xpathObj);
 		xmlXPathFreeContext(xpathCtx);
 		free(cdata->errors);
+		free(cdata->xml_in);
 		xmlFreeDoc(doc);
 		return PARSER_NOT_COMMAND;
 	}
@@ -2306,6 +2311,7 @@ epp_parse_command(
 	if (xpathObj == NULL) {
 		xmlXPathFreeContext(xpathCtx);
 		free(cdata->errors);
+		free(cdata->xml_in);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -2328,6 +2334,7 @@ epp_parse_command(
 		xmlFree(cdata->clTRID);
 		xmlXPathFreeContext(xpathCtx);
 		free(cdata->errors);
+		free(cdata->xml_in);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
@@ -2411,7 +2418,7 @@ epp_parse_command(
 
 	xmlXPathFreeContext(xpathCtx);
 	xmlFreeDoc(doc);
-	xmlMemoryDump();
+	/* xmlMemoryDump(); - never showed anything :-/ */
 
 	if (cdata->type == EPP_LOGIN) return PARSER_CMD_LOGIN;
 	if (cdata->type == EPP_LOGOUT) return PARSER_CMD_LOGOUT;
@@ -2427,6 +2434,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 	assert(cdata != NULL);
 	assert(cdata->clTRID != NULL);
 	free(cdata->clTRID);
+	free(cdata->xml_in);
 	/* free error messages if there are any */
 	CL_FOREACH(cdata->errors) {
 		epp_error	*e = (epp_error *) CL_CONTENT(cdata->errors);
@@ -2437,7 +2445,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 	cl_purge(cdata->errors);
 	/*
 	 * corba function might not be called and therefore svTRID might be
-	 * still NULL (msg too)
+	 * still NULL (msg and xml_out too)
 	 */
 	FREENULL(cdata->svTRID);
 	FREENULL(cdata->msg);

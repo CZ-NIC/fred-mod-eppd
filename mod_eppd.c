@@ -83,11 +83,6 @@
 
 /** Length of EPP header containing message size. */
 #define EPP_HEADER_LENGTH	4
-/**
- * If client claims in EPP header that he is sending message which is longer
- * than this number of bytes, the message is omitted.
- */
-#define MAX_FRAME_LENGTH	16000
 
 /**
  * eppd_module declaration.
