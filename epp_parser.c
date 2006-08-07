@@ -873,7 +873,7 @@ parse_create_contact(
 		cdata->type = EPP_DUMMY;
 		return;
 	}
-	if ((cdata->in->create_contact.discl = malloc(sizeof
+	if ((cdata->in->create_contact.discl = calloc(1, sizeof
 					(*cdata->in->create_contact.discl))) == NULL) {
 		free(cdata->in->create_contact.postalInfo);
 		free(cdata->in);
