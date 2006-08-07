@@ -147,6 +147,7 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	epp_postalInfo	*pi;
 	epp_discl	*discl;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
+	int	discl_printed;	/* true if disclose tag has been already printed */
 
 	START_ELEMENT(writer, simple_err, "resData");
 	START_ELEMENT(writer, simple_err, "contact:infData");
@@ -193,35 +194,41 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 		get_rfc3339_date(cdata->out->info_contact.upDate, strbuf);
 		WRITE_ELEMENT(writer, simple_err, "contact:upDate", strbuf);
 	}
-	/* disclose section */
+	/* output disclose section only if there is at least one discl element */
 	discl = cdata->out->info_contact.discl;
-	START_ELEMENT(writer, simple_err, "contact:disclose");
-	WRITE_ATTRIBUTE(writer, simple_err, "flag", "0");
-	if (!discl->name) {
-		START_ELEMENT(writer, simple_err, "contact:name");
-		END_ELEMENT(writer, simple_err);
+	discl_printed = 0;
+	if (!discl->name || !discl->org || !discl->addr ||
+			!discl->voice || !discl->fax || !discl->email)
+	{
+		START_ELEMENT(writer, simple_err, "contact:disclose");
+		WRITE_ATTRIBUTE(writer, simple_err, "flag", "0");
+		if (!discl->name) {
+			discl_printed = 1;
+			START_ELEMENT(writer, simple_err, "contact:name");
+			END_ELEMENT(writer, simple_err);
+		}
+		if (!discl->org) {
+			START_ELEMENT(writer, simple_err, "contact:org");
+			END_ELEMENT(writer, simple_err);
+		}
+		if (!discl->addr) {
+			START_ELEMENT(writer, simple_err, "contact:addr");
+			END_ELEMENT(writer, simple_err);
+		}
+		if (!discl->voice) {
+			START_ELEMENT(writer, simple_err, "contact:voice");
+			END_ELEMENT(writer, simple_err);
+		}
+		if (!discl->fax) {
+			START_ELEMENT(writer, simple_err, "contact:fax");
+			END_ELEMENT(writer, simple_err);
+		}
+		if (!discl->email) {
+			START_ELEMENT(writer, simple_err, "contact:email");
+			END_ELEMENT(writer, simple_err);
+		}
+		END_ELEMENT(writer, simple_err); /* disclose */
 	}
-	if (!discl->org) {
-		START_ELEMENT(writer, simple_err, "contact:org");
-		END_ELEMENT(writer, simple_err);
-	}
-	if (!discl->addr) {
-		START_ELEMENT(writer, simple_err, "contact:addr");
-		END_ELEMENT(writer, simple_err);
-	}
-	if (!discl->voice) {
-		START_ELEMENT(writer, simple_err, "contact:voice");
-		END_ELEMENT(writer, simple_err);
-	}
-	if (!discl->fax) {
-		START_ELEMENT(writer, simple_err, "contact:fax");
-		END_ELEMENT(writer, simple_err);
-	}
-	if (!discl->email) {
-		START_ELEMENT(writer, simple_err, "contact:email");
-		END_ELEMENT(writer, simple_err);
-	}
-	END_ELEMENT(writer, simple_err); /* disclose */
 	END_ELEMENT(writer, simple_err); /* infdata */
 	END_ELEMENT(writer, simple_err); /* resdata */
 	return 1;
