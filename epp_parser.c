@@ -4,7 +4,7 @@
  * Component for parsing EPP requests in form of xml documents.
  * The product is a data structure which contains data from xml document.
  * This file also contains routine which handles deallocation of this
- * structure. Currently it is based on libxml library.
+ * structure. Currently the component is based on libxml library.
  */
 
 #include <string.h>
@@ -33,10 +33,23 @@
 
 
 /**
- * Following macros are shortcuts for xpath evaluation.
+ * @defgroup xpathgroup Macros and functions for convenient usage of xpath
+ * queries.
+ * Following macro parameters are used often and have following meaning.
+ * 	- ctx: XPath context.
+ * 	- err_handler: Label used in goto statement when anything goes wrong.
+ * 	- expr: XPath expression.
+ * 	- doc: XML document.
+ * 	- str: string where is stored return value (content of xml tag)
+ * 	- list: list of strings where are stored return values (content of xml tags)
+ *
+ * @{
  */
-/*
- * This Combines xpath evaluation and error handling if unsuccessful
+
+/**
+ * This combines xpath evaluation and error handling if unsuccessful.
+ * It is not used very often, instead other higher level functions and macros
+ * are used, if it is possible.
  */
 #define XPATH_EVAL(obj, ctx, err_handler, expr)	\
 	do {                                        \
@@ -44,13 +57,17 @@
 		if (obj == NULL) goto err_handler;      \
 	}while(0);
 
-/*
- * Sometimes we want to know only if the element is there or not
+/**
+ * Sometimes we want to know only if the element is there or not.
  * If error occures we return 0, which means: object is not there
- * (hope that it doesn't do much damage).
+ * (I hope that it doesn't do much damage).
+ *
+ * @param ctx XPath context.
+ * @param expr XPath expression.
+ * @return 1 if the element described by expr is there, otherwise 0.
  */
 static inline
-char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
+int xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 {
 		int ret;
 
@@ -61,9 +78,10 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		return ret;
 }
 
-/*
- * In str is put the content of element described by xpath expression.
- * The element must be only one and is required to exist.
+/**
+ * Into str is put the content of element described by xpath expression.
+ * The element must be only one and is required to exist, otherwise assert
+ * aborts the program.
  */
 #define XPATH_REQ1(str, doc, ctx, err_handler, expr)            \
 	do {                                                        \
@@ -75,8 +93,8 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		xmlXPathFreeObject(obj);                                \
 	}while(0);
 
-/*
- * In str is put the content of element described by xpath expression.
+/**
+ * Into str is put the content of element described by xpath expression.
  * The element must be only one and if the element does not exist
  * empty string is copied to str.
  */
@@ -92,15 +110,15 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		xmlXPathFreeObject(obj);                                \
 	}while(0);
 
-/*
- * In str is put the content of element described by xpath expression.
+/**
+ * Into str is put the content of element described by xpath expression.
  * The element must be only one and if the element does not exist,
  * resulting str is NULL. In addition to previous macro, if element
  * does exist and its content has zero length, resulting string is
  * one char - backspace. This is used in processing of update request
  * to distinguish between element which is not updated and element
  * which is erased (Note that we cannot use NULL value because CORBA
- * doesn't like it.
+ * doesn't like it).
  */
 #define XPATH_TAKE1_UPD(str, doc, ctx, err_handler, expr)       \
 	do {                                                        \
@@ -123,8 +141,10 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		xmlXPathFreeObject(obj);                                \
 	}while(0);
 
-/*
- * Same as above but fills a list of values instead of just one.
+/**
+ * Into list is put the content of elements described by xpath expression.
+ * There may be more elements matching xpath expression, their content is
+ * copied in a list.
  */
 #define XPATH_TAKEN(list, doc, ctx, err_handler, expr)          \
 	do {                                                        \
@@ -147,7 +167,8 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 	}while(0);
 
 /*
- * Same as above but gets attribute values instead of text content.
+ * Into list is put the values of attribute of name attr of elements matching
+ * xpath expression expr.
  */
 #define XPATH_TAKEN_ATTR(list, ctx, err_handler, expr, attr)    \
 	do {                                                        \
@@ -169,14 +190,21 @@ char xpath_exists(xmlXPathContextPtr ctx, const char *expr)
 		xmlXPathFreeObject(obj);                                \
 	}while(0);
 
-/*
- * This is "carefull free". Pointer is freed only if not NULL.
+/**
+ * @}
+ */
+
+/**
+ * This is a "carefull free", which means pointer is freed only if it is
+ * not NULL. This is used so often in cleanup code that it is worth of
+ * creating such a macro.
  */
 #define FREENULL(pointer)	if (pointer) free(pointer);
 
 /**
  * Enumeration of all implemented EPP commands as defined in rfc.
- * This is REDuced form - without object suffix.
+ * It is REDuced form - without object suffix. And is used as hash
+ * value in command hash table for fast recognition of commands.
  */
 typedef enum {
 	EPP_RED_UNKNOWN_CMD,
@@ -192,27 +220,33 @@ typedef enum {
 	EPP_RED_UPDATE
 }epp_red_command_type;
 
-/* item of command hash table */
 typedef struct cmd_hash_item_t cmd_hash_item;
+
+/**
+ * Item of command hash table used for fast command recognition.
+ */
 struct cmd_hash_item_t {
-	cmd_hash_item	*next;
-	char	*key;	/* hash key (command name) */
-	epp_command_type	val;	/* hash value (command type) */
+	cmd_hash_item	*next;	/**< Next item in hash table. */
+	char	*key;	/**< Hash key (command name). */
+	epp_command_type	val;	/**< Hash value (command type). */
 };
 
 /**
- * hash table of epp commands used for command lookup speedup.
- * Once the table is initialized, it is read-only.
+ * Hash table of epp commands used for fast command lookup.
+ * Once the table is initialized, it is read-only. There for it is thread-safe
+ * eventhough it is declared as static.
  */
 static cmd_hash_item *hash_cmd[HASH_SIZE_CMD];
 
 /**
- * Function makes xor of first 4 bytes of command name.
- * We assume that command names are at least 4 bytes long and that there
- * are no 2 command with the same first four letters - that's true for
+ * Function for hashing of command name.
+ * Function makes xor of first 4 bytes of command name, which is sufficient
+ * since first 4 letters are unique for all EPP commands. It is both simple
+ * and fast. We assume that command names are at least 4 bytes long and that
+ * there are no 2 command with the same first four letters - that's true for
  * EPP commands.
- * @par key Command name
- * @ret Hash value
+ * @param key Command name.
+ * @return Hash value.
  */
 static unsigned char get_cmd_hash(const char *key)
 {
@@ -225,28 +259,31 @@ static unsigned char get_cmd_hash(const char *key)
 }
 
 /**
- * Function inserts item in command hash table.
- * @par key Input key for hash algorithm
- * @par type Command type associated with given key
- * @ret Zero in case of success, one in case of failure
+ * Function inserts command in hash table.
+ * @param key Input key for hash algorithm
+ * @param type Command type associated with given key
+ * @return 0 in case of success, 1 in case of failure (Theese non-standard
+ * return values are due to the way the results are processed in
+ * epp_parser_init()).
  */
 static char cmd_hash_insert(
-		cmd_hash_item *hash_cmd[],
 		const char *key,
 		epp_command_type type)
 {
 	cmd_hash_item	*hi;
 	int	index;
 
-	assert(hash_cmd != NULL);
 	assert(key != NULL);
+	assert(strlen(key) >= 4);
 
-	if ((hi = malloc(sizeof *hi)) == NULL) return 0;
+	/* allocate and initialize new item */
+	if ((hi = malloc(sizeof *hi)) == NULL) return 1;
 	hi->val = type;
 	if ((hi->key = strdup(key)) == NULL) {
 		free(hi);
 		return 1;
 	}
+	/* enqueue new item in hash table */
 	index = get_cmd_hash(key);
 	hi->next = hash_cmd[index];
 	hash_cmd[index] = hi;
@@ -255,40 +292,38 @@ static char cmd_hash_insert(
 }
 
 /**
- * This Routine does traditional hash lookup on command hash table.
- * @par key Command name
- * @ret Command type
+ * This routine does traditional lookup on hash table containing commands.
+ * @param key Command name.
+ * @return Command type, if command is not found in hash table, value
+ * EPP_UNKNOWN_CMD is returned.
  */
 static epp_command_type
-cmd_hash_lookup(cmd_hash_item *hash_cmd[], const char *key)
+cmd_hash_lookup(const char *key)
 {
 	cmd_hash_item	*hi;
-
-	assert(hash_cmd != NULL);
 
 	/* iterate through hash chain */
 	for (hi = hash_cmd[get_cmd_hash(key)]; hi != NULL; hi = hi->next) {
 		if (!strncmp(hi->key, key, 4)) break;
 	}
-
 	/* did we find anything? */
 	if (hi) return hi->val;
-
+	/* command is not there */
 	return EPP_UNKNOWN_CMD;
 }
 
 /**
- * Function frees all items in command hash table.
+ * Function releases all items in command hash table.
  */
 static void
-cmd_hash_clean(cmd_hash_item *hash_cmd[])
+cmd_hash_clean(void)
 {
 	cmd_hash_item	*tmp;
 	int	i;
 
-	assert(hash_cmd != NULL);
-
+	/* step through all hash table indexes */
 	for (i = 0; i < HASH_SIZE_CMD; i++) {
+		/* free one hash chain */
 		while (hash_cmd[i]) {
 			tmp = hash_cmd[i]->next;
 			free(hash_cmd[i]->key);
@@ -303,33 +338,41 @@ void epp_parser_init(void)
 	char rc;
 
 	/* just to be sure the table is empty */
-	cmd_hash_clean(hash_cmd);
+	cmd_hash_clean();
 
 	/* initialize command hash table */
 	rc = 0;
-	rc |= cmd_hash_insert(hash_cmd, "login", EPP_RED_LOGIN);
-	rc |= cmd_hash_insert(hash_cmd, "logout", EPP_RED_LOGOUT);
-	rc |= cmd_hash_insert(hash_cmd, "check", EPP_RED_CHECK);
-	rc |= cmd_hash_insert(hash_cmd, "info", EPP_RED_INFO);
-	rc |= cmd_hash_insert(hash_cmd, "poll", EPP_RED_POLL);
-	rc |= cmd_hash_insert(hash_cmd, "transfer", EPP_RED_TRANSFER);
-	rc |= cmd_hash_insert(hash_cmd, "create", EPP_RED_CREATE);
-	rc |= cmd_hash_insert(hash_cmd, "delete", EPP_RED_DELETE);
-	rc |= cmd_hash_insert(hash_cmd, "renew", EPP_RED_RENEW);
-	rc |= cmd_hash_insert(hash_cmd, "update", EPP_RED_UPDATE);
+	rc |= cmd_hash_insert("login", EPP_RED_LOGIN);
+	rc |= cmd_hash_insert("logout", EPP_RED_LOGOUT);
+	rc |= cmd_hash_insert("check", EPP_RED_CHECK);
+	rc |= cmd_hash_insert("info", EPP_RED_INFO);
+	rc |= cmd_hash_insert("poll", EPP_RED_POLL);
+	rc |= cmd_hash_insert("transfer", EPP_RED_TRANSFER);
+	rc |= cmd_hash_insert("create", EPP_RED_CREATE);
+	rc |= cmd_hash_insert("delete", EPP_RED_DELETE);
+	rc |= cmd_hash_insert("renew", EPP_RED_RENEW);
+	rc |= cmd_hash_insert("update", EPP_RED_UPDATE);
 	if (rc) {
-		/* error has been spotted */
-		cmd_hash_clean(hash_cmd);
+		/* at least one error has been spotted */
+		cmd_hash_clean();
 		return;
 	}
 
+	/*
+	 * It seems libxml is working well even without parser and xpath
+	 * initialization, but we will rather invoke them.
+	 */
 	xmlInitParser();
 	xmlXPathInit();
 }
 
+/**
+ * Function releases command hash table and calls libxml's parser cleanup
+ * routine.
+ */
 void epp_parser_init_cleanup(void)
 {
-	cmd_hash_clean(hash_cmd);
+	cmd_hash_clean();
 	xmlCleanupParser();
 }
 
@@ -2340,8 +2383,8 @@ epp_parse_command(
 	assert(xmlXPathNodeSetGetLength(xpathObj->nodesetval) > 0);
 
 	/* command lookup through hash table .. huraaa :) */
-	cmd = cmd_hash_lookup(hash_cmd,
-			(char *) xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->name);
+	cmd = cmd_hash_lookup( (char *)
+			xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->name);
 	xmlXPathFreeObject(xpathObj);
 
 	/*

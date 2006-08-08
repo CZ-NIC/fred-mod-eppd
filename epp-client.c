@@ -154,11 +154,8 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 			case ccReg_contactCreate_handle:
 				err_item->spec = errspec_contactCreate_handle;
 				break;
-			case ccReg_nssetCreate_handle:
-				err_item->spec = errspec_nssetCreate_handle;
-				break;
-			case ccReg_domainCreate_fqdn:
-				err_item->spec = errspec_domainCreate_fqdn;
+			case ccReg_contactInfo_handle:
+				err_item->spec = errspec_contactInfo_handle;
 				break;
 			case ccReg_contactUpdate_status_add:
 				err_item->spec = errspec_contactUpdate_status_add;
@@ -166,17 +163,17 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 			case ccReg_contactUpdate_status_rem:
 				err_item->spec = errspec_contactUpdate_status_rem;
 				break;
+			case ccReg_nssetCreate_handle:
+				err_item->spec = errspec_nssetCreate_handle;
+				break;
+			case ccReg_nssetInfo_handle:
+				err_item->spec = errspec_nssetInfo_handle;
+				break;
 			case ccReg_nssetUpdate_status_add:
 				err_item->spec = errspec_nssetUpdate_status_add;
 				break;
 			case ccReg_nssetUpdate_status_rem:
 				err_item->spec = errspec_nssetUpdate_status_rem;
-				break;
-			case ccReg_domainUpdate_status_add:
-				err_item->spec = errspec_domainUpdate_status_add;
-				break;
-			case ccReg_domainUpdate_status_rem:
-				err_item->spec = errspec_domainUpdate_status_rem;
 				break;
 			case ccReg_nssetCreate_tech:
 				err_item->spec = errspec_nssetCreate_tech;
@@ -204,6 +201,18 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 				break;
 			case ccReg_nssetUpdate_ns_addr_rem:
 				err_item->spec = errspec_nssetUpdate_ns_addr_rem;
+				break;
+			case ccReg_domainCreate_fqdn:
+				err_item->spec = errspec_domainCreate_fqdn;
+				break;
+			case ccReg_domainInfo_fqdn:
+				err_item->spec = errspec_domainInfo_fqdn;
+				break;
+			case ccReg_domainUpdate_status_add:
+				err_item->spec = errspec_domainUpdate_status_add;
+				break;
+			case ccReg_domainUpdate_status_rem:
+				err_item->spec = errspec_domainUpdate_status_rem;
 				break;
 			case ccReg_domainCreate_registrant:
 				err_item->spec = errspec_domainCreate_registrant;
