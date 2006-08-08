@@ -645,7 +645,11 @@ epp_gen_response(
 		if (xmlTextWriterWriteRaw(writer, BAD_CAST e->value) < 0)
 			goto simple_err;
 		END_ELEMENT(writer, simple_err); /* value */
-		WRITE_ELEMENT(writer, simple_err, "reason", e->reason);
+		START_ELEMENT(writer, simple_err, "reason");
+		if (lang != LANG_EN)
+			WRITE_ATTRIBUTE(writer, simple_err, "lang", "cs");
+		WRITE_STRING(writer, simple_err, e->reason);
+		END_ELEMENT(writer, simple_err); /* reason */
 		END_ELEMENT(writer, simple_err); /* extValue */
 	}
 	END_ELEMENT(writer, simple_err); /* result */

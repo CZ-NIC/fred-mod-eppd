@@ -378,16 +378,13 @@ void epp_parser_init_cleanup(void)
 
 
 /**
- * Login parser.
- * checks:
- *   - language supported
- *   - correct epp version
+ * Parser of EPP login command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
-parse_login(
-		xmlDocPtr doc,
-		xmlXPathContextPtr xpathCtx,
-		epp_command_data *cdata)
+parse_login(xmlDocPtr doc, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
 	char	*str;
 	struct circ_list	*item;
@@ -479,15 +476,13 @@ error_l:
 }
 
 /**
- * <check> parser for domain, contact and nsset object.
- * data in:
- *   - names of objects to be checked
+ * Parser of EPP check command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
-parse_check(
-		xmlDocPtr doc,
-		xmlXPathContextPtr xpathCtx,
-		epp_command_data *cdata)
+parse_check(xmlDocPtr doc, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
 	struct circ_list	*item;
 
@@ -558,14 +553,13 @@ error_ch:
 }
 
 /**
- * <info> parser for domain, contact and nsset object.
- * Ignores authinfo.
+ * Parser of EPP info command. Authinfo tag is ignored.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
-parse_info(
-		xmlDocPtr doc,
-		xmlXPathContextPtr xpathCtx,
-		epp_command_data *cdata)
+parse_info(xmlDocPtr doc, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
 	/* allocate necessary structures */
 	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
@@ -623,13 +617,13 @@ error_i:
 }
 
 /**
- * <poll> parser.
+ * Parser of EPP poll command. This is for both poll variants - req and ack.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
-parse_poll(
-		xmlDocPtr doc,
-		xmlXPathContextPtr xpathCtx,
-		epp_command_data *cdata)
+parse_poll(xmlDocPtr doc, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
 	xmlXPathObjectPtr	xpathObj;
 	xmlChar	*str;
@@ -709,6 +703,7 @@ parse_poll(
 		valerr->value = strdup((char *) buf->content);
 		xmlBufferFree(buf);
 
+		/* TODO This should be bilingual */
 		valerr->reason = strdup("Required parameter msgID is missing");
 		valerr->standalone = 1;
 
@@ -727,7 +722,10 @@ parse_poll(
 }
 
 /**
- * Assistant procedure for parsing <create> domain
+ * Parser of EPP create-domain command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_create_domain(
@@ -899,7 +897,10 @@ error_cd:
 }
 
 /**
- * Assistant procedure for parsing <create> contact
+ * Parser of EPP create-contact command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_create_contact(
@@ -1030,7 +1031,10 @@ error_cc:
 }
 
 /**
- * Assistant procedure for parsing <create> nsset
+ * Parser of EPP create-nsset command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_create_nsset(
@@ -1066,8 +1070,7 @@ parse_create_nsset(
 	}
 	CL_NEW(cdata->in->create_nsset.ns);
 	/* get the domain data */
-	XPATH_REQ1(cdata->in->create_nsset.id, doc, xpathCtx, error_cn,
-			"nsset:id");
+	XPATH_REQ1(cdata->in->create_nsset.id, doc, xpathCtx, error_cn, "nsset:id");
 	XPATH_REQ1(cdata->in->create_nsset.authInfo, doc, xpathCtx, error_cn,
 			"nsset:authInfo/nsset:pw");
 	/* process "unbounded" number of tech contacts */
@@ -1076,35 +1079,33 @@ parse_create_nsset(
 	/* process multiple ns records which have in turn multiple addresses */
 	XPATH_EVAL(xpathObj, xpathCtx, error_cn, "nsset:ns");
 	assert(xmlXPathNodeSetGetLength(xpathObj->nodesetval) > 0);
-	/* memory leaks are possible with this scheme but not ussual */
 	for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++) {
-		epp_ns	*ns;
-		struct circ_list	*item;
+		epp_ns	*ns = NULL;
+		struct circ_list	*item = NULL;
+
 		/* allocate data structures */
-		if ((item = malloc(sizeof *item)) == NULL) {
-			xmlXPathFreeObject(xpathObj);
-			goto error_cn;
-		}
+		if ((item = malloc(sizeof *item)) == NULL) goto error_cn2;
 		CL_NEW(item);
-		if ((ns = malloc(sizeof *ns)) == NULL) {
-			free(item);
-			xmlXPathFreeObject(xpathObj);
-			goto error_cn;
-		}
-		if ((ns->addr = malloc(sizeof *(ns->addr))) == NULL) {
-			free(item);
-			free(ns);
-			xmlXPathFreeObject(xpathObj);
-			goto error_cn;
-		}
+		if ((ns = malloc(sizeof *ns)) == NULL) goto error_cn2;
+		if ((ns->addr = malloc(sizeof *(ns->addr))) == NULL) goto error_cn2;
 		CL_NEW(ns->addr);
 		/* get data */
 		xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
-		XPATH_REQ1(ns->name, doc, xpathCtx, error_cn, "nsset:name");
-		XPATH_TAKEN(ns->addr, doc, xpathCtx, error_cn, "nsset:addr");
+		XPATH_REQ1(ns->name, doc, xpathCtx, error_cn2, "nsset:name");
+		XPATH_TAKEN(ns->addr, doc, xpathCtx, error_cn2, "nsset:addr");
 		/* enqueue ns record */
 		CL_CONTENT(item) = ns;
 		CL_ADD(cdata->in->create_nsset.ns, item);
+		continue;
+error_cn2:
+		/*
+		 * free items which would be otherwise lost in case of jump to
+		 * error_cn label
+		 */
+		free(item);
+		free(ns);
+		xmlXPathFreeObject(xpathObj);
+		goto error_cn;
 	}
 	xmlXPathFreeObject(xpathObj);
 
@@ -1137,7 +1138,10 @@ error_cn:
 }
 
 /**
- * <create> parser for domain, contact and nsset object.
+ * Parser of EPP create command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_create(
@@ -1160,10 +1164,7 @@ parse_create(
 
 	XPATH_EVAL(xpathObj, xpathCtx, error_c, "epp:create/domain:create");
 	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
-		xmlNodePtr	node;
-
 		/* change relative path prefix and backup old one */
-		node = xpathCtx->node;
 		xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
 		xmlXPathFreeObject(xpathObj);
 		parse_create_domain(doc, xpathCtx, cdata);
@@ -1192,7 +1193,10 @@ error_c:
 }
 
 /**
- * <delete> parser for domain, contact and nsset object.
+ * Parser of EPP delete command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_delete(
@@ -1235,17 +1239,11 @@ parse_delete(
 		cdata->in = NULL;
 		cdata->rc = 2000;
 		cdata->type = EPP_DUMMY;
-		return;
 	}
-
 	return;
 
-	/*
-	 * nasty error's epilog
-	 * Used in case of internal critical failure. It is not terribly
-	 * effecient but this case should not occure very often.
-	 */
 error_d:
+	/* nasty error's epilog */
 	FREENULL(cdata->in->delete.id);
 	free(cdata->in);
 	cdata->in = NULL;
@@ -1254,7 +1252,10 @@ error_d:
 }
 
 /**
- * Assistant procedure for parsing <update> domain
+ * Parser of EPP update-domain command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_update_domain(
@@ -1566,7 +1567,10 @@ error_ud:
 }
 
 /**
- * Assistant procedure for parsing <update> contact
+ * Parser of EPP update-contact command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_update_contact(
@@ -1639,7 +1643,10 @@ parse_update_contact(
 			"contact:chg/contact:vat");
 	XPATH_TAKE1_UPD(cdata->in->update_contact.ssn, doc, xpathCtx, error_uc,
 			"contact:chg/contact:ssn");
-	/* is there disclose section ? */
+	/*
+	 * there can be just one disclose section, now it depens if with flag
+	 * 0 or 1
+	 */
 	if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[flag=0]"))
 	{
 		cdata->in->update_contact.discl->name = xpath_exists(xpathCtx,
@@ -1793,7 +1800,10 @@ error_uc:
 }
 
 /**
- * Assistant procedure for parsing <update> nsset
+ * Parser of EPP update-nsset command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_update_nsset(
@@ -1802,7 +1812,7 @@ parse_update_nsset(
 		epp_command_data *cdata)
 {
 	struct circ_list	*item;
-	xmlNodePtr	node;
+	xmlNodePtr	node;	/* for saving xpath context */
 	xmlXPathObjectPtr	xpathObj;
 	int	j;
 
@@ -1983,7 +1993,10 @@ error_un:
 
 
 /**
- * <update> parser for domain, contact and nsset object.
+ * Parser of EPP update command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_update(
@@ -2035,11 +2048,6 @@ parse_update(
 	xmlXPathFreeObject(xpathObj);
 	return;
 
-	/*
-	 * nasty error's epilog
-	 * Used in case of internal critical failure. It is not terribly
-	 * effecient but this case should not occure very often.
-	 */
 error_u:
 	cdata->in = NULL;
 	cdata->rc = 2400;
@@ -2047,7 +2055,10 @@ error_u:
 }
 
 /**
- * <renew> parser for domain object.
+ * Parser of EPP renew command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_renew(
@@ -2092,6 +2103,10 @@ parse_renew(
 		if (*str == 'y') cdata->in->renew.period *= 12;
 		free(str);
 	}
+	/*
+	 * value 0 means that the period was not given and default value
+	 * should be used instead
+	 */
 	else cdata->in->renew.period = 0;
 
 	xmlXPathFreeObject(xpathObj);
@@ -2112,12 +2127,8 @@ parse_renew(
 	cdata->type = EPP_RENEW_DOMAIN;
 	return;
 
-	/*
-	 * nasty error's epilog
-	 * Used in case of internal critical failure. It is not terribly
-	 * effecient but this case should not occure very often.
-	 */
 error_r:
+	/* nasty error's epilog */
 	FREENULL(cdata->in->renew.name);
 	free(cdata->in);
 	cdata->in = NULL;
@@ -2126,7 +2137,10 @@ error_r:
 }
 
 /**
- * <transfer> parser for domain object.
+ * Parser of EPP transfer command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
  */
 static void
 parse_transfer(
@@ -2159,12 +2173,51 @@ parse_transfer(
 		XPATH_EVAL(xpathObj, xpathCtx, error_t,
 				"epp:transfer[@op='request']/nsset:transfer");
 		if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 0) {
-			/* transfer not implemented for object */
+			/*
+			 * Transfer not implemented for object or bad transfer option.
+			 * Generate error message.
+			 */
+			struct circ_list	*new_item;
+			xmlBufferPtr	buf;
+			xmlNodePtr	node;
+			epp_error	*valerr;
+
 			xmlXPathFreeObject(xpathObj);
 			free(cdata->in);
 			cdata->in = NULL;
 			cdata->rc = 2102;
 			cdata->type = EPP_DUMMY;
+
+			valerr = malloc(sizeof *valerr);
+			new_item = malloc(sizeof *new_item);
+
+			/* dump problematic node */
+			buf = xmlBufferCreate();
+			if (buf == NULL) {
+				free(valerr);
+				free(new_item);
+				return;
+			}
+			XPATH_EVAL(xpathObj, xpathCtx, error_t, "epp:transfer");
+			node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
+			if (xmlNodeDump(buf, doc, node, 0, 0) < 0) {
+				free(valerr);
+				free(new_item);
+				xmlBufferFree(buf);
+				xmlXPathFreeObject(xpathObj);
+				return;
+			}
+			xmlXPathFreeObject(xpathObj);
+			valerr->value = strdup((char *) buf->content);
+			xmlBufferFree(buf);
+
+			/* TODO This should be bilingual */
+			valerr->reason =
+				strdup("Unimplemented op value or bad object type");
+			valerr->standalone = 1;
+
+			CL_CONTENT(new_item) = (void *) valerr;
+			CL_ADD(cdata->errors, new_item);
 			return;
 		}
 		else {
@@ -2189,12 +2242,8 @@ parse_transfer(
 	}
 	return;
 
-	/*
-	 * nasty error's epilog
-	 * Used in case of internal critical failure. It is not terribly
-	 * effecient but this case should not occure very often.
-	 */
 error_t:
+	/* nasty error's epilog */
 	FREENULL(cdata->in->transfer.id);
 	FREENULL(cdata->in->transfer.authInfo);
 	free(cdata->in);
@@ -2467,10 +2516,6 @@ epp_parse_command(
 	return PARSER_CMD_OTHER;
 }
 
-/**
- * This is very good chance to perform integrity checks. Therefore
- * there are so many asserts inside this function.
- */
 void epp_command_data_cleanup(epp_command_data *cdata)
 {
 	assert(cdata != NULL);
