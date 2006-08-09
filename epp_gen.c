@@ -1,5 +1,11 @@
-/*
- * Copyright statement
+/**
+ * @file epp_gen.c
+ *
+ * Component for generating greeting frame and responses to EPP commands
+ * in form of xml documents. Result of generator is the generated string
+ * and validation errors if validation of responses is turned on. Greeting
+ * frame is not validated, therefore only string is returned (without the list
+ * of validation errors).
  */
 
 #include <assert.h>
@@ -7,8 +13,6 @@
 #include <string.h>
 #include <time.h>
 
-//#include <libxml/tree.h>
-//#include <libxml/xmlschemas.h>
 #include <libxml/parser.h>
 #include <libxml/xmlwriter.h>
 
@@ -17,48 +21,64 @@
 #include "epp_gen.h"
 #include "epp_version.h"
 
-/*
+/**
+ * @defgroup xmlwritegroup Macros for convenient xml document construction.
  * Following macros are shortcuts used for document creation. So that
  * we don't have to clutter the code with error checking and other stuff.
  * That makes the code much more readable.
  *
  * All macros assume that
- *    err_handler parameter is the place where to jump when error occurs
- *    writer is is initialized and it is xml writer
+ *    - err_handler: parameter is the place where to jump when error occurs
+ *    - writer: is is initialized and it is xml writer
+ *    - elem: is name of a tag to be written
+ *    - str: is value which should be written inside of a tag
+ *    - attr_name: is a name of attribute
+ *    - attr_value: is a value of an attribute
+ *
+ * @{
  */
+
+/** Wrapper around libxml's xmlTestWriterStartElement() function. */
 #define START_ELEMENT(writer, err_handler, elem)	\
 	do {										\
 		if (xmlTextWriterStartElement(writer, BAD_CAST (elem)) < 0) goto err_handler;	\
 	}while(0)
 
+/** Wrapper around libxml's xmlTestWriterWriteElement() function. */
 #define WRITE_ELEMENT(writer, err_handler, elem, str)	\
 	do {										\
 		if (((char *) str)[0] != '\0')						\
 			if (xmlTextWriterWriteElement(writer, BAD_CAST (elem), BAD_CAST (str)) < 0) goto err_handler;	\
 	}while(0)
 
+/** Wrapper around libxml's xmlTestWriterWriteString() function. */
 #define WRITE_STRING(writer, err_handler, str)		\
 	do {										\
 		if (xmlTextWriterWriteString(writer, BAD_CAST (str)) < 0) goto err_handler;	\
 	}while(0)
 
+/** Wrapper around libxml's xmlTestWriterWriteAttribute() function. */
 #define WRITE_ATTRIBUTE(writer, err_handler, attr_name, attr_value)	\
 	do {										\
 		if (xmlTextWriterWriteAttribute(writer, BAD_CAST (attr_name), BAD_CAST (attr_value)) < 0) goto err_handler;	\
 	}while(0)
 
+/** Wrapper around libxml's xmlTestWriterEndElement() function. */
 #define END_ELEMENT(writer, err_handler)	\
 	do {										\
 		if (xmlTextWriterEndElement(writer) < 0) goto err_handler; \
 	}while(0)
 
+/**
+ * @}
+ */
 
 gen_status
 epp_gen_greeting(const char *svid, char **greeting)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
-	char	strdate[50];
+	char	strdate[50];	/* buffer used to hold date in string form */
 	int	error_seen = 1;
 
 	assert(svid != NULL);

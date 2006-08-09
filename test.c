@@ -243,6 +243,7 @@ int main(int argc, char *argv[])
 
 			/* API: free greeting data */
 			epp_free_greeting(greeting);
+			continue;
 		}
 		else if (pstat == PARSER_CMD_LOGOUT) {
 			int logout; // not used
