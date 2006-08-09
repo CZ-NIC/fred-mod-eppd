@@ -1,59 +1,66 @@
+/**
+ * @file epp_gen.h
+ * Interface to component which generates xml documents and returns result
+ * in form of a string.
+ */
 #ifndef EPP_GEN_H
 #define EPP_GEN_H
 
 #include "epp_common.h"
 
+/**
+ * Namespace used for specifing location of a schema in xml document.
+ */
 #define XSI	"http://www.w3.org/2001/XMLSchema-instance"
 
 /**
- * XML generator status values (part of mod_eppd - epp_parser interface).
+ * XML generator status values.
  */
 typedef enum {
-	GEN_OK,
-	/* could not create xml buffer */
-	GEN_EBUFFER,
-	/* could not create xml writer */
-	GEN_EWRITER,
-	/* error when building xml document */
-	GEN_EBUILD,
+	GEN_OK,	/**< No error appeared, everything was allright. */
+	GEN_EBUFFER,	/**< Could not create xml buffer. */
+	GEN_EWRITER,	/**< Could not create xml writer. */
+	GEN_EBUILD,	/**< Error when building xml document. */
 	/*
 	 * following errors may appear only if response validation is turned on
 	 */
-	/* this should be impossible !! - generating something what is not xml */
-	GEN_NOT_XML,
-	/* malloc failure during response validation */
-	GEN_EINTERNAL,
-	/* error when parsing schema */
-	GEN_ESCHEMA,
-	/* response does not validate */
-	GEN_NOT_VALID
+	GEN_NOT_XML,	/**< Something what is not xml was generated. */
+	GEN_EINTERNAL,	/**< Malloc failure during response validation. */
+	GEN_ESCHEMA,	/**< Error when parsing xml schema used for validation. */
+	GEN_NOT_VALID	/**< Response does not validate. */
 }gen_status;
 
+/**
+ * Return value from generator consists of generated string and validation
+ * errors if validation of responses is turned on.
+ */
 typedef struct {
-	char	*response;
-	struct circ_list	*valerr;
+	char	*response;	/**< Result of generation phase. */
+	struct circ_list	*valerr;	/**< List of validation errors. */
 }epp_gen;
 
 /**
- * Routine makes up epp greeting frame. It is assumed that Output parameters
- * struct is filled by zeros upon function entry.
+ * Routine makes up epp greeting frame.
  *
- * @par svid EPP server ID
- * @par svdate When the greeting was generated
- * @par greeting Greeting frame
- * @ret GEN_OK or other status in case of failure
+ * @param svid Part of server ID used in svid tag.
+ * @param greeting Greeting string.
+ * @return Generator status.
  */
 gen_status
 epp_gen_greeting(const char *svid, char **greeting);
 
 /**
- * Generate command response in XML format.
- * @par xml_globs Used to lookup message in hash table
- * @par cdata Input values
- * @par result Generated string
- * @par val_errors If validation of responses is turned on and response does
- *                 not validate, then this is the place where to look for errors.
- * @ret GEN_OK if success
+ * Generate command response in XML format. There is option that response
+ * can be validated, the validation errors are then returned together with
+ * generated string in form of a list.
+ *
+ * @param validate Tells if response should be validated or not (boolean).
+ * @param schema_url Location of schema against which to validate.
+ * @param lang Language selected by the client.
+ * @param cdata Input values
+ * @param gen Generated string and possibly validation errors if validation
+ * is turned on.
+ * @return Generator status.
  */
 gen_status
 epp_gen_response(
@@ -64,12 +71,16 @@ epp_gen_response(
 		epp_gen *gen);
 
 /**
- * free string allocated by generate functions.
- * @par genstring String to be freed
+ * Free response created by response generator and free validation errors.
+ * @param gen Result of generator.
  */
 void epp_free_gen(epp_gen *gen);
 
+/**
+ * Free response created by greeting generator. Simple free() is called
+ * on greeting string.
+ * @param greeting Greeting string.
+ */
 void epp_free_greeting(char *greeting);
 
 #endif /* EPP_GEN_H */
-

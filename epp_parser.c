@@ -2289,8 +2289,11 @@ epp_parse_command(
 
 	/* save input xml document */
 	cdata->xml_in = malloc(bytes + 1);
-	if (request != NULL)
-		strncpy(cdata->xml_in, request, bytes);
+	if (request != NULL) {
+		memcpy(cdata->xml_in, request, bytes);
+		/* the result is not null terminated yet */
+		cdata->xml_in[bytes] = '\0';
+	}
 	else cdata->xml_in = strdup("");
 
 	/* validate the doc */
