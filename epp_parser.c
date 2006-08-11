@@ -1722,9 +1722,13 @@ parse_update_contact(
 					cdata->in->update_contact.postalInfo->street[i] = (char *)
 							xmlNodeListGetString(doc, xmlXPathNodeSetItem(
 								xpathObj->nodesetval, i)->xmlChildrenNode, 1);
-				/* the rest must be empty strings */
-				for (j = i; j < 3; j++)
-					cdata->in->update_contact.postalInfo->street[j] = strdup("");
+				/* the rest must be "backspace" strings */
+				for (j = i; j < 3; j++) {
+					char *str = malloc(2);
+					str[0] = BS_CHAR;
+					str[1] = '\0';
+					cdata->in->update_contact.postalInfo->street[j] = str;
+				}
 			}
 			xmlXPathFreeObject(xpathObj);
 		}
