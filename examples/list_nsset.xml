@@ -4,11 +4,9 @@
      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
   <command>
     <info>
-    <nsset:info xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.0"
+      <nsset:list xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.0"
 	    xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.0
-	    nsset-1.0.xsd">
-        <nsset:id>exampleNsset</nsset:id>
-      </nsset:info>
+		nsset-1.0.xsd"/>
     </info>
     <clTRID>ABC-12346</clTRID>
   </command>

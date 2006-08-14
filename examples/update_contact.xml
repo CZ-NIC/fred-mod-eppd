@@ -36,7 +36,7 @@
 		  <contact:disclose flag="0">
 		  </contact:disclose>
 		  <contact:vat>7035555556</contact:vat>
-		  <contact:ssn>8888888856</contact:ssn>
+		  <contact:ssn type="rc">8888888856</contact:ssn>
 		  <contact:notifyEmail>novyjouda@example.com</contact:notifyEmail>
 		</contact:chg>
 	  </contact:update>
