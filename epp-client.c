@@ -145,8 +145,8 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 			case ccReg_pollAck_msgID:
 				err_item->spec = errspec_pollAck_msgID;
 				break;
-			case ccReg_contactUpdate_cc:
-				err_item->spec = errspec_contactUpdate_cc;
+			case ccReg_contactInfo_handle:
+				err_item->spec = errspec_contactInfo_handle;
 				break;
 			case ccReg_contactCreate_cc:
 				err_item->spec = errspec_contactCreate_cc;
@@ -154,8 +154,8 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 			case ccReg_contactCreate_handle:
 				err_item->spec = errspec_contactCreate_handle;
 				break;
-			case ccReg_contactInfo_handle:
-				err_item->spec = errspec_contactInfo_handle;
+			case ccReg_contactUpdate_cc:
+				err_item->spec = errspec_contactUpdate_cc;
 				break;
 			case ccReg_contactUpdate_status_add:
 				err_item->spec = errspec_contactUpdate_status_add;
@@ -163,11 +163,20 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 			case ccReg_contactUpdate_status_rem:
 				err_item->spec = errspec_contactUpdate_status_rem;
 				break;
+			case ccReg_nssetInfo_handle:
+				err_item->spec = errspec_nssetInfo_handle;
+				break;
 			case ccReg_nssetCreate_handle:
 				err_item->spec = errspec_nssetCreate_handle;
 				break;
-			case ccReg_nssetInfo_handle:
-				err_item->spec = errspec_nssetInfo_handle;
+			case ccReg_nssetCreate_ns_name:
+				err_item->spec = errspec_nssetCreate_ns_name;
+				break;
+			case ccReg_nssetCreate_ns_addr:
+				err_item->spec = errspec_nssetCreate_ns_addr;
+				break;
+			case ccReg_nssetCreate_tech:
+				err_item->spec = errspec_nssetCreate_tech;
 				break;
 			case ccReg_nssetUpdate_status_add:
 				err_item->spec = errspec_nssetUpdate_status_add;
@@ -175,17 +184,11 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 			case ccReg_nssetUpdate_status_rem:
 				err_item->spec = errspec_nssetUpdate_status_rem;
 				break;
-			case ccReg_nssetCreate_tech:
-				err_item->spec = errspec_nssetCreate_tech;
-				break;
 			case ccReg_nssetUpdate_tech_add:
 				err_item->spec = errspec_nssetUpdate_tech_add;
 				break;
 			case ccReg_nssetUpdate_tech_rem:
 				err_item->spec = errspec_nssetUpdate_tech_rem;
-				break;
-			case ccReg_nssetCreate_ns_name:
-				err_item->spec = errspec_nssetCreate_ns_name;
 				break;
 			case ccReg_nssetUpdate_ns_name_add:
 				err_item->spec = errspec_nssetUpdate_ns_name_add;
@@ -193,47 +196,38 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 			case ccReg_nssetUpdate_ns_name_rem:
 				err_item->spec = errspec_nssetUpdate_ns_name_rem;
 				break;
-			case ccReg_nssetCreate_ns_addr:
-				err_item->spec = errspec_nssetCreate_ns_addr;
-				break;
 			case ccReg_nssetUpdate_ns_addr_add:
 				err_item->spec = errspec_nssetUpdate_ns_addr_add;
 				break;
 			case ccReg_nssetUpdate_ns_addr_rem:
 				err_item->spec = errspec_nssetUpdate_ns_addr_rem;
 				break;
-			case ccReg_domainCreate_fqdn:
-				err_item->spec = errspec_domainCreate_fqdn;
-				break;
 			case ccReg_domainInfo_fqdn:
 				err_item->spec = errspec_domainInfo_fqdn;
 				break;
-			case ccReg_domainUpdate_status_add:
-				err_item->spec = errspec_domainUpdate_status_add;
-				break;
-			case ccReg_domainUpdate_status_rem:
-				err_item->spec = errspec_domainUpdate_status_rem;
+			case ccReg_domainCreate_fqdn:
+				err_item->spec = errspec_domainCreate_fqdn;
 				break;
 			case ccReg_domainCreate_registrant:
 				err_item->spec = errspec_domainCreate_registrant;
 				break;
-			case ccReg_domainUpdate_registrant:
-				err_item->spec = errspec_domainUpdate_registrant;
-				break;
 			case ccReg_domainCreate_nsset:
 				err_item->spec = errspec_domainCreate_nsset;
-				break;
-			case ccReg_domainUpdate_nsset:
-				err_item->spec = errspec_domainUpdate_nsset;
 				break;
 			case ccReg_domainCreate_period:
 				err_item->spec = errspec_domainCreate_period;
 				break;
-			case ccReg_domainRenew_period:
-				err_item->spec = errspec_domainRenew_period;
-				break;
 			case ccReg_domainCreate_admin:
 				err_item->spec = errspec_domainCreate_admin;
+				break;
+			case ccReg_domainCreate_ext_valDate:
+				err_item->spec = errspec_domainCreate_ext_valdate;
+				break;
+			case ccReg_domainUpdate_registrant:
+				err_item->spec = errspec_domainUpdate_registrant;
+				break;
+			case ccReg_domainUpdate_nsset:
+				err_item->spec = errspec_domainUpdate_nsset;
 				break;
 			case ccReg_domainUpdate_admin_add:
 				err_item->spec = errspec_domainUpdate_admin_add;
@@ -241,17 +235,23 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 			case ccReg_domainUpdate_admin_rem:
 				err_item->spec = errspec_domainUpdate_admin_rem;
 				break;
-			case ccReg_domainCreate_ext_valDate:
-				err_item->spec = errspec_domainCreate_ext_valdate;
+			case ccReg_domainUpdate_status_add:
+				err_item->spec = errspec_domainUpdate_status_add;
+				break;
+			case ccReg_domainUpdate_status_rem:
+				err_item->spec = errspec_domainUpdate_status_rem;
 				break;
 			case ccReg_domainUpdate_ext_valDate:
 				err_item->spec = errspec_domainUpdate_ext_valdate;
 				break;
-			case ccReg_domainRenew_ext_valDate:
-				err_item->spec = errspec_domainRenew_ext_valDate;
-				break;
 			case ccReg_domainRenew_curExpDate:
 				err_item->spec = errspec_domainRenew_curExpDate;
+				break;
+			case ccReg_domainRenew_period:
+				err_item->spec = errspec_domainRenew_period;
+				break;
+			case ccReg_domainRenew_ext_valDate:
+				err_item->spec = errspec_domainRenew_ext_valDate;
 				break;
 			default:
 				err_item->spec = errspec_unknow;
@@ -460,7 +460,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 		epp_object_type obj)
 {
 	CORBA_Environment ev[1];
-	ccReg_Avail	*c_bools;
+	ccReg_CheckResp	*c_avails;
 	ccReg_Check	*c_ids;
 	ccReg_Response *response;
 	struct circ_list	*item;
@@ -483,7 +483,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	if (obj == EPP_CONTACT)
 		response = ccReg_EPP_ContactCheck(globs->service,
 				c_ids,
-				&c_bools,
+				&c_avails,
 				session,
 				cdata->clTRID,
 				cdata->xml_in,
@@ -491,7 +491,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	else if (obj == EPP_DOMAIN)
 		response = ccReg_EPP_DomainCheck(globs->service,
 				c_ids,
-				&c_bools,
+				&c_avails,
 				session,
 				cdata->clTRID,
 				cdata->xml_in,
@@ -500,7 +500,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 		assert(obj == EPP_NSSET);
 		response = ccReg_EPP_NSSetCheck(globs->service,
 				c_ids,
-				&c_bools,
+				&c_avails,
 				session,
 				cdata->clTRID,
 				cdata->xml_in,
@@ -521,45 +521,48 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	 * empty string
 	 */
 	if (*response->svTRID == '\0') {
-		CORBA_free(c_bools);
+		CORBA_free(c_avails);
 		CORBA_free(response);
 		return CORBA_REMOTE_ERROR;
 	}
 
 	/* alloc necessary structures */
 	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(c_bools);
+		CORBA_free(c_avails);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
-	if ((cdata->out->check.bools = malloc(sizeof *item)) == NULL) {
+	if ((cdata->out->check.avails = malloc(sizeof *item)) == NULL) {
 		free(cdata->out);
 		cdata->out = NULL;
-		CORBA_free(c_bools);
+		CORBA_free(c_avails);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
-	CL_NEW(cdata->out->check.bools);
+	CL_NEW(cdata->out->check.avails);
 
 	/* length of results returned should be same as lenght of input objects */
-	assert(len == c_bools->_length);
+	assert(len == c_avails->_length); /* XXX change this in production release */
 	/*
 	 * circular list stores items in reversed order.
 	 * Therefore we have reverse processing order of items in
-	 * c_bools->_buffer array
+	 * c_avails->_buffer array
 	 */
-	for (i = c_bools->_length - 1; i >= 0; i--) {
+	for (i = c_avails->_length - 1; i >= 0; i--) {
+		epp_avail	*avail;
+
 		if ((item = malloc(sizeof *item)) == NULL) break;
-		/*
-		 * note that we cannot use zero value for false value
-		 * since value zero of content pointer denotes that
-		 * the item in list is a sentinel (first and last).
-		 * Therefore we will use value 2 for false (1 remains true).
-		 */
-		CL_CONTENT(item) = (void *) (c_bools->_buffer[i] ? 1 : 2);
-		CL_ADD(cdata->out->check.bools, item);
+		if ((avail = malloc(sizeof *avail)) == NULL) {
+			free(item);
+			break;
+		}
+		avail->avail = (c_avails->_buffer[i].avail == ccReg_NotExist) ? 1 : 0;
+		avail->reason = strdup(c_avails->_buffer[i].reason);
+		if (avail->avail) assert(*avail->reason == '\0');
+		CL_CONTENT(item) = (void *) avail;
+		CL_ADD(cdata->out->check.avails, item);
 	}
-	CORBA_free(c_bools);
+	CORBA_free(c_avails);
 
 	/* handle situation when item allocation above failed */
 	if (i > 0) {
@@ -660,10 +663,13 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 
 	/* ok, now everything was successfully allocated */
 	cdata->out->info_contact.roid = strdup(c_contact->ROID);
+	cdata->out->info_contact.authInfo = strdup(c_contact->authInfo);
+	cdata->out->info_contact.clID = strdup(c_contact->ClID);
 	cdata->out->info_contact.crID = strdup(c_contact->CrID);
 	cdata->out->info_contact.upID = strdup(c_contact->UpID);
 	cdata->out->info_contact.crDate = c_contact->CrDate;
 	cdata->out->info_contact.upDate = c_contact->UpDate;
+	cdata->out->info_contact.trDate = c_contact->trDate;
 	/* contact status */
 	CL_NEW(cdata->out->info_contact.status);
 	for (i = 0; i < c_contact->stat._length; i++) {
@@ -690,6 +696,27 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 		strdup(c_contact->NotifyEmail);
 	cdata->out->info_contact.vat = strdup(c_contact->VAT);
 	cdata->out->info_contact.ssn = strdup(c_contact->SSN);
+	/* convert ssntype from idl's enum to our enum */
+	switch (c_contact->SSN) {
+		case ccReg_RC:
+			cdata->out->info_contact.ssntype = SSN_RC;
+			break;
+		case ccReg_OP:
+			cdata->out->info_contact.ssntype = SSN_OP;
+			break;
+		case ccReg_PASS:
+			cdata->out->info_contact.ssntype = SSN_PASSPORT;
+			break;
+		case ccReg_MPSV:
+			cdata->out->info_contact.ssntype = SSN_MPSV;
+			break;
+		case ccReg_ICO:
+			cdata->out->info_contact.ssntype = SSN_ICO;
+			break;
+		default:
+			cdata->out->info_contact.ssntype = SSN_UNKNOWN;
+			break;
+	}
 	/* disclose info */
 	discl = cdata->out->info_contact.discl;
 	discl->name = c_contact->DiscloseName;
@@ -1208,6 +1235,24 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 }
 
 /**
+ * Convert our SSN enum to IDL's SSNTyp enum.
+ * @param our_ssn Out ssn's type.
+ * @return SSN type as defined in IDL.
+ */
+static ccReg_SSNTyp
+convSSNType(our_ssn)
+{
+	switch (our_ssn) {
+		case SSN_ICO: return ccReg_ICO; break;
+		case SSN_OP: return ccReg_OP; break;
+		case SSN_RC: return ccReg_RC; break;
+		case SSN_PASSPORT: return ccReg_PASSPORT; break;
+		case SSN_MPSV: return ccReg_MPSV; break;
+		default: return ccReg_EMPTY; break;
+	}
+}
+
+/**
  * EPP create contact.
  *
  * @param globs Corba context.
@@ -1229,6 +1274,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 
 	/* fill in corba input values */
 	c_contact = ccReg_ContactChange__alloc();
+	c_contact->AuthInfoPw = CORBA_string_dup(cdata->in->create_contact.authInfo);
 	c_contact->Telephone = CORBA_string_dup(cdata->in->create_contact.voice);
 	c_contact->Fax = CORBA_string_dup(cdata->in->create_contact.fax);
 	c_contact->Email = CORBA_string_dup(cdata->in->create_contact.email);
@@ -1236,6 +1282,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 		CORBA_string_dup(cdata->in->create_contact.notify_email);
 	c_contact->VAT = CORBA_string_dup(cdata->in->create_contact.vat);
 	c_contact->SSN = CORBA_string_dup(cdata->in->create_contact.ssn);
+	c_contact->SSNtype = convSSNType(cdata->in->create_contact.ssn);
 	/* disclose */
 	c_contact->DiscloseName = cdata->in->create_contact.discl->name;
 	c_contact->DiscloseOrganization = cdata->in->create_contact.discl->org;
@@ -1745,6 +1792,7 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 		CORBA_string_dup(cdata->in->update_contact.postalInfo->pc);
 	c_contact->CC =
 		CORBA_string_dup(cdata->in->update_contact.postalInfo->cc);
+	c_contact->AuthInfoPw = CORBA_string_dup(cdata->in->update_contact.authInfo);
 	c_contact->Telephone = CORBA_string_dup(cdata->in->update_contact.voice);
 	c_contact->Fax = CORBA_string_dup(cdata->in->update_contact.fax);
 	c_contact->Email = CORBA_string_dup(cdata->in->update_contact.email);
@@ -1752,6 +1800,7 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 		CORBA_string_dup(cdata->in->update_contact.notify_email);
 	c_contact->VAT = CORBA_string_dup(cdata->in->update_contact.vat);
 	c_contact->SSN = CORBA_string_dup(cdata->in->update_contact.ssn);
+	c_contact->SSNtype = convSSNType(cdata->in->update_contact.ssn);
 	c_contact->DiscloseName = cdata->in->update_contact.discl->name;
 	c_contact->DiscloseOrganization = cdata->in->update_contact.discl->org;
 	c_contact->DiscloseAddress = cdata->in->update_contact.discl->addr;
@@ -1947,7 +1996,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 }
 
 /**
- * EPP transfer for domain and nsset is so similar that it is worth of
+ * EPP transfer for domain, contact and nsset is so similar that it is worth of
  * having the code in one function and pass object type as parameter.
  *
  * @param globs Corba context.
@@ -1967,6 +2016,15 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 
 	if (obj == EPP_DOMAIN) {
 		response = ccReg_EPP_DomainTransfer(globs->service,
+				cdata->in->transfer.id,
+				cdata->in->transfer.authInfo,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+	}
+	else if (obj == EPP_CONTACT) {
+		response = ccReg_EPP_ContactTransfer(globs->service,
 				cdata->in->transfer.id,
 				cdata->in->transfer.authInfo,
 				session,
@@ -2037,6 +2095,15 @@ epp_call_cmd(epp_corba_globs *globs, int session, epp_command_data *cdata)
 		case EPP_INFO_NSSET:
 			cstat = epp_call_info_nsset(globs, session, cdata);
 			break;
+		case EPP_LIST_CONTACT:
+			cstat = epp_call_list(globs, session, cdata, EPP_CONTACT);
+			break;
+		case EPP_LIST_DOMAIN:
+			cstat = epp_call_list(globs, session, cdata, EPP_DOMAIN);
+			break;
+		case EPP_LIST_NSSET:
+			cstat = epp_call_list(globs, session, cdata, EPP_NSSET);
+			break;
 		case EPP_POLL_REQ:
 			cstat = epp_call_poll_req(globs, session, cdata);
 			break;
@@ -2072,6 +2139,9 @@ epp_call_cmd(epp_corba_globs *globs, int session, epp_command_data *cdata)
 			break;
 		case EPP_UPDATE_NSSET:
 			cstat = epp_call_update_nsset(globs, session, cdata);
+			break;
+		case EPP_TRANSFER_CONTACT:
+			cstat = epp_call_transfer(globs, session, cdata, EPP_CONTACT);
 			break;
 		case EPP_TRANSFER_DOMAIN:
 			cstat = epp_call_transfer(globs, session, cdata, EPP_DOMAIN);

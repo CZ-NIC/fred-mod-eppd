@@ -30,6 +30,9 @@ typedef enum {
 	EPP_INFO_CONTACT,
 	EPP_INFO_DOMAIN,
 	EPP_INFO_NSSET,
+	EPP_LIST_CONTACT,
+	EPP_LIST_DOMAIN,
+	EPP_LIST_NSSET,
 	EPP_POLL_REQ,
 	EPP_POLL_ACK,
 	/* transform commands */
@@ -42,6 +45,7 @@ typedef enum {
 	EPP_UPDATE_CONTACT,
 	EPP_UPDATE_DOMAIN,
 	EPP_UPDATE_NSSET,
+	EPP_TRANSFER_CONTACT,
 	EPP_TRANSFER_DOMAIN,
 	EPP_TRANSFER_NSSET,
 	EPP_RENEW_DOMAIN
@@ -258,6 +262,26 @@ typedef struct {
 }epp_ds;
 
 /**
+ * Type of identification number used in contact object.
+ */
+typedef enum {
+	SSN_UNKNOWN,	/**< Unknown value means also undefined in some contexts. */
+	SSN_OP,	/**< Number of ID card. */
+	SSN_RC,	/**< Born number (rodne cislo). */
+	SSN_PASSPORT,	/**< Number of passport. */
+	SSN_MPSV,	/**< Number assigned by "ministerstvo prace a soc. veci". */
+	SSN_ICO	/**< ICO. */
+}epp_ssnType;
+
+/**
+ * Structure holding answer to EPP check command.
+ */
+typedef struct {
+	int	avail;	/**< True if object is available, false otherwise. */
+	char	*reason;	/**< If object is not available, here is the reason. */
+}epp_avail;
+
+/**
  * This structure is central to the concept of the whole module. The
  * communication among module's components is done through this structure.
  * It gathers outputs of parsing stage and serves as input/output
@@ -331,9 +355,11 @@ typedef struct {
 			char	*voice;
 			char	*fax;
 			char	*email;
+			char	*authInfo;
 			char	*notify_email;
 			char	*vat;
 			char	*ssn;
+			epp_ssnType	ssntype;
 			epp_discl	*discl;
 		}create_contact;
 		/* additional create nsset parameters */
@@ -381,9 +407,11 @@ typedef struct {
 			char	*voice;
 			char	*fax;
 			char	*email;
+			char	*authInfo;
 			char	*notify_email;
 			char	*vat;
 			char	*ssn;
+			epp_ssnType	ssntype;
 			epp_discl	*discl;
 		}update_contact;
 		/* additional update nsset parameters */
@@ -412,8 +440,8 @@ typedef struct {
 	union {
 		/* additional check contact and domain parameters */
 		struct {
-			/* booleans are answers to check */
-			struct circ_list	*bools;
+			/* booleans+reasons are answers to check */
+			struct circ_list	*avails;
 		}check;
 		/* additional info contact parameters */
 		struct {
@@ -423,14 +451,18 @@ typedef struct {
 			char	*voice;
 			char	*fax;
 			char	*email;
+			char	*clID;
 			char	*crID;
 			unsigned long long	crDate;
 			char	*upID;
 			unsigned long long	upDate;
-			char	*notify_email;
+			unsigned long long	trDate;
+			char	*authInfo;
+			epp_discl	*discl;
 			char	*vat;
 			char	*ssn;
-			epp_discl	*discl;
+			epp_ssnType	ssntype;
+			char	*notify_email;
 		}info_contact;
 		/* additional info domain parameters */
 		struct {

@@ -11,12 +11,12 @@
        domain-1.0.xsd">
         <domain:name>e#a-ple.cz</domain:name>
         <domain:add>
-		<domain:contact>jouda</domain:contact>
-		<domain:contact>regcontact2</domain:contact>
+		<domain:admin>jouda</domain:admin>
+		<domain:admin>regcontact2</domain:admin>
 		<domain:status s="clientRenewProhibited" />
 	</domain:add>
         <domain:rem>
-		<domain:contact>regcontact</domain:contact>
+		<domain:admin>regcontact</domain:admin>
 		<domain:status s="clientUpdateProhibited" />
 	</domain:rem>
         <domain:chg>

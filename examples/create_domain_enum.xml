@@ -13,7 +13,7 @@
         <domain:period unit="y">2</domain:period>
         <domain:nsset>exampleNsset</domain:nsset>
         <domain:registrant>jouda</domain:registrant>
-        <domain:contact>regcontact</domain:contact>
+        <domain:admin>regcontact</domain:admin>
         <domain:authInfo>
           <domain:pw>2fooBAR</domain:pw>
         </domain:authInfo>

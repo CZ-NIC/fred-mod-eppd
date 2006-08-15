@@ -204,6 +204,8 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 			cdata->out->info_contact.fax);
 	WRITE_ELEMENT(writer, simple_err, "contact:email",
 			cdata->out->info_contact.email);
+	WRITE_ELEMENT(writer, simple_err, "contact:clID",
+			cdata->out->info_contact.clID);
 	WRITE_ELEMENT(writer, simple_err, "contact:crID",
 			cdata->out->info_contact.crID);
 	get_rfc3339_date(cdata->out->info_contact.crDate, strbuf);
@@ -213,6 +215,16 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	if (cdata->out->info_contact.upDate > 0) {
 		get_rfc3339_date(cdata->out->info_contact.upDate, strbuf);
 		WRITE_ELEMENT(writer, simple_err, "contact:upDate", strbuf);
+	}
+	if (cdata->out->info_contact.trDate > 0) {
+		get_rfc3339_date(cdata->out->info_contact.trDate, strbuf);
+		WRITE_ELEMENT(writer, simple_err, "contact:trDate", strbuf);
+	}
+	if (*cdata->out->info_contact.authInfo != '\0') {
+		START_ELEMENT(writer, simple_err, "contact:authInfo");
+		WRITE_ELEMENT(writer, simple_err, "contact:pw",
+				cdata->out->info_contact.authInfo);
+		END_ELEMENT(writer, simple_err); /* auth info */
 	}
 	/* output disclose section only if there is at least one discl element */
 	discl = cdata->out->info_contact.discl;
@@ -249,6 +261,12 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 		}
 		END_ELEMENT(writer, simple_err); /* disclose */
 	}
+	WRITE_ELEMENT(writer, simple_err, "contact:vat",
+			cdata->out->info_contact.vat);
+	WRITE_ELEMENT(writer, simple_err, "contact:ssn",
+			cdata->out->info_contact.ssn);
+	WRITE_ELEMENT(writer, simple_err, "contact:notifyEmail",
+			cdata->out->info_contact.notify_email);
 	END_ELEMENT(writer, simple_err); /* infdata */
 	END_ELEMENT(writer, simple_err); /* resdata */
 	return 1;
