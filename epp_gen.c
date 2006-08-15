@@ -161,13 +161,20 @@ greeting_err:
 	return GEN_EBUILD;
 }
 
+/**
+ * This is assistant function for generating info contact <resData>
+ * xml subtree.
+ *
+ * @param writer XML writer.
+ * @param cdata Data needed to generate XML.
+ * @return 1 if OK, 0 in case of failure.
+ */
 static char
 gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
 	epp_postalInfo	*pi;
 	epp_discl	*discl;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
-	int	discl_printed;	/* true if disclose tag has been already printed */
 
 	START_ELEMENT(writer, simple_err, "resData");
 	START_ELEMENT(writer, simple_err, "contact:infData");
@@ -228,14 +235,12 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	}
 	/* output disclose section only if there is at least one discl element */
 	discl = cdata->out->info_contact.discl;
-	discl_printed = 0;
 	if (!discl->name || !discl->org || !discl->addr ||
 			!discl->voice || !discl->fax || !discl->email)
 	{
 		START_ELEMENT(writer, simple_err, "contact:disclose");
 		WRITE_ATTRIBUTE(writer, simple_err, "flag", "0");
 		if (!discl->name) {
-			discl_printed = 1;
 			START_ELEMENT(writer, simple_err, "contact:name");
 			END_ELEMENT(writer, simple_err);
 		}
@@ -263,8 +268,36 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	}
 	WRITE_ELEMENT(writer, simple_err, "contact:vat",
 			cdata->out->info_contact.vat);
-	WRITE_ELEMENT(writer, simple_err, "contact:ssn",
-			cdata->out->info_contact.ssn);
+	if (*cdata->out->info_contact.ssn != '\0') {
+		char	*type;
+
+		switch (cdata->out->info_contact.ssntype) {
+			case SSN_OP:
+				type = strdup("op");
+				break;
+			case SSN_RC:
+				type = strdup("rc");
+				break;
+			case SSN_PASSPORT:
+				type = strdup("passport");
+				break;
+			case SSN_MPSV:
+				type = strdup("mpsv");
+				break;
+			case SSN_ICO:
+				type = strdup("ico");
+				break;
+			default:
+				/* what should we do? We will create nonvalidating document. */
+				type = strdup("unknown");
+				break;
+		}
+		START_ELEMENT(writer, simple_err, "contact:ssn");
+		WRITE_ATTRIBUTE(writer, simple_err, "type", type);
+		WRITE_STRING(writer, simple_err, cdata->out->info_contact.ssn);
+		END_ELEMENT(writer, simple_err); /* ssn */
+		free(type);
+	}
 	WRITE_ELEMENT(writer, simple_err, "contact:notifyEmail",
 			cdata->out->info_contact.notify_email);
 	END_ELEMENT(writer, simple_err); /* infdata */
@@ -275,6 +308,14 @@ simple_err:
 	return 0;
 }
 
+/**
+ * This is assistant function for generating info domain <resData>
+ * xml subtree.
+ *
+ * @param writer XML writer.
+ * @param cdata Data needed to generate XML.
+ * @return 1 if OK, 0 in case of failure.
+ */
 static char
 gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
@@ -298,11 +339,8 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 			cdata->out->info_domain.registrant);
 	CL_RESET(cdata->out->info_domain.admin);
 	CL_FOREACH(cdata->out->info_domain.admin) {
-		START_ELEMENT(writer, simple_err, "domain:contact");
-		WRITE_ATTRIBUTE(writer, simple_err, "type", "admin");
-		WRITE_STRING(writer, simple_err,
+		WRITE_ELEMENT(writer, simple_err, "domain:admin",
 				CL_CONTENT(cdata->out->info_domain.admin));
-		END_ELEMENT(writer, simple_err);
 	}
 	WRITE_ELEMENT(writer, simple_err, "domain:nsset",
 			cdata->out->info_domain.nsset);
@@ -348,6 +386,10 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 			END_ELEMENT(writer, simple_err); /* infdata (enumval) */
 		}
 		/*
+		 * NOTE: This does not have any effect because ds records are
+		 * initialized to empty list in corba component untill the dnssec
+		 * extension will be fully implemented.
+		 */
 		if (cl_length(cdata->out->info_domain.ds) > 0) {
 			START_ELEMENT(writer, simple_err, "secdns:infData");
 			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:secdns", NS_SECDNS);
@@ -369,10 +411,10 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 					WRITE_ELEMENT(writer, simple_err, "secdns:maxSigLife",
 							strbuf);
 				}
-				 *
+				/*
 				 * all fields of keyData should be filled in or none of them.
 				 * We test value of pubkey and decide according to its value.
-				 *
+				 */
 				if (*ds->pubkey != '\0') {
 					START_ELEMENT(writer, simple_err, "secdns:keyData");
 					snprintf(strbuf, 24, "%u", ds->flags);
@@ -389,7 +431,6 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 			}
 			END_ELEMENT(writer, simple_err); // infdata (secdns)
 		}
-		*/
 		END_ELEMENT(writer, simple_err); /* extension */
 	}
 	return 1;
@@ -398,6 +439,14 @@ simple_err:
 	return 0;
 }
 
+/**
+ * This is assistant function for generating info nsset <resData>
+ * xml subtree.
+ *
+ * @param writer XML writer.
+ * @param cdata Data needed to generate XML.
+ * @return 1 if OK, 0 in case of failure.
+ */
 static char
 gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
@@ -463,12 +512,27 @@ simple_err:
 	return 0;
 }
 
+/**
+ * Function completes xml tags to both ends of value provided by client
+ * which cased error on side of central register. The standard requires
+ * to return client provided value INCLUDING bordering xml tags. Because
+ * central register is not aware of any xml, it returns just parameter
+ * which caused the error and on us is to accompany that parameter value
+ * with appropriate xml tags. This should be considered as temporary hack,
+ * since we are anyway not able to complete exactly the same tags as the client
+ * provided, when it is done this way. But untill we find better solution
+ * this is sufficient.
+ *
+ * @param e Error specification (the field e->value is changed inside
+ * the function).
+ */
 static void
 complete_tags(epp_error	*e)
 {
 	char	*newstr;
 	int	len;
 
+	/* this is same for all switch cases, so we will do it here. */
 	len = strlen(e->value);
 
 	switch (e->spec) {
@@ -490,7 +554,9 @@ complete_tags(epp_error	*e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</cc>");
 			break;
+		case errspec_contactInfo_handle:
 		case errspec_contactCreate_handle:
+		case errspec_nssetInfo_handle:
 		case errspec_nssetCreate_handle:
 			len += 2 * strlen("<id>") + 1;
 			newstr = malloc(len + 1);
@@ -499,6 +565,7 @@ complete_tags(epp_error	*e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</id>");
 			break;
+		case errspec_domainInfo_fqdn:
 		case errspec_domainCreate_fqdn:
 			len += 2 * strlen("<name>") + 1;
 			newstr = malloc(len + 1);
@@ -581,12 +648,12 @@ complete_tags(epp_error	*e)
 		case errspec_domainCreate_admin:
 		case errspec_domainUpdate_admin_add:
 		case errspec_domainUpdate_admin_rem:
-			len += 2 * strlen("<contact>") + 1;
+			len += 2 * strlen("<admin>") + 1;
 			newstr = malloc(len + 1);
 			*newstr = '\0';
-			strcat(newstr, "<contact>");
+			strcat(newstr, "<admin>");
 			strcat(newstr, e->value);
-			strcat(newstr, "</contact>");
+			strcat(newstr, "</admin>");
 			break;
 		case errspec_domainCreate_ext_valdate:
 		case errspec_domainUpdate_ext_valdate:
@@ -636,6 +703,7 @@ epp_gen_response(
 	assert(schema_url != NULL);
 	assert(cdata != NULL);
 
+	/* initialize default return values */
 	gen->response = NULL;
 	gen->valerr = NULL;
 
@@ -742,22 +810,25 @@ epp_gen_response(
 			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
 					LOC_DOMAIN);
 			CL_RESET(cdata->in->check.ids);
-			CL_RESET(cdata->out->check.bools);
+			CL_RESET(cdata->out->check.avails);
 			CL_FOREACH(cdata->in->check.ids) {
-				CL_NEXT(cdata->out->check.bools);
+				epp_avail	*avail;
+
+				CL_NEXT(cdata->out->check.avails);
+				avail = CL_CONTENT(cdata->out->check.avails);
 				START_ELEMENT(writer, simple_err, "domain:cd");
 				START_ELEMENT(writer, simple_err, "domain:name");
-				/*
-				 * value 1 == true, value 2 == false (see epp-client.c for
-				 * explanation)
-				 */
-				WRITE_ATTRIBUTE(writer, simple_err, "avail",
-						(CL_CONTENT(cdata->out->check.bools) == (void *) 1) ?
-						"1" : "0");
+				if (avail->avail)
+					WRITE_ATTRIBUTE(writer, simple_err, "avail", "1");
+				else
+					WRITE_ATTRIBUTE(writer, simple_err, "avail", "0");
 				WRITE_STRING(writer, simple_err,
 						CL_CONTENT(cdata->in->check.ids));
-				END_ELEMENT(writer, simple_err);
-				END_ELEMENT(writer, simple_err);
+				END_ELEMENT(writer, simple_err); /* name */
+				if (!avail->avail)
+					WRITE_ELEMENT(writer, simple_err, "domain:reason",
+							avail->reason);
+				END_ELEMENT(writer, simple_err); /* cd (check data) */
 			}
 			END_ELEMENT(writer, simple_err); /* chkData */
 			END_ELEMENT(writer, simple_err); /* resData */
@@ -770,22 +841,25 @@ epp_gen_response(
 			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
 					LOC_CONTACT);
 			CL_RESET(cdata->in->check.ids);
-			CL_RESET(cdata->out->check.bools);
+			CL_RESET(cdata->out->check.avails);
 			CL_FOREACH(cdata->in->check.ids) {
-				CL_NEXT(cdata->out->check.bools);
+				epp_avail	*avail;
+
+				CL_NEXT(cdata->out->check.avails);
+				avail = CL_CONTENT(cdata->out->check.avails);
 				START_ELEMENT(writer, simple_err, "contact:cd");
-				START_ELEMENT(writer, simple_err, "contact:id");
-				/*
-				 * value 1 == true, value 2 == false (see epp-client.c for
-				 * explanation)
-				 */
-				WRITE_ATTRIBUTE(writer, simple_err, "avail",
-						(CL_CONTENT(cdata->out->check.bools) == (void *) 1) ?
-						"1" : "0");
+				START_ELEMENT(writer, simple_err, "contact:name");
+				if (avail->avail)
+					WRITE_ATTRIBUTE(writer, simple_err, "avail", "1");
+				else
+					WRITE_ATTRIBUTE(writer, simple_err, "avail", "0");
 				WRITE_STRING(writer, simple_err,
 						CL_CONTENT(cdata->in->check.ids));
-				END_ELEMENT(writer, simple_err);
-				END_ELEMENT(writer, simple_err);
+				END_ELEMENT(writer, simple_err); /* name */
+				if (!avail->avail)
+					WRITE_ELEMENT(writer, simple_err, "contact:reason",
+							avail->reason);
+				END_ELEMENT(writer, simple_err); /* cd (check data) */
 			}
 			END_ELEMENT(writer, simple_err); /* chkData */
 			END_ELEMENT(writer, simple_err); /* resData */
@@ -797,22 +871,25 @@ epp_gen_response(
 			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
 			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",LOC_NSSET);
 			CL_RESET(cdata->in->check.ids);
-			CL_RESET(cdata->out->check.bools);
+			CL_RESET(cdata->out->check.avails);
 			CL_FOREACH(cdata->in->check.ids) {
-				CL_NEXT(cdata->out->check.bools);
+				epp_avail	*avail;
+
+				CL_NEXT(cdata->out->check.avails);
+				avail = CL_CONTENT(cdata->out->check.avails);
 				START_ELEMENT(writer, simple_err, "nsset:cd");
-				START_ELEMENT(writer, simple_err, "nsset:id");
-				/*
-				 * value 1 == true, value 2 == false (see epp-client.c for
-				 * explanation)
-				 */
-				WRITE_ATTRIBUTE(writer, simple_err, "avail",
-						(CL_CONTENT(cdata->out->check.bools) == (void *) 1) ?
-						"1" : "0");
+				START_ELEMENT(writer, simple_err, "nsset:name");
+				if (avail->avail)
+					WRITE_ATTRIBUTE(writer, simple_err, "avail", "1");
+				else
+					WRITE_ATTRIBUTE(writer, simple_err, "avail", "0");
 				WRITE_STRING(writer, simple_err,
 						CL_CONTENT(cdata->in->check.ids));
-				END_ELEMENT(writer, simple_err);
-				END_ELEMENT(writer, simple_err);
+				END_ELEMENT(writer, simple_err); /* name */
+				if (!avail->avail)
+					WRITE_ELEMENT(writer, simple_err, "nsset:reason",
+							avail->reason);
+				END_ELEMENT(writer, simple_err); /* cd (check data) */
 			}
 			END_ELEMENT(writer, simple_err); /* chkData */
 			END_ELEMENT(writer, simple_err); /* resData */
@@ -885,6 +962,48 @@ epp_gen_response(
 			get_rfc3339_date(cdata->out->renew.exDate, strbuf);
 			WRITE_ELEMENT(writer, simple_err, "domain:exDate", strbuf);
 			END_ELEMENT(writer, simple_err); /* renData */
+			END_ELEMENT(writer, simple_err); /* resData */
+			break;
+		case EPP_LIST_CONTACT:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "resData");
+			START_ELEMENT(writer, simple_err, "contact:listData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
+					LOC_CONTACT);
+			CL_FOREACH(cdata->out->list.handles) {
+				WRITE_ELEMENT(writer, simple_err, "contact:id",
+						CL_CONTENT(cdata->out->list.handles));
+			}
+			END_ELEMENT(writer, simple_err); /* listData */
+			END_ELEMENT(writer, simple_err); /* resData */
+			break;
+		case EPP_LIST_DOMAIN:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "resData");
+			START_ELEMENT(writer, simple_err, "domain:listData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
+					LOC_DOMAIN);
+			CL_FOREACH(cdata->out->list.handles) {
+				WRITE_ELEMENT(writer, simple_err, "domain:name",
+						CL_CONTENT(cdata->out->list.handles));
+			}
+			END_ELEMENT(writer, simple_err); /* listData */
+			END_ELEMENT(writer, simple_err); /* resData */
+			break;
+		case EPP_LIST_NSSET:
+			if (cdata->rc != 1000) break;
+			START_ELEMENT(writer, simple_err, "resData");
+			START_ELEMENT(writer, simple_err, "nsset:listData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
+					LOC_NSSET);
+			CL_FOREACH(cdata->out->list.handles) {
+				WRITE_ELEMENT(writer, simple_err, "nsset:id",
+						CL_CONTENT(cdata->out->list.handles));
+			}
+			END_ELEMENT(writer, simple_err); /* listData */
 			END_ELEMENT(writer, simple_err); /* resData */
 			break;
 		default:

@@ -801,7 +801,7 @@ parse_create_domain(
 	xmlXPathFreeObject(xpathObj);
 	/* process "unbounded" number of admin contacts */
 	XPATH_TAKEN(cdata->in->create_domain.admin, doc, xpathCtx, error_cd,
-			"domain:contact");
+			"domain:admin");
 
 	/* now look for optional extensions (extension tag is 2 layers upwards) */
 	xpathCtx->node = xpathCtx->node->parent->parent;
@@ -1414,9 +1414,9 @@ parse_update_domain(
 			"domain:chg/domain:authInfo/domain:pw");
 	/* add & rem data */
 	XPATH_TAKEN(cdata->in->update_domain.add_admin, doc, xpathCtx, error_ud,
-			"domain:add/domain:contact");
+			"domain:add/domain:admin");
 	XPATH_TAKEN(cdata->in->update_domain.rem_admin, doc, xpathCtx, error_ud,
-			"domain:rem/domain:contact");
+			"domain:rem/domain:admin");
 	/* status (attrs) */
 	XPATH_TAKEN_ATTR(cdata->in->update_domain.add_status, xpathCtx, error_ud,
 			"domain:add/domain:status", "s");
@@ -3042,6 +3042,17 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			CL_FOREACH(cdata->in->update_nsset.rem_status)
 				free(CL_CONTENT(cdata->in->update_nsset.rem_status));
 			cl_purge(cdata->in->update_nsset.rem_status);
+			break;
+		case EPP_LIST_CONTACT:
+		case EPP_LIST_DOMAIN:
+		case EPP_LIST_NSSET:
+			assert(cdata->in == NULL);
+			if (cdata->out != NULL) {
+				CL_RESET(cdata->out->list.handles);
+				CL_FOREACH(cdata->out->list.handles);
+					free(CL_CONTENT(cdata->out->list.handles));
+				cl_purge(cdata->out->list.handles);
+			}
 			break;
 		case EPP_TRANSFER_NSSET:
 		case EPP_TRANSFER_DOMAIN:

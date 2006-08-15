@@ -201,6 +201,8 @@ inline unsigned cl_length(struct circ_list *cl);
  * Free circular list, note that content of all items must be freed
  * before using this function. List pointer must be at the beginning
  * upon start (use CL_RESET for that if you are not sure).
+ *
+ * @param cl List to purge.
  */
 inline void cl_purge(struct circ_list *cl);
 /** @} */
@@ -239,8 +241,8 @@ typedef struct {
  * Nameserver has a name and possibly more than one ip address.
  */
 typedef struct {
-	char	*name;
-	struct circ_list	*addr;
+	char	*name;	/**< fqdn of nameserver. */
+	struct circ_list	*addr;	/**< List of ip addresses. */
 }epp_ns;
 
 /**
@@ -519,6 +521,10 @@ typedef struct {
 		struct {
 			unsigned long long	exDate;
 		}renew;
+		/* additional parameters of command "list" */
+		struct {
+			struct circ_list	*handles;
+		}list;
 	}*out;
 }epp_command_data;
 

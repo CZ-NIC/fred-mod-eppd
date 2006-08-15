@@ -566,7 +566,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 
 	/* handle situation when item allocation above failed */
 	if (i > 0) {
-		cl_purge(cdata->out->check.bools);
+		cl_purge(cdata->out->check.avails);
 		free(cdata->out);
 		cdata->out = NULL;
 		CORBA_free(response);
@@ -663,13 +663,13 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 
 	/* ok, now everything was successfully allocated */
 	cdata->out->info_contact.roid = strdup(c_contact->ROID);
-	cdata->out->info_contact.authInfo = strdup(c_contact->authInfo);
+	cdata->out->info_contact.authInfo = strdup(c_contact->AuthInfoPw);
 	cdata->out->info_contact.clID = strdup(c_contact->ClID);
 	cdata->out->info_contact.crID = strdup(c_contact->CrID);
 	cdata->out->info_contact.upID = strdup(c_contact->UpID);
 	cdata->out->info_contact.crDate = c_contact->CrDate;
 	cdata->out->info_contact.upDate = c_contact->UpDate;
-	cdata->out->info_contact.trDate = c_contact->trDate;
+	cdata->out->info_contact.trDate = c_contact->TrDate;
 	/* contact status */
 	CL_NEW(cdata->out->info_contact.status);
 	for (i = 0; i < c_contact->stat._length; i++) {
@@ -697,7 +697,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 	cdata->out->info_contact.vat = strdup(c_contact->VAT);
 	cdata->out->info_contact.ssn = strdup(c_contact->SSN);
 	/* convert ssntype from idl's enum to our enum */
-	switch (c_contact->SSN) {
+	switch (c_contact->SSNtype) {
 		case ccReg_RC:
 			cdata->out->info_contact.ssntype = SSN_RC;
 			break;
@@ -1235,18 +1235,18 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 }
 
 /**
- * Convert our SSN enum to IDL's SSNTyp enum.
+ * Convert our SSN enum to IDL's SSNtyp enum.
  * @param our_ssn Out ssn's type.
  * @return SSN type as defined in IDL.
  */
-static ccReg_SSNTyp
+static ccReg_SSNtyp
 convSSNType(our_ssn)
 {
 	switch (our_ssn) {
 		case SSN_ICO: return ccReg_ICO; break;
 		case SSN_OP: return ccReg_OP; break;
 		case SSN_RC: return ccReg_RC; break;
-		case SSN_PASSPORT: return ccReg_PASSPORT; break;
+		case SSN_PASSPORT: return ccReg_PASS; break;
 		case SSN_MPSV: return ccReg_MPSV; break;
 		default: return ccReg_EMPTY; break;
 	}
@@ -2002,7 +2002,7 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
  * @param globs Corba context.
  * @param session Session identifier.
  * @param cdata Data from xml request.
- * @param obj Object type (see #epp_object_type)
+ * @param obj Object type (see #epp_object_type).
  * @return status (see #corba_status).
  */
 static corba_status
@@ -2058,6 +2058,102 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 		CORBA_free(response);
 		return CORBA_REMOTE_ERROR;
 	}
+
+	get_errors(cdata->errors, &response->errors);
+	cdata->svTRID = strdup(response->svTRID);
+	cdata->msg = strdup(response->errMsg);
+	cdata->rc = response->errCode;
+
+	CORBA_free(response);
+	return CORBA_OK;
+}
+
+/**
+ * List command for domain, contact and nsset is so similar that it is worth of
+ * having the code in one function and pass object type as parameter.
+ *
+ * @param globs Corba context.
+ * @param session Session identifier.
+ * @param cdata Data from xml request.
+ * @param obj Object type (see #epp_object_type).
+ * @return status (see #corba_status).
+ */
+static corba_status
+epp_call_list(epp_corba_globs *globs, int session,
+		epp_command_data *cdata, epp_object_type obj)
+{
+	CORBA_Environment	 ev[1];
+	ccReg_Response	*response;
+	ccReg_Lists	*c_handles;
+	struct circ_list	*item;
+	int	 i;
+
+	CORBA_exception_init(ev);
+
+	if (obj == EPP_DOMAIN) {
+		response = ccReg_EPP_DomainList(globs->service,
+				&c_handles,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+	}
+	else if (obj == EPP_CONTACT) {
+		response = ccReg_EPP_ContactList(globs->service,
+				&c_handles,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+	}
+	else {
+		assert(obj == EPP_NSSET);
+		response = ccReg_EPP_NSSetList(globs->service,
+				&c_handles,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+	}
+
+	if (raised_exception(ev)) {
+		/* do NOT try to free response even if not NULL -> segfault */
+		CORBA_exception_free(ev);
+		return CORBA_ERROR;
+	}
+	CORBA_exception_free(ev);
+
+	/*
+	 * in case of an error of EPP server (CR) the svTRID field is
+	 * empty string
+	 */
+	if (*response->svTRID == '\0') {
+		CORBA_free(response);
+		CORBA_free(c_handles);
+		return CORBA_REMOTE_ERROR;
+	}
+
+	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+		CORBA_free(response);
+		CORBA_free(c_handles);
+		return CORBA_INT_ERROR;
+	}
+	if ((cdata->out->list.handles = malloc(sizeof *item)) == NULL) {
+		free(cdata->out);
+		cdata->out = NULL;
+		CORBA_free(response);
+		CORBA_free(c_handles);
+		return CORBA_INT_ERROR;
+	}
+	CL_NEW(cdata->out->list.handles);
+
+	for (i = 0; i < c_handles->_length; i++) {
+		/* if malloc fails we will silently ignore the rest of handles */
+		if ((item = malloc(sizeof *item)) == NULL) break;
+		CL_CONTENT(item) = strdup(c_handles->_buffer[i]);
+		CL_ADD(cdata->out->list.handles, item);
+	}
+	CORBA_free(c_handles);
 
 	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);

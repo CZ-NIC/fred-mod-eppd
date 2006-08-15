@@ -126,7 +126,7 @@ typedef struct {
 	epp_corba_globs	*corba_globs;	/**< Variables needed for corba submodule. */
 	char	*epplog;	/**< Epp log filename. */
 	apr_file_t	*epplogfp;	/**< File descriptor of epp log file. */
-	epp_loglevel	loglevel;	/**< Epp log level #epp_loglevel. */
+	epp_loglevel	loglevel;	/**< Epp log level. */
 }eppd_server_conf;
 
 /** Used for access serialization to epp log file. */
