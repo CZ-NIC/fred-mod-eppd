@@ -719,12 +719,12 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 	}
 	/* disclose info */
 	discl = cdata->out->info_contact.discl;
-	discl->name = c_contact->DiscloseName;
-	discl->org = c_contact->DiscloseOrganization;
-	discl->addr = c_contact->DiscloseAddress;
-	discl->voice = c_contact->DiscloseTelephone;
-	discl->fax = c_contact->DiscloseFax;
-	discl->email = c_contact->DiscloseEmail;
+	discl->name = (c_contact->DiscloseName == ccReg_DISCL_HIDE) ? 1 : 0;
+	discl->org = (c_contact->DiscloseOrganization == ccReg_DISCL_HIDE) ? 1 : 0;
+	discl->addr = (c_contact->DiscloseAddress == ccReg_DISCL_HIDE) ? 1 : 0;
+	discl->voice = (c_contact->DiscloseTelephone == ccReg_DISCL_HIDE) ? 1 : 0;
+	discl->fax = (c_contact->DiscloseFax == ccReg_DISCL_HIDE) ? 1 : 0;
+	discl->email = (c_contact->DiscloseEmail == ccReg_DISCL_HIDE) ? 1 : 0;
 
 	CORBA_free(c_contact);
 
@@ -1240,7 +1240,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
  * @return SSN type as defined in IDL.
  */
 static ccReg_SSNtyp
-convSSNType(our_ssn)
+convSSNType(epp_ssnType our_ssn)
 {
 	switch (our_ssn) {
 		case SSN_ICO: return ccReg_ICO; break;
@@ -1282,14 +1282,20 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 		CORBA_string_dup(cdata->in->create_contact.notify_email);
 	c_contact->VAT = CORBA_string_dup(cdata->in->create_contact.vat);
 	c_contact->SSN = CORBA_string_dup(cdata->in->create_contact.ssn);
-	c_contact->SSNtype = convSSNType(cdata->in->create_contact.ssn);
+	c_contact->SSNtype = convSSNType(cdata->in->create_contact.ssntype);
 	/* disclose */
-	c_contact->DiscloseName = cdata->in->create_contact.discl->name;
-	c_contact->DiscloseOrganization = cdata->in->create_contact.discl->org;
-	c_contact->DiscloseAddress = cdata->in->create_contact.discl->addr;
-	c_contact->DiscloseTelephone = cdata->in->create_contact.discl->voice;
-	c_contact->DiscloseFax = cdata->in->create_contact.discl->fax;
-	c_contact->DiscloseEmail = cdata->in->create_contact.discl->email;
+	c_contact->DiscloseName = (cdata->in->create_contact.discl->name ?
+			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
+	c_contact->DiscloseOrganization = (cdata->in->create_contact.discl->org ?
+			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
+	c_contact->DiscloseAddress = (cdata->in->create_contact.discl->addr ?
+			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
+	c_contact->DiscloseTelephone = (cdata->in->create_contact.discl->voice ?
+			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
+	c_contact->DiscloseFax = (cdata->in->create_contact.discl->fax ?
+			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
+	c_contact->DiscloseEmail = (cdata->in->create_contact.discl->email ?
+			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
 	/* postal info */
 	c_contact->Name =
 		CORBA_string_dup(cdata->in->create_contact.postalInfo->name);
@@ -1731,6 +1737,24 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 }
 
 /**
+ * Function for conversion of our disclose flag to IDL's disclose flag.
+ * @param flag Disclose flag to be converted.
+ * @return Disclose flag of type defined in IDL.
+ */
+static ccReg_Disclose
+convDiscl(char flag)
+{
+	switch (flag) {
+		case  1: return ccReg_DISCL_HIDE; break;
+		case  0: return ccReg_DISCL_DISPLAY; break;
+		case -1: return ccReg_DISCL_EMPTY; break;
+		default: assert(0); break;
+	}
+	/* never reached */
+	return ccReg_DISCL_EMPTY;
+}
+
+/**
  * EPP update contact.
  *
  * @param globs Corba context.
@@ -1800,13 +1824,16 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 		CORBA_string_dup(cdata->in->update_contact.notify_email);
 	c_contact->VAT = CORBA_string_dup(cdata->in->update_contact.vat);
 	c_contact->SSN = CORBA_string_dup(cdata->in->update_contact.ssn);
-	c_contact->SSNtype = convSSNType(cdata->in->update_contact.ssn);
-	c_contact->DiscloseName = cdata->in->update_contact.discl->name;
-	c_contact->DiscloseOrganization = cdata->in->update_contact.discl->org;
-	c_contact->DiscloseAddress = cdata->in->update_contact.discl->addr;
-	c_contact->DiscloseTelephone = cdata->in->update_contact.discl->voice;
-	c_contact->DiscloseFax = cdata->in->update_contact.discl->fax;
-	c_contact->DiscloseEmail = cdata->in->update_contact.discl->email;
+	c_contact->SSNtype = convSSNType(cdata->in->update_contact.ssntype);
+	c_contact->DiscloseName = convDiscl(cdata->in->update_contact.discl->name);
+	c_contact->DiscloseOrganization =
+		convDiscl(cdata->in->update_contact.discl->org);
+	c_contact->DiscloseAddress =
+		convDiscl(cdata->in->update_contact.discl->addr);
+	c_contact->DiscloseTelephone =
+		convDiscl(cdata->in->update_contact.discl->voice);
+	c_contact->DiscloseFax = convDiscl(cdata->in->update_contact.discl->fax);
+	c_contact->DiscloseEmail = convDiscl(cdata->in->update_contact.discl->email);
 
 	/* send the updates to repository */
 	response = ccReg_EPP_ContactUpdate(globs->service,
