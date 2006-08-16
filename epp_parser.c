@@ -565,13 +565,6 @@ error_ch:
 static void
 parse_info(xmlDocPtr doc, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-	/* allocate necessary structures */
-	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
-		cdata->rc = 2400;
-		cdata->type = EPP_DUMMY;
-		return;
-	}
-
 	/*
 	 * catch the "list command" cases at the beginning, then proceed with
 	 * info command
@@ -584,6 +577,12 @@ parse_info(xmlDocPtr doc, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 		cdata->type = EPP_LIST_NSSET;
 	else {
 		/* info command */
+		/* allocate necessary structures */
+		if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
+			cdata->rc = 2400;
+			cdata->type = EPP_DUMMY;
+			return;
+		}
 		/* get object type - contact, domain or nsset */
 		if (xpath_exists(xpathCtx, "epp:info/contact:info"))
 		{
