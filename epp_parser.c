@@ -1680,9 +1680,13 @@ parse_update_contact(
 	/* the most difficult item comes first (ssn) */
 	XPATH_TAKE1_UPD(cdata->in->update_contact.ssn, doc, xpathCtx, error_uc,
 			"contact:chg/contact:ssn");
+	if (*cdata->in->update_contact.ssn == '\0' ||
+			*cdata->in->update_contact.ssn == BS_CHAR)
+	{
+		cdata->in->create_contact.ssntype = SSN_UNKNOWN;
+	}
+	else {
 	/* depending on ssn value we decide what to do with attribute */
-	if (*cdata->in->update_contact.ssn != '\0' &&
-			*cdata->in->update_contact.ssn != BS_CHAR) {
 		char	*str;
 
 		XPATH_EVAL(xpathObj, xpathCtx, error_uc, "contact:chg/contact:ssn");
@@ -1749,10 +1753,6 @@ parse_update_contact(
 		free(str);
 		/* schema and source code is out of sync if following error occurs */
 		assert(cdata->in->create_contact.ssntype != SSN_UNKNOWN);
-	}
-	else {
-		xmlXPathFreeObject(xpathObj);
-		cdata->in->create_contact.ssntype = SSN_UNKNOWN;
 	}
 
 	XPATH_REQ1(cdata->in->update_contact.id, doc, xpathCtx, error_uc,

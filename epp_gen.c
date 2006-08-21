@@ -848,7 +848,7 @@ epp_gen_response(
 				CL_NEXT(cdata->out->check.avails);
 				avail = CL_CONTENT(cdata->out->check.avails);
 				START_ELEMENT(writer, simple_err, "contact:cd");
-				START_ELEMENT(writer, simple_err, "contact:name");
+				START_ELEMENT(writer, simple_err, "contact:id");
 				if (avail->avail)
 					WRITE_ATTRIBUTE(writer, simple_err, "avail", "1");
 				else
@@ -878,7 +878,7 @@ epp_gen_response(
 				CL_NEXT(cdata->out->check.avails);
 				avail = CL_CONTENT(cdata->out->check.avails);
 				START_ELEMENT(writer, simple_err, "nsset:cd");
-				START_ELEMENT(writer, simple_err, "nsset:name");
+				START_ELEMENT(writer, simple_err, "nsset:id");
 				if (avail->avail)
 					WRITE_ATTRIBUTE(writer, simple_err, "avail", "1");
 				else
