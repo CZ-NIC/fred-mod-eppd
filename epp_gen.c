@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include <libxml/parser.h>
 #include <libxml/xmlwriter.h>
@@ -240,27 +241,27 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	{
 		START_ELEMENT(writer, simple_err, "contact:disclose");
 		WRITE_ATTRIBUTE(writer, simple_err, "flag", "0");
-		if (!discl->name) {
+		if (discl->name) {
 			START_ELEMENT(writer, simple_err, "contact:name");
 			END_ELEMENT(writer, simple_err);
 		}
-		if (!discl->org) {
+		if (discl->org) {
 			START_ELEMENT(writer, simple_err, "contact:org");
 			END_ELEMENT(writer, simple_err);
 		}
-		if (!discl->addr) {
+		if (discl->addr) {
 			START_ELEMENT(writer, simple_err, "contact:addr");
 			END_ELEMENT(writer, simple_err);
 		}
-		if (!discl->voice) {
+		if (discl->voice) {
 			START_ELEMENT(writer, simple_err, "contact:voice");
 			END_ELEMENT(writer, simple_err);
 		}
-		if (!discl->fax) {
+		if (discl->fax) {
 			START_ELEMENT(writer, simple_err, "contact:fax");
 			END_ELEMENT(writer, simple_err);
 		}
-		if (!discl->email) {
+		if (discl->email) {
 			START_ELEMENT(writer, simple_err, "contact:email");
 			END_ELEMENT(writer, simple_err);
 		}
@@ -692,13 +693,24 @@ epp_gen_response(
 		char *schema_url,
 		epp_lang lang,
 		epp_command_data *cdata,
-		epp_gen *gen)
+		epp_gen *gen,
+		unsigned long long *timestart,
+		unsigned long long *timeend)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	res_code[5];
 	char	error_seen = 1;
+	struct timeval	tv; /* for meassuring of time spent in parser */
+	gen_status	ret;
+
+	/* get current time with microsecond resulution */
+	*timestart = 0;
+	*timeend = 0;
+	timerclear(&tv);
+	if (gettimeofday(&tv, NULL) == 0)
+		*timestart = tv.tv_sec * 1000000 + tv.tv_usec;
 
 	assert(schema_url != NULL);
 	assert(cdata != NULL);
@@ -1031,11 +1043,12 @@ simple_err:
 	gen->response = strdup((char *) buf->content);
 	xmlBufferFree(buf);
 
+	ret = GEN_OK;
+
 	/* optional add on - response validation */
 	if (validate) {
 		xmlDocPtr	doc;
 		valid_status	val_ret;
-		gen_status	ret;
 
 		/* parse xml request */
 		doc = xmlParseMemory(gen->response, strlen(gen->response));
@@ -1071,10 +1084,14 @@ simple_err:
 		}
 
 		xmlFreeDoc(doc);
-		return ret;
 	}
 
-	return GEN_OK;
+	/* get end time */
+	timerclear(&tv);
+	if (gettimeofday(&tv, NULL) == 0)
+		*timeend = tv.tv_sec * 1000000 + tv.tv_usec;
+
+	return ret;
 }
 
 void epp_free_gen(epp_gen *gen)

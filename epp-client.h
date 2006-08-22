@@ -106,9 +106,12 @@ epp_call_logout(
  * @param corba_globs Corba context.
  * @param session Session identifier
  * @param cdata Data from parsed xml command.
+ * @param timebefore Time in microseconds before CORBA call (perf measurement)
+ * @param timeafter Time in microseconds after CORBA call (perf measurement)
  * @return status (see #corba_status).
  */
 corba_status
-epp_call_cmd(epp_corba_globs *corba_globs, int session, epp_command_data *cdata);
+epp_call_cmd(epp_corba_globs *corba_globs, int session, epp_command_data *cdata,
+		unsigned long long *timebefore, unsigned long long *timeafter);
 
 #endif /* EPP_CLIENT_H */

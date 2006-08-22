@@ -480,7 +480,9 @@ static int epp_process_connection(conn_rec *c)
 		epp_command_data	cdata;	/* self-descriptive data structure */
 		epp_gen	gen;	/* generated answer and possibly encountered errors */
 		parser_status	pstat;	/* parser's return code */
+		unsigned long long	times[5]; /* array of times for perf measurement */
 
+		bzero(times, 5 * sizeof(unsigned long long));
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
 		apr_pool_tag(rpool, "EPP_request");
@@ -518,7 +520,7 @@ static int epp_process_connection(conn_rec *c)
 			 * cdata structure with data
 			 */
 			pstat = epp_parse_command(session, sc->schema, request, bytes,
-					&cdata);
+					&cdata, &times[0], &times[1]);
 		}
 
 		switch (pstat) {
@@ -638,7 +640,8 @@ static int epp_process_connection(conn_rec *c)
 			}
 			else {
 				/* go ahead to generic corba function call */
-				cstat = epp_call_cmd(sc->corba_globs, session, &cdata);
+				cstat = epp_call_cmd(sc->corba_globs, session, &cdata,
+						&times[2], &times[3]);
 			}
 
 			/* catch corba failures */
@@ -668,7 +671,7 @@ static int epp_process_connection(conn_rec *c)
 
 			/* generate xml response */
 			gstat = epp_gen_response(sc->valid_resp, sc->schema,
-					lang, &cdata, &gen);
+					lang, &cdata, &gen, &times[4], &times[5]);
 
 			epp_command_data_cleanup(&cdata); /* not needed anymore */
 
@@ -727,11 +730,16 @@ static int epp_process_connection(conn_rec *c)
 		apr_brigade_puts(bb, NULL, NULL, gen.response);
 		epplog(c, rpool, session, EPP_DEBUG, "Response content: %s",
 				gen.response);
+		/* record perf data */
+		epplog(c, rpool, session, EPP_DEBUG, "Perf data: %llu, %llu, %llu, "
+				"%llu, %llu",
+				times[1] - times[0], times[2] - times[1], times[3] - times[2],
+				times[4] - times[3], times[5] - times[4]);
 		epp_free_gen(&gen);
 		status = ap_fflush(c->output_filters, bb);
 		if (status != APR_SUCCESS) {
 			epplog(c, rpool, session, EPP_FATAL,
-				"Error when sending response to client");
+					"Error when sending response to client");
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
@@ -739,7 +747,7 @@ static int epp_process_connection(conn_rec *c)
 		status = apr_brigade_cleanup(bb);
 		if (status != APR_SUCCESS) {
 			epplog(c, rpool, session, EPP_FATAL,
-				"Could not cleanup bucket brigade used for response");
+					"Could not cleanup bucket brigade used for response");
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 

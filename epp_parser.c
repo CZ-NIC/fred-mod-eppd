@@ -10,6 +10,7 @@
 #include <string.h>
 #define __USE_XOPEN
 #include <time.h>	/* strptime */
+#include <sys/time.h>	/* perfdata */
 #include <stdlib.h>
 #include <assert.h>
 
@@ -1683,7 +1684,7 @@ parse_update_contact(
 	if (*cdata->in->update_contact.ssn == '\0' ||
 			*cdata->in->update_contact.ssn == BS_CHAR)
 	{
-		cdata->in->create_contact.ssntype = SSN_UNKNOWN;
+		cdata->in->update_contact.ssntype = SSN_UNKNOWN;
 	}
 	else {
 	/* depending on ssn value we decide what to do with attribute */
@@ -1749,10 +1750,10 @@ parse_update_contact(
 			return;
 		}
 		xmlXPathFreeObject(xpathObj);
-		cdata->in->create_contact.ssntype = string2ssntype(str);
+		cdata->in->update_contact.ssntype = string2ssntype(str);
 		free(str);
 		/* schema and source code is out of sync if following error occurs */
-		assert(cdata->in->create_contact.ssntype != SSN_UNKNOWN);
+		assert(cdata->in->update_contact.ssntype != SSN_UNKNOWN);
 	}
 
 	XPATH_REQ1(cdata->in->update_contact.id, doc, xpathCtx, error_uc,
@@ -2408,7 +2409,9 @@ epp_parse_command(
 		const char *schema_url,
 		const char *request,
 		unsigned bytes,
-		epp_command_data *cdata)
+		epp_command_data *cdata,
+		unsigned long long *timestart,
+		unsigned long long *timeend)
 {
 	xmlDocPtr	doc;
 	xmlXPathContextPtr	xpathCtx;
@@ -2416,6 +2419,14 @@ epp_parse_command(
 	xmlNodeSetPtr	nodeset;
 	epp_red_command_type	cmd;
 	valid_status	val_ret;
+	struct timeval	tv; /* for meassuring of time spent in parser */
+
+	/* get current time with microsecond resulution */
+	*timestart = 0;
+	*timeend = 0;
+	timerclear(&tv);
+	if (gettimeofday(&tv, NULL) == 0)
+		*timestart = tv.tv_sec * 1000000 + tv.tv_usec;
 
 	/* check input parameters */
 	assert(request != NULL);
@@ -2666,6 +2677,12 @@ epp_parse_command(
 
 	if (cdata->type == EPP_LOGIN) return PARSER_CMD_LOGIN;
 	if (cdata->type == EPP_LOGOUT) return PARSER_CMD_LOGOUT;
+
+	/* get end time */
+	timerclear(&tv);
+	if (gettimeofday(&tv, NULL) == 0)
+		*timeend = tv.tv_sec * 1000000 + tv.tv_usec;
+
 	return PARSER_CMD_OTHER;
 }
 

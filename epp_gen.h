@@ -60,6 +60,8 @@ epp_gen_greeting(const char *svid, char **greeting);
  * @param cdata Input values
  * @param gen Generated string and possibly validation errors if validation
  * is turned on.
+ * @param timebegin Starting time of function (perf data).
+ * @param timeend Ending time of function (perf data).
  * @return Generator status.
  */
 gen_status
@@ -68,7 +70,9 @@ epp_gen_response(
 		char *schema_url,
 		epp_lang lang,
 		epp_command_data *cdata,
-		epp_gen *gen);
+		epp_gen *gen,
+		unsigned long long *timestart,
+		unsigned long long *timeend);
 
 /**
  * Free response created by response generator and free validation errors.

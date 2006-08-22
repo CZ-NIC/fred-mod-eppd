@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <orbit/orbit.h>
 
 #include "epp_common.h"
@@ -2192,10 +2193,19 @@ epp_call_list(epp_corba_globs *globs, int session,
 }
 
 corba_status
-epp_call_cmd(epp_corba_globs *globs, int session, epp_command_data *cdata)
+epp_call_cmd(epp_corba_globs *globs, int session, epp_command_data *cdata,
+		unsigned long long *timebefore, unsigned long long *timeafter)
 {
 	corba_status	cstat;
+	struct timeval	tv; /* for meassuring of time spent in parser */
 
+	/* get current time with microsecond resulution */
+	*timebefore = 0;
+	*timeafter = 0;
+	timerclear(&tv);
+	if (gettimeofday(&tv, NULL) == 0)
+		*timebefore = tv.tv_sec * 1000000 + tv.tv_usec;
+	
 	switch (cdata->type) {
 		case EPP_DUMMY:
 			cstat = epp_call_dummy(globs, session, cdata);
@@ -2276,6 +2286,11 @@ epp_call_cmd(epp_corba_globs *globs, int session, epp_command_data *cdata)
 			cstat = CORBA_INT_ERROR;
 			break;
 	}
+
+	/* get end time */
+	timerclear(&tv);
+	if (gettimeofday(&tv, NULL) == 0)
+		*timeafter = tv.tv_sec * 1000000 + tv.tv_usec;
 
 	return cstat;
 }

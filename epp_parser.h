@@ -49,6 +49,8 @@ void epp_parser_init_cleanup(void);
  * @param request	Request to be processed.
  * @param bytes	Length of the request.
  * @param cdata Output of parsing stage (xml converted to structure).
+ * @param timestart Time in microseconds at begining of function (perf data).
+ * @param timeend Time in microseconds at end of function (perf data).
  * @return Status of parsing.
  */
 parser_status
@@ -57,7 +59,9 @@ epp_parse_command(
 		const char *schema_url,
 		const char *request,
 		unsigned bytes,
-		epp_command_data *cdata);
+		epp_command_data *cdata,
+		unsigned long long *timestart,
+		unsigned long long *timeend);
 
 /**
  * Cleanup routine taking care of releasing resources pointed by pointers
