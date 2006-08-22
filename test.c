@@ -150,6 +150,7 @@ int main(int argc, char *argv[])
 	gen_status	gstat;
 	char version_buf[101];
 	char fp[] = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
+	unsigned long long notused1, notused2;
 
 	/* API: init parser */
 	epp_parser_init();
@@ -227,7 +228,7 @@ int main(int argc, char *argv[])
 
 		/* API: process command */
 		pstat = epp_parse_command(session, SCHEMA , text,
-				strlen(text), &cdata);
+				strlen(text), &cdata, &notused1, &notused2);
 		if (pstat == PARSER_HELLO) {
 			/* API: greeting */
 			if (epp_call_hello(corba_globs, version_buf, 100) == 0) {
@@ -257,7 +258,8 @@ int main(int argc, char *argv[])
 		}
 		else if (pstat == PARSER_CMD_OTHER) {
 			/* API: corba call */
-			cstat = epp_call_cmd(corba_globs, session, &cdata);
+			cstat = epp_call_cmd(corba_globs, session, &cdata, &notused1,
+					&notused2);
 		}
 		else {
 			fputs("XML PARSER error\n", stderr);
@@ -269,7 +271,7 @@ int main(int argc, char *argv[])
 
 			/* API: generate response */
 			gstat = epp_gen_response(1, SCHEMA , lang, &cdata,
-					&gen);
+					&gen, &notused1, &notused2);
 			switch (gstat) {
 				/*
 				 * following errors are serious and response cannot be sent

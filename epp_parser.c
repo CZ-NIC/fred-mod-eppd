@@ -1795,18 +1795,17 @@ parse_update_contact(
 	}
 	else if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[flag=1]"))
 	{
-		cdata->in->update_contact.discl->name = 1 - xpath_exists(xpathCtx,
-				"contact:chg/contact:disclose/contact:name");
-		cdata->in->update_contact.discl->org = 1 - xpath_exists(xpathCtx,
-				"contact:chg/contact:disclose/contact:org");
-		cdata->in->update_contact.discl->addr = 1 - xpath_exists(xpathCtx,
-				"contact:chg/contact:disclose/contact:addr");
-		cdata->in->update_contact.discl->voice = 1 - xpath_exists(xpathCtx,
-				"contact:chg/contact:disclose/contact:voice");
-		cdata->in->update_contact.discl->fax = 1 - xpath_exists(xpathCtx,
-				"contact:chg/contact:disclose/contact:fax");
-		cdata->in->update_contact.discl->email = 1 - xpath_exists(xpathCtx,
-				"contact:chg/contact:disclose/contact:email");
+		/*
+		 * disclose with flag 1 is non-sense (literally to specify attributes
+		 * which should be disclosed - handled exceptionally - when server's
+		 * default policy is to disclose all, doesn't make any sence.
+		 */
+		cdata->in->update_contact.discl->name = 0;
+		cdata->in->update_contact.discl->org = 0;
+		cdata->in->update_contact.discl->addr = 0;
+		cdata->in->update_contact.discl->voice = 0;
+		cdata->in->update_contact.discl->fax = 0;
+		cdata->in->update_contact.discl->email = 0;
 	}
 	else {
 		/* fill discl with value "not updated" -1 */
