@@ -1841,15 +1841,15 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 	c_contact->VAT = CORBA_string_dup(cdata->in->update_contact.vat);
 	c_contact->SSN = CORBA_string_dup(cdata->in->update_contact.ssn);
 	c_contact->SSNtype = convSSNType(cdata->in->update_contact.ssntype);
-	c_contact->DiscloseName = convDiscl(cdata->in->update_contact.discl->name);
-	c_contact->DiscloseOrganization =
-		convDiscl(cdata->in->update_contact.discl->org);
-	c_contact->DiscloseAddress =
-		convDiscl(cdata->in->update_contact.discl->addr);
-	c_contact->DiscloseTelephone =
-		convDiscl(cdata->in->update_contact.discl->voice);
-	c_contact->DiscloseFax = convDiscl(cdata->in->update_contact.discl->fax);
-	c_contact->DiscloseEmail = convDiscl(cdata->in->update_contact.discl->email);
+	{
+		epp_discl	*discl = cdata->in->update_contact.discl;
+		c_contact->DiscloseName = convDiscl(discl->name);
+		c_contact->DiscloseOrganization = convDiscl(discl->org);
+		c_contact->DiscloseAddress = convDiscl(discl->addr);
+		c_contact->DiscloseTelephone = convDiscl(discl->voice);
+		c_contact->DiscloseFax = convDiscl(discl->fax);
+		c_contact->DiscloseEmail = convDiscl(discl->email);
+	}
 
 	/* send the updates to repository */
 	response = ccReg_EPP_ContactUpdate(globs->service,
