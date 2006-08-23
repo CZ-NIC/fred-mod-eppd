@@ -151,9 +151,10 @@ int main(int argc, char *argv[])
 	char version_buf[101];
 	char fp[] = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
 	unsigned long long notused1, notused2;
+	void	*schema;
 
 	/* API: init parser */
-	epp_parser_init();
+	schema = epp_parser_init(SCHEMA);
 
 	/* API: init corba */
 	if (!read_ior("/tmp/ccReg.ref", ior)) {
@@ -227,7 +228,7 @@ int main(int argc, char *argv[])
 		}
 
 		/* API: process command */
-		pstat = epp_parse_command(session, SCHEMA , text,
+		pstat = epp_parse_command(session, schema , text,
 				strlen(text), &cdata, &notused1, &notused2);
 		if (pstat == PARSER_HELLO) {
 			/* API: greeting */
@@ -270,7 +271,7 @@ int main(int argc, char *argv[])
 			epp_gen	gen;
 
 			/* API: generate response */
-			gstat = epp_gen_response(1, SCHEMA , lang, &cdata,
+			gstat = epp_gen_response(1, schema , lang, &cdata,
 					&gen, &notused1, &notused2);
 			switch (gstat) {
 				/*
@@ -328,7 +329,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* API: clean up globs */
-	epp_parser_init_cleanup();
+	epp_parser_init_cleanup(schema);
 	epp_corba_init_cleanup(corba_globs);
 
 	return 0;
