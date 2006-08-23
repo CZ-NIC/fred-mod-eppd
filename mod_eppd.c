@@ -729,11 +729,18 @@ static int epp_process_connection(conn_rec *c)
 		apr_brigade_puts(bb, NULL, NULL, gen.response);
 		epplog(c, rpool, session, EPP_DEBUG, "Response content: %s",
 				gen.response);
-		/* record perf data */
-		epplog(c, rpool, session, EPP_DEBUG, "Perf data: %llu, %llu, %llu, "
-				"%llu, %llu",
-				times[1] - times[0], times[2] - times[1], times[3] - times[2],
-				times[4] - times[3], times[5] - times[4]);
+		/*
+		 * record perf data
+		 * apache 2.0 has problem with processing %llu formating, therefore
+		 * we overtype the results to a more common numeric values
+		 */
+		epplog(c, rpool, session, EPP_DEBUG, "Perf data: %u, %u, %u, "
+				"%u, %u",
+				(unsigned int) (times[1] - times[0]), /* parser */
+				(unsigned int) (times[2] - times[1]),   /* the between */
+				(unsigned int) (times[3] - times[2]), /* CORBA */
+				(unsigned int) (times[4] - times[3]),   /* the between */
+				(unsigned int) (times[5] - times[4]));/* generator */
 		epp_free_gen(&gen);
 		status = ap_fflush(c->output_filters, bb);
 		if (status != APR_SUCCESS) {
