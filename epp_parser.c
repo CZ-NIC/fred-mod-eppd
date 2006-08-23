@@ -17,6 +17,7 @@
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xmlmemory.h>
+#include <libxml/xmlschemas.h>
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 
@@ -334,8 +335,11 @@ cmd_hash_clean(void)
 	}
 }
 
-void epp_parser_init(void)
+void *
+epp_parser_init(const char *url_schema)
 {
+	xmlSchemaPtr	schema; /* parsed schema */
+	xmlSchemaParserCtxtPtr	spctx;	/* schema parser's context */
 	char rc;
 
 	/* just to be sure the table is empty */
@@ -356,7 +360,7 @@ void epp_parser_init(void)
 	if (rc) {
 		/* at least one error has been spotted */
 		cmd_hash_clean();
-		return;
+		return NULL;
 	}
 
 	/*
@@ -365,14 +369,27 @@ void epp_parser_init(void)
 	 */
 	xmlInitParser();
 	xmlXPathInit();
+
+	/* parse epp schema */
+	spctx = xmlSchemaNewParserCtxt(url_schema);
+	if (spctx == NULL) return NULL;
+	schema = xmlSchemaParse(spctx);
+	xmlSchemaFreeParserCtxt(spctx);
+	/*
+	 * schema might be corrupted though it is unlikely, in that case
+	 * schema has NULL value
+	 */
+	return (void *) schema;
 }
 
 /**
  * Function releases command hash table and calls libxml's parser cleanup
  * routine.
+ * @param schema Parsed xml schema.
  */
-void epp_parser_init_cleanup(void)
+void epp_parser_init_cleanup(void *schema)
 {
+	xmlSchemaFree((xmlSchemaPtr) schema);
 	cmd_hash_clean();
 	xmlCleanupParser();
 }
@@ -2405,7 +2422,7 @@ error_t:
 parser_status
 epp_parse_command(
 		int session,
-		const char *schema_url,
+		void *schema,
 		const char *request,
 		unsigned bytes,
 		epp_command_data *cdata,
@@ -2457,7 +2474,7 @@ epp_parse_command(
 	else cdata->xml_in = strdup("");
 
 	/* validate the doc */
-	val_ret = validate_doc(schema_url, doc, cdata->errors);
+	val_ret = validate_doc((xmlSchemaPtr) schema, doc, cdata->errors);
 
 	if (val_ret == VAL_ESCHEMA || val_ret == VAL_EINTERNAL) {
 		/* free error messages if there are any */

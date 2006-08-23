@@ -109,25 +109,14 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 }
 
 valid_status
-validate_doc(const char *url_schema, xmlDocPtr doc, struct circ_list *err_list)
+validate_doc(xmlSchemaPtr schema, xmlDocPtr doc, struct circ_list *err_list)
 {
-	xmlSchemaParserCtxtPtr	spctx;	/* schema parser context */
 	xmlSchemaValidCtxtPtr	svctx;	/* schema validator context */
-	xmlSchemaPtr	schema; /* schema against which are validated requests */
 	valerr_ctx	ctx;	/* context used for validator's error hook */
 	int	rc;	/* return code from xmllib's validator */
 
-	/* parse epp schema */
-	spctx = xmlSchemaNewParserCtxt(url_schema);
-	if (spctx == NULL) return VAL_EINTERNAL;
-	schema = xmlSchemaParse(spctx);
-	xmlSchemaFreeParserCtxt(spctx);
-	/* schemas might be corrupted though it is unlikely */
-	if (schema == NULL) return VAL_ESCHEMA;
-
 	svctx = xmlSchemaNewValidCtxt(schema);
 	if (svctx == NULL) {
-		xmlSchemaFree(schema);
 		return VAL_EINTERNAL;
 	}
 	/* initialize error hook's context */
@@ -138,16 +127,13 @@ validate_doc(const char *url_schema, xmlDocPtr doc, struct circ_list *err_list)
 	rc = xmlSchemaValidateDoc(svctx, doc);
 	if (rc < 0) {	/* -1 is validator's internal error */
 		xmlSchemaFreeValidCtxt(svctx);
-		xmlSchemaFree(schema);
 		return VAL_EINTERNAL;
 	}
 	if (rc > 0) {	/* the doc does not validate */
 		xmlSchemaFreeValidCtxt(svctx);
-		xmlSchemaFree(schema);
 		return VAL_NOT_VALID;
 	}
 	xmlSchemaFreeValidCtxt(svctx);
-	xmlSchemaFree(schema);
 
 	assert(CL_EMPTY(err_list));
 	return VAL_OK;

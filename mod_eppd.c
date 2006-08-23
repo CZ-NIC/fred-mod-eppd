@@ -119,9 +119,8 @@ typedef enum {
 typedef struct {
 	int	epp_enabled;	/**< Decides whether mod_eppd is enabled for host. */
 	char	*servername;	/**< Epp server name used in <greeting> frame. */
-	char	*iorfile;	/**< File containing corba object's reference. */
-	char	*ior;	/**< Object's reference. */
-	char	*schema;	/**< URL of EPP schema (use just path). */
+	char	*ior;	/**< CORBA object's reference. */
+	void	*schema;	/**< URL of EPP schema (use just path). */
 	int	valid_resp;	/**< Validate responses before sending them to client. */
 	epp_corba_globs	*corba_globs;	/**< Variables needed for corba submodule. */
 	char	*epplog;	/**< Epp log filename. */
@@ -877,9 +876,9 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 				&eppd_module);
 
 		if (sc->epp_enabled) {
-			if (sc->iorfile == NULL) {
+			if (sc->ior == NULL) {
 				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
-						"EPPiorfile not configured");
+						"IOR not configured");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 			if (sc->schema == NULL) {
@@ -894,10 +893,6 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 			}
 			/* set default loglevel */
 			if (sc->loglevel == 0) sc->loglevel = EPP_INFO;
-			/*
-			 * do initialization of xml
-			 */
-			epp_parser_init();
 			/*
 			 * do initialization of corba
 			 */
@@ -965,6 +960,9 @@ static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
 
 /**
  * Handler for apache's configuration directive "EPPiorfile".
+ * The ior is read from the file right here and stays in use for life-time
+ * of apache. Therefore if you want to change IOR then you should also
+ * restart apache.
  *
  * @param cmd Command structure.
  * @param dummy Not used parameter.
@@ -972,7 +970,7 @@ static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
  * @return Error string in case of failure otherwise NULL.
  */
 static const char *set_iorfile(cmd_parms *cmd, void *dummy,
-		const char *a1)
+		const char *iorfile)
 {
 	const char *err;
 	char	buf[1001]; /* should be enough for ior */
@@ -990,22 +988,20 @@ static const char *set_iorfile(cmd_parms *cmd, void *dummy,
 	 * catch double definition of iorfile
 	 * that's not serious fault so we will just print message in log
 	 */
-	if (sc->iorfile != NULL) {
+	if (sc->ior != NULL) {
 		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
 			"mod_eppd: more than one definition of iorfile. All but\
 			the first one will be ignored");
 		return NULL;
 	}
 
-	sc->iorfile = apr_pstrdup(cmd->pool, a1);
-
 	/* open file */
-	status = apr_file_open(&f, sc->iorfile, APR_FOPEN_READ,
+	status = apr_file_open(&f, iorfile, APR_FOPEN_READ,
 			APR_OS_DEFAULT, cmd->temp_pool);
 	if (status != APR_SUCCESS) {
 		return apr_psprintf(cmd->temp_pool,
 					"mod_eppd: could not open file %s (IOR)",
-					sc->iorfile);
+					iorfile);
 	}
 
 	/* read the file */
@@ -1016,7 +1012,7 @@ static const char *set_iorfile(cmd_parms *cmd, void *dummy,
 	if ((status != APR_SUCCESS) && (status != APR_EOF)) {
 		return apr_psprintf(cmd->temp_pool,
 				"mod_eppd: error when reading file %s (IOR)",
-				sc->iorfile);
+				iorfile);
 	}
 	sc->ior = apr_pstrdup(cmd->pool, buf);
 
@@ -1025,6 +1021,8 @@ static const char *set_iorfile(cmd_parms *cmd, void *dummy,
 
 /**
  * Handler for apache's configuration directive "EPPschema".
+ * The xml schema file is herewith read and parsed and stays in use for life-time
+ * of apache. So you have to restart the apache if you want to change schema.
  *
  * @param cmd Command structure.
  * @param dummy Not used parameter.
@@ -1032,7 +1030,7 @@ static const char *set_iorfile(cmd_parms *cmd, void *dummy,
  * @return Error string in case of failure otherwise NULL.
  */
 static const char *set_schema(cmd_parms *cmd, void *dummy,
-		const char *a1)
+		const char *schemaurl)
 {
 	const char *err;
 	server_rec *s = cmd->server;
@@ -1053,7 +1051,17 @@ static const char *set_schema(cmd_parms *cmd, void *dummy,
 		return NULL;
 	}
 
-	sc->schema = apr_pstrdup(cmd->pool, a1);
+	/*
+	 * do initialization of xml and parsing of xml schema
+	 */
+	sc->schema = epp_parser_init(schemaurl);
+	if (sc->schema == NULL) {
+		return apr_psprintf(cmd->temp_pool,
+				"mod_eppd: error in xml parser initialization. "
+				"It is likely that xml schema '%s' is corupted, check it with "
+				"xmllint of other similar tool.",
+				schemaurl);
+	}
 
     return NULL;
 }

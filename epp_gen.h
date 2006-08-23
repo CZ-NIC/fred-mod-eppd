@@ -67,7 +67,7 @@ epp_gen_greeting(const char *svid, char **greeting);
 gen_status
 epp_gen_response(
 		int validate,
-		char *schema_url,
+		void *schema,
 		epp_lang lang,
 		epp_command_data *cdata,
 		epp_gen *gen,

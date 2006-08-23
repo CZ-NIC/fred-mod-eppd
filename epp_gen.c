@@ -15,6 +15,7 @@
 #include <sys/time.h>
 
 #include <libxml/parser.h>
+#include <libxml/xmlschemas.h>
 #include <libxml/xmlwriter.h>
 
 #include "epp_common.h"
@@ -690,7 +691,7 @@ complete_tags(epp_error	*e)
 gen_status
 epp_gen_response(
 		int validate,
-		char *schema_url,
+		void *schema,
 		epp_lang lang,
 		epp_command_data *cdata,
 		epp_gen *gen,
@@ -712,7 +713,7 @@ epp_gen_response(
 	if (gettimeofday(&tv, NULL) == 0)
 		*timestart = tv.tv_sec * 1000000 + tv.tv_usec;
 
-	assert(schema_url != NULL);
+	assert(schema != NULL);
 	assert(cdata != NULL);
 
 	/* initialize default return values */
@@ -1064,7 +1065,7 @@ simple_err:
 		}
 		CL_NEW(gen->valerr);
 
-		val_ret = validate_doc(schema_url, doc, gen->valerr);
+		val_ret = validate_doc((xmlSchemaPtr) schema, doc, gen->valerr);
 		switch (val_ret) {
 			case VAL_OK:
 				ret = GEN_OK;

@@ -54,7 +54,7 @@ typedef enum {
  * @return Status (see #valid_status).
  */
 valid_status validate_doc(
-		const char *url_schema,
+		xmlSchemaPtr schema,
 		xmlDocPtr doc,
 		struct circ_list *err_list);
 

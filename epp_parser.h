@@ -32,20 +32,26 @@ typedef enum {
 }parser_status;
 
 /**
- * This routine initializes libxml's parser and hash table for command
- * recognition.
+ * This routine initializes libxml's parser, hash table for command
+ * recognition and parses xml schema, which is returned.
+ * @param url_schema XML schema location.
+ * @return Parsed xml schema.
  */
-void epp_parser_init(void);
+void *
+epp_parser_init(const char *url_schema);
 
 /**
- * This will cleanup command hash table and libxml's parser.
+ * This will cleanup command hash table, libxml's parser and release
+ * parsed xml schema.
+ * @param schema Parsed xml schema.
  */
-void epp_parser_init_cleanup(void);
+void epp_parser_init_cleanup(void *schema);
 
 /**
  * This is the main workhorse of parser component. It's task is to parse
  * request and get data saved in structure.
  * @param session	Client's session identifier.
+ * @param schema	Parsed xml schema used for validation.
  * @param request	Request to be processed.
  * @param bytes	Length of the request.
  * @param cdata Output of parsing stage (xml converted to structure).
@@ -56,7 +62,7 @@ void epp_parser_init_cleanup(void);
 parser_status
 epp_parse_command(
 		int session,
-		const char *schema_url,
+		void *schema,
 		const char *request,
 		unsigned bytes,
 		epp_command_data *cdata,

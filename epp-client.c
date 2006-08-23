@@ -30,6 +30,9 @@ struct epp_corba_globs_t {
 	ccReg_EPP	service;	/**< service is ccReg object stub */
 };
 
+/* XXX temp */
+const char	*sior;
+
 epp_corba_globs *
 epp_corba_init(const char *ior)
 {
@@ -48,6 +51,8 @@ epp_corba_init(const char *ior)
 		return NULL;
 	}
 
+	/* XXX temp */
+	sior = strdup(ior);
 	/* create object's stub */
 	e_service = (ccReg_EPP) CORBA_ORB_string_to_object(global_orb, ior, ev);
 	if (raised_exception(ev)) {
@@ -1271,6 +1276,16 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	ccReg_Response *response;
 
 	assert(cdata->in != NULL);
+	/* XXX temp */
+	CORBA_exception_init(ev);
+	CORBA_Object_release(globs->service, ev);
+	CORBA_exception_free(ev);
+	CORBA_exception_init(ev);
+	globs->service = (ccReg_EPP) CORBA_ORB_string_to_object(globs->corba, sior, ev);
+	if (raised_exception(ev)) {
+		assert(1 == 0);
+	}
+	CORBA_exception_free(ev);
 	CORBA_exception_init(ev);
 
 	/* fill in corba input values */
