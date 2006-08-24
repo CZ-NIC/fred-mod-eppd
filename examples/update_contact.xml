@@ -34,6 +34,9 @@
 		  <contact:fax>+1.9999999999</contact:fax>
 		  <contact:email>novyjouda@example.com</contact:email>
 		  <contact:disclose flag="0">
+			  <contact:name />
+			  <contact:addr />
+			  <contact:email />
 		  </contact:disclose>
 		  <contact:vat>7035555556</contact:vat>
 		  <contact:ssn type="rc">8888888856</contact:ssn>

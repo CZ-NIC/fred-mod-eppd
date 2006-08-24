@@ -1795,7 +1795,7 @@ parse_update_contact(
 	 * there can be just one disclose section, now it depens if with flag
 	 * 0 or 1
 	 */
-	if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[flag='0']"))
+	if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[@flag='0']"))
 	{
 		cdata->in->update_contact.discl->name = xpath_exists(xpathCtx,
 				"contact:chg/contact:disclose/contact:name");
@@ -1810,7 +1810,7 @@ parse_update_contact(
 		cdata->in->update_contact.discl->email = xpath_exists(xpathCtx,
 				"contact:chg/contact:disclose/contact:email");
 	}
-	else if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[flag='1']"))
+	else if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[@flag='1']"))
 	{
 		/*
 		 * disclose with flag 1 is non-sense (literally to specify attributes

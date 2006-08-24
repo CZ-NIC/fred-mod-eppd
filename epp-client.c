@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <unistd.h>
 #include <orbit/orbit.h>
 
 #include "epp_common.h"
@@ -21,6 +22,17 @@
 
 /** Quick test if corba exception was raised. */
 #define raised_exception(ev)	((ev)->_major != CORBA_NO_EXCEPTION)
+/**
+ * Maximum number of retries when connection failure occurs before
+ * the failure is announced to a caller.
+ */
+#define MAX_RETRIES	3
+/** Number of microseconds between retries when connection failure occurs. */
+#define RETR_SLEEP  100000
+
+/** True if exception is COMM_FAILURE, which is used in retry loop. */
+#define IS_NOT_COMM_FAILURE_EXCEPTION(_ev)                             \
+	(strcmp(_ev->_id, "IDL:omg.org/CORBA/COMM_FAILURE:1.0"))
 
 /**
  * Persistent structure initialized at startup, needed for corba function calls.
@@ -29,9 +41,6 @@ struct epp_corba_globs_t {
 	CORBA_ORB	corba;	/**< corba is global corba object. */
 	ccReg_EPP	service;	/**< service is ccReg object stub */
 };
-
-/* XXX temp */
-const char	*sior;
 
 epp_corba_globs *
 epp_corba_init(const char *ior)
@@ -51,8 +60,6 @@ epp_corba_init(const char *ior)
 		return NULL;
 	}
 
-	/* XXX temp */
-	sior = strdup(ior);
 	/* create object's stub */
 	e_service = (ccReg_EPP) CORBA_ORB_string_to_object(global_orb, ior, ev);
 	if (raised_exception(ev)) {
@@ -277,13 +284,21 @@ epp_call_hello(epp_corba_globs *globs, char *buf, unsigned len)
 {
 	CORBA_Environment ev[1];
 	CORBA_string version;
+	int	retr;
 
-	CORBA_exception_init(ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
-	version = ccReg_EPP_version(globs->service, ev);
+		version = ccReg_EPP_version(globs->service, ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free version even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return 0;
 	}
@@ -312,14 +327,23 @@ epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
+	int	retr;
 
-	CORBA_exception_init(ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
-	response = ccReg_EPP_GetTransaction(globs->service,
-			session,
-			cdata->clTRID,
-			cdata->rc,
-			ev);
+		response = ccReg_EPP_GetTransaction(globs->service,
+				session,
+				cdata->clTRID,
+				cdata->rc,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	if (raised_exception(ev)) {
 		/* do NOT try to free response even if not NULL -> segfault */
@@ -358,28 +382,38 @@ epp_call_login(
 	CORBA_long	c_session;
 	ccReg_Languages	c_lang;
 	ccReg_Response *response;
+	int	retr;
 
-	CORBA_exception_init(ev);
 	c_lang = (cdata->in->login.lang == LANG_EN) ? ccReg_EN : ccReg_CS;
 
-	response = ccReg_EPP_ClientLogin(globs->service,
-			cdata->in->login.clID,
-			cdata->in->login.pw,
-			cdata->in->login.newPW,
-			cdata->clTRID,
-			cdata->xml_in,
-			&c_session,
-			certID,
-			c_lang,
-			ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
+		response = ccReg_EPP_ClientLogin(globs->service,
+				cdata->in->login.clID,
+				cdata->in->login.pw,
+				cdata->in->login.newPW,
+				cdata->clTRID,
+				cdata->xml_in,
+				&c_session,
+				certID,
+				c_lang,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
+
+	/* if it is exception then return */
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
-
 	CORBA_exception_free(ev);
+
 	/*
 	 * in case of an error of EPP server (CR) the svTRID field is
 	 * empty string
@@ -413,17 +447,26 @@ epp_call_logout(
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
+	int	retr;
 
-	CORBA_exception_init(ev);
 	*logout = 0;
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
-	response = ccReg_EPP_ClientLogout(globs->service,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			ev);
+		response = ccReg_EPP_ClientLogout(globs->service,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
+
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -471,8 +514,7 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	ccReg_Response *response;
 	struct circ_list	*item;
 	int	len, i;
-
-	CORBA_exception_init(ev);
+	int	retr;
 
 	/* get number of contacts */
 	len = cl_length(cdata->in->check.ids);
@@ -486,37 +528,46 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	CL_FOREACH(cdata->in->check.ids)
 		c_ids->_buffer[i++] = CORBA_string_dup(CL_CONTENT(cdata->in->check.ids));
 
-	if (obj == EPP_CONTACT)
-		response = ccReg_EPP_ContactCheck(globs->service,
-				c_ids,
-				&c_avails,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
-	else if (obj == EPP_DOMAIN)
-		response = ccReg_EPP_DomainCheck(globs->service,
-				c_ids,
-				&c_avails,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
-	else {
-		assert(obj == EPP_NSSET);
-		response = ccReg_EPP_NSSetCheck(globs->service,
-				c_ids,
-				&c_avails,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
+
+		if (obj == EPP_CONTACT)
+			response = ccReg_EPP_ContactCheck(globs->service,
+					c_ids,
+					&c_avails,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		else if (obj == EPP_DOMAIN)
+			response = ccReg_EPP_DomainCheck(globs->service,
+					c_ids,
+					&c_avails,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		else {
+			assert(obj == EPP_NSSET);
+			response = ccReg_EPP_NSSetCheck(globs->service,
+					c_ids,
+					&c_avails,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		}
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
 	}
 
 	CORBA_free(c_ids);
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -606,21 +657,29 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 	epp_postalInfo	*pi;
 	epp_discl	*discl;
 	struct circ_list	*item;
-	int	i;
+	int	i, retr;
 
-	CORBA_exception_init(ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
-	/* get information about contact from central repository */
-	response = ccReg_EPP_ContactInfo(globs->service,
-			cdata->in->info.id,
-			&c_contact,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			ev);
+		/* get information about contact from central repository */
+		response = ccReg_EPP_ContactInfo(globs->service,
+				cdata->in->info.id,
+				&c_contact,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -759,21 +818,28 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 	ccReg_Response	*response;
 	ccReg_Domain	*c_domain;
 	struct circ_list	*item;
-	int i;
+	int i, retr;
 
-	CORBA_exception_init(ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
-	/* get information about domain */
-	response = ccReg_EPP_DomainInfo(globs->service,
-			cdata->in->info.id,
-			&c_domain,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			ev);
+		/* get information about domain */
+		response = ccReg_EPP_DomainInfo(globs->service,
+				cdata->in->info.id,
+				&c_domain,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -888,21 +954,28 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 	ccReg_NSSet	*c_nsset;
 	ccReg_Response	*response;
 	struct circ_list	*item;
-	int i, j;
+	int i, j, retr;
 
-	CORBA_exception_init(ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
-	/* get information about nsset */
-	response = ccReg_EPP_NSSetInfo(globs->service,
-			cdata->in->info.id,
-			&c_nsset,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			ev);
+		/* get information about nsset */
+		response = ccReg_EPP_NSSetInfo(globs->service,
+				cdata->in->info.id,
+				&c_nsset,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -1025,22 +1098,30 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	CORBA_long	c_msgID;
 	ccReg_timestamp	c_qdate;
 	CORBA_char	*c_msg;
+	int	retr;
 
-	CORBA_exception_init(ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
-	/* get message from repository */
-	response = ccReg_EPP_PollRequest(globs->service,
-			&c_msgID,
-			&c_count,
-			&c_qdate,
-			&c_msg,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			ev);
+		/* get message from repository */
+		response = ccReg_EPP_PollRequest(globs->service,
+				&c_msgID,
+				&c_count,
+				&c_qdate,
+				&c_msg,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -1093,22 +1174,31 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	CORBA_long	c_msgID;
 	CORBA_short	c_count;
 	ccReg_Response *response;
+	int	retr;
 
 	assert(cdata->in != NULL);
-	CORBA_exception_init(ev);
 
-	/* send acknoledgement */
-	response = ccReg_EPP_PollAcknowledgement(globs->service,
-			cdata->in->poll_ack.msgid,
-			&c_count,
-			&c_msgID,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
+
+		/* send acknoledgement */
+		response = ccReg_EPP_PollAcknowledgement(globs->service,
+				cdata->in->poll_ack.msgid,
+				&c_count,
+				&c_msgID,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -1158,10 +1248,9 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	ccReg_Response *response;
 	ccReg_AdminContact	*c_admin;
 	ccReg_ExtensionList	*c_ext_list;
-	int	len, i;
+	int	len, i, retr;
 
 	assert(cdata->in != NULL);
-	CORBA_exception_init(ev);
 
 	/* fill in corba input parameters */
 	c_admin = ccReg_AdminContact__alloc();
@@ -1188,27 +1277,36 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		c_ext_list->_buffer[0]._release = CORBA_TRUE;
 	}
 
-	/* send new domain in central repository */
-	response = ccReg_EPP_DomainCreate(globs->service,
-			cdata->in->create_domain.name,
-			cdata->in->create_domain.registrant,
-			cdata->in->create_domain.nsset,
-			cdata->in->create_domain.authInfo,
-			cdata->in->create_domain.period,
-			c_admin,
-			&c_crDate,
-			&c_exDate,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			c_ext_list,
-			ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
+
+		/* send new domain in central repository */
+		response = ccReg_EPP_DomainCreate(globs->service,
+				cdata->in->create_domain.name,
+				cdata->in->create_domain.registrant,
+				cdata->in->create_domain.nsset,
+				cdata->in->create_domain.authInfo,
+				cdata->in->create_domain.period,
+				c_admin,
+				&c_crDate,
+				&c_exDate,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				c_ext_list,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	CORBA_free(c_admin);
 	CORBA_free(c_ext_list);
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -1274,19 +1372,9 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	ccReg_timestamp	c_crDate;
 	ccReg_ContactChange	*c_contact;
 	ccReg_Response *response;
+	int	retr;
 
 	assert(cdata->in != NULL);
-	/* XXX temp */
-	CORBA_exception_init(ev);
-	CORBA_Object_release(globs->service, ev);
-	CORBA_exception_free(ev);
-	CORBA_exception_init(ev);
-	globs->service = (ccReg_EPP) CORBA_ORB_string_to_object(globs->corba, sior, ev);
-	if (raised_exception(ev)) {
-		assert(1 == 0);
-	}
-	CORBA_exception_free(ev);
-	CORBA_exception_init(ev);
 
 	/* fill in corba input values */
 	c_contact = ccReg_ContactChange__alloc();
@@ -1332,20 +1420,29 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	c_contact->CC =
 		CORBA_string_dup(cdata->in->create_contact.postalInfo->cc);
 
-	/* send new contact in repository */
-	response = ccReg_EPP_ContactCreate(globs->service,
-			cdata->in->create_contact.id,
-			c_contact,
-			&c_crDate,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
+
+		/* send new contact in repository */
+		response = ccReg_EPP_ContactCreate(globs->service,
+				cdata->in->create_contact.id,
+				c_contact,
+				&c_crDate,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	CORBA_free(c_contact);
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -1393,10 +1490,9 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 	ccReg_DNSHost	*c_dnshost;
 	ccReg_TechContact	*c_tech;
 	ccReg_timestamp	c_crDate;
-	int	len, i, j;
+	int	len, i, j, retr;
 
 	assert(cdata->in != NULL);
-	CORBA_exception_init(ev);
 
 	/* alloc & init sequence of nameservers */
 	c_dnshost = ccReg_DNSHost__alloc();
@@ -1430,23 +1526,32 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 		c_tech->_buffer[i++] = CORBA_string_dup(
 				CL_CONTENT(cdata->in->create_nsset.tech));
 
-	/* send new nsset to repository */
-	response = ccReg_EPP_NSSetCreate(globs->service,
-			cdata->in->create_nsset.id,
-			cdata->in->create_nsset.authInfo,
-			c_tech,
-			c_dnshost,
-			&c_crDate,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
+
+		/* send new nsset to repository */
+		response = ccReg_EPP_NSSetCreate(globs->service,
+				cdata->in->create_nsset.id,
+				cdata->in->create_nsset.authInfo,
+				c_tech,
+				c_dnshost,
+				&c_crDate,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	CORBA_free(c_tech);
 	CORBA_free(c_dnshost);
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -1493,37 +1598,45 @@ epp_call_delete(epp_corba_globs *globs, int session,
 {
 	ccReg_Response *response;
 	CORBA_Environment ev[1];
+	int	retr;
 
 	assert(cdata->in != NULL);
 
-	CORBA_exception_init(ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
-	if (obj == EPP_DOMAIN)
-		response = ccReg_EPP_DomainDelete(globs->service,
-				cdata->in->delete.id,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
-	else if (obj == EPP_CONTACT)
-		response = ccReg_EPP_ContactDelete(globs->service,
-				cdata->in->delete.id,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
-	else {
-		assert(obj == EPP_NSSET);
-		response = ccReg_EPP_NSSetDelete(globs->service,
-				cdata->in->delete.id,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
+		if (obj == EPP_DOMAIN)
+			response = ccReg_EPP_DomainDelete(globs->service,
+					cdata->in->delete.id,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		else if (obj == EPP_CONTACT)
+			response = ccReg_EPP_ContactDelete(globs->service,
+					cdata->in->delete.id,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		else {
+			assert(obj == EPP_NSSET);
+			response = ccReg_EPP_NSSetDelete(globs->service,
+					cdata->in->delete.id,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		}
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
 	}
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -1563,6 +1676,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 	ccReg_Response *response;
 	ccReg_timestamp	c_exDate;
 	ccReg_ExtensionList	*c_ext_list;
+	int	retr;
 
 	assert(cdata->in != NULL);
 	CORBA_exception_init(ev);
@@ -1581,22 +1695,31 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 		c_ext_list->_buffer[0]._release = CORBA_TRUE;
 	}
 
-	/* send renew request to repository */
-	response = ccReg_EPP_DomainRenew(globs->service,
-			cdata->in->renew.name,
-			cdata->in->renew.exDate,
-			cdata->in->renew.period,
-			&c_exDate,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			c_ext_list,
-			ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
+
+		/* send renew request to repository */
+		response = ccReg_EPP_DomainRenew(globs->service,
+				cdata->in->renew.name,
+				cdata->in->renew.exDate,
+				cdata->in->renew.period,
+				&c_exDate,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				c_ext_list,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	CORBA_free(c_ext_list);
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -1645,10 +1768,9 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 	ccReg_Status	*c_status_add;
 	ccReg_Status	*c_status_rem;
 	ccReg_ExtensionList	*c_ext_list;
-	int	i, len;
+	int	i, len, retr;
 
 	assert(cdata->in != NULL);
-	CORBA_exception_init(ev);
 
 	/* admin add */
 	c_admin_add = ccReg_AdminContact__alloc();
@@ -1705,21 +1827,31 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 		c_ext_list->_buffer[0]._release = CORBA_TRUE;
 	}
 
-	/* send the updates to repository */
-	response = ccReg_EPP_DomainUpdate(globs->service,
-			cdata->in->update_domain.name,
-			cdata->in->update_domain.registrant,
-			cdata->in->update_domain.authInfo,
-			cdata->in->update_domain.nsset,
-			c_admin_add,
-			c_admin_rem,
-			c_status_add,
-			c_status_rem,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			c_ext_list,
-			ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
+
+		/* send the updates to repository */
+		response = ccReg_EPP_DomainUpdate(globs->service,
+				cdata->in->update_domain.name,
+				cdata->in->update_domain.registrant,
+				cdata->in->update_domain.authInfo,
+				cdata->in->update_domain.nsset,
+				c_admin_add,
+				c_admin_rem,
+				c_status_add,
+				c_status_rem,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				c_ext_list,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	CORBA_free(c_status_rem);
 	CORBA_free(c_status_add);
@@ -1728,7 +1860,6 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 	CORBA_free(c_ext_list);
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -1787,10 +1918,9 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 	ccReg_Status	*c_status_add;
 	ccReg_Status	*c_status_rem;
 	ccReg_ContactChange	*c_contact;
-	int	i, len;
+	int	i, len, retr;
 
 	assert(cdata->in != NULL);
-	CORBA_exception_init(ev);
 
 	/* status add */
 	c_status_add = ccReg_Status__alloc();
@@ -1851,23 +1981,32 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 		c_contact->DiscloseEmail = convDiscl(discl->email);
 	}
 
-	/* send the updates to repository */
-	response = ccReg_EPP_ContactUpdate(globs->service,
-			cdata->in->update_contact.id,
-			c_contact,
-			c_status_add,
-			c_status_rem,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
+
+		/* send the updates to repository */
+		response = ccReg_EPP_ContactUpdate(globs->service,
+				cdata->in->update_contact.id,
+				c_contact,
+				c_status_add,
+				c_status_rem,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	CORBA_free(c_status_rem);
 	CORBA_free(c_status_add);
 	CORBA_free(c_contact);
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -1912,10 +2051,9 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 	ccReg_Status	*c_status_add;
 	ccReg_Status	*c_status_rem;
 	epp_ns	*ns;
-	int	i, j, len;
+	int	i, j, len, retr;
 
 	assert(cdata->in != NULL);
-	CORBA_exception_init(ev);
 
 	/* tech add */
 	c_tech_add = ccReg_TechContact__alloc();
@@ -1991,20 +2129,30 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 			CORBA_string_dup(CL_CONTENT(cdata->in->update_nsset.rem_ns));
 	}
 
-	/* send the updates to repository */
-	response = ccReg_EPP_NSSetUpdate(globs->service,
-			cdata->in->update_nsset.id,
-			cdata->in->update_nsset.authInfo,
-			c_dnshost_add,
-			c_dnshost_rem,
-			c_tech_add,
-			c_tech_rem,
-			c_status_add,
-			c_status_rem,
-			session,
-			cdata->clTRID,
-			cdata->xml_in,
-			ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
+
+		/* send the updates to repository */
+		response = ccReg_EPP_NSSetUpdate(globs->service,
+				cdata->in->update_nsset.id,
+				cdata->in->update_nsset.authInfo,
+				c_dnshost_add,
+				c_dnshost_rem,
+				c_tech_add,
+				c_tech_rem,
+				c_status_add,
+				c_status_rem,
+				session,
+				cdata->clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
+	}
 
 	CORBA_free(c_status_rem);
 	CORBA_free(c_status_add);
@@ -2014,7 +2162,6 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 	CORBA_free(c_dnshost_add);
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -2054,40 +2201,48 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
+	int	retr;
 
-	CORBA_exception_init(ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
-	if (obj == EPP_DOMAIN) {
-		response = ccReg_EPP_DomainTransfer(globs->service,
-				cdata->in->transfer.id,
-				cdata->in->transfer.authInfo,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
-	}
-	else if (obj == EPP_CONTACT) {
-		response = ccReg_EPP_ContactTransfer(globs->service,
-				cdata->in->transfer.id,
-				cdata->in->transfer.authInfo,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
-	}
-	else {
-		assert(obj == EPP_NSSET);
-		response = ccReg_EPP_NSSetTransfer(globs->service,
-				cdata->in->transfer.id,
-				cdata->in->transfer.authInfo,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
+		if (obj == EPP_DOMAIN) {
+			response = ccReg_EPP_DomainTransfer(globs->service,
+					cdata->in->transfer.id,
+					cdata->in->transfer.authInfo,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		}
+		else if (obj == EPP_CONTACT) {
+			response = ccReg_EPP_ContactTransfer(globs->service,
+					cdata->in->transfer.id,
+					cdata->in->transfer.authInfo,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		}
+		else {
+			assert(obj == EPP_NSSET);
+			response = ccReg_EPP_NSSetTransfer(globs->service,
+					cdata->in->transfer.id,
+					cdata->in->transfer.authInfo,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		}
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
 	}
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
 		CORBA_exception_free(ev);
 		return CORBA_ERROR;
 	}
@@ -2129,34 +2284,42 @@ epp_call_list(epp_corba_globs *globs, int session,
 	ccReg_Response	*response;
 	ccReg_Lists	*c_handles;
 	struct circ_list	*item;
-	int	 i;
+	int	 i, retr;
 
-	CORBA_exception_init(ev);
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		CORBA_exception_init(ev);
 
-	if (obj == EPP_DOMAIN) {
-		response = ccReg_EPP_DomainList(globs->service,
-				&c_handles,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
-	}
-	else if (obj == EPP_CONTACT) {
-		response = ccReg_EPP_ContactList(globs->service,
-				&c_handles,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
-	}
-	else {
-		assert(obj == EPP_NSSET);
-		response = ccReg_EPP_NSSetList(globs->service,
-				&c_handles,
-				session,
-				cdata->clTRID,
-				cdata->xml_in,
-				ev);
+		if (obj == EPP_DOMAIN) {
+			response = ccReg_EPP_DomainList(globs->service,
+					&c_handles,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		}
+		else if (obj == EPP_CONTACT) {
+			response = ccReg_EPP_ContactList(globs->service,
+					&c_handles,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		}
+		else {
+			assert(obj == EPP_NSSET);
+			response = ccReg_EPP_NSSetList(globs->service,
+					&c_handles,
+					session,
+					cdata->clTRID,
+					cdata->xml_in,
+					ev);
+		}
+
+		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		CORBA_exception_free(ev);
+		usleep(RETR_SLEEP);
 	}
 
 	if (raised_exception(ev)) {
