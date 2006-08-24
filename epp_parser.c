@@ -394,6 +394,23 @@ void epp_parser_init_cleanup(void *schema)
 	xmlCleanupParser();
 }
 
+/**
+ * Convert string with date to number of seconds since ...
+ * @param str Date in string format.
+ * @return Number of seconds.
+ */
+static unsigned long long
+str2timestamp(const char *str)
+{
+	struct tm t;
+	char	buf[20];
+
+	bzero(&t, sizeof t);
+	snprintf(buf, 19, "%s UTC", str);
+	strptime(str, "%Y-%m-%d %z", &t);
+	/* XXX is timegm thread-safe? */
+	return timegm(&t);
+}
 
 /**
  * Parser of EPP login command.
@@ -826,14 +843,8 @@ parse_create_domain(
 	/* enumval extension */
 	XPATH_TAKE1(str, doc, xpathCtx, error_cd,
 			"epp:extension/enumval:create/enumval:valExDate");
-	if (*str != '\0') {
-		struct tm t;
-
-		bzero(&t, sizeof t);
-		strptime(str, "%Y-%m-%d", &t);
-		/* XXX is timegm thread-safe? */
-		cdata->in->create_domain.valExDate = timegm(&t);
-	}
+	if (*str != '\0')
+		cdata->in->create_domain.valExDate = str2timestamp(str);
 	free(str);
 
 	/* secDNS extension */
@@ -1446,14 +1457,8 @@ parse_update_domain(
 	/* enumval extension */
 	XPATH_TAKE1(str, doc, xpathCtx, error_ud,
 			"epp:extension/enumval:update/enumval:chg/enumval:valExDate");
-	if (*str != '\0') {
-		struct tm t;
-
-		bzero(&t, sizeof t);
-		strptime(str, "%Y-%m-%d", &t);
-		/* XXX is timegm thread-safe? */
-		cdata->in->update_domain.valExDate = timegm(&t);
-	}
+	if (*str != '\0')
+		cdata->in->update_domain.valExDate = str2timestamp(str);
 	free(str);
 
 	/* secDNS extension */
@@ -2220,7 +2225,6 @@ parse_renew(
 {
 	xmlXPathObjectPtr	xpathObj;
 	char	*str;
-	struct tm t;
 
 	/* allocate necessary structures */
 	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
@@ -2233,10 +2237,7 @@ parse_renew(
 		"epp:renew/domain:renew/domain:name");
 	XPATH_REQ1(str, doc, xpathCtx, error_r,
 		"epp:renew/domain:renew/domain:curExpDate");
-	bzero(&t, sizeof t);
-	strptime(str, "%Y-%m-%d", &t);
-	/* XXX is timegm thread-safe? */
-	cdata->in->renew.exDate = timegm(&t);
+	cdata->in->renew.exDate = str2timestamp(str);
 	free(str);
 	/* domain period handling is slightly more difficult */
 	XPATH_EVAL(xpathObj, xpathCtx, error_r,
@@ -2267,12 +2268,7 @@ parse_renew(
 	XPATH_TAKE1(str, doc, xpathCtx, error_r,
 			"epp:extension/enumval:renew/enumval:valExDate");
 	if (*str != '\0') {
-		struct tm t;
-
-		bzero(&t, sizeof t);
-		strptime(str, "%Y-%m-%d", &t);
-		/* XXX is timegm thread-safe? */
-		cdata->in->renew.valExDate = timegm(&t);
+		cdata->in->renew.valExDate = str2timestamp(str);
 	}
 	free(str);
 
