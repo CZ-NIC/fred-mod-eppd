@@ -47,15 +47,13 @@ epp_corba_init(const char *ior)
 {
 	CORBA_ORB  global_orb = CORBA_OBJECT_NIL;	/* global orb */
 	ccReg_EPP e_service = CORBA_OBJECT_NIL;	/* object's stub */
-	epp_corba_globs	*globs;	/* structure used to store global_orb and service */
+	epp_corba_globs	*globs;	/* used to store global_orb and service */
 	CORBA_Environment ev[1];
 	CORBA_exception_init(ev);
  
 	/* create orb object */
 	global_orb = CORBA_ORB_init(0, NULL, "orbit-local-orb", ev);
 	if (raised_exception(ev)) {
-		CORBA_exception_free(ev);
-		if (global_orb != CORBA_OBJECT_NIL) CORBA_ORB_destroy(global_orb, ev);
 		CORBA_exception_free(ev);
 		return NULL;
 	}
@@ -64,14 +62,9 @@ epp_corba_init(const char *ior)
 	e_service = (ccReg_EPP) CORBA_ORB_string_to_object(global_orb, ior, ev);
 	if (raised_exception(ev)) {
 		CORBA_exception_free(ev);
-		/* releasing managed object */
-		CORBA_Object_release(e_service, ev);
-		CORBA_exception_free(ev);
 		/* tear down the ORB */
-		if (global_orb != CORBA_OBJECT_NIL) {
-			CORBA_ORB_destroy(global_orb, ev);
-			CORBA_exception_free(ev);
-		}
+		CORBA_ORB_destroy(global_orb, ev);
+		CORBA_exception_free(ev);
 		return NULL;
 	}
 	CORBA_exception_free(ev);
@@ -81,10 +74,8 @@ epp_corba_init(const char *ior)
 		CORBA_Object_release(e_service, ev);
 		CORBA_exception_free(ev);
 		/* tear down the ORB */
-		if (global_orb != CORBA_OBJECT_NIL) {
-			CORBA_ORB_destroy(global_orb, ev);
-			CORBA_exception_free(ev);
-		}
+		CORBA_ORB_destroy(global_orb, ev);
+		CORBA_exception_free(ev);
 		return NULL;
 	}
 
@@ -1681,7 +1672,6 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 	int	retr;
 
 	assert(cdata->in != NULL);
-	CORBA_exception_init(ev);
 	c_ext_list = ccReg_ExtensionList__alloc();
 	/* fill extension list if needed */
 	if (cdata->in->renew.valExDate != 0) {

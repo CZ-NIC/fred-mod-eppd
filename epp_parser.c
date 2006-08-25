@@ -407,7 +407,7 @@ str2timestamp(const char *str)
 
 	bzero(&t, sizeof t);
 	snprintf(buf, 19, "%s UTC", str);
-	strptime(str, "%Y-%m-%d %z", &t);
+	strptime(buf, "%Y-%m-%d %z", &t);
 	/* XXX is timegm thread-safe? */
 	return timegm(&t);
 }

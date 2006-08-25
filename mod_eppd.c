@@ -1007,8 +1007,7 @@ static const char *set_iorfile(cmd_parms *cmd, void *dummy,
 			APR_OS_DEFAULT, cmd->temp_pool);
 	if (status != APR_SUCCESS) {
 		return apr_psprintf(cmd->temp_pool,
-					"mod_eppd: could not open file %s (IOR)",
-					iorfile);
+					"mod_eppd: could not open file %s (IOR)", iorfile);
 	}
 
 	/* read the file */
@@ -1018,8 +1017,7 @@ static const char *set_iorfile(cmd_parms *cmd, void *dummy,
 	apr_file_close(f);
 	if ((status != APR_SUCCESS) && (status != APR_EOF)) {
 		return apr_psprintf(cmd->temp_pool,
-				"mod_eppd: error when reading file %s (IOR)",
-				iorfile);
+				"mod_eppd: error when reading file %s (IOR)", iorfile);
 	}
 	sc->ior = apr_pstrdup(cmd->pool, buf);
 

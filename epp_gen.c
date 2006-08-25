@@ -791,6 +791,7 @@ epp_gen_response(
 		case EPP_UPDATE_NSSET:
 		case EPP_TRANSFER_DOMAIN:
 		case EPP_TRANSFER_NSSET:
+		case EPP_TRANSFER_CONTACT:
 			break;
 		/* commands with <msgQ> element */
 		case EPP_POLL_REQ:
