@@ -479,9 +479,9 @@ static int epp_process_connection(conn_rec *c)
 		epp_command_data	cdata;	/* self-descriptive data structure */
 		epp_gen	gen;	/* generated answer and possibly encountered errors */
 		parser_status	pstat;	/* parser's return code */
-		unsigned long long	times[5]; /* array of times for perf measurement */
+		unsigned long long	times[6]; /* array of times for perf measurement */
 
-		bzero(times, 5 * sizeof(unsigned long long));
+		bzero(times, 6 * sizeof(unsigned long long));
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
 		apr_pool_tag(rpool, "EPP_request");
