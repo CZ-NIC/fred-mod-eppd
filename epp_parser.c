@@ -811,7 +811,7 @@ parse_create_domain(
 			"domain:name");
 	XPATH_REQ1(cdata->in->create_domain.registrant, doc, xpathCtx, error_cd,
 			"domain:registrant");
-	XPATH_REQ1(cdata->in->create_domain.nsset, doc, xpathCtx, error_cd,
+	XPATH_TAKE1(cdata->in->create_domain.nsset, doc, xpathCtx, error_cd,
 			"domain:nsset");
 	XPATH_REQ1(cdata->in->create_domain.authInfo, doc, xpathCtx, error_cd,
 			"domain:authInfo/domain:pw");
