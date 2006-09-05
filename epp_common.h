@@ -222,19 +222,28 @@ typedef struct {
 
 /**
  * Disclose information of contact.
- * All items inside are treated as booleans.
+ * All items except flag inside are treated as booleans.
  * Value 1 means it is an exception to data collection policy.
- * Example: if server data collection policy is "public"
- * 	then value 1 in this structure means the item should be private.
- * Note: Data collection policy of our server is "public".
+ * Flag represents the default server policy.
+ * Example: if server data collection policy is "public" (flag == 0)
+ * 	then value 1 in this structure means the item should be hidden.
  */
 typedef struct {
-	char	name;
-	char	org;
-	char	addr;
-	char	voice;
-	char	fax;
-	char	email;
+	/**
+	 * Value 1 means following items are exception to server policy, which
+	 * is assumed to be private (hide all items).
+	 * Value 0 means following items are exception to server policy, which
+	 * is assumed to be public (show all items).
+	 * And value -1 means there are not elements that require exceptional
+	 * behaviour.
+	 */
+	char	flag;
+	unsigned char	name; /**< Contact's name is exceptional. */
+	unsigned char	org; /**< Contact's organization is exceptional. */
+	unsigned char	addr; /**< Contact's address is exceptional. */
+	unsigned char	voice; /**< Contact's voice (tel. number) is exceptional. */
+	unsigned char	fax; /**< Contact's fax number is exceptional. */
+	unsigned char	email; /**< Contact's email address is exceptional. */
 }epp_discl;
 
 /**
@@ -348,7 +357,7 @@ typedef struct {
 			/* dnssec extension */
 			struct circ_list	*ds;
 			/* enum validation extension */
-			unsigned long long	valExDate;
+			char	*valExDate;
 		}create_domain;
 		/* additional create contact parameters */
 		struct {
@@ -378,10 +387,10 @@ typedef struct {
 		/* additional renew domain parameters */
 		struct {
 			char	*name;
-			unsigned long long	exDate;
+			char	*exDate;
 			int	period;
 			/* enum validation extension */
-			unsigned long long	valExDate;
+			char	*valExDate;
 		}renew;
 		/* additional update domain parameters */
 		struct {
@@ -398,7 +407,7 @@ typedef struct {
 			struct circ_list	*add_ds;
 			struct circ_list	*rem_ds;
 			/* enum validation extension */
-			unsigned long long	valExDate;
+			char	*valExDate;
 		}update_domain;
 		/* additional update contact parameters */
 		struct {
@@ -455,10 +464,10 @@ typedef struct {
 			char	*email;
 			char	*clID;
 			char	*crID;
-			unsigned long long	crDate;
+			char	*crDate;
 			char	*upID;
-			unsigned long long	upDate;
-			unsigned long long	trDate;
+			char	*upDate;
+			char	*trDate;
 			char	*authInfo;
 			epp_discl	*discl;
 			char	*vat;
@@ -475,16 +484,16 @@ typedef struct {
 			char	*nsset;
 			char	*clID;
 			char	*crID;
-			unsigned long long	crDate;
-			unsigned long long	exDate;
+			char	*crDate;
+			char	*exDate;
 			char	*upID;
-			unsigned long long	upDate;
-			unsigned long long	trDate;
+			char	*upDate;
+			char	*trDate;
 			char	*authInfo;
 			/* dnssec extension */
 			struct circ_list	*ds;
 			/* enum validation extension */
-			unsigned long long	valExDate;
+			char	*valExDate;
 		}info_domain;
 		/* additional info nsset parameters */
 		struct {
@@ -493,9 +502,9 @@ typedef struct {
 			char	*clID;
 			char	*crID;
 			char	*upID;
-			unsigned long long	crDate;
-			unsigned long long	upDate;
-			unsigned long long	trDate;
+			char	*crDate;
+			char	*upDate;
+			char	*trDate;
 			char	*authInfo;
 			struct circ_list	*ns;
 			struct circ_list	*tech;
@@ -504,7 +513,7 @@ typedef struct {
 		struct {
 			int	count;
 			int	msgid;
-			unsigned long long	qdate;
+			char	*qdate;
 			char	*msg;
 		}poll_req;
 		/* additional poll acknoledge parameters */
@@ -514,12 +523,12 @@ typedef struct {
 		}poll_ack;
 		/* additional create contact, nsset or domain parameters */
 		struct {
-			unsigned long long	crDate;
-			unsigned long long	exDate; /* used only in domain object */
+			char	*crDate;
+			char	*exDate; /* used only in domain object */
 		}create;
 		/* additional renew domain parameters */
 		struct {
-			unsigned long long	exDate;
+			char	*exDate;
 		}renew;
 		/* additional parameters of command "list" */
 		struct {
@@ -527,22 +536,5 @@ typedef struct {
 		}list;
 	}*out;
 }epp_command_data;
-
-/**
- * Function for converting number of seconds since 1970 ... to string
- * formated in rfc 3339 way. This is required by EPP protocol.
- * @par date Number of seconds since epoch.
- * @par str Preallocated buffer for date (must be at least 25 bytes long).
- */
-void get_rfc3339_date(long long date, char *str);
-
-/**
- * Function for converting number of seconds since 1970 ... to string
- * formated in rfc 3339 way. The time part is stripped, so that only
- * date time remains.
- * @par date Number of seconds since epoch.
- * @par str Preallocated buffer for date (must be at least 11 bytes long).
- */
-void get_stripped_date(long long date, char *str);
 
 #endif

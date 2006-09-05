@@ -31,11 +31,12 @@ typedef struct epp_corba_globs_t epp_corba_globs;
  * in all subsequent corba function calls, no matter to which connection
  * they belong.
  *
- * @param iorfile A file where is stored service's reference
+ * @param ns_loc Location of nameservice in format "host[:port]".
+ * @param obj_name Name under which is object known to nameservice.
  * @return corba_globs or NULL in case of failure
  */
 epp_corba_globs *
-epp_corba_init(const char *iorfile);
+epp_corba_init(const char *ns_loc, const char *obj_name);
 
 /**
  * corba_init_cleanup releases resources allocated in epp_corba_init().
@@ -51,13 +52,17 @@ epp_corba_init_cleanup(epp_corba_globs *corba_globs);
  * frame.
  *
  * @param corba_globs Corba context.
- * @param buf Allocated buffer for version string.
- * @param len Length of allocated buffer (version string is truncated
- * if longer then len - 1).
+ * @param version_buf Allocated buffer for version string.
+ * @param versionbuf_len Length of allocated buffer (version string is truncated
+ * if longer).
+ * @param curdate_buf Allocated buffer for current date.
+ * @param curdatebuf_len Length of allocated buffer (current date is truncated
+ * if longer).
  * @return If successfull 1 and 0 if corba function call failed.
  */
 int
-epp_call_hello(epp_corba_globs *corba_globs, char *buf, unsigned len);
+epp_call_hello(epp_corba_globs *globs, char *version_buf,
+		unsigned versionbuf_len, char *curdate_buf, unsigned curdatebuf_len);
 
 /**
  * Call corba login function, which sets up a session variables.

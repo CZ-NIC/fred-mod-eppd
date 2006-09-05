@@ -28,33 +28,3 @@ inline void cl_purge(struct circ_list *cl)
 		}
 		free(cl);
 }
-
-void get_rfc3339_date(long long date, char *str)
-{
-	struct tm t;
-	time_t	time = date;
-
-	/* we will leave empty string in buffer if gmtime failes */
-	if (gmtime_r(&time, &t) == NULL) {
-		str[0] = '\0';
-		return;
-	}
-	snprintf(str, 25, "%04d-%02d-%02dT%02d:%02d:%02d.0Z",
-			1900 + t.tm_year, t.tm_mon + 1, t.tm_mday,
-			t.tm_hour, t.tm_min, t.tm_sec);
-}
-
-void get_stripped_date(long long date, char *str)
-{
-	struct tm t;
-	time_t	time = date;
-
-	/* we will leave empty string in buffer if gmtime failes */
-	if (gmtime_r(&time, &t) == NULL) {
-		str[0] = '\0';
-		return;
-	}
-	snprintf(str, 25, "%04d-%02d-%02d",
-			1900 + t.tm_year, t.tm_mon + 1, t.tm_mday);
-}
-

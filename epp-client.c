@@ -15,10 +15,10 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <orbit/orbit.h>
+#include <ORBitservices/CosNaming.h>
 
 #include "epp_common.h"
 #include "epp-client.h"
-#include "ccReg.h"
 
 /** Quick test if corba exception was raised. */
 #define raised_exception(ev)	((ev)->_major != CORBA_NO_EXCEPTION)
@@ -32,7 +32,7 @@
 
 /** True if exception is COMM_FAILURE, which is used in retry loop. */
 #define IS_NOT_COMM_FAILURE_EXCEPTION(_ev)                             \
-	(strcmp(_ev->_id, "IDL:omg.org/CORBA/COMM_FAILURE:1.0"))
+	(strcmp((_ev)->_id, "IDL:omg.org/CORBA/COMM_FAILURE:1.0"))
 
 /**
  * Persistent structure initialized at startup, needed for corba function calls.
@@ -43,14 +43,38 @@ struct epp_corba_globs_t {
 };
 
 epp_corba_globs *
-epp_corba_init(const char *ior)
+epp_corba_init(const char *ns_loc, const char *obj_name)
 {
 	CORBA_ORB  global_orb = CORBA_OBJECT_NIL;	/* global orb */
-	ccReg_EPP e_service = CORBA_OBJECT_NIL;	/* object's stub */
+	ccReg_EPP service = CORBA_OBJECT_NIL;	/* object's stub */
 	epp_corba_globs	*globs;	/* used to store global_orb and service */
 	CORBA_Environment ev[1];
-	CORBA_exception_init(ev);
+	CosNaming_NamingContext ns; /* used for nameservice */
+	CosNaming_NameComponent *name_component; /* EPP's name */
+	CosNaming_Name *cos_name; /* Cos name used in service lookup */
+	char ns_string[150];
+	int argc = 0;
  
+	CORBA_exception_init(ev);
+
+	assert(ns_loc != NULL);
+	assert(obj_name != NULL);
+
+	/* build a name of EPP object */
+	name_component = (CosNaming_NameComponent *)
+		malloc(2 * sizeof(CosNaming_NameComponent));
+	name_component[0].id = CORBA_string_dup("ccReg");
+	name_component[0].kind = CORBA_string_dup("context");
+	name_component[1].id = CORBA_string_dup(obj_name);
+	name_component[1].kind = CORBA_string_dup("Object");
+	cos_name = (CosNaming_Name *) malloc (sizeof(CosNaming_Name));
+	cos_name->_maximum = cos_name->_length = 2;
+	cos_name->_buffer = name_component;
+	CORBA_sequence_set_release(cos_name, FALSE);
+
+	ns_string[149] = 0;
+	snprintf(ns_string, 149, "corbaloc::%s/NameService", ns_loc);
+	CORBA_exception_init(ev);
 	/* create orb object */
 	global_orb = CORBA_ORB_init(0, NULL, "orbit-local-orb", ev);
 	if (raised_exception(ev)) {
@@ -58,29 +82,45 @@ epp_corba_init(const char *ior)
 		return NULL;
 	}
 
-	/* create object's stub */
-	e_service = (ccReg_EPP) CORBA_ORB_string_to_object(global_orb, ior, ev);
-	if (raised_exception(ev)) {
+	/* get nameservice */
+	ns = (CosNaming_NamingContext) CORBA_ORB_string_to_object(global_orb,
+			ns_string, ev);
+	if (ns == CORBA_OBJECT_NIL || raised_exception(ev)) {
 		CORBA_exception_free(ev);
 		/* tear down the ORB */
 		CORBA_ORB_destroy(global_orb, ev);
 		CORBA_exception_free(ev);
 		return NULL;
 	}
+	/* get EPP object */
+	service =(ccReg_EPP) CosNaming_NamingContext_resolve(ns, cos_name, ev);
+	if (service == CORBA_OBJECT_NIL || raised_exception(ev)) {
+		CORBA_exception_free(ev);
+		/* release nameservice */
+		CORBA_Object_release(ns, ev);
+		CORBA_exception_free(ev);
+		/* tear down the ORB */
+		CORBA_ORB_destroy(global_orb, ev);
+		CORBA_exception_free(ev);
+		return NULL;
+	}
+	/* release nameservice */
+	CORBA_Object_release(ns, ev);
 	CORBA_exception_free(ev);
 
+	/* wrap orb and service in one struct */
 	if ((globs = malloc(sizeof *globs)) == NULL) {
 		/* releasing managed object */
-		CORBA_Object_release(e_service, ev);
+		CORBA_Object_release(service, ev);
 		CORBA_exception_free(ev);
 		/* tear down the ORB */
 		CORBA_ORB_destroy(global_orb, ev);
 		CORBA_exception_free(ev);
 		return NULL;
 	}
-
 	globs->corba = global_orb;
-	globs->service = e_service;
+	globs->service = service;
+
 	return globs;
 }
 
@@ -133,15 +173,6 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 			err_item->value = malloc(10); /* should be enough for any number */
 			snprintf(err_item->value, 10, "%ld",
 					*((long *) c_error->value._value));
-		}
-		else if (CORBA_TypeCode_equal(c_error->value._type,
-					TC_ccReg_timestamp, ev) ||
-				CORBA_TypeCode_equal(c_error->value._type,
-					TC_CORBA_unsigned_long_long, ev))
-		{
-			err_item->value = malloc(30);
-			get_rfc3339_date( *((unsigned long long *) c_error->value._value),
-					err_item->value);
 		}
 		else
 			err_item->value = strdup("Unknown value type");
@@ -273,17 +304,19 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 }
 
 int
-epp_call_hello(epp_corba_globs *globs, char *buf, unsigned len)
+epp_call_hello(epp_corba_globs *globs, char *version_buf,
+		unsigned versionbuf_len, char *curdate_buf, unsigned curdatebuf_len)
 {
 	CORBA_Environment ev[1];
 	CORBA_string version;
+	CORBA_string curdate;
 	int	retr;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
 		CORBA_exception_init(ev);
 
-		version = ccReg_EPP_version(globs->service, ev);
+		version = ccReg_EPP_version(globs->service, &curdate, ev);
 
 		/* if COMM_FAILURE exception is not raised then quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
@@ -297,9 +330,11 @@ epp_call_hello(epp_corba_globs *globs, char *buf, unsigned len)
 	}
 	CORBA_exception_free(ev);
 
-	strncpy(buf, version, len - 1);
-	/* just want to be sure the string is NULL terminated in any case */
-	buf[len] = '\0';
+	strncpy(version_buf, version, versionbuf_len - 1);
+	strncpy(curdate_buf, curdate, curdatebuf_len - 1);
+	/* just want to be sure the strings are NULL terminated in any case */
+	version_buf[versionbuf_len] = '\0';
+	curdate_buf[curdatebuf_len] = '\0';
 	CORBA_free(version);
 	return 1;
 }
@@ -725,9 +760,9 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 	cdata->out->info_contact.clID = strdup(c_contact->ClID);
 	cdata->out->info_contact.crID = strdup(c_contact->CrID);
 	cdata->out->info_contact.upID = strdup(c_contact->UpID);
-	cdata->out->info_contact.crDate = c_contact->CrDate;
-	cdata->out->info_contact.upDate = c_contact->UpDate;
-	cdata->out->info_contact.trDate = c_contact->TrDate;
+	cdata->out->info_contact.crDate = strdup(c_contact->CrDate);
+	cdata->out->info_contact.upDate = strdup(c_contact->UpDate);
+	cdata->out->info_contact.trDate = strdup(c_contact->TrDate);
 	/* contact status */
 	CL_NEW(cdata->out->info_contact.status);
 	for (i = 0; i < c_contact->stat._length; i++) {
@@ -777,12 +812,20 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 	}
 	/* disclose info */
 	discl = cdata->out->info_contact.discl;
-	discl->name = (c_contact->DiscloseName == ccReg_DISCL_HIDE) ? 1 : 0;
-	discl->org = (c_contact->DiscloseOrganization == ccReg_DISCL_HIDE) ? 1 : 0;
-	discl->addr = (c_contact->DiscloseAddress == ccReg_DISCL_HIDE) ? 1 : 0;
-	discl->voice = (c_contact->DiscloseTelephone == ccReg_DISCL_HIDE) ? 1 : 0;
-	discl->fax = (c_contact->DiscloseFax == ccReg_DISCL_HIDE) ? 1 : 0;
-	discl->email = (c_contact->DiscloseEmail == ccReg_DISCL_HIDE) ? 1 : 0;
+	if (c_contact->DiscloseFlag == ccReg_DISCL_HIDE)
+		discl->flag = 0;
+	else if (c_contact->DiscloseFlag == ccReg_DISCL_DISPLAY)
+		discl->flag = 1;
+	else discl->flag = -1;
+	/* init discl values only if there is exceptional behaviour */
+	if (discl->flag != -1) {
+		discl->name = (c_contact->DiscloseName == CORBA_TRUE) ? 1 : 0;
+		discl->org = (c_contact->DiscloseOrganization == CORBA_TRUE) ? 1 : 0;
+		discl->addr = (c_contact->DiscloseAddress == CORBA_TRUE) ? 1 : 0;
+		discl->voice = (c_contact->DiscloseTelephone == CORBA_TRUE) ? 1 : 0;
+		discl->fax = (c_contact->DiscloseFax == CORBA_TRUE) ? 1 : 0;
+		discl->email = (c_contact->DiscloseEmail == CORBA_TRUE) ? 1 : 0;
+	}
 
 	CORBA_free(c_contact);
 
@@ -884,10 +927,10 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 	cdata->out->info_domain.clID = strdup(c_domain->ClID);
 	cdata->out->info_domain.crID = strdup(c_domain->CrID);
 	cdata->out->info_domain.upID = strdup(c_domain->UpID);
-	cdata->out->info_domain.crDate = c_domain->CrDate;
-	cdata->out->info_domain.upDate = c_domain->UpDate;
-	cdata->out->info_domain.trDate = c_domain->TrDate;
-	cdata->out->info_domain.exDate = c_domain->ExDate;
+	cdata->out->info_domain.crDate = strdup(c_domain->CrDate);
+	cdata->out->info_domain.upDate = strdup(c_domain->UpDate);
+	cdata->out->info_domain.trDate = strdup(c_domain->TrDate);
+	cdata->out->info_domain.exDate = strdup(c_domain->ExDate);
 
 	cdata->out->info_domain.registrant = strdup(c_domain->Registrant);
 	cdata->out->info_domain.nsset = strdup(c_domain->nsset);
@@ -1020,9 +1063,9 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 	cdata->out->info_nsset.clID = strdup(c_nsset->ClID);
 	cdata->out->info_nsset.crID = strdup(c_nsset->CrID);
 	cdata->out->info_nsset.upID = strdup(c_nsset->UpID);
-	cdata->out->info_nsset.crDate = c_nsset->CrDate;
-	cdata->out->info_nsset.upDate = c_nsset->UpDate;
-	cdata->out->info_nsset.trDate = c_nsset->TrDate;
+	cdata->out->info_nsset.crDate = strdup(c_nsset->CrDate);
+	cdata->out->info_nsset.upDate = strdup(c_nsset->UpDate);
+	cdata->out->info_nsset.trDate = strdup(c_nsset->TrDate);
 	cdata->out->info_nsset.authInfo = strdup(c_nsset->AuthInfoPw);
 
 	/* allocate and initialize status list */
@@ -1089,7 +1132,7 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	CORBA_Environment	ev[1];
 	CORBA_short	c_count;
 	CORBA_long	c_msgID;
-	ccReg_timestamp	c_qdate;
+	CORBA_string	c_qdate;
 	CORBA_char	*c_msg;
 	int	retr;
 
@@ -1138,7 +1181,7 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 
 	cdata->out->poll_req.count = c_count;
 	cdata->out->poll_req.msgid = c_msgID;
-	cdata->out->poll_req.qdate = c_qdate;
+	cdata->out->poll_req.qdate = strdup(c_qdate);
 	cdata->out->poll_req.msg = strdup(c_msg);
 
 	CORBA_free(c_msg);
@@ -1236,8 +1279,8 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	ccReg_timestamp	c_crDate;
-	ccReg_timestamp	c_exDate;
+	CORBA_string	c_crDate;
+	CORBA_string	c_exDate;
 	ccReg_Response *response;
 	ccReg_AdminContact	*c_admin;
 	ccReg_ExtensionList	*c_ext_list;
@@ -1257,11 +1300,11 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->create_domain.admin));
 	c_ext_list = ccReg_ExtensionList__alloc();
 	/* fill extension list if needed */
-	if (cdata->in->create_domain.valExDate != 0) {
+	if (*cdata->in->create_domain.valExDate != '\0') {
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();
-		c_enumval->valExDate = cdata->in->create_domain.valExDate;
+		c_enumval->valExDate = strdup(cdata->in->create_domain.valExDate);
 		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
 		c_ext_list->_maximum = c_ext_list->_length = 1;
 		c_ext_list->_release = CORBA_TRUE;
@@ -1319,8 +1362,8 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		return CORBA_INT_ERROR;
 	}
 
-	cdata->out->create.crDate = c_crDate;
-	cdata->out->create.exDate = c_exDate;
+	cdata->out->create.crDate = strdup(c_crDate);
+	cdata->out->create.exDate = strdup(c_exDate);
 
 	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
@@ -1350,6 +1393,24 @@ convSSNType(epp_ssnType our_ssn)
 }
 
 /**
+ * Function for conversion of our disclose flag to IDL's disclose flag.
+ * @param flag Disclose flag to be converted.
+ * @return Disclose flag of type defined in IDL.
+ */
+static ccReg_Disclose
+convDiscl(char flag)
+{
+	switch (flag) {
+		case  1: return ccReg_DISCL_HIDE; break;
+		case  0: return ccReg_DISCL_DISPLAY; break;
+		case -1: return ccReg_DISCL_EMPTY; break;
+		default: assert(0); break;
+	}
+	/* never reached */
+	return ccReg_DISCL_EMPTY;
+}
+
+/**
  * EPP create contact.
  *
  * @param globs Corba context.
@@ -1362,7 +1423,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	ccReg_timestamp	c_crDate;
+	CORBA_string	c_crDate;
 	ccReg_ContactChange	*c_contact;
 	ccReg_Response *response;
 	int	retr;
@@ -1376,23 +1437,21 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	c_contact->Fax = CORBA_string_dup(cdata->in->create_contact.fax);
 	c_contact->Email = CORBA_string_dup(cdata->in->create_contact.email);
 	c_contact->NotifyEmail =
-		CORBA_string_dup(cdata->in->create_contact.notify_email);
+			CORBA_string_dup(cdata->in->create_contact.notify_email);
 	c_contact->VAT = CORBA_string_dup(cdata->in->create_contact.vat);
 	c_contact->SSN = CORBA_string_dup(cdata->in->create_contact.ssn);
 	c_contact->SSNtype = convSSNType(cdata->in->create_contact.ssntype);
 	/* disclose */
-	c_contact->DiscloseName = (cdata->in->create_contact.discl->name ?
-			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
-	c_contact->DiscloseOrganization = (cdata->in->create_contact.discl->org ?
-			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
-	c_contact->DiscloseAddress = (cdata->in->create_contact.discl->addr ?
-			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
-	c_contact->DiscloseTelephone = (cdata->in->create_contact.discl->voice ?
-			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
-	c_contact->DiscloseFax = (cdata->in->create_contact.discl->fax ?
-			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
-	c_contact->DiscloseEmail = (cdata->in->create_contact.discl->email ?
-			ccReg_DISCL_HIDE : ccReg_DISCL_DISPLAY);
+	c_contact->DiscloseFlag = convDiscl(cdata->in->create_contact.discl->flag);
+	if (c_contact->DiscloseFlag != ccReg_DISCL_EMPTY) {
+		epp_discl	*discl = cdata->in->create_contact.discl;
+		c_contact->DiscloseName = (discl->name ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseOrganization = (discl->org ? CORBA_TRUE :CORBA_FALSE);
+		c_contact->DiscloseAddress = (discl->addr ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseTelephone = (discl->voice ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseFax = (discl->fax ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseEmail = (discl->email ? CORBA_TRUE : CORBA_FALSE);
+	}
 	/* postal info */
 	c_contact->Name =
 		CORBA_string_dup(cdata->in->create_contact.postalInfo->name);
@@ -1455,7 +1514,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 		return CORBA_INT_ERROR;
 	}
 
-	cdata->out->create.crDate = c_crDate;
+	cdata->out->create.crDate = strdup(c_crDate);
 
 	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
@@ -1482,7 +1541,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 	ccReg_Response *response;
 	ccReg_DNSHost	*c_dnshost;
 	ccReg_TechContact	*c_tech;
-	ccReg_timestamp	c_crDate;
+	CORBA_string	c_crDate;
 	int	len, i, j, retr;
 
 	assert(cdata->in != NULL);
@@ -1564,7 +1623,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 		return CORBA_INT_ERROR;
 	}
 
-	cdata->out->create.crDate = c_crDate;
+	cdata->out->create.crDate = strdup(c_crDate);
 
 	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
@@ -1667,7 +1726,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
-	ccReg_timestamp	c_exDate;
+	CORBA_string	c_exDate;
 	ccReg_ExtensionList	*c_ext_list;
 	int	retr;
 
@@ -1678,7 +1737,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();
-		c_enumval->valExDate = cdata->in->renew.valExDate;
+		c_enumval->valExDate = strdup(cdata->in->renew.valExDate);
 		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
 		c_ext_list->_maximum = c_ext_list->_length = 1;
 		c_ext_list->_release = CORBA_TRUE;
@@ -1730,7 +1789,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
-	cdata->out->renew.exDate = c_exDate;
+	cdata->out->renew.exDate = strdup(c_exDate);
 
 	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
@@ -1810,7 +1869,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();
-		c_enumval->valExDate = cdata->in->update_domain.valExDate;
+		c_enumval->valExDate = strdup(cdata->in->update_domain.valExDate);
 		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
 		c_ext_list->_maximum = c_ext_list->_length = 1;
 		c_ext_list->_release = CORBA_TRUE;
@@ -1873,24 +1932,6 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 
 	CORBA_free(response);
 	return CORBA_OK;
-}
-
-/**
- * Function for conversion of our disclose flag to IDL's disclose flag.
- * @param flag Disclose flag to be converted.
- * @return Disclose flag of type defined in IDL.
- */
-static ccReg_Disclose
-convDiscl(char flag)
-{
-	switch (flag) {
-		case  1: return ccReg_DISCL_HIDE; break;
-		case  0: return ccReg_DISCL_DISPLAY; break;
-		case -1: return ccReg_DISCL_EMPTY; break;
-		default: assert(0); break;
-	}
-	/* never reached */
-	return ccReg_DISCL_EMPTY;
 }
 
 /**
@@ -1963,14 +2004,16 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 	c_contact->VAT = CORBA_string_dup(cdata->in->update_contact.vat);
 	c_contact->SSN = CORBA_string_dup(cdata->in->update_contact.ssn);
 	c_contact->SSNtype = convSSNType(cdata->in->update_contact.ssntype);
-	{
+	/* disclose */
+	c_contact->DiscloseFlag = convDiscl(cdata->in->update_contact.discl->flag);
+	if (c_contact->DiscloseFlag != ccReg_DISCL_EMPTY) {
 		epp_discl	*discl = cdata->in->update_contact.discl;
-		c_contact->DiscloseName = convDiscl(discl->name);
-		c_contact->DiscloseOrganization = convDiscl(discl->org);
-		c_contact->DiscloseAddress = convDiscl(discl->addr);
-		c_contact->DiscloseTelephone = convDiscl(discl->voice);
-		c_contact->DiscloseFax = convDiscl(discl->fax);
-		c_contact->DiscloseEmail = convDiscl(discl->email);
+		c_contact->DiscloseName = (discl->name ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseOrganization = (discl->org ? CORBA_TRUE :CORBA_FALSE);
+		c_contact->DiscloseAddress = (discl->addr ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseTelephone = (discl->voice ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseFax = (discl->fax ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseEmail = (discl->email ? CORBA_TRUE : CORBA_FALSE);
 	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {

@@ -149,6 +149,7 @@ int main(int argc, char *argv[])
 	corba_status	cstat;
 	gen_status	gstat;
 	char version_buf[101];
+	char curdate_buf[51];
 	char fp[] = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
 	unsigned long long notused1, notused2;
 	void	*schema;
@@ -161,17 +162,17 @@ int main(int argc, char *argv[])
 		fputs("Could not read IOR\n", stderr);
 		return 1;
 	}
-	if ((corba_globs = epp_corba_init(ior)) == NULL) {
+	if ((corba_globs = epp_corba_init("localhost", "EPP")) == NULL) {
 		fputs("Error in corba initialization\n", stderr);
 		return 1;
 	}
 
 	/* API: greeting */
-	if (epp_call_hello(corba_globs, version_buf, 100) == 0) {
+	if (epp_call_hello(corba_globs, version_buf, 100, curdate_buf, 50) == 0) {
 		fputs("Could not get version from CR\n", stderr);
 		return 1;
 	}
-	gstat = epp_gen_greeting(version_buf, &greeting);
+	gstat = epp_gen_greeting(version_buf, curdate_buf, &greeting);
 	if (gstat != GEN_OK) {
 		fputs("Error in greeting generator\n", stderr);
 		return 1;
@@ -232,11 +233,12 @@ int main(int argc, char *argv[])
 				strlen(text), &cdata, &notused1, &notused2);
 		if (pstat == PARSER_HELLO) {
 			/* API: greeting */
-			if (epp_call_hello(corba_globs, version_buf, 100) == 0) {
+			if (epp_call_hello(corba_globs, version_buf, 100, curdate_buf, 50)
+					== 0) {
 				fputs("Could not get version from CR\n", stderr);
 				return 1;
 			}
-			gstat = epp_gen_greeting(version_buf, &greeting);
+			gstat = epp_gen_greeting(version_buf, curdate_buf, &greeting);
 			if (gstat != GEN_OK) {
 				fputs("Error when creating epp greeting\n", stderr);
 				return 1;

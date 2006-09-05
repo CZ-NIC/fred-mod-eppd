@@ -43,11 +43,12 @@ typedef struct {
  * Routine makes up epp greeting frame.
  *
  * @param svid Part of server ID used in svid tag.
+ * @param date Current date as returned from server.
  * @param greeting Greeting string.
  * @return Generator status.
  */
 gen_status
-epp_gen_greeting(const char *svid, char **greeting);
+epp_gen_greeting(const char *svid, const char *date, char **greeting);
 
 /**
  * Generate command response in XML format. There is option that response

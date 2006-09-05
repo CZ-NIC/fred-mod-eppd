@@ -395,24 +395,6 @@ void epp_parser_init_cleanup(void *schema)
 }
 
 /**
- * Convert string with date to number of seconds since ...
- * @param str Date in string format.
- * @return Number of seconds.
- */
-static unsigned long long
-str2timestamp(const char *str)
-{
-	struct tm t;
-	char	buf[20];
-
-	bzero(&t, sizeof t);
-	snprintf(buf, 19, "%s UTC", str);
-	strptime(buf, "%Y-%m-%d %z", &t);
-	/* XXX is timegm thread-safe? */
-	return timegm(&t);
-}
-
-/**
  * Parser of EPP login command.
  * @param doc Parsed XML document.
  * @param xpathCtx XPath context.
@@ -841,11 +823,8 @@ parse_create_domain(
 	xpathCtx->node = xpathCtx->node->parent->parent;
 
 	/* enumval extension */
-	XPATH_TAKE1(str, doc, xpathCtx, error_cd,
+	XPATH_TAKE1(cdata->in->create_domain.valExDate, doc, xpathCtx, error_cd,
 			"epp:extension/enumval:create/enumval:valExDate");
-	if (*str != '\0')
-		cdata->in->create_domain.valExDate = str2timestamp(str);
-	free(str);
 
 	/* secDNS extension */
 	XPATH_EVAL(xpathObj, xpathCtx, error_cd,
@@ -927,6 +906,7 @@ error_cd:
 		free(CL_CONTENT(cdata->in->create_domain.ds));
 	}
 	cl_purge(cdata->in->create_domain.ds);
+	FREENULL(cdata->in->create_domain.valExDate);
 
 	free(cdata->in);
 	cdata->in = NULL;
@@ -1026,9 +1006,17 @@ parse_create_contact(
 	}
 	xmlXPathFreeObject(xpathObj);
 
-	/* disclose info */
+	/*
+	 * disclose flags - we don't interpret anyhow disclose flags, we just
+	 * send the values to CR and CR decides in conjuction with default
+	 * server policy what to do
+	 */
 	if (xpath_exists(xpathCtx, "contact:disclose[@flag='0']"))
-	{
+		cdata->in->create_contact.discl->flag = 0;
+	if (xpath_exists(xpathCtx, "contact:disclose[@flag='1']"))
+		cdata->in->create_contact.discl->flag = 1;
+	else cdata->in->create_contact.discl->flag = -1;
+	if (cdata->in->create_contact.discl->flag != -1) {
 		cdata->in->create_contact.discl->name = xpath_exists(xpathCtx,
 				"contact:disclose/contact:name");
 		cdata->in->create_contact.discl->org = xpath_exists(xpathCtx,
@@ -1331,6 +1319,74 @@ error_d:
 }
 
 /**
+ * Parser of EPP renew command.
+ * @param doc Parsed XML document.
+ * @param xpathCtx XPath context.
+ * @param cdata Output of parsing stage.
+ */
+static void
+parse_renew(
+		xmlDocPtr doc,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	xmlXPathObjectPtr	xpathObj;
+	char	*str;
+
+	/* allocate necessary structures */
+	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	/* get renew data */
+	XPATH_REQ1(cdata->in->renew.name, doc, xpathCtx, error_r,
+		"epp:renew/domain:renew/domain:name");
+	XPATH_REQ1(cdata->in->renew.exDate, doc, xpathCtx, error_r,
+		"epp:renew/domain:renew/domain:curExpDate");
+	/* domain period handling is slightly more difficult */
+	XPATH_EVAL(xpathObj, xpathCtx, error_r,
+			"epp:renew/domain:renew/domain:period");
+	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
+		str = (char *) xmlNodeListGetString(doc, xmlXPathNodeSetItem(
+					xpathObj->nodesetval, 0)->xmlChildrenNode, 1);
+		assert(str != NULL && *str != '\0');
+		cdata->in->renew.period = atoi(str);
+		free(str);
+		/* correct period value if given in years and not months */
+		str = (char *) xmlGetProp(
+				xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
+				BAD_CAST "unit");
+		assert(str != NULL);
+		if (*str == 'y') cdata->in->renew.period *= 12;
+		free(str);
+	}
+	/*
+	 * value 0 means that the period was not given and default value
+	 * should be used instead
+	 */
+	else cdata->in->renew.period = 0;
+
+	xmlXPathFreeObject(xpathObj);
+
+	/* enumval extension */
+	XPATH_TAKE1(cdata->in->renew.valExDate, doc, xpathCtx, error_r,
+			"epp:extension/enumval:renew/enumval:valExDate");
+
+	cdata->type = EPP_RENEW_DOMAIN;
+	return;
+
+error_r:
+	/* nasty error's epilog */
+	FREENULL(cdata->in->renew.name);
+	FREENULL(cdata->in->renew.exDate);
+	free(cdata->in);
+	cdata->in = NULL;
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
+/**
  * Parser of EPP update-domain command.
  * @param doc Parsed XML document.
  * @param xpathCtx XPath context.
@@ -1455,11 +1511,8 @@ parse_update_domain(
 	xpathCtx->node = xpathCtx->node->parent->parent;
 
 	/* enumval extension */
-	XPATH_TAKE1(str, doc, xpathCtx, error_ud,
+	XPATH_TAKE1(cdata->in->update_domain.valExDate, doc, xpathCtx, error_ud,
 			"epp:extension/enumval:update/enumval:chg/enumval:valExDate");
-	if (*str != '\0')
-		cdata->in->update_domain.valExDate = str2timestamp(str);
-	free(str);
 
 	/* secDNS extension */
 	XPATH_EVAL(xpathObj, xpathCtx, error_ud, "epp:extension/secdns:update");
@@ -1613,6 +1666,7 @@ error_ud:
 	cl_purge(cdata->in->update_domain.rem_status);
 
 	/* clear the extensions */
+	FREENULL(cdata->in->update_domain.valExDate);
 	CL_FOREACH(cdata->in->update_domain.chg_ds) {
 		FREENULL(((epp_ds *)
 					CL_CONTENT(cdata->in->update_domain.chg_ds))->digest);
@@ -1797,11 +1851,16 @@ parse_update_contact(
 	XPATH_TAKE1_UPD(cdata->in->update_contact.vat, doc, xpathCtx, error_uc,
 			"contact:chg/contact:vat");
 	/*
-	 * there can be just one disclose section, now it depens if with flag
+	 * there can be just one disclose section, now it depens if the flag is
 	 * 0 or 1
 	 */
 	if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[@flag='0']"))
-	{
+		cdata->in->update_contact.discl->flag = 0;
+	else if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[@flag='1']"))
+		cdata->in->update_contact.discl->flag = 1;
+	else cdata->in->update_contact.discl->flag = -1;
+
+	if (cdata->in->update_contact.discl->flag != -1) {
 		cdata->in->update_contact.discl->name = xpath_exists(xpathCtx,
 				"contact:chg/contact:disclose/contact:name");
 		cdata->in->update_contact.discl->org = xpath_exists(xpathCtx,
@@ -1814,29 +1873,6 @@ parse_update_contact(
 				"contact:chg/contact:disclose/contact:fax");
 		cdata->in->update_contact.discl->email = xpath_exists(xpathCtx,
 				"contact:chg/contact:disclose/contact:email");
-	}
-	else if (xpath_exists(xpathCtx, "contact:chg/contact:disclose[@flag='1']"))
-	{
-		/*
-		 * disclose with flag 1 is non-sense (literally to specify attributes
-		 * which should be disclosed - handled exceptionally - when server's
-		 * default policy is to disclose all, doesn't make any sence.
-		 */
-		cdata->in->update_contact.discl->name = 0;
-		cdata->in->update_contact.discl->org = 0;
-		cdata->in->update_contact.discl->addr = 0;
-		cdata->in->update_contact.discl->voice = 0;
-		cdata->in->update_contact.discl->fax = 0;
-		cdata->in->update_contact.discl->email = 0;
-	}
-	else {
-		/* fill discl with value "not updated" -1 */
-		cdata->in->update_contact.discl->name = -1;
-		cdata->in->update_contact.discl->org = -1;
-		cdata->in->update_contact.discl->addr = -1;
-		cdata->in->update_contact.discl->voice = -1;
-		cdata->in->update_contact.discl->fax = -1;
-		cdata->in->update_contact.discl->email = -1;
 	}
 	/* is there postalInfo section ? */
 	if (xpath_exists(xpathCtx,
@@ -2206,79 +2242,6 @@ parse_update(
 	return;
 
 error_u:
-	cdata->in = NULL;
-	cdata->rc = 2400;
-	cdata->type = EPP_DUMMY;
-}
-
-/**
- * Parser of EPP renew command.
- * @param doc Parsed XML document.
- * @param xpathCtx XPath context.
- * @param cdata Output of parsing stage.
- */
-static void
-parse_renew(
-		xmlDocPtr doc,
-		xmlXPathContextPtr xpathCtx,
-		epp_command_data *cdata)
-{
-	xmlXPathObjectPtr	xpathObj;
-	char	*str;
-
-	/* allocate necessary structures */
-	if ((cdata->in = calloc(1, sizeof (*cdata->in))) == NULL) {
-		cdata->rc = 2400;
-		cdata->type = EPP_DUMMY;
-		return;
-	}
-	/* get renew data */
-	XPATH_REQ1(cdata->in->renew.name, doc, xpathCtx, error_r,
-		"epp:renew/domain:renew/domain:name");
-	XPATH_REQ1(str, doc, xpathCtx, error_r,
-		"epp:renew/domain:renew/domain:curExpDate");
-	cdata->in->renew.exDate = str2timestamp(str);
-	free(str);
-	/* domain period handling is slightly more difficult */
-	XPATH_EVAL(xpathObj, xpathCtx, error_r,
-			"epp:renew/domain:renew/domain:period");
-	if (xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1) {
-		str = (char *) xmlNodeListGetString(doc, xmlXPathNodeSetItem(
-					xpathObj->nodesetval, 0)->xmlChildrenNode, 1);
-		assert(str != NULL && *str != '\0');
-		cdata->in->renew.period = atoi(str);
-		free(str);
-		/* correct period value if given in years and not months */
-		str = (char *) xmlGetProp(
-				xmlXPathNodeSetItem(xpathObj->nodesetval, 0),
-				BAD_CAST "unit");
-		assert(str != NULL);
-		if (*str == 'y') cdata->in->renew.period *= 12;
-		free(str);
-	}
-	/*
-	 * value 0 means that the period was not given and default value
-	 * should be used instead
-	 */
-	else cdata->in->renew.period = 0;
-
-	xmlXPathFreeObject(xpathObj);
-
-	/* enumval extension */
-	XPATH_TAKE1(str, doc, xpathCtx, error_r,
-			"epp:extension/enumval:renew/enumval:valExDate");
-	if (*str != '\0') {
-		cdata->in->renew.valExDate = str2timestamp(str);
-	}
-	free(str);
-
-	cdata->type = EPP_RENEW_DOMAIN;
-	return;
-
-error_r:
-	/* nasty error's epilog */
-	FREENULL(cdata->in->renew.name);
-	free(cdata->in);
 	cdata->in = NULL;
 	cdata->rc = 2400;
 	cdata->type = EPP_DUMMY;
@@ -2772,13 +2735,16 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(cdata->out->info_contact.voice);
 				free(cdata->out->info_contact.fax);
 				free(cdata->out->info_contact.email);
-				free(cdata->out->info_contact.notify_email);	/* ext */
+				free(cdata->out->info_contact.notify_email);
 				free(cdata->out->info_contact.clID);
 				free(cdata->out->info_contact.crID);
 				free(cdata->out->info_contact.upID);
+				free(cdata->out->info_contact.crDate);
+				free(cdata->out->info_contact.upDate);
+				free(cdata->out->info_contact.trDate);
 				free(cdata->out->info_contact.authInfo);
-				free(cdata->out->info_contact.vat);	/* ext */
-				free(cdata->out->info_contact.ssn);	/* ext */
+				free(cdata->out->info_contact.vat);
+				free(cdata->out->info_contact.ssn);
 				/* status */
 				CL_RESET(cdata->out->info_contact.status);
 				CL_FOREACH(cdata->out->info_contact.status)
@@ -2813,6 +2779,10 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(cdata->out->info_domain.clID);
 				free(cdata->out->info_domain.crID);
 				free(cdata->out->info_domain.upID);
+				free(cdata->out->info_domain.crDate);
+				free(cdata->out->info_domain.exDate);
+				free(cdata->out->info_domain.upDate);
+				free(cdata->out->info_domain.trDate);
 				free(cdata->out->info_domain.authInfo);
 				/* status */
 				CL_RESET(cdata->out->info_domain.status);
@@ -2843,6 +2813,9 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(cdata->out->info_nsset.clID);
 				free(cdata->out->info_nsset.crID);
 				free(cdata->out->info_nsset.upID);
+				free(cdata->out->info_nsset.crDate);
+				free(cdata->out->info_nsset.upDate);
+				free(cdata->out->info_nsset.trDate);
 				free(cdata->out->info_nsset.authInfo);
 				/* ns */
 				CL_RESET(cdata->out->info_nsset.ns);
@@ -2881,6 +2854,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(CL_CONTENT(cdata->in->create_domain.admin));
 			cl_purge(cdata->in->create_domain.admin);
 			/* clear the extensions */
+			free(cdata->in->create_domain.valExDate);
 			assert(cdata->in->create_domain.ds != NULL);
 			CL_FOREACH(cdata->in->create_domain.ds) {
 				epp_ds	*ds = (epp_ds *) CL_CONTENT(cdata->in->create_domain.ds);
@@ -2889,6 +2863,10 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(ds);
 			}
 			cl_purge(cdata->in->create_domain.ds);
+			if (cdata->out != NULL) {
+				free(cdata->out->create.crDate);
+				free(cdata->out->create.exDate);
+			}
 			break;
 		case EPP_CREATE_CONTACT:
 			assert(cdata->in != NULL);
@@ -2916,6 +2894,9 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			}
 			assert(cdata->in->create_contact.discl != NULL);
 			free(cdata->in->create_contact.discl);
+			if (cdata->out != NULL) {
+				free(cdata->out->create.crDate);
+			}
 			break;
 		case EPP_CREATE_NSSET:
 			assert(cdata->in != NULL);
@@ -2933,6 +2914,9 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(ns);
 			}
 			cl_purge(cdata->in->create_nsset.ns);
+			if (cdata->out != NULL) {
+				free(cdata->out->create.crDate);
+			}
 			break;
 		case EPP_DELETE_DOMAIN:
 		case EPP_DELETE_CONTACT:
@@ -2944,6 +2928,11 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 		case EPP_RENEW_DOMAIN:
 			assert(cdata->in != NULL);
 			free(cdata->in->renew.name);
+			free(cdata->in->renew.exDate);
+			free(cdata->in->renew.valExDate);
+			if (cdata->out != NULL) {
+				free(cdata->out->renew.exDate);
+			}
 			break;
 		case EPP_UPDATE_DOMAIN:
 			assert(cdata->in != NULL);
@@ -2971,6 +2960,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				free(CL_CONTENT(cdata->in->update_domain.rem_status));
 			cl_purge(cdata->in->update_domain.rem_status);
 			/* clear the extensions */
+			free(cdata->in->update_domain.valExDate);
 			assert(cdata->in->update_domain.chg_ds != NULL);
 			assert(cdata->in->update_domain.add_ds != NULL);
 			assert(cdata->in->update_domain.rem_ds != NULL);
@@ -3091,6 +3081,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			break;
 		case EPP_POLL_REQ:
 			if (cdata->out != NULL)
+				free(cdata->out->poll_req.qdate);
 				free(cdata->out->poll_req.msg);
 			break;
 		case EPP_POLL_ACK:

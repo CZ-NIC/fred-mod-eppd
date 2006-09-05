@@ -78,7 +78,6 @@
 #include "epp_common.h"
 #include "epp_parser.h"
 #include "epp_gen.h"
-#include "epp_version.h"
 #include "epp-client.h"
 
 /** Length of EPP header containing message size. */
@@ -119,7 +118,8 @@ typedef enum {
 typedef struct {
 	int	epp_enabled;	/**< Decides whether mod_eppd is enabled for host. */
 	char	*servername;	/**< Epp server name used in <greeting> frame. */
-	char	*ior;	/**< CORBA object's reference. */
+	char	*ns_loc;	/**< Location of CORBA nameservice. */
+	char	*object;	/**< Name under which is object known to nameservice. */
 	void	*schema;	/**< URL of EPP schema (use just path). */
 	int	valid_resp;	/**< Validate responses before sending them to client. */
 	epp_corba_globs	*corba_globs;	/**< Variables needed for corba submodule. */
@@ -556,10 +556,12 @@ static int epp_process_connection(conn_rec *c)
 		if (pstat == PARSER_HELLO) {
 			int	rc;
 			char	version_buf[101];
+			char	curdate_buf[51];
 			gen_status	gstat;	/* generator's return code */
 
 			/* get info from CR used in <greeting> frame */
-			rc = epp_call_hello(sc->corba_globs, version_buf, 100);
+			rc = epp_call_hello(sc->corba_globs, version_buf, 100,
+					curdate_buf, 50);
 
 			if (rc == 0) {
 				epplog(c, rpool, session, EPP_ERROR,
@@ -573,10 +575,8 @@ static int epp_process_connection(conn_rec *c)
 			 * from corba server through version() function)
 			 */
 			gstat = epp_gen_greeting(
-					apr_pstrcat(rpool, sc->servername,
-						" (", version_buf, ")",
-						NULL),
-					&gen.response);
+					apr_pstrcat(rpool,sc->servername," (",version_buf,")",NULL),
+					curdate_buf, &gen.response);
 			if (gstat != GEN_OK) {
 				epplog(c, rpool, session, EPP_FATAL,
 						"Error when creating epp greeting");
@@ -826,7 +826,31 @@ static void epp_init_child_hook(apr_pool_t *p, server_rec *s)
 }
 
 /**
- * In post config hook is check consistensy of configuration (required
+ * Cleanup routine, is merely wrapper around epp_corba_init_cleanup().
+ *
+ * @param data Corba globs.
+ * @return Always 0.
+ */
+static int epp_cleanup_corba(void *data)
+{
+	epp_corba_init_cleanup((epp_corba_globs *) data);
+	return 0;
+}
+
+/**
+ * Cleanup routine, is merely wrapper around epp_parser_init_cleanup().
+ *
+ * @param data XML schema.
+ * @return Always 0.
+ */
+static int epp_cleanup_xml(void *data)
+{
+	epp_parser_init_cleanup(data);
+	return 0;
+}
+
+/**
+ * In post config hook is check consistency of configuration (required
  * parameters, default values of parameters), components are initialized,
  * log file is setted up ...
  *
@@ -883,33 +907,39 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 				&eppd_module);
 
 		if (sc->epp_enabled) {
-			if (sc->ior == NULL) {
-				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
-						"IOR not configured");
-				return HTTP_INTERNAL_SERVER_ERROR;
-			}
-			if (sc->schema == NULL) {
-				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
-						"EPP schema not configured");
-				return HTTP_INTERNAL_SERVER_ERROR;
-			}
 			if (sc->servername == NULL) {
-				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+				ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
 						"EPP Servername not configured");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-			/* set default loglevel */
-			if (sc->loglevel == 0) sc->loglevel = EPP_INFO;
+			if (sc->schema == NULL) {
+				ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+						"EPP schema not configured");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+			/* register cleanup for xml */
+			apr_pool_cleanup_register(p, sc->schema, epp_cleanup_xml,
+					apr_pool_cleanup_null);
+			/* set default values for object lookup data */
+			if (sc->ns_loc == NULL)
+				sc->ns_loc = apr_pstrdup(p, "localhost");
+			if (sc->object == NULL)
+				sc->object = apr_pstrdup(p, "EPP");
 			/*
 			 * do initialization of corba
 			 */
-			corba_globs = epp_corba_init(sc->ior);
+			corba_globs = epp_corba_init(sc->ns_loc, sc->object);
 			if (corba_globs == NULL) {
-				ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+				ap_log_error(APLOG_MARK, APLOG_CRIT, 0, s,
 						"Corba initialization failed");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 			sc->corba_globs = corba_globs;
+			/* register cleanup for corba globs */
+			apr_pool_cleanup_register(p, sc->corba_globs, epp_cleanup_corba,
+					apr_pool_cleanup_null);
+			/* set default loglevel */
+			if (sc->loglevel == 0) sc->loglevel = EPP_INFO;
 
 			/*
 			 * open epp log file (if configured to do so)
@@ -936,7 +966,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 	}
 	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
 		"mod_eppd started (mod_eppd version %s, SVN revision %s, BUILT %s %s)",
-				MODEPPD_VERSION, SVN_REV, __DATE__, __TIME__);
+				PACKAGE_VERSION, SVN_REV, __DATE__, __TIME__);
 
 	return OK;
 }
@@ -966,24 +996,18 @@ static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
 }
 
 /**
- * Handler for apache's configuration directive "EPPiorfile".
- * The ior is read from the file right here and stays in use for life-time
- * of apache. Therefore if you want to change IOR then you should also
- * restart apache.
+ * Handler for apache's configuration directive "EPPNameservice".
+ * Sets the host and optional port where nameservice runs.
  *
  * @param cmd Command structure.
  * @param dummy Not used parameter.
- * @param a1 The filename with corba object reference.
+ * @param ns_loc The host [port] of nameservice.
  * @return Error string in case of failure otherwise NULL.
  */
-static const char *set_iorfile(cmd_parms *cmd, void *dummy,
-		const char *iorfile)
+static const char *set_ns_loc(cmd_parms *cmd, void *dummy,
+		const char *ns_loc)
 {
 	const char *err;
-	char	buf[1001]; /* should be enough for ior */
-	apr_file_t	*f;
-	apr_size_t	nbytes;
-	apr_status_t	status;
 	server_rec *s = cmd->server;
 	eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(s->module_config, &eppd_module);
@@ -992,34 +1016,53 @@ static const char *set_iorfile(cmd_parms *cmd, void *dummy,
     if (err) return err;
 
 	/*
-	 * catch double definition of iorfile
+	 * catch double definition of location
 	 * that's not serious fault so we will just print message in log
 	 */
-	if (sc->ior != NULL) {
+	if (sc->ns_loc != NULL) {
 		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-			"mod_eppd: more than one definition of iorfile. All but\
+			"mod_eppd: more than one definition of nameserice location. All but \
 			the first one will be ignored");
 		return NULL;
 	}
 
-	/* open file */
-	status = apr_file_open(&f, iorfile, APR_FOPEN_READ,
-			APR_OS_DEFAULT, cmd->temp_pool);
-	if (status != APR_SUCCESS) {
-		return apr_psprintf(cmd->temp_pool,
-					"mod_eppd: could not open file %s (IOR)", iorfile);
+	sc->ns_loc = apr_pstrdup(cmd->pool, ns_loc);
+
+    return NULL;
+}
+
+/**
+ * Handler for apache's configuration directive "EPPObject".
+ * Sets the name under which is EPP object known to nameservice.
+ *
+ * @param cmd Command structure.
+ * @param dummy Not used parameter.
+ * @param obj_name A name of object.
+ * @return Error string in case of failure otherwise NULL.
+ */
+static const char *set_epp_object(cmd_parms *cmd, void *dummy,
+		const char *obj_name)
+{
+	const char *err;
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(s->module_config, &eppd_module);
+
+	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
+    if (err) return err;
+
+	/*
+	 * catch double definition of object's name
+	 * that's not serious fault so we will just print message in log
+	 */
+	if (sc->object != NULL) {
+		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+			"mod_eppd: more than one definition of object's name. All but \
+			the first one will be ignored");
+		return NULL;
 	}
 
-	/* read the file */
-	nbytes = 1000;
-	status = apr_file_read(f, (void *) buf, &nbytes);
-	buf[nbytes] = 0;
-	apr_file_close(f);
-	if ((status != APR_SUCCESS) && (status != APR_EOF)) {
-		return apr_psprintf(cmd->temp_pool,
-				"mod_eppd: error when reading file %s (IOR)", iorfile);
-	}
-	sc->ior = apr_pstrdup(cmd->pool, buf);
+	sc->object = apr_pstrdup(cmd->pool, obj_name);
 
     return NULL;
 }
@@ -1222,8 +1265,6 @@ static const char *set_valid_resp(cmd_parms *cmd, void *dummy, int flag)
 static const command_rec eppd_cmds[] = {
     AP_INIT_FLAG("EPPprotocol", set_epp_protocol, NULL, RSRC_CONF,
 			 "Whether this server is serving the epp protocol"),
-	AP_INIT_TAKE1("EPPiorfile", set_iorfile, NULL, RSRC_CONF,
-			 "File where is stored IOR of EPP service"),
 	AP_INIT_TAKE1("EPPschema", set_schema, NULL, RSRC_CONF,
 			 "URL of XML schema of EPP protocol"),
 	AP_INIT_TAKE1("EPPservername", set_servername, NULL, RSRC_CONF,
@@ -1236,6 +1277,12 @@ static const command_rec eppd_cmds[] = {
 			 "Set to on, to validate every outcomming response."
 			 "This will slow down the server and should be used only for"
 			 " debugging purposes."),
+	AP_INIT_TAKE1("EPPNameservice", set_ns_loc, NULL, RSRC_CONF,
+			 "Location of CORBA nameservice (host[:port]). Default is "
+			 "localhost."),
+	AP_INIT_TAKE1("EPPObject", set_epp_object, NULL, RSRC_CONF,
+			 "Name under which is the EPP object known to nameserver. "
+			 "Default is \"EPP\"."),
     { NULL }
 };
 
