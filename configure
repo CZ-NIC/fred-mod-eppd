@@ -806,8 +806,8 @@ Optional Packages:
   --with-apxs             location of apxs executable
   --with-orbit-idl        location of orbit-idl-2 executable
   --with-pkg-config       location of pkg-config executable
-  --with-idl              location of idl file containing ccReg module
-                          [idl/ccReg.idl]
+  --with-idl              location of idl file containing EPP interface
+                          [idl/EPP.idl]
   --with-schema           xml schema defining EPP protocol
                           [schemas/all-1.0.xsd]
   --with-doc              location of doxygen executable used for html
@@ -2720,8 +2720,10 @@ if test "${with_apr_config+set}" = set; then
 
 fi;
 if test x"$APR_CONFIG" = x; then
-	# Extract the first word of "apr-config", so it can be a program name with args.
-set dummy apr-config; ac_word=$2
+	for ac_prog in apr-config apr-1-config
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
 echo "$as_me:$LINENO: checking for $ac_word" >&5
 echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
 if test "${ac_cv_path_APR_CONFIG+set}" = set; then
@@ -2758,6 +2760,9 @@ else
   echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
+
+  test -n "$APR_CONFIG" && break
+done
 
 fi
 as_ac_File=`echo "ac_cv_file_$APR_CONFIG" | $as_tr_sh`
@@ -2798,8 +2803,10 @@ if test "${with_apu_config+set}" = set; then
 
 fi;
 if test x"$APU_CONFIG" = x; then
-	# Extract the first word of "apu-config", so it can be a program name with args.
-set dummy apu-config; ac_word=$2
+	for ac_prog in apu-config apu-1-config
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
 echo "$as_me:$LINENO: checking for $ac_word" >&5
 echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
 if test "${ac_cv_path_APU_CONFIG+set}" = set; then
@@ -2836,6 +2843,9 @@ else
   echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
+
+  test -n "$APU_CONFIG" && break
+done
 
 fi
 as_ac_File=`echo "ac_cv_file_$APU_CONFIG" | $as_tr_sh`
@@ -3114,7 +3124,7 @@ if test "${with_idl+set}" = set; then
   IDL=$with_idl
 
 else
-  IDL=idl/ccReg.idl
+  IDL=idl/EPP.idl
 
 fi;
 as_ac_File=`echo "ac_cv_file_$IDL" | $as_tr_sh`

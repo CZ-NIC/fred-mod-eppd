@@ -41,7 +41,7 @@ AC_ARG_WITH([apr-config], [AS_HELP_STRING([--with-apr-config],
 			[location of apr-config executable])],
 			[AC_SUBST([APR_CONFIG], [$with_apr-config])])
 if test x"$APR_CONFIG" = x; then
-	AC_PATH_PROG([APR_CONFIG], [apr-config])
+	AC_PATH_PROGS([APR_CONFIG], [apr-config apr-1-config])
 fi
 AC_CHECK_FILE([$APR_CONFIG], [], [AC_MSG_ERROR(
 			   [apr-config executable "$APR_CONFIG" does not exist (use --with-apr-config)])])
@@ -53,7 +53,7 @@ AC_ARG_WITH([apu-config], [AS_HELP_STRING([--with-apu-config],
 			[location of apu-config executable])],
 			[AC_SUBST([APU_CONFIG], [$with_apu-config])])
 if test x"$APU_CONFIG" = x; then
-	AC_PATH_PROG([APU_CONFIG], [apu-config])
+	AC_PATH_PROGS([APU_CONFIG], [apu-config apu-1-config])
 fi
 AC_CHECK_FILE([$APU_CONFIG], [], [AC_MSG_ERROR(
 			   [apu-config executable "$APU_CONFIG" does not exist (use --with-apu-config)])])
