@@ -1277,10 +1277,10 @@ static const command_rec eppd_cmds[] = {
 			 "Set to on, to validate every outcomming response."
 			 "This will slow down the server and should be used only for"
 			 " debugging purposes."),
-	AP_INIT_TAKE1("EPPNameservice", set_ns_loc, NULL, RSRC_CONF,
+	AP_INIT_TAKE1("EPPnameservice", set_ns_loc, NULL, RSRC_CONF,
 			 "Location of CORBA nameservice (host[:port]). Default is "
 			 "localhost."),
-	AP_INIT_TAKE1("EPPObject", set_epp_object, NULL, RSRC_CONF,
+	AP_INIT_TAKE1("EPPobject", set_epp_object, NULL, RSRC_CONF,
 			 "Name under which is the EPP object known to nameserver. "
 			 "Default is \"EPP\"."),
     { NULL }
