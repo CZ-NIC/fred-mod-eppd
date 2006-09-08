@@ -1405,8 +1405,8 @@ static ccReg_Disclose
 convDiscl(char flag)
 {
 	switch (flag) {
-		case  1: return ccReg_DISCL_HIDE; break;
-		case  0: return ccReg_DISCL_DISPLAY; break;
+		case  1: return ccReg_DISCL_DISPLAY; break;
+		case  0: return ccReg_DISCL_HIDE; break;
 		case -1: return ccReg_DISCL_EMPTY; break;
 		default: assert(0); break;
 	}
