@@ -967,6 +967,9 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 			cdata->out->info_domain.valExDate = c_enumval->valExDate;
 		}
 	}
+	/* if valExDate was not given, then fill it with empty value */
+	if (cdata->out->info_domain.valExDate == NULL)
+		cdata->out->info_domain.valExDate = strdup("");
 
 	CORBA_free(c_domain);
 

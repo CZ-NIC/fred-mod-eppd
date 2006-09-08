@@ -74,22 +74,22 @@ uninstall:
 mod_eppd.so: $(MOD_OBJS)
 	$(CC) -Wl,-rpath $(AP_INSTALLDIR) -Bshareable -shared -o mod_eppd.so $(LDFLAGS) $(LIBS) $(AP_LDFLAGS) $(ORB_LDFLAGS) $(AP_LIBS) $(XML_LIBS) $(MOD_OBJS)
 
-mod_eppd.o:	mod_eppd.c epp_parser.h epp_gen.h epp-client.h epp_common.h
+mod_eppd.o: mod_eppd.c epp_parser.h epp_gen.h epp-client.h epp_common.h config.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(AP_CPPFLAGS) $(AP_CFLAGS) $(AP_INCLUDE) $(DEFS) -c mod_eppd.c
 
-epp_xmlcommon.o: epp_xmlcommon.c epp_xmlcommon.h epp_common.h
+epp_xmlcommon.o: epp_xmlcommon.c epp_xmlcommon.h epp_common.h config.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(XML_CFLAGS) $(DEFS) -c epp_xmlcommon.c
 
-epp_parser.o: epp_parser.c epp_parser.h epp_common.h epp_xmlcommon.h
+epp_parser.o: epp_parser.c epp_parser.h epp_common.h epp_xmlcommon.h config.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(XML_CFLAGS) $(DEFS) -c epp_parser.c
 
-epp_gen.o: epp_gen.c epp_gen.h epp_common.h epp_xmlcommon.h
+epp_gen.o: epp_gen.c epp_gen.h epp_common.h epp_xmlcommon.h config.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(XML_CFLAGS) $(DEFS) -c epp_gen.c
 
-epp_common.o: epp_common.c epp_common.h
+epp_common.o: epp_common.c epp_common.h config.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(DEFS) -c epp_common.c
 
-epp-client.o: epp-client.c epp-client.h epp_common.h ${IDLPREFIX}.h
+epp-client.o: epp-client.c epp-client.h epp_common.h ${IDLPREFIX}.h config.h
 	$(CC) -fPIC -include ${IDLPREFIX}.h $(CPPFLAGS) $(CFLAGS) $(ORB_CFLAGS) $(DEFS) -c epp-client.c
 
 ${IDLPREFIX}-common.o: ${IDLPREFIX}-common.c ${IDLPREFIX}.h
@@ -98,7 +98,7 @@ ${IDLPREFIX}-common.o: ${IDLPREFIX}-common.c ${IDLPREFIX}.h
 ${IDLPREFIX}-stubs.o: ${IDLPREFIX}-stubs.c ${IDLPREFIX}.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(ORB_CFLAGS) $(DEFS) -c ${IDLPREFIX}-stubs.c
 
-test: test.o $(OBJS)
+test: test.o $(OBJS) config.h
 	$(CC) $(LDFLAGS) $(LIBS) $(ORB_LDFLAGS) $(XML_LIBS) -o test test.o $(OBJS)
 
 test.o: test.c epp_common.h epp_parser.h epp_gen.h epp-client.h
