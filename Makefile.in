@@ -110,7 +110,7 @@ $(IDLOUT): $(IDL)
 distclean:
 	-rm -f $(ALL_OBJS)
 	-rm -f $(IDLOUT)
-	-rm -rf acconfig.h autom4te.cache configure Makefile config.log config.status
+	-rm -rf acconfig.h autom4te.cache configure Makefile config.h config.log config.status
 	-rm -f doxygen.log
 	-rm -f $(TARDIR).tar
 
@@ -125,7 +125,7 @@ clean:
 realclean:
 	-rm -f $(ALL_OBJS)
 	-rm -f $(IDLOUT)
-	-rm -rf acconfig.h autom4te.cache configure Makefile config.log config.status
+	-rm -rf acconfig.h autom4te.cache configure Makefile config.h config.log config.status
 	-rm -f doxygen.log
 	-rm -f $(EXECFILES)
 	-rm -fr doc/html

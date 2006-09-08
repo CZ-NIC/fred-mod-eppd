@@ -22,6 +22,10 @@
 #include "epp_xmlcommon.h"
 #include "epp_gen.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 /**
  * @defgroup xmlwritegroup Macros for convenient xml document construction.
  * Following macros are shortcuts used for document creation. So that

@@ -20,6 +20,10 @@
 #include "epp_common.h"
 #include "epp-client.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 /** Quick test if corba exception was raised. */
 #define raised_exception(ev)	((ev)->_major != CORBA_NO_EXCEPTION)
 /**

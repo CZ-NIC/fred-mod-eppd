@@ -537,4 +537,41 @@ typedef struct {
 	}*out;
 }epp_command_data;
 
-#endif
+/**
+ * @defgroup allocgroup Functions for memory allocation.
+ *
+ * A memory allocated by these functions is automatically freed when
+ * processing of request is finished.
+ *
+ * @{
+ */
+
+/**
+ * Allocate memory from memory pool.
+ * @param pool Memory pool.
+ * @param size Number of bytes to allocate.
+ * @return Pointer to allocated memory.
+ */
+void *epp_malloc(void *pool, unsigned size);
+
+/**
+ * Allocate memory from memory pool and prezero it.
+ * @param pool Memory pool.
+ * @param size Number of bytes to allocate.
+ * @return Pointer to allocated memory.
+ */
+void *epp_calloc(void *pool, unsigned size);
+
+/**
+ * Duplicate string from argument, the memory will be allocated from
+ * memory pool.
+ * @param pool Memory pool.
+ * @param str String which is going to be duplicated.
+ * @return Pointer duplicated string.
+ */
+void *epp_strdup(void *pool, char *str);
+
+/**
+ * @}
+ */
+#endif /* EPP_COMMON_H */

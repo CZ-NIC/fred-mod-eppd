@@ -143,8 +143,10 @@ else
 	AC_MSG_CHECKING([SVN revision])
 	AC_MSG_RESULT([$SVNREV])
 fi
-AC_DEFINE_UNQUOTED([SVN_REV], [["]$SVNREV["]])
+AC_DEFINE_UNQUOTED([SVN_REV], [["]$SVNREV["]], [SVN revision])
+#AC_DEFINE([SVN_REV], [], [Description])
 
 # finalization
+AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

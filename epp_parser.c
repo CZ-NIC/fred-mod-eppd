@@ -25,6 +25,10 @@
 #include "epp_xmlcommon.h"
 #include "epp_parser.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #define BS_CHAR	8	/**< Backspace ASCII code. */
 /**
  * Size of hash table used for hashing command names. The size is tradeof

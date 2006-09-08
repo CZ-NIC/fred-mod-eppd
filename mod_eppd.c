@@ -80,6 +80,10 @@
 #include "epp_gen.h"
 #include "epp-client.h"
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 /** Length of EPP header containing message size. */
 #define EPP_HEADER_LENGTH	4
 
