@@ -110,34 +110,10 @@ int openfile(char *text , char *filename )
 	return 1;
 }
 
-/**
- * Import object from file.
- */
-static int
-read_ior (const char *filename, char *ior)
-{
-	FILE         *file;
-	int	i;
-	char	c;
-
-	if ((file = fopen(filename, "r")) == NULL) {
-		return 0;
-	}
-
-	for (i = 0; (c = fgetc(file)) != EOF; ior[i++] = c);
-
-	/* terminate string with \0 */
-	ior[i] = '\0';
-
-	fclose (file);
-	return 1;
-}
- 
 int main(int argc, char *argv[])
 {
 	void	*corba_globs;
 	char	*greeting;
-	char	ior[1000];
 	int	session;
 	epp_lang	lang;
 	epp_command_data cdata;
@@ -158,11 +134,7 @@ int main(int argc, char *argv[])
 	schema = epp_parser_init(SCHEMA);
 
 	/* API: init corba */
-	if (!read_ior("/tmp/ccReg.ref", ior)) {
-		fputs("Could not read IOR\n", stderr);
-		return 1;
-	}
-	if ((corba_globs = epp_corba_init("localhost", "EPP")) == NULL) {
+	if ((corba_globs = epp_corba_init("curlew", "EPP")) == NULL) {
 		fputs("Error in corba initialization\n", stderr);
 		return 1;
 	}

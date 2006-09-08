@@ -1017,7 +1017,7 @@ parse_create_contact(
 	 */
 	if (xpath_exists(xpathCtx, "contact:disclose[@flag='0']"))
 		cdata->in->create_contact.discl->flag = 0;
-	if (xpath_exists(xpathCtx, "contact:disclose[@flag='1']"))
+	else if (xpath_exists(xpathCtx, "contact:disclose[@flag='1']"))
 		cdata->in->create_contact.discl->flag = 1;
 	else cdata->in->create_contact.discl->flag = -1;
 	if (cdata->in->create_contact.discl->flag != -1) {
