@@ -964,7 +964,8 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 		{
 			ccReg_ENUMValidationExtension	*c_enumval =
 				c_domain->ext._buffer[i]._value;
-			cdata->out->info_domain.valExDate = c_enumval->valExDate;
+			cdata->out->info_domain.valExDate =
+				strdup(c_enumval->valExDate);
 		}
 	}
 	/* if valExDate was not given, then fill it with empty value */
