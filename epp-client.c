@@ -760,6 +760,7 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 
 	/* ok, now everything was successfully allocated */
 	cdata->out->info_contact.roid = strdup(c_contact->ROID);
+	cdata->out->info_contact.handle = strdup(c_contact->handle);
 	cdata->out->info_contact.authInfo = strdup(c_contact->AuthInfoPw);
 	cdata->out->info_contact.clID = strdup(c_contact->ClID);
 	cdata->out->info_contact.crID = strdup(c_contact->CrID);
@@ -927,6 +928,7 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 	}
 
 	/* ok, now everything was successfully allocated */
+	cdata->out->info_domain.handle = strdup(c_domain->name);
 	cdata->out->info_domain.roid = strdup(c_domain->ROID);
 	cdata->out->info_domain.clID = strdup(c_domain->ClID);
 	cdata->out->info_domain.crID = strdup(c_domain->CrID);
@@ -1067,6 +1069,7 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 	}
 
 	/* ok, now alomost everything was successfully allocated */
+	cdata->out->info_nsset.handle = strdup(c_nsset->handle);
 	cdata->out->info_nsset.roid = strdup(c_nsset->ROID);
 	cdata->out->info_nsset.clID = strdup(c_nsset->ClID);
 	cdata->out->info_nsset.crID = strdup(c_nsset->CrID);

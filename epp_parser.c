@@ -2670,6 +2670,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 	assert(cdata != NULL);
 	assert(cdata->clTRID != NULL);
 	assert(cdata->xml_in != NULL);
+
 	free(cdata->clTRID);
 	free(cdata->xml_in);
 	/* free error messages if there are any */
@@ -2735,6 +2736,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 				epp_postalInfo	*pi;
 				epp_discl	*discl;
 
+				free(cdata->out->info_contact.handle);
 				free(cdata->out->info_contact.roid);
 				free(cdata->out->info_contact.voice);
 				free(cdata->out->info_contact.fax);
@@ -2777,6 +2779,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			assert(cdata->in != NULL);
 			free(cdata->in->info.id);
 			if (cdata->out != NULL) {
+				free(cdata->out->info_domain.handle);
 				free(cdata->out->info_domain.roid);
 				free(cdata->out->info_domain.registrant);
 				free(cdata->out->info_domain.nsset);
@@ -2813,6 +2816,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			assert(cdata->in != NULL);
 			free(cdata->in->info.id);
 			if (cdata->out != NULL) {
+				free(cdata->out->info_nsset.handle);
 				free(cdata->out->info_nsset.roid);
 				free(cdata->out->info_nsset.clID);
 				free(cdata->out->info_nsset.crID);

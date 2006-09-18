@@ -182,7 +182,7 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	START_ELEMENT(writer, simple_err, "contact:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
-	WRITE_ELEMENT(writer, simple_err, "contact:id", cdata->in->info.id);
+	WRITE_ELEMENT(writer, simple_err, "contact:id", cdata->out->info_contact.handle);
 	WRITE_ELEMENT(writer, simple_err, "contact:roid",
 			cdata->out->info_contact.roid);
 	CL_RESET(cdata->out->info_contact.status);
@@ -324,7 +324,7 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 	START_ELEMENT(writer, simple_err, "domain:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_DOMAIN);
-	WRITE_ELEMENT(writer, simple_err, "domain:name",cdata->in->info.id);
+	WRITE_ELEMENT(writer, simple_err, "domain:name",cdata->out->info_domain.handle);
 	WRITE_ELEMENT(writer, simple_err, "domain:roid",
 			cdata->out->info_domain.roid);
 	CL_RESET(cdata->out->info_domain.status);
@@ -449,7 +449,7 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 	START_ELEMENT(writer, simple_err, "nsset:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_NSSET);
-	WRITE_ELEMENT(writer, simple_err, "nsset:id",cdata->in->info.id);
+	WRITE_ELEMENT(writer, simple_err, "nsset:id",cdata->out->info_nsset.handle);
 	WRITE_ELEMENT(writer, simple_err, "nsset:roid",cdata->out->info_nsset.roid);
 	/* status flags */
 	CL_RESET(cdata->out->info_nsset.status);
