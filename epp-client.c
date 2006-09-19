@@ -98,7 +98,6 @@ epp_corba_init(const char *ns_loc, const char *obj_name)
 	}
 	/* get EPP object */
 	service =(ccReg_EPP) CosNaming_NamingContext_resolve(ns, cos_name, ev);
-	CORBA_free(cos_name);
 	if (service == CORBA_OBJECT_NIL || raised_exception(ev)) {
 		CORBA_exception_free(ev);
 		/* release nameservice */
