@@ -169,7 +169,7 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 		err_item->reason = strdup(c_error->reason);
 		err_item->standalone = 0; /* the surrounding tags are missing */
 
-		/* convert "any" type (timestamp, long, string) to string */
+		/* convert "any" type (short, long, string) to string */
 		if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_string, ev))
 			err_item->value = strdup(* ((char **) c_error->value._value));
 		else if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_long, ev))
@@ -177,6 +177,12 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 			err_item->value = malloc(10); /* should be enough for any number */
 			snprintf(err_item->value, 10, "%ld",
 					*((long *) c_error->value._value));
+		}
+		else if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_short, ev))
+		{
+			err_item->value = malloc(10); /* should be enough for any number */
+			snprintf(err_item->value, 10, "%d",
+					*((short *) c_error->value._value));
 		}
 		else
 			err_item->value = strdup("Unknown value type");
@@ -1762,7 +1768,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 	assert(cdata->in != NULL);
 	c_ext_list = ccReg_ExtensionList__alloc();
 	/* fill extension list if needed */
-	if (cdata->in->renew.valExDate != 0) {
+	if (*cdata->in->renew.valExDate != '\0') {
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();
@@ -1902,7 +1908,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_domain.rem_status));
 	c_ext_list = ccReg_ExtensionList__alloc();
 	/* fill extension list if needed */
-	if (cdata->in->create_domain.valExDate != 0) {
+	if (*cdata->in->create_domain.valExDate != '\0') {
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();

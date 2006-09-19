@@ -858,10 +858,11 @@ static int epp_cleanup_xml(void *data)
  * parameters, default values of parameters), components are initialized,
  * log file is setted up ...
  *
- * @param p Memory pool.
- * @param plog Memory pool used for logging.
+ * @param p     Memory pool.
+ * @param plog  Memory pool used for logging.
  * @param ptemp Memory pool destroyed right after postconfig phase.
- * @param s Server record.
+ * @param s     Server record.
+ * @return      Status.
  */
 static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 		apr_pool_t *ptemp, server_rec *s)
@@ -968,7 +969,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 		}
 		s = s->next;
 	}
-	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+	ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
 		"mod_eppd started (mod_eppd version %s, SVN revision %s, BUILT %s %s)",
 				PACKAGE_VERSION, SVN_REV, __DATE__, __TIME__);
 
