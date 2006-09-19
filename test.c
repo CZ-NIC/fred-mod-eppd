@@ -231,7 +231,8 @@ int main(int argc, char *argv[])
 			/* API: corba call */
 			cstat = epp_call_login(corba_globs, &session, &lang, fp, &cdata);
 		}
-		else if (pstat == PARSER_CMD_OTHER) {
+		else if (pstat == PARSER_CMD_OTHER || pstat == PARSER_NOT_VALID)
+		{
 			/* API: corba call */
 			cstat = epp_call_cmd(corba_globs, session, &cdata, &notused1,
 					&notused2);

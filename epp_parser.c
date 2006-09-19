@@ -1847,8 +1847,6 @@ parse_update_contact(
 			"contact:chg/contact:fax");
 	XPATH_TAKE1(cdata->in->update_contact.email, doc, xpathCtx, error_uc,
 			"contact:chg/contact:email");
-	XPATH_TAKE1(cdata->in->update_contact.authInfo, doc, xpathCtx, error_uc,
-			"contact:chg/contact:authInfo/contact:pw");
 	XPATH_TAKE1_UPD(cdata->in->update_contact.notify_email, doc, xpathCtx,
 			error_uc,
 			"contact:chg/contact:notifyEmail");
@@ -2674,6 +2672,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 	free(cdata->clTRID);
 	free(cdata->xml_in);
 	/* free error messages if there are any */
+	CL_RESET(cdata->errors);
 	CL_FOREACH(cdata->errors) {
 		epp_error	*e = (epp_error *) CL_CONTENT(cdata->errors);
 		free(e->value);
@@ -2802,6 +2801,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 					free(CL_CONTENT(cdata->out->info_domain.admin));
 				cl_purge(cdata->out->info_domain.admin);
 				/* clear extensions */
+				free(cdata->out->info_domain.valExDate);
 				CL_FOREACH(cdata->out->info_domain.ds) {
 					FREENULL(((epp_ds *)
 								CL_CONTENT(cdata->out->info_domain.ds))->digest);
@@ -3075,7 +3075,7 @@ void epp_command_data_cleanup(epp_command_data *cdata)
 			assert(cdata->in == NULL);
 			if (cdata->out != NULL) {
 				CL_RESET(cdata->out->list.handles);
-				CL_FOREACH(cdata->out->list.handles);
+				CL_FOREACH(cdata->out->list.handles)
 					free(CL_CONTENT(cdata->out->list.handles));
 				cl_purge(cdata->out->list.handles);
 			}

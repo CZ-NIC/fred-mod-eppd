@@ -74,7 +74,7 @@ epp_corba_init(const char *ns_loc, const char *obj_name)
 	cos_name = (CosNaming_Name *) malloc (sizeof(CosNaming_Name));
 	cos_name->_maximum = cos_name->_length = 2;
 	cos_name->_buffer = name_component;
-	CORBA_sequence_set_release(cos_name, FALSE);
+	CORBA_sequence_set_release(cos_name, CORBA_TRUE);
 
 	ns_string[149] = 0;
 	snprintf(ns_string, 149, "corbaloc::%s/NameService", ns_loc);
@@ -98,6 +98,7 @@ epp_corba_init(const char *ns_loc, const char *obj_name)
 	}
 	/* get EPP object */
 	service =(ccReg_EPP) CosNaming_NamingContext_resolve(ns, cos_name, ev);
+	CORBA_free(cos_name);
 	if (service == CORBA_OBJECT_NIL || raised_exception(ev)) {
 		CORBA_exception_free(ev);
 		/* release nameservice */
@@ -340,6 +341,7 @@ epp_call_hello(epp_corba_globs *globs, char *version_buf,
 	version_buf[versionbuf_len] = '\0';
 	curdate_buf[curdatebuf_len] = '\0';
 	CORBA_free(version);
+	CORBA_free(curdate);
 	return 1;
 }
 
@@ -1143,7 +1145,7 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	CORBA_Environment	ev[1];
 	CORBA_short	c_count;
 	CORBA_long	c_msgID;
-	CORBA_string	c_qdate;
+	CORBA_char	*c_qdate;
 	CORBA_char	*c_msg;
 	int	retr;
 
@@ -1180,12 +1182,14 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	 */
 	if (*response->svTRID == '\0') {
 		CORBA_free(c_msg);
+		CORBA_free(c_qdate);
 		CORBA_free(response);
 		return CORBA_REMOTE_ERROR;
 	}
 
 	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(c_msg);
+		CORBA_free(c_qdate);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
@@ -1196,6 +1200,7 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	cdata->out->poll_req.msg = strdup(c_msg);
 
 	CORBA_free(c_msg);
+	CORBA_free(c_qdate);
 
 	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
@@ -1290,8 +1295,8 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	CORBA_string	c_crDate;
-	CORBA_string	c_exDate;
+	CORBA_char	*c_crDate;
+	CORBA_char	*c_exDate;
 	ccReg_Response *response;
 	ccReg_AdminContact	*c_admin;
 	ccReg_ExtensionList	*c_ext_list;
@@ -1315,13 +1320,18 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();
-		c_enumval->valExDate = strdup(cdata->in->create_domain.valExDate);
+		c_enumval->valExDate =
+			CORBA_string_dup(cdata->in->create_domain.valExDate);
 		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
 		c_ext_list->_maximum = c_ext_list->_length = 1;
 		c_ext_list->_release = CORBA_TRUE;
 		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
 		c_ext_list->_buffer[0]._value = c_enumval;
 		c_ext_list->_buffer[0]._release = CORBA_TRUE;
+	}
+	else {
+		c_ext_list->_maximum = c_ext_list->_length = 0;
+		c_ext_list->_release = CORBA_FALSE;
 	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
@@ -1365,6 +1375,8 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	 */
 	if (*response->svTRID == '\0') {
 		CORBA_free(response);
+		CORBA_free(c_crDate);
+		CORBA_free(c_exDate);
 		return CORBA_REMOTE_ERROR;
 	}
 
@@ -1375,6 +1387,9 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 
 	cdata->out->create.crDate = strdup(c_crDate);
 	cdata->out->create.exDate = strdup(c_exDate);
+
+	CORBA_free(c_crDate);
+	CORBA_free(c_exDate);
 
 	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
@@ -1434,7 +1449,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	CORBA_string	c_crDate;
+	CORBA_char	*c_crDate;
 	ccReg_ContactChange	*c_contact;
 	ccReg_Response *response;
 	int	retr;
@@ -1516,6 +1531,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	 * empty string
 	 */
 	if (*response->svTRID == '\0') {
+		CORBA_free(c_crDate);
 		CORBA_free(response);
 		return CORBA_REMOTE_ERROR;
 	}
@@ -1526,6 +1542,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	}
 
 	cdata->out->create.crDate = strdup(c_crDate);
+	CORBA_free(c_crDate);
 
 	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
@@ -1552,7 +1569,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 	ccReg_Response *response;
 	ccReg_DNSHost	*c_dnshost;
 	ccReg_TechContact	*c_tech;
-	CORBA_string	c_crDate;
+	CORBA_char	*c_crDate;
 	int	len, i, j, retr;
 
 	assert(cdata->in != NULL);
@@ -1625,6 +1642,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 	 * empty string
 	 */
 	if (*response->svTRID == '\0') {
+		CORBA_free(c_crDate);
 		CORBA_free(response);
 		return CORBA_REMOTE_ERROR;
 	}
@@ -1635,6 +1653,7 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 	}
 
 	cdata->out->create.crDate = strdup(c_crDate);
+	CORBA_free(c_crDate);
 
 	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
@@ -1737,7 +1756,7 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
-	CORBA_string	c_exDate;
+	CORBA_char	*c_exDate;
 	ccReg_ExtensionList	*c_ext_list;
 	int	retr;
 
@@ -1748,13 +1767,18 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();
-		c_enumval->valExDate = strdup(cdata->in->renew.valExDate);
+		c_enumval->valExDate =
+			CORBA_string_dup(cdata->in->renew.valExDate);
 		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
 		c_ext_list->_maximum = c_ext_list->_length = 1;
 		c_ext_list->_release = CORBA_TRUE;
 		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
 		c_ext_list->_buffer[0]._value = c_enumval;
 		c_ext_list->_buffer[0]._release = CORBA_TRUE;
+	}
+	else {
+		c_ext_list->_maximum = c_ext_list->_length = 0;
+		c_ext_list->_release = CORBA_FALSE;
 	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
@@ -1792,15 +1816,18 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 	 * empty string
 	 */
 	if (*response->svTRID == '\0') {
+		CORBA_free(c_exDate);
 		CORBA_free(response);
 		return CORBA_REMOTE_ERROR;
 	}
 
 	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+		CORBA_free(c_exDate);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 	cdata->out->renew.exDate = strdup(c_exDate);
+	CORBA_free(c_exDate);
 
 	get_errors(cdata->errors, &response->errors);
 	cdata->svTRID = strdup(response->svTRID);
@@ -1880,13 +1907,18 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();
-		c_enumval->valExDate = strdup(cdata->in->update_domain.valExDate);
+		c_enumval->valExDate =
+			CORBA_string_dup(cdata->in->update_domain.valExDate);
 		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
 		c_ext_list->_maximum = c_ext_list->_length = 1;
 		c_ext_list->_release = CORBA_TRUE;
 		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
 		c_ext_list->_buffer[0]._value = c_enumval;
 		c_ext_list->_buffer[0]._release = CORBA_TRUE;
+	}
+	else {
+		c_ext_list->_maximum = c_ext_list->_length = 0;
+		c_ext_list->_release = CORBA_FALSE;
 	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
