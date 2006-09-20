@@ -10,8 +10,6 @@
 
 /** Standard EPP xml namespace */
 #define NS_EPP	"urn:ietf:params:xml:ns:epp-1.0"
-/** Standard EPP xml namespace */
-#define NS_EPPCOM	"urn:ietf:params:xml:ns:eppcom-1.0"
 /** Our custom namespace used for contact object */
 #define NS_CONTACT	"http://www.nic.cz/xml/epp/contact-1.0"
 /** Our custom namespace used for domain object */

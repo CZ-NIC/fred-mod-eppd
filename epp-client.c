@@ -1908,7 +1908,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_domain.rem_status));
 	c_ext_list = ccReg_ExtensionList__alloc();
 	/* fill extension list if needed */
-	if (*cdata->in->create_domain.valExDate != '\0') {
+	if (*cdata->in->update_domain.valExDate != '\0') {
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();
