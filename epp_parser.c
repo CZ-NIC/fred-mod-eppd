@@ -799,7 +799,7 @@ parse_create_domain(
 			"domain:registrant");
 	XPATH_TAKE1(cdata->in->create_domain.nsset, doc, xpathCtx, error_cd,
 			"domain:nsset");
-	XPATH_REQ1(cdata->in->create_domain.authInfo, doc, xpathCtx, error_cd,
+	XPATH_TAKE1(cdata->in->create_domain.authInfo, doc, xpathCtx, error_cd,
 			"domain:authInfo/domain:pw");
 	/* domain period handling is slightly more difficult */
 	XPATH_EVAL(xpathObj, xpathCtx, error_cd, "domain:period");
@@ -976,7 +976,7 @@ parse_create_contact(
 	/* get the contact data */
 	XPATH_REQ1(cdata->in->create_contact.id, doc, xpathCtx, error_cc,
 			"contact:id");
-	XPATH_REQ1(cdata->in->create_contact.authInfo, doc, xpathCtx, error_cc,
+	XPATH_TAKE1(cdata->in->create_contact.authInfo, doc, xpathCtx, error_cc,
 			"contact:authInfo/contact:pw");
 	XPATH_TAKE1(cdata->in->create_contact.voice, doc, xpathCtx, error_cc,
 			"contact:voice");
@@ -1142,7 +1142,7 @@ parse_create_nsset(
 	CL_NEW(cdata->in->create_nsset.ns);
 	/* get the domain data */
 	XPATH_REQ1(cdata->in->create_nsset.id, doc, xpathCtx, error_cn, "nsset:id");
-	XPATH_REQ1(cdata->in->create_nsset.authInfo, doc, xpathCtx, error_cn,
+	XPATH_TAKE1(cdata->in->create_nsset.authInfo, doc, xpathCtx, error_cn,
 			"nsset:authInfo/nsset:pw");
 	/* process "unbounded" number of tech contacts */
 	XPATH_TAKEN(cdata->in->create_nsset.tech, doc, xpathCtx, error_cn,
