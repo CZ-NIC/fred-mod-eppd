@@ -31,15 +31,6 @@ typedef enum {
 }gen_status;
 
 /**
- * Return value from generator consists of generated string and validation
- * errors if validation of responses is turned on.
- */
-typedef struct {
-	char	*response;	/**< Result of generation phase. */
-	struct circ_list	*valerr;	/**< List of validation errors. */
-}epp_gen;
-
-/**
  * Routine makes up epp greeting frame.
  *
  * @param svid Part of server ID used in svid tag.
@@ -48,44 +39,32 @@ typedef struct {
  * @return Generator status.
  */
 gen_status
-epp_gen_greeting(const char *svid, const char *date, char **greeting);
+epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting);
 
 /**
  * Generate command response in XML format. There is option that response
  * can be validated, the validation errors are then returned together with
  * generated string in form of a list.
  *
+ * @param pool Memory pool from which to allocate memory.
  * @param validate Tells if response should be validated or not (boolean).
  * @param schema_url Location of schema against which to validate.
  * @param lang Language selected by the client.
  * @param cdata Input values
- * @param gen Generated string and possibly validation errors if validation
- * is turned on.
- * @param timebegin Starting time of function (perf data).
- * @param timeend Ending time of function (perf data).
+ * @param response Result of generation phase = generated string.
+ * @param List of validation errors if validation is turned on.
  * @return Generator status.
  */
 gen_status
 epp_gen_response(
+		void *pool,
 		int validate,
 		void *schema,
 		epp_lang lang,
 		epp_command_data *cdata,
-		epp_gen *gen,
-		unsigned long long *timestart,
-		unsigned long long *timeend);
-
-/**
- * Free response created by response generator and free validation errors.
- * @param gen Result of generator.
- */
-void epp_free_gen(epp_gen *gen);
-
-/**
- * Free response created by greeting generator. Simple free() is called
- * on greeting string.
- * @param greeting Greeting string.
- */
-void epp_free_greeting(char *greeting);
+		char **response,
+		struct circ_list **valerr);
 
 #endif /* EPP_GEN_H */
+
+/* vim: set ts=4 sw=4: */

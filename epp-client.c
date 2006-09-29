@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
 #include <unistd.h>
 #include <orbit/orbit.h>
 #include <ORBitservices/CosNaming.h>
@@ -57,7 +56,6 @@ epp_corba_init(const char *ns_loc, const char *obj_name)
 	CosNaming_NameComponent *name_component; /* EPP's name */
 	CosNaming_Name *cos_name; /* Cos name used in service lookup */
 	char ns_string[150];
-	int argc = 0;
  
 	CORBA_exception_init(ev);
 
@@ -148,44 +146,51 @@ epp_corba_init_cleanup(epp_corba_globs *globs)
  * This function helps to convert error codes for incorrect parameter location
  * used in IDL to error codes understandable by the rest of the module.
  *
+ * @param pool    Pool for memory allocations.
  * @param cerrors Buffer of errors used as input.
- * @param errors List of errors
- * converted errors (output).
+ * @param errors  List of errors - converted errors (output).
  */
-static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
-	struct circ_list	*item; epp_error	*err_item; int	i; ccReg_Error_seq
-		*c_error; CORBA_Environment ev[1];
+static void get_errors(void *pool,
+		struct circ_list *errors,
+		ccReg_Error *c_errors)
+{
+	struct circ_list	*item;
+	epp_error	*err_item;
+	int	i;
+	ccReg_Error_seq *c_error;
+	CORBA_Environment ev[1];
 
 	CORBA_exception_init(ev);
 
 	/* process all errors one by one */
 	for (i = 0; i < c_errors->_length; i++) {
-		if ((item = malloc(sizeof *item)) == NULL) break;
-		if ((err_item = malloc(sizeof *err_item)) == NULL) {
-			free(item);
+		if ((item = epp_malloc(pool, sizeof *item)) == NULL ||
+			(err_item = epp_malloc(pool, sizeof *err_item)) == NULL)
+		{
 			break;
 		}
 		c_error = &c_errors->_buffer[i];
-		err_item->reason = strdup(c_error->reason);
+		err_item->reason = epp_strdup(pool, c_error->reason);
 		err_item->standalone = 0; /* the surrounding tags are missing */
 
 		/* convert "any" type (short, long, string) to string */
 		if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_string, ev))
-			err_item->value = strdup(* ((char **) c_error->value._value));
+			err_item->value = epp_strdup(pool,
+					* ((char **) c_error->value._value));
 		else if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_long, ev))
 		{
-			err_item->value = malloc(10); /* should be enough for any number */
+			err_item->value = epp_malloc(pool, 10); /* should be enough for any number */
 			snprintf(err_item->value, 10, "%ld",
 					*((long *) c_error->value._value));
 		}
 		else if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_short, ev))
 		{
-			err_item->value = malloc(10); /* should be enough for any number */
+			err_item->value = epp_malloc(pool, 10); /* should be enough for any number */
 			snprintf(err_item->value, 10, "%d",
 					*((short *) c_error->value._value));
 		}
 		else
-			err_item->value = strdup("Unknown value type");
+			err_item->value = epp_strdup(pool, "Unknown value type");
 
 		/* convert error code */
 		switch (c_error->code) {
@@ -314,19 +319,21 @@ static void get_errors(struct circ_list *errors, ccReg_Error *c_errors) {
 }
 
 int
-epp_call_hello(epp_corba_globs *globs, char *version_buf,
-		unsigned versionbuf_len, char *curdate_buf, unsigned curdatebuf_len)
+epp_call_hello(void *pool,
+		epp_corba_globs *globs,
+		char **version,
+		char **curdate)
 {
 	CORBA_Environment ev[1];
-	CORBA_string version;
-	CORBA_string curdate;
+	CORBA_char	*c_version;
+	CORBA_char	*c_curdate;
 	int	retr;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
 		CORBA_exception_init(ev);
 
-		version = ccReg_EPP_version(globs->service, &curdate, ev);
+		c_version = ccReg_EPP_version(globs->service, &c_curdate, ev);
 
 		/* if COMM_FAILURE exception is not raised then quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
@@ -340,13 +347,11 @@ epp_call_hello(epp_corba_globs *globs, char *version_buf,
 	}
 	CORBA_exception_free(ev);
 
-	strncpy(version_buf, version, versionbuf_len - 1);
-	strncpy(curdate_buf, curdate, curdatebuf_len - 1);
-	/* just want to be sure the strings are NULL terminated in any case */
-	version_buf[versionbuf_len] = '\0';
-	curdate_buf[curdatebuf_len] = '\0';
-	CORBA_free(version);
-	CORBA_free(curdate);
+	*version = epp_strdup(pool, c_version);
+	*curdate = epp_strdup(pool, c_curdate);
+
+	CORBA_free(c_version);
+	CORBA_free(c_curdate);
 	return 1;
 }
 
@@ -356,16 +361,20 @@ epp_call_hello(epp_corba_globs *globs, char *version_buf,
  * about the error. This call is used for failures detected already on side
  * of mod_eppd.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
+epp_call_dummy(void *pool,
+		epp_corba_globs *globs,
+		int session,
+		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	ccReg_Response *response;
+	ccReg_Response	*response;
 	int	retr;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
@@ -400,9 +409,9 @@ epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 		return CORBA_REMOTE_ERROR;
 	}
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	/* rc is known */
 
 	CORBA_free(response);
@@ -410,7 +419,7 @@ epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 }
 
 corba_status
-epp_call_login(
+epp_call_login(void *pool,
 		epp_corba_globs *globs,
 		int *session,
 		epp_lang *lang,
@@ -462,9 +471,9 @@ epp_call_login(
 		return CORBA_REMOTE_ERROR;
 	}
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -478,7 +487,7 @@ epp_call_login(
 }
 
 corba_status
-epp_call_logout(
+epp_call_logout(void *pool,
 		epp_corba_globs *globs,
 		int session,
 		epp_command_data *cdata,
@@ -520,9 +529,9 @@ epp_call_logout(
 		return CORBA_REMOTE_ERROR;
 	}
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -537,14 +546,18 @@ epp_call_logout(
  * EPP check for domain, nsset and contact is so similar that it is worth of
  * having the code in one function and pass object type as parameter.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @param obj Object type (see #epp_object_type)
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @param obj     Object type (see #epp_object_type)
+ * @return        Status.
  */
 static corba_status
-epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
+epp_call_check(void *pool,
+		epp_corba_globs *globs,
+		int session,
+		epp_command_data *cdata,
 		epp_object_type obj)
 {
 	CORBA_Environment ev[1];
@@ -565,7 +578,8 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	/* copy each requested object in corba buffer */
 	i = 0;
 	CL_FOREACH(cdata->in->check.ids)
-		c_ids->_buffer[i++] = CORBA_string_dup(CL_CONTENT(cdata->in->check.ids));
+		c_ids->_buffer[i++] = CORBA_string_dup(
+				CL_CONTENT(cdata->in->check.ids));
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -623,21 +637,19 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	}
 
 	/* alloc necessary structures */
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(c_avails);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->check.avails = malloc(sizeof *item)) == NULL) {
-		free(cdata->out);
-		cdata->out = NULL;
+	if (!(cdata->out = epp_calloc(pool, sizeof (*cdata->out)))
+		|| !(cdata->out->check.avails = epp_malloc(pool, sizeof *item)))
+	{
 		CORBA_free(c_avails);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 	CL_NEW(cdata->out->check.avails);
 
-	/* length of results returned should be same as lenght of input objects */
+	/*
+	 * length of results returned should be same as lenght of input
+	 * objects
+	 */
 	assert(len == c_avails->_length); /* XXX change this in production release */
 	/*
 	 * circular list stores items in reversed order.
@@ -647,13 +659,14 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 	for (i = c_avails->_length - 1; i >= 0; i--) {
 		epp_avail	*avail;
 
-		if ((item = malloc(sizeof *item)) == NULL) break;
-		if ((avail = malloc(sizeof *avail)) == NULL) {
-			free(item);
+		if ((item = epp_malloc(pool, sizeof *item)) == NULL ||
+			(avail = epp_malloc(pool, sizeof *avail)) == NULL)
+		{
 			break;
 		}
-		avail->avail = (c_avails->_buffer[i].avail == ccReg_NotExist) ? 1 : 0;
-		avail->reason = strdup(c_avails->_buffer[i].reason);
+		avail->avail =
+			(c_avails->_buffer[i].avail == ccReg_NotExist) ? 1 : 0;
+		avail->reason = epp_strdup(pool, c_avails->_buffer[i].reason);
 		if (avail->avail) assert(*avail->reason == '\0');
 		CL_CONTENT(item) = (void *) avail;
 		CL_ADD(cdata->out->check.avails, item);
@@ -662,16 +675,13 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 
 	/* handle situation when item allocation above failed */
 	if (i > 0) {
-		cl_purge(cdata->out->check.avails);
-		free(cdata->out);
-		cdata->out = NULL;
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -681,13 +691,16 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata,
 /**
  * EPP info contact.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_info_contact(epp_corba_globs *globs, int session,
+epp_call_info_contact(void *pool,
+		epp_corba_globs *globs,
+		int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -735,72 +748,56 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 	}
 
 	/* first allocate all necessary structures */
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(c_contact);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->info_contact.postalInfo = calloc(1, sizeof *pi)) == NULL) {
-		free(cdata->out);
-		cdata->out = NULL;
-		CORBA_free(c_contact);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->info_contact.discl = calloc(1, sizeof *discl)) == NULL) {
-		free(cdata->out->info_contact.postalInfo);
-		free(cdata->out);
-		cdata->out = NULL;
-		CORBA_free(c_contact);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->info_contact.status = malloc(sizeof *item)) == NULL) {
-		free(cdata->out->info_contact.discl);
-		free(cdata->out->info_contact.postalInfo);
-		free(cdata->out);
-		cdata->out = NULL;
+	if (!(cdata->out = epp_calloc(pool, sizeof (*cdata->out)))
+		|| !(cdata->out->info_contact.postalInfo =
+			epp_calloc(pool, sizeof *pi))
+		|| !(cdata->out->info_contact.discl =
+			epp_calloc(pool, sizeof *discl))
+		|| !(cdata->out->info_contact.status =
+			epp_malloc(pool, sizeof *item)))
+	{
 		CORBA_free(c_contact);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 
 	/* ok, now everything was successfully allocated */
-	cdata->out->info_contact.roid = strdup(c_contact->ROID);
-	cdata->out->info_contact.handle = strdup(c_contact->handle);
-	cdata->out->info_contact.authInfo = strdup(c_contact->AuthInfoPw);
-	cdata->out->info_contact.clID = strdup(c_contact->ClID);
-	cdata->out->info_contact.crID = strdup(c_contact->CrID);
-	cdata->out->info_contact.upID = strdup(c_contact->UpID);
-	cdata->out->info_contact.crDate = strdup(c_contact->CrDate);
-	cdata->out->info_contact.upDate = strdup(c_contact->UpDate);
-	cdata->out->info_contact.trDate = strdup(c_contact->TrDate);
+	cdata->out->info_contact.roid = epp_strdup(pool, c_contact->ROID);
+	cdata->out->info_contact.handle = epp_strdup(pool, c_contact->handle);
+	cdata->out->info_contact.authInfo = epp_strdup(pool, c_contact->AuthInfoPw);
+	cdata->out->info_contact.clID = epp_strdup(pool, c_contact->ClID);
+	cdata->out->info_contact.crID = epp_strdup(pool, c_contact->CrID);
+	cdata->out->info_contact.upID = epp_strdup(pool, c_contact->UpID);
+	cdata->out->info_contact.crDate = epp_strdup(pool, c_contact->CrDate);
+	cdata->out->info_contact.upDate = epp_strdup(pool, c_contact->UpDate);
+	cdata->out->info_contact.trDate = epp_strdup(pool, c_contact->TrDate);
 	/* contact status */
 	CL_NEW(cdata->out->info_contact.status);
 	for (i = 0; i < c_contact->stat._length; i++) {
-		item = malloc(sizeof *item);
-		CL_CONTENT(item) =(void *) strdup(c_contact->stat._buffer[i]);
+		item = epp_malloc(pool, sizeof *item);
+		CL_CONTENT(item) =
+			(void *) epp_strdup(pool, c_contact->stat._buffer[i]);
 		CL_ADD(cdata->out->info_contact.status, item);
 	}
 	/* postal info */
 	pi = cdata->out->info_contact.postalInfo;
-	pi->name = strdup(c_contact->Name);
-	pi->org = strdup(c_contact->Organization);
-	pi->street[0] = strdup(c_contact->Street1);
-	pi->street[1] = strdup(c_contact->Street2);
-	pi->street[2] = strdup(c_contact->Street3);
-	pi->city = strdup(c_contact->City);
-	pi->sp = strdup(c_contact->StateOrProvince);
-	pi->pc = strdup(c_contact->PostalCode);
-	pi->cc = strdup(c_contact->CountryCode);
+	pi->name = epp_strdup(pool, c_contact->Name);
+	pi->org = epp_strdup(pool, c_contact->Organization);
+	pi->street[0] = epp_strdup(pool, c_contact->Street1);
+	pi->street[1] = epp_strdup(pool, c_contact->Street2);
+	pi->street[2] = epp_strdup(pool, c_contact->Street3);
+	pi->city = epp_strdup(pool, c_contact->City);
+	pi->sp = epp_strdup(pool, c_contact->StateOrProvince);
+	pi->pc = epp_strdup(pool, c_contact->PostalCode);
+	pi->cc = epp_strdup(pool, c_contact->CountryCode);
 	/* other attributes */
-	cdata->out->info_contact.voice = strdup(c_contact->Telephone);
-	cdata->out->info_contact.fax = strdup(c_contact->Fax);
-	cdata->out->info_contact.email = strdup(c_contact->Email);
+	cdata->out->info_contact.voice = epp_strdup(pool, c_contact->Telephone);
+	cdata->out->info_contact.fax = epp_strdup(pool, c_contact->Fax);
+	cdata->out->info_contact.email = epp_strdup(pool, c_contact->Email);
 	cdata->out->info_contact.notify_email =
-		strdup(c_contact->NotifyEmail);
-	cdata->out->info_contact.vat = strdup(c_contact->VAT);
-	cdata->out->info_contact.ssn = strdup(c_contact->SSN);
+		epp_strdup(pool, c_contact->NotifyEmail);
+	cdata->out->info_contact.vat = epp_strdup(pool, c_contact->VAT);
+	cdata->out->info_contact.ssn = epp_strdup(pool, c_contact->SSN);
 	/* convert ssntype from idl's enum to our enum */
 	switch (c_contact->SSNtype) {
 		case ccReg_RC:
@@ -841,9 +838,9 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 
 	CORBA_free(c_contact);
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -853,20 +850,23 @@ epp_call_info_contact(epp_corba_globs *globs, int session,
 /**
  * EPP info domain.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_info_domain(epp_corba_globs *globs, int session,
+epp_call_info_domain(void *pool,
+		epp_corba_globs *globs,
+		int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_Response	*response;
 	ccReg_Domain	*c_domain;
 	struct circ_list	*item;
-	int i, retr;
+	int	i, retr;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -904,62 +904,48 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 	}
 
 	/* allocate necessary structures */
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(c_domain);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->info_domain.status = malloc(sizeof *item)) == NULL) {
-		free(cdata->out);
-		cdata->out = NULL;
-		CORBA_free(c_domain);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->info_domain.admin = malloc(sizeof *item)) == NULL) {
-		free(cdata->out->info_domain.status);
-		free(cdata->out);
-		cdata->out = NULL;
-		CORBA_free(c_domain);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->info_domain.ds = malloc(sizeof *item)) == NULL) {
-		free(cdata->out->info_domain.admin);
-		free(cdata->out->info_domain.status);
-		free(cdata->out);
-		cdata->out = NULL;
+	if (!(cdata->out = epp_calloc(pool, sizeof (*cdata->out)))
+		|| !(cdata->out->info_domain.status =
+			epp_malloc(pool, sizeof *item))
+		|| !(cdata->out->info_domain.admin =
+			epp_malloc(pool, sizeof *item))
+		|| !(cdata->out->info_domain.ds =
+			epp_malloc(pool, sizeof *item)))
+	{
 		CORBA_free(c_domain);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 
 	/* ok, now everything was successfully allocated */
-	cdata->out->info_domain.handle = strdup(c_domain->name);
-	cdata->out->info_domain.roid = strdup(c_domain->ROID);
-	cdata->out->info_domain.clID = strdup(c_domain->ClID);
-	cdata->out->info_domain.crID = strdup(c_domain->CrID);
-	cdata->out->info_domain.upID = strdup(c_domain->UpID);
-	cdata->out->info_domain.crDate = strdup(c_domain->CrDate);
-	cdata->out->info_domain.upDate = strdup(c_domain->UpDate);
-	cdata->out->info_domain.trDate = strdup(c_domain->TrDate);
-	cdata->out->info_domain.exDate = strdup(c_domain->ExDate);
-
-	cdata->out->info_domain.registrant = strdup(c_domain->Registrant);
-	cdata->out->info_domain.nsset = strdup(c_domain->nsset);
-	cdata->out->info_domain.authInfo = strdup(c_domain->AuthInfoPw);
+	cdata->out->info_domain.roid   = epp_strdup(pool, c_domain->ROID);
+	cdata->out->info_domain.handle = epp_strdup(pool, c_domain->name);
+	cdata->out->info_domain.clID   = epp_strdup(pool, c_domain->ClID);
+	cdata->out->info_domain.crID   = epp_strdup(pool, c_domain->CrID);
+	cdata->out->info_domain.upID   = epp_strdup(pool, c_domain->UpID);
+	cdata->out->info_domain.crDate = epp_strdup(pool, c_domain->CrDate);
+	cdata->out->info_domain.upDate = epp_strdup(pool, c_domain->UpDate);
+	cdata->out->info_domain.trDate = epp_strdup(pool, c_domain->TrDate);
+	cdata->out->info_domain.exDate = epp_strdup(pool, c_domain->ExDate);
+	cdata->out->info_domain.registrant = epp_strdup(pool,
+			c_domain->Registrant);
+	cdata->out->info_domain.nsset  = epp_strdup(pool, c_domain->nsset);
+	cdata->out->info_domain.authInfo = epp_strdup(pool,
+			c_domain->AuthInfoPw);
 
 	/* allocate and initialize status, admin lists */
 	CL_NEW(cdata->out->info_domain.status);
 	for (i = 0; i < c_domain->stat._length; i++) {
-		item = malloc(sizeof *item);
-		CL_CONTENT(item) = (void *) strdup(c_domain->stat._buffer[i]);
+		item = epp_malloc(pool, sizeof *item);
+		CL_CONTENT(item) =
+			(void *) epp_strdup(pool, c_domain->stat._buffer[i]);
 		CL_ADD(cdata->out->info_domain.status, item);
 	}
 	CL_NEW(cdata->out->info_domain.admin);
 	for (i = 0; i < c_domain->admin._length; i++) {
-		item = malloc(sizeof *item);
-		CL_CONTENT(item) = (void *) strdup(c_domain->admin._buffer[i]);
+		item = epp_malloc(pool, sizeof *item);
+		CL_CONTENT(item) =
+			(void *) epp_strdup(pool, c_domain->admin._buffer[i]);
 		CL_ADD(cdata->out->info_domain.admin, item);
 	}
 	/* temporary stub until dnssec will be implemented */
@@ -973,19 +959,20 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 		{
 			ccReg_ENUMValidationExtension	*c_enumval =
 				c_domain->ext._buffer[i]._value;
+
 			cdata->out->info_domain.valExDate =
-				strdup(c_enumval->valExDate);
+				epp_strdup(pool, c_enumval->valExDate);
 		}
 	}
 	/* if valExDate was not given, then fill it with empty value */
 	if (cdata->out->info_domain.valExDate == NULL)
-		cdata->out->info_domain.valExDate = strdup("");
+		cdata->out->info_domain.valExDate = epp_strdup(pool, "");
 
 	CORBA_free(c_domain);
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -995,13 +982,17 @@ epp_call_info_domain(epp_corba_globs *globs, int session,
 /**
  * EPP info nsset.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
+epp_call_info_nsset(void *pool,
+		epp_corba_globs *globs,
+		int session,
+		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_NSSet	*c_nsset;
@@ -1045,59 +1036,44 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 	}
 
 	/* allocate needed structures */
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(c_nsset);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->info_nsset.status = malloc(sizeof *item)) == NULL) {
-		free(cdata->out);
-		cdata->out = NULL;
-		CORBA_free(c_nsset);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->info_nsset.ns = malloc(sizeof *item)) == NULL) {
-		free(cdata->out->info_nsset.status);
-		free(cdata->out);
-		cdata->out = NULL;
-		CORBA_free(c_nsset);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->info_nsset.tech = malloc(sizeof *item)) == NULL) {
-		free(cdata->out->info_nsset.ns);
-		free(cdata->out->info_nsset.status);
-		free(cdata->out);
-		cdata->out = NULL;
+	if (!(cdata->out = epp_calloc(pool, sizeof (*cdata->out)))
+		|| !(cdata->out->info_nsset.status =
+				epp_malloc(pool, sizeof *item))
+		|| !(cdata->out->info_nsset.ns =
+				epp_malloc(pool, sizeof *item))
+		|| !(cdata->out->info_nsset.tech =
+				epp_malloc(pool, sizeof *item)))
+	{
 		CORBA_free(c_nsset);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 
 	/* ok, now alomost everything was successfully allocated */
-	cdata->out->info_nsset.handle = strdup(c_nsset->handle);
-	cdata->out->info_nsset.roid = strdup(c_nsset->ROID);
-	cdata->out->info_nsset.clID = strdup(c_nsset->ClID);
-	cdata->out->info_nsset.crID = strdup(c_nsset->CrID);
-	cdata->out->info_nsset.upID = strdup(c_nsset->UpID);
-	cdata->out->info_nsset.crDate = strdup(c_nsset->CrDate);
-	cdata->out->info_nsset.upDate = strdup(c_nsset->UpDate);
-	cdata->out->info_nsset.trDate = strdup(c_nsset->TrDate);
-	cdata->out->info_nsset.authInfo = strdup(c_nsset->AuthInfoPw);
+	cdata->out->info_nsset.roid   = epp_strdup(pool, c_nsset->ROID);
+	cdata->out->info_nsset.handle = epp_strdup(pool, c_nsset->handle);
+	cdata->out->info_nsset.clID   = epp_strdup(pool, c_nsset->ClID);
+	cdata->out->info_nsset.crID   = epp_strdup(pool, c_nsset->CrID);
+	cdata->out->info_nsset.upID   = epp_strdup(pool, c_nsset->UpID);
+	cdata->out->info_nsset.crDate = epp_strdup(pool, c_nsset->CrDate);
+	cdata->out->info_nsset.upDate = epp_strdup(pool, c_nsset->UpDate);
+	cdata->out->info_nsset.trDate = epp_strdup(pool, c_nsset->TrDate);
+	cdata->out->info_nsset.authInfo = epp_strdup(pool, c_nsset->AuthInfoPw);
 
 	/* allocate and initialize status list */
 	CL_NEW(cdata->out->info_nsset.status);
 	for (i = 0; i < c_nsset->stat._length; i++) {
-		item = malloc(sizeof *item);
-		CL_CONTENT(item) = (void *) strdup(c_nsset->stat._buffer[i]);
+		item = epp_malloc(pool, sizeof *item);
+		CL_CONTENT(item) =
+			(void *) epp_strdup(pool, c_nsset->stat._buffer[i]);
 		CL_ADD(cdata->out->info_nsset.status, item);
 	}
 	/* allocate and initialize tech list */
 	CL_NEW(cdata->out->info_nsset.tech);
 	for (i = 0; i < c_nsset->tech._length; i++) {
-		item = malloc(sizeof *item);
-		CL_CONTENT(item) = (void *) strdup(c_nsset->tech._buffer[i]);
+		item = epp_malloc(pool, sizeof *item);
+		CL_CONTENT(item) =
+			(void *) epp_strdup(pool, c_nsset->tech._buffer[i]);
 		CL_ADD(cdata->out->info_nsset.tech, item);
 	}
 	/*
@@ -1108,27 +1084,27 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 		epp_ns	*item_ns;
 
 		/* ns item */
-		item = malloc(sizeof *item);
-		item_ns = malloc(sizeof *item_ns);
+		item = epp_malloc(pool, sizeof *item);
+		item_ns = epp_malloc(pool, sizeof *item_ns);
 		CL_CONTENT(item) = (void *) item_ns;
 		CL_ADD(cdata->out->info_nsset.ns, item);
 		/* content of ns item */
-		item_ns->name = strdup(c_nsset->dns._buffer[i].fqdn);
-		item_ns->addr = malloc(sizeof (struct circ_list));
+		item_ns->name = epp_strdup(pool, c_nsset->dns._buffer[i].fqdn);
+		item_ns->addr = epp_malloc(pool, sizeof (struct circ_list));
 		CL_NEW(item_ns->addr);
 		for (j = 0; j < c_nsset->dns._buffer[i].inet._length; j++) {
-			item = malloc(sizeof *item);
+			item = epp_malloc(pool, sizeof *item);
 			CL_CONTENT(item) = (void *)
-				strdup(c_nsset->dns._buffer[i].inet._buffer[j]);
+				epp_strdup(pool, c_nsset->dns._buffer[i].inet._buffer[j]);
 			CL_ADD(item_ns->addr, item);
 		}
 	}
 
 	CORBA_free(c_nsset);
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -1138,13 +1114,17 @@ epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata
 /**
  * EPP poll request.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
+epp_call_poll_req(void *pool,
+		epp_corba_globs *globs,
+		int session,
+		epp_command_data *cdata)
 {
 	ccReg_Response	*response;
 	CORBA_Environment	ev[1];
@@ -1192,7 +1172,7 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 		return CORBA_REMOTE_ERROR;
 	}
 
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(c_msg);
 		CORBA_free(c_qdate);
 		CORBA_free(response);
@@ -1201,15 +1181,15 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 
 	cdata->out->poll_req.count = c_count;
 	cdata->out->poll_req.msgid = c_msgID;
-	cdata->out->poll_req.qdate = strdup(c_qdate);
-	cdata->out->poll_req.msg = strdup(c_msg);
+	cdata->out->poll_req.qdate = epp_strdup(pool, c_qdate);
+	cdata->out->poll_req.msg = epp_strdup(pool, c_msg);
 
 	CORBA_free(c_msg);
 	CORBA_free(c_qdate);
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -1217,15 +1197,19 @@ epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 }
 
 /**
- * EPP poll acknoledge.
+ * EPP poll acknowledge.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
+epp_call_poll_ack(void *pool,
+		epp_corba_globs *globs,
+		int session,
+		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	CORBA_long	c_msgID;
@@ -1270,7 +1254,7 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 		return CORBA_REMOTE_ERROR;
 	}
 
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
@@ -1278,9 +1262,9 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 	cdata->out->poll_ack.count = c_count;
 	cdata->out->poll_ack.msgid = c_msgID;
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -1290,13 +1274,16 @@ epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 /**
  * EPP create domain.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_create_domain(epp_corba_globs *globs, int session,
+epp_call_create_domain(void *pool,
+		epp_corba_globs *globs,
+		int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -1336,7 +1323,7 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 	}
 	else {
 		c_ext_list->_maximum = c_ext_list->_length = 0;
-		c_ext_list->_release = CORBA_FALSE;
+		c_ext_list->_release = CORBA_TRUE;
 	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
@@ -1385,20 +1372,20 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 
-	cdata->out->create.crDate = strdup(c_crDate);
-	cdata->out->create.exDate = strdup(c_exDate);
+	cdata->out->create.crDate = epp_strdup(pool, c_crDate);
+	cdata->out->create.exDate = epp_strdup(pool, c_exDate);
 
 	CORBA_free(c_crDate);
 	CORBA_free(c_exDate);
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -1407,8 +1394,9 @@ epp_call_create_domain(epp_corba_globs *globs, int session,
 
 /**
  * Convert our SSN enum to IDL's SSNtyp enum.
- * @param our_ssn Out ssn's type.
- * @return SSN type as defined in IDL.
+ *
+ * @param our_ssn Our ssn's type.
+ * @return        SSN type as defined in IDL.
  */
 static ccReg_SSNtyp
 convSSNType(epp_ssnType our_ssn)
@@ -1425,8 +1413,9 @@ convSSNType(epp_ssnType our_ssn)
 
 /**
  * Function for conversion of our disclose flag to IDL's disclose flag.
+ *
  * @param flag Disclose flag to be converted.
- * @return Disclose flag of type defined in IDL.
+ * @return     Disclose flag of type defined in IDL.
  */
 static ccReg_Disclose
 convDiscl(char flag)
@@ -1444,13 +1433,16 @@ convDiscl(char flag)
 /**
  * EPP create contact.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_create_contact(epp_corba_globs *globs, int session,
+epp_call_create_contact(void *pool,
+		epp_corba_globs *globs,
+		int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -1476,6 +1468,7 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 	c_contact->DiscloseFlag = convDiscl(cdata->in->create_contact.discl->flag);
 	if (c_contact->DiscloseFlag != ccReg_DISCL_EMPTY) {
 		epp_discl	*discl = cdata->in->create_contact.discl;
+
 		c_contact->DiscloseName = (discl->name ? CORBA_TRUE : CORBA_FALSE);
 		c_contact->DiscloseOrganization = (discl->org ? CORBA_TRUE :CORBA_FALSE);
 		c_contact->DiscloseAddress = (discl->addr ? CORBA_TRUE : CORBA_FALSE);
@@ -1541,17 +1534,17 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 
-	cdata->out->create.crDate = strdup(c_crDate);
+	cdata->out->create.crDate = epp_strdup(pool, c_crDate);
 	CORBA_free(c_crDate);
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -1561,13 +1554,16 @@ epp_call_create_contact(epp_corba_globs *globs, int session,
 /**
  * EPP create nsset.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_create_nsset(epp_corba_globs *globs, int session,
+epp_call_create_nsset(void *pool,
+		epp_corba_globs *globs,
+		int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -1652,17 +1648,17 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 
-	cdata->out->create.crDate = strdup(c_crDate);
+	cdata->out->create.crDate = epp_strdup(pool, c_crDate);
 	CORBA_free(c_crDate);
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -1673,15 +1669,19 @@ epp_call_create_nsset(epp_corba_globs *globs, int session,
  * EPP delete for domain, nsset and contact is so similar that it is worth of
  * having the code in one function and pass object type as parameter.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @param obj Object type (see #epp_object_type)
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @param obj     Object type (see #epp_object_type)
+ * @return        Status.
  */
 static corba_status
-epp_call_delete(epp_corba_globs *globs, int session,
-		epp_command_data *cdata, epp_object_type obj)
+epp_call_delete(void *pool,
+		epp_corba_globs *globs,
+		int session,
+		epp_command_data *cdata,
+		epp_object_type obj)
 {
 	ccReg_Response *response;
 	CORBA_Environment ev[1];
@@ -1738,9 +1738,9 @@ epp_call_delete(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -1750,17 +1750,20 @@ epp_call_delete(epp_corba_globs *globs, int session,
 /**
  * EPP renew domain.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_renew_domain(epp_corba_globs *globs, int session,
+epp_call_renew_domain(void *pool,
+		epp_corba_globs *globs,
+		int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	ccReg_Response *response;
+	ccReg_Response	*response;
 	CORBA_char	*c_exDate;
 	ccReg_ExtensionList	*c_ext_list;
 	int	retr;
@@ -1826,17 +1829,17 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
+	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(c_exDate);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
-	cdata->out->renew.exDate = strdup(c_exDate);
+	cdata->out->renew.exDate = epp_strdup(pool, c_exDate);
 	CORBA_free(c_exDate);
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -1846,17 +1849,20 @@ epp_call_renew_domain(epp_corba_globs *globs, int session,
 /**
  * EPP update domain.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        status.
  */
 static corba_status
-epp_call_update_domain(epp_corba_globs *globs, int session,
+epp_call_update_domain(void *pool,
+		epp_corba_globs *globs,
+		int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	ccReg_Response *response;
+	ccReg_Response	*response;
 	ccReg_AdminContact	*c_admin_add;
 	ccReg_AdminContact	*c_admin_rem;
 	ccReg_Status	*c_status_add;
@@ -1908,7 +1914,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 				CL_CONTENT(cdata->in->update_domain.rem_status));
 	c_ext_list = ccReg_ExtensionList__alloc();
 	/* fill extension list if needed */
-	if (*cdata->in->update_domain.valExDate != '\0') {
+	if (*cdata->in->create_domain.valExDate != '\0') {
 		ccReg_ENUMValidationExtension	*c_enumval;
 
 		c_enumval = ccReg_ENUMValidationExtension__alloc();
@@ -1925,6 +1931,7 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 		c_ext_list->_maximum = c_ext_list->_length = 0;
 		c_ext_list->_release = CORBA_FALSE;
 	}
+
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -1973,9 +1980,9 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -1985,17 +1992,20 @@ epp_call_update_domain(epp_corba_globs *globs, int session,
 /**
  * EPP update contact.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_update_contact(epp_corba_globs *globs, int session,
+epp_call_update_contact(void *pool,
+		epp_corba_globs *globs,
+		int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	ccReg_Response *response;
+	ccReg_Response	*response;
 	ccReg_Status	*c_status_add;
 	ccReg_Status	*c_status_rem;
 	ccReg_ContactChange	*c_contact;
@@ -2104,9 +2114,9 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -2116,13 +2126,16 @@ epp_call_update_contact(epp_corba_globs *globs, int session,
 /**
  * EPP update nsset.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @return        Status.
  */
 static corba_status
-epp_call_update_nsset(epp_corba_globs *globs, int session,
+epp_call_update_nsset(void *pool,
+		epp_corba_globs *globs,
+		int session,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
@@ -2259,9 +2272,9 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -2272,15 +2285,19 @@ epp_call_update_nsset(epp_corba_globs *globs, int session,
  * EPP transfer for domain, contact and nsset is so similar that it is worth of
  * having the code in one function and pass object type as parameter.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @param obj Object type (see #epp_object_type).
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @param obj     Object type (see #epp_object_type).
+ * @return        Status.
  */
 static corba_status
-epp_call_transfer(epp_corba_globs *globs, int session,
-		epp_command_data *cdata, epp_object_type obj)
+epp_call_transfer(void *pool,
+		epp_corba_globs *globs,
+		int session,
+		epp_command_data *cdata,
+		epp_object_type obj)
 {
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
@@ -2340,9 +2357,9 @@ epp_call_transfer(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -2353,15 +2370,19 @@ epp_call_transfer(epp_corba_globs *globs, int session,
  * List command for domain, contact and nsset is so similar that it is worth of
  * having the code in one function and pass object type as parameter.
  *
- * @param globs Corba context.
+ * @param pool    Pool for memory allocations.
+ * @param globs   Corba context.
  * @param session Session identifier.
- * @param cdata Data from xml request.
- * @param obj Object type (see #epp_object_type).
- * @return status (see #corba_status).
+ * @param cdata   Data from xml request.
+ * @param obj     Object type (see #epp_object_type).
+ * @return        Status.
  */
 static corba_status
-epp_call_list(epp_corba_globs *globs, int session,
-		epp_command_data *cdata, epp_object_type obj)
+epp_call_list(void *pool,
+		epp_corba_globs *globs,
+		int session,
+		epp_command_data *cdata,
+		epp_object_type obj)
 {
 	CORBA_Environment	 ev[1];
 	ccReg_Response	*response;
@@ -2422,14 +2443,9 @@ epp_call_list(epp_corba_globs *globs, int session,
 		return CORBA_REMOTE_ERROR;
 	}
 
-	if ((cdata->out = calloc(1, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(response);
-		CORBA_free(c_handles);
-		return CORBA_INT_ERROR;
-	}
-	if ((cdata->out->list.handles = malloc(sizeof *item)) == NULL) {
-		free(cdata->out);
-		cdata->out = NULL;
+	if (!(cdata->out = epp_calloc(pool, sizeof (*cdata->out)))
+		|| !(cdata->out->list.handles = epp_malloc(pool, sizeof *item)))
+	{
 		CORBA_free(response);
 		CORBA_free(c_handles);
 		return CORBA_INT_ERROR;
@@ -2438,15 +2454,15 @@ epp_call_list(epp_corba_globs *globs, int session,
 
 	for (i = 0; i < c_handles->_length; i++) {
 		/* if malloc fails we will silently ignore the rest of handles */
-		if ((item = malloc(sizeof *item)) == NULL) break;
-		CL_CONTENT(item) = strdup(c_handles->_buffer[i]);
+		if ((item = epp_malloc(pool, sizeof *item)) == NULL) break;
+		CL_CONTENT(item) = epp_strdup(pool, c_handles->_buffer[i]);
 		CL_ADD(cdata->out->list.handles, item);
 	}
 	CORBA_free(c_handles);
 
-	get_errors(cdata->errors, &response->errors);
-	cdata->svTRID = strdup(response->svTRID);
-	cdata->msg = strdup(response->errMsg);
+	get_errors(pool, cdata->errors, &response->errors);
+	cdata->svTRID = epp_strdup(pool, response->svTRID);
+	cdata->msg = epp_strdup(pool, response->errMsg);
 	cdata->rc = response->errCode;
 
 	CORBA_free(response);
@@ -2454,104 +2470,93 @@ epp_call_list(epp_corba_globs *globs, int session,
 }
 
 corba_status
-epp_call_cmd(epp_corba_globs *globs, int session, epp_command_data *cdata,
-		unsigned long long *timebefore, unsigned long long *timeafter)
+epp_call_cmd(void *pool,
+		epp_corba_globs *globs,
+		int session,
+		epp_command_data *cdata)
 {
 	corba_status	cstat;
-	struct timeval	tv; /* for meassuring of time spent in parser */
 
-	/* get current time with microsecond resulution */
-	*timebefore = 0;
-	*timeafter = 0;
-	timerclear(&tv);
-	if (gettimeofday(&tv, NULL) == 0)
-		*timebefore = tv.tv_sec * 1000000 + tv.tv_usec;
-	
 	switch (cdata->type) {
 		case EPP_DUMMY:
-			cstat = epp_call_dummy(globs, session, cdata);
+			cstat = epp_call_dummy(pool, globs, session, cdata);
 			break;
 		case EPP_CHECK_CONTACT:
-			cstat = epp_call_check(globs, session, cdata, EPP_CONTACT);
+			cstat = epp_call_check(pool, globs, session, cdata, EPP_CONTACT);
 			break;
 		case EPP_CHECK_DOMAIN:
-			cstat = epp_call_check(globs, session, cdata, EPP_DOMAIN);
+			cstat = epp_call_check(pool, globs, session, cdata, EPP_DOMAIN);
 			break;
 		case EPP_CHECK_NSSET:
-			cstat = epp_call_check(globs, session, cdata, EPP_NSSET);
+			cstat = epp_call_check(pool, globs, session, cdata, EPP_NSSET);
 			break;
 		case EPP_INFO_CONTACT:
-			cstat = epp_call_info_contact(globs, session, cdata);
+			cstat = epp_call_info_contact(pool, globs, session, cdata);
 			break;
 		case EPP_INFO_DOMAIN:
-			cstat = epp_call_info_domain(globs, session, cdata);
+			cstat = epp_call_info_domain(pool, globs, session, cdata);
 			break;
 		case EPP_INFO_NSSET:
-			cstat = epp_call_info_nsset(globs, session, cdata);
+			cstat = epp_call_info_nsset(pool, globs, session, cdata);
 			break;
 		case EPP_LIST_CONTACT:
-			cstat = epp_call_list(globs, session, cdata, EPP_CONTACT);
+			cstat = epp_call_list(pool, globs, session, cdata, EPP_CONTACT);
 			break;
 		case EPP_LIST_DOMAIN:
-			cstat = epp_call_list(globs, session, cdata, EPP_DOMAIN);
+			cstat = epp_call_list(pool, globs, session, cdata, EPP_DOMAIN);
 			break;
 		case EPP_LIST_NSSET:
-			cstat = epp_call_list(globs, session, cdata, EPP_NSSET);
+			cstat = epp_call_list(pool, globs, session, cdata, EPP_NSSET);
 			break;
 		case EPP_POLL_REQ:
-			cstat = epp_call_poll_req(globs, session, cdata);
+			cstat = epp_call_poll_req(pool, globs, session, cdata);
 			break;
 		case EPP_POLL_ACK:
-			cstat = epp_call_poll_ack(globs, session, cdata);
+			cstat = epp_call_poll_ack(pool, globs, session, cdata);
 			break;
 		case EPP_CREATE_CONTACT:
-			cstat = epp_call_create_contact(globs, session, cdata);
+			cstat = epp_call_create_contact(pool, globs, session, cdata);
 			break;
 		case EPP_CREATE_DOMAIN:
-			cstat = epp_call_create_domain(globs, session, cdata);
+			cstat = epp_call_create_domain(pool, globs, session, cdata);
 			break;
 		case EPP_CREATE_NSSET:
-			cstat = epp_call_create_nsset(globs, session, cdata);
+			cstat = epp_call_create_nsset(pool, globs, session, cdata);
 			break;
 		case EPP_DELETE_CONTACT:
-			cstat = epp_call_delete(globs, session, cdata, EPP_CONTACT);
+			cstat = epp_call_delete(pool, globs, session, cdata, EPP_CONTACT);
 			break;
 		case EPP_DELETE_DOMAIN:
-			cstat = epp_call_delete(globs, session, cdata, EPP_DOMAIN);
+			cstat = epp_call_delete(pool, globs, session, cdata, EPP_DOMAIN);
 			break;
 		case EPP_DELETE_NSSET:
-			cstat = epp_call_delete(globs, session, cdata, EPP_NSSET);
+			cstat = epp_call_delete(pool, globs, session, cdata, EPP_NSSET);
 			break;
 		case EPP_RENEW_DOMAIN:
-			cstat = epp_call_renew_domain(globs, session, cdata);
+			cstat = epp_call_renew_domain(pool, globs, session, cdata);
 			break;
 		case EPP_UPDATE_DOMAIN:
-			cstat = epp_call_update_domain(globs, session, cdata);
+			cstat = epp_call_update_domain(pool, globs, session, cdata);
 			break;
 		case EPP_UPDATE_CONTACT:
-			cstat = epp_call_update_contact(globs, session, cdata);
+			cstat = epp_call_update_contact(pool, globs, session, cdata);
 			break;
 		case EPP_UPDATE_NSSET:
-			cstat = epp_call_update_nsset(globs, session, cdata);
+			cstat = epp_call_update_nsset(pool, globs, session, cdata);
 			break;
 		case EPP_TRANSFER_CONTACT:
-			cstat = epp_call_transfer(globs, session, cdata, EPP_CONTACT);
+			cstat = epp_call_transfer(pool, globs, session, cdata, EPP_CONTACT);
 			break;
 		case EPP_TRANSFER_DOMAIN:
-			cstat = epp_call_transfer(globs, session, cdata, EPP_DOMAIN);
+			cstat = epp_call_transfer(pool, globs, session, cdata, EPP_DOMAIN);
 			break;
 		case EPP_TRANSFER_NSSET:
-			cstat = epp_call_transfer(globs, session, cdata, EPP_NSSET);
+			cstat = epp_call_transfer(pool, globs, session, cdata, EPP_NSSET);
 			break;
 		default:
 			cstat = CORBA_INT_ERROR;
 			break;
 	}
-
-	/* get end time */
-	timerclear(&tv);
-	if (gettimeofday(&tv, NULL) == 0)
-		*timeafter = tv.tv_sec * 1000000 + tv.tv_usec;
 
 	return cstat;
 }

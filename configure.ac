@@ -1,5 +1,6 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
+# vim: set ts=4 sw=4:
 
 AC_PREREQ(2.59)
 AC_INIT([mod_eppd], 1.0, [], [mod_eppd])
@@ -129,6 +130,7 @@ fi
 AC_CHECK_FILE([$DOXYGEN], [], [AC_MSG_NOTICE(
 			   [doxygen executable "$DOXYGEN" not found, you will not be able to generate html documentation])])
 
+#
 # check svn revision (if available)
 #
 AC_SUBST([SVNREV], [unknown])
@@ -144,7 +146,16 @@ else
 	AC_MSG_RESULT([$SVNREV])
 fi
 AC_DEFINE_UNQUOTED([SVN_REV], [["]$SVNREV["]], [SVN revision])
-#AC_DEFINE([SVN_REV], [], [Description])
+
+#
+# check perf option
+#
+AC_ARG_ENABLE([profiling],
+			  AS_HELP_STRING([--enable-profiling], [enable simple profiling support]),
+			  profiling=$enableval)
+if test "$profiling" = "yes"; then
+	AC_DEFINE([EPP_PERF], [1], [Profiling support])
+fi
 
 # finalization
 AC_CONFIG_HEADERS([config.h])

@@ -21,14 +21,18 @@
  * validator.
  */
 typedef struct {
+	void	*pool; /**< Pool to allocate memory from. */
 	struct circ_list	*err_list;	/**< List of encountered errors. */
 	xmlDocPtr	doc;	/**< XML document. */
 }valerr_ctx;
 
 /**
- * This is a callback for validator errors. Purpose is to cumulate
- * all encountered errors in a list, which is further processed after
- * the validation is done.
+ * This is a callback for validator errors.
+ *
+ * Purpose is to cumulate all encountered errors in a list, which is further
+ * processed after the validation is done. If any malloc inside this routine
+ * fails, the error is silently dropped and is not queued in the list of
+ * errors. That makes algorithm a bit less complicated.
  *
  * @param ctx Hook's context pointer.
  * @param error Specification of encountered error.
@@ -46,13 +50,11 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 	/* get context parameters */
 	struct circ_list	*error_list = ((valerr_ctx *) ctx)->err_list;
 	xmlDocPtr	doc = ((valerr_ctx *) ctx)->doc;
+	void	*pool = ((valerr_ctx *) ctx)->pool;
 
 	/* in case of allocation failure simply don't log the error and exit */
-	if ((valerr = malloc(sizeof *valerr)) == NULL) return;
-	if ((new_item = malloc(sizeof *new_item)) == NULL) {
-		free(valerr);
-		return;
-	}
+	if ((valerr = epp_malloc(pool, sizeof *valerr)) == NULL) return;
+	if ((new_item = epp_malloc(pool, sizeof *new_item)) == NULL) return;
 
 	/*
 	 * xmlError has quite a lot of fields, we are interested only in 3
@@ -65,13 +67,12 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 	 * valerr->code = error->code;
 	 */
 
-	/* get error message */
+	/*
+	 * get error message (we don't use strdup because we have to
+	 * truncate trailing newline)
+	 */
 	len = strlen(error->message);
-	if ((valerr->reason = malloc(len)) == NULL) {
-		free(valerr);
-		free(new_item);
-		return;
-	}
+	if ((valerr->reason = (char *) epp_malloc(pool, len)) == NULL) return;
 	strncpy(valerr->reason, error->message, --len); /* truncate trailing \n */
 	(valerr->reason)[len] = '\0';
 	node = (xmlNodePtr) error->node;
@@ -91,16 +92,11 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 
 	/* get content of problematic tag */
 	buf = xmlBufferCreate();
-	if (buf == NULL)
-		valerr->value = strdup("unknown");
-	else {
-		if (xmlNodeDump(buf, doc, node, 0, 0) < 0)
-			valerr->value = strdup("unknown");
-		else {
-			valerr->value = strdup((char *) buf->content);
-		}
-		xmlBufferFree(buf);
-	}
+	if (buf == NULL) return;
+	if (xmlNodeDump(buf, doc, node, 0, 0) < 0) return;
+	valerr->value = epp_strdup(pool, (char *) buf->content);
+	xmlBufferFree(buf);
+	if (valerr->value == NULL) return;
 	valerr->standalone = 1;	/* the surrounding tag is included */
 
 	/* enqueue new error item */
@@ -109,7 +105,10 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 }
 
 valid_status
-validate_doc(xmlSchemaPtr schema, xmlDocPtr doc, struct circ_list *err_list)
+validate_doc(void *pool,
+		xmlSchemaPtr schema,
+		xmlDocPtr doc,
+		struct circ_list *err_list)
 {
 	xmlSchemaValidCtxtPtr	svctx;	/* schema validator context */
 	valerr_ctx	ctx;	/* context used for validator's error hook */
@@ -122,6 +121,7 @@ validate_doc(xmlSchemaPtr schema, xmlDocPtr doc, struct circ_list *err_list)
 	/* initialize error hook's context */
 	ctx.err_list = err_list;
 	ctx.doc = doc;
+	ctx.pool = pool;
 	xmlSchemaSetValidStructuredErrors(svctx, validerr_callback, &ctx);
 	/* validate request against schema */
 	rc = xmlSchemaValidateDoc(svctx, doc);
@@ -139,3 +139,4 @@ validate_doc(xmlSchemaPtr schema, xmlDocPtr doc, struct circ_list *err_list)
 	return VAL_OK;
 }
 
+/* vim: set ts=4 sw=4: */

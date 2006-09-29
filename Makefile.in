@@ -74,7 +74,7 @@ uninstall:
 mod_eppd.so: $(MOD_OBJS)
 	$(CC) -Wl,-rpath $(AP_INSTALLDIR) -Bshareable -shared -o mod_eppd.so $(LDFLAGS) $(LIBS) $(AP_LDFLAGS) $(ORB_LDFLAGS) $(AP_LIBS) $(XML_LIBS) $(MOD_OBJS)
 
-mod_eppd.o: mod_eppd.c epp_parser.h epp_gen.h epp-client.h epp_common.h config.h
+mod_eppd.o:	mod_eppd.c epp_parser.h epp_gen.h epp-client.h epp_common.h config.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(AP_CPPFLAGS) $(AP_CFLAGS) $(AP_INCLUDE) $(DEFS) -c mod_eppd.c
 
 epp_xmlcommon.o: epp_xmlcommon.c epp_xmlcommon.h epp_common.h config.h
@@ -98,11 +98,11 @@ ${IDLPREFIX}-common.o: ${IDLPREFIX}-common.c ${IDLPREFIX}.h
 ${IDLPREFIX}-stubs.o: ${IDLPREFIX}-stubs.c ${IDLPREFIX}.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(ORB_CFLAGS) $(DEFS) -c ${IDLPREFIX}-stubs.c
 
-test: test.o $(OBJS) config.h
+test: test.o $(OBJS)
 	$(CC) $(LDFLAGS) $(LIBS) $(ORB_LDFLAGS) $(XML_LIBS) -o test test.o $(OBJS)
 
-test.o: test.c epp_common.h epp_parser.h epp_gen.h epp-client.h
-	$(CC) -c test.c -DSCHEMA=\"$(SCHEMA)\"
+test.o: test.c epp_common.h epp_parser.h epp_gen.h epp-client.h config.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEFS) -DSCHEMA=\"$(SCHEMA)\" -c test.c
 
 $(IDLOUT): $(IDL)
 	$(ORBIT-IDL) --noskels $(IDL)

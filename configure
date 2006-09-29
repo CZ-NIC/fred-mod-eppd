@@ -798,6 +798,11 @@ if test -n "$ac_init_help"; then
    esac
   cat <<\_ACEOF
 
+Optional Features:
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --with-profiling        enable simple profiling support
+
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
@@ -3275,6 +3280,7 @@ echo "$as_me: doxygen executable \"$DOXYGEN\" not found, you will not be able to
 fi
 
 
+#
 # check svn revision (if available)
 #
 SVNREV=unknown
@@ -3359,7 +3365,22 @@ cat >>confdefs.h <<_ACEOF
 #define SVN_REV "$SVNREV"
 _ACEOF
 
-#AC_DEFINE([SVN_REV], [], [Description])
+
+#
+# check perf option
+#
+# Check whether --enable-profiling or --disable-profiling was given.
+if test "${enable_profiling+set}" = set; then
+  enableval="$enable_profiling"
+  profiling=$enableval
+fi;
+if test "$profiling" = "yes"; then
+
+cat >>confdefs.h <<\_ACEOF
+#define EPP_PERF 1
+_ACEOF
+
+fi
 
 # finalization
           ac_config_headers="$ac_config_headers config.h"

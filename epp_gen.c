@@ -11,8 +11,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <sys/time.h>
 
 #include <libxml/parser.h>
 #include <libxml/xmlschemas.h>
@@ -79,7 +77,7 @@
  */
 
 gen_status
-epp_gen_greeting(const char *svid, const char *date, char **greeting)
+epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
@@ -153,7 +151,7 @@ greeting_err:
 	xmlFreeTextWriter(writer);
 	if (!error_seen) {
 		/* successful end */
-		*greeting = strdup((char *) buf->content);
+		*greeting = epp_strdup(pool, (char *) buf->content);
 		xmlBufferFree(buf);
 		return GEN_OK;
 	}
@@ -182,7 +180,8 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	START_ELEMENT(writer, simple_err, "contact:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
-	WRITE_ELEMENT(writer, simple_err, "contact:id", cdata->out->info_contact.handle);
+	WRITE_ELEMENT(writer, simple_err, "contact:id",
+			cdata->out->info_contact.handle);
 	WRITE_ELEMENT(writer, simple_err, "contact:roid",
 			cdata->out->info_contact.roid);
 	CL_RESET(cdata->out->info_contact.status);
@@ -268,34 +267,34 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "contact:vat",
 			cdata->out->info_contact.vat);
 	if (*cdata->out->info_contact.ssn != '\0') {
-		char	*type;
+		char	type[15];
 
 		switch (cdata->out->info_contact.ssntype) {
 			case SSN_OP:
-				type = strdup("op");
+				snprintf(type, 14, "%s", "op");
 				break;
 			case SSN_RC:
-				type = strdup("rc");
+				snprintf(type, 14, "%s", "rc");
 				break;
 			case SSN_PASSPORT:
-				type = strdup("passport");
+				snprintf(type, 14, "%s", "passport");
 				break;
 			case SSN_MPSV:
-				type = strdup("mpsv");
+				snprintf(type, 14, "%s", "mpsv");
 				break;
 			case SSN_ICO:
-				type = strdup("ico");
+				snprintf(type, 14, "%s", "ico");
 				break;
 			default:
 				/* what should we do? We will create nonvalidating document. */
-				type = strdup("unknown");
+				snprintf(type, 14, "%s", "unknown");
 				break;
 		}
+		type[14] = '\0';
 		START_ELEMENT(writer, simple_err, "contact:ssn");
 		WRITE_ATTRIBUTE(writer, simple_err, "type", type);
 		WRITE_STRING(writer, simple_err, cdata->out->info_contact.ssn);
 		END_ELEMENT(writer, simple_err); /* ssn */
-		free(type);
 	}
 	WRITE_ELEMENT(writer, simple_err, "contact:notifyEmail",
 			cdata->out->info_contact.notify_email);
@@ -318,13 +317,12 @@ simple_err:
 static char
 gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
-	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
-
 	START_ELEMENT(writer, simple_err, "resData");
 	START_ELEMENT(writer, simple_err, "domain:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_DOMAIN);
-	WRITE_ELEMENT(writer, simple_err, "domain:name",cdata->out->info_domain.handle);
+	WRITE_ELEMENT(writer, simple_err, "domain:name",
+			cdata->out->info_domain.handle);
 	WRITE_ELEMENT(writer, simple_err, "domain:roid",
 			cdata->out->info_domain.roid);
 	CL_RESET(cdata->out->info_domain.status);
@@ -380,6 +378,7 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 					cdata->out->info_domain.valExDate);
 			END_ELEMENT(writer, simple_err); /* infdata (enumval) */
 		}
+#ifdef SECDNS_ENABLED
 		/*
 		 * NOTE: This does not have any effect because ds records are
 		 * initialized to empty list in corba component untill the dnssec
@@ -426,6 +425,7 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 			}
 			END_ELEMENT(writer, simple_err); // infdata (secdns)
 		}
+#endif
 		END_ELEMENT(writer, simple_err); /* extension */
 	}
 	return 1;
@@ -449,8 +449,8 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 	START_ELEMENT(writer, simple_err, "nsset:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_NSSET);
-	WRITE_ELEMENT(writer, simple_err, "nsset:id",cdata->out->info_nsset.handle);
-	WRITE_ELEMENT(writer, simple_err, "nsset:roid",cdata->out->info_nsset.roid);
+	WRITE_ELEMENT(writer, simple_err, "nsset:id", cdata->out->info_nsset.handle);
+	WRITE_ELEMENT(writer, simple_err, "nsset:roid", cdata->out->info_nsset.roid);
 	/* status flags */
 	CL_RESET(cdata->out->info_nsset.status);
 	CL_FOREACH(cdata->out->info_nsset.status) {
@@ -516,7 +516,7 @@ simple_err:
  * the function).
  */
 static void
-complete_tags(epp_error	*e)
+complete_tags(void *pool, epp_error	*e)
 {
 	char	*newstr;
 	int	len;
@@ -528,7 +528,7 @@ complete_tags(epp_error	*e)
 		case errspec_pollAck_msgID:
 			len += strlen("<poll op=\"ack\" msgID=\"");
 			len += strlen("\"/>");
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<poll op=\"ack\" msgID=\"");
 			strcat(newstr, e->value);
@@ -537,7 +537,7 @@ complete_tags(epp_error	*e)
 		case errspec_contactUpdate_cc:
 		case errspec_contactCreate_cc:
 			len += 2 * strlen("<cc>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<cc>");
 			strcat(newstr, e->value);
@@ -548,7 +548,7 @@ complete_tags(epp_error	*e)
 		case errspec_nssetInfo_handle:
 		case errspec_nssetCreate_handle:
 			len += 2 * strlen("<id>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<id>");
 			strcat(newstr, e->value);
@@ -557,7 +557,7 @@ complete_tags(epp_error	*e)
 		case errspec_domainInfo_fqdn:
 		case errspec_domainCreate_fqdn:
 			len += 2 * strlen("<name>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<name>");
 			strcat(newstr, e->value);
@@ -571,7 +571,7 @@ complete_tags(epp_error	*e)
 		case errspec_domainUpdate_status_rem:
 			len += strlen("<status s=\"");
 			len += strlen("\"/>");
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<status s=\"");
 			strcat(newstr, e->value);
@@ -581,7 +581,7 @@ complete_tags(epp_error	*e)
 		case errspec_nssetUpdate_tech_add:
 		case errspec_nssetUpdate_tech_rem:
 			len += 2 * strlen("<tech>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<tech>");
 			strcat(newstr, e->value);
@@ -591,7 +591,7 @@ complete_tags(epp_error	*e)
 		case errspec_nssetUpdate_ns_name_add:
 		case errspec_nssetUpdate_ns_name_rem:
 			len += 2 * strlen("<name>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<name>");
 			strcat(newstr, e->value);
@@ -601,7 +601,7 @@ complete_tags(epp_error	*e)
 		case errspec_nssetUpdate_ns_addr_add:
 		case errspec_nssetUpdate_ns_addr_rem:
 			len += 2 * strlen("<addr>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<addr>");
 			strcat(newstr, e->value);
@@ -610,7 +610,7 @@ complete_tags(epp_error	*e)
 		case errspec_domainCreate_registrant:
 		case errspec_domainUpdate_registrant:
 			len += 2 * strlen("<registrant>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<registrant>");
 			strcat(newstr, e->value);
@@ -619,7 +619,7 @@ complete_tags(epp_error	*e)
 		case errspec_domainCreate_nsset:
 		case errspec_domainUpdate_nsset:
 			len += 2 * strlen("<nsset>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<nsset>");
 			strcat(newstr, e->value);
@@ -628,7 +628,7 @@ complete_tags(epp_error	*e)
 		case errspec_domainCreate_period:
 		case errspec_domainRenew_period:
 			len += 2 * strlen("<period>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<period>");
 			strcat(newstr, e->value);
@@ -638,7 +638,7 @@ complete_tags(epp_error	*e)
 		case errspec_domainUpdate_admin_add:
 		case errspec_domainUpdate_admin_rem:
 			len += 2 * strlen("<admin>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<admin>");
 			strcat(newstr, e->value);
@@ -648,7 +648,7 @@ complete_tags(epp_error	*e)
 		case errspec_domainUpdate_ext_valdate:
 		case errspec_domainRenew_ext_valDate:
 			len += 2 * strlen("<valExDate>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<valExDate>");
 			strcat(newstr, e->value);
@@ -656,7 +656,7 @@ complete_tags(epp_error	*e)
 			break;
 		case errspec_domainRenew_curExpDate:
 			len += 2 * strlen("<curExpDate>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<curExpDate>");
 			strcat(newstr, e->value);
@@ -664,48 +664,40 @@ complete_tags(epp_error	*e)
 			break;
 		default:
 			len += 2 * strlen("<unknown>") + 1;
-			newstr = malloc(len + 1);
+			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
 			strcat(newstr, "<unknown>");
 			strcat(newstr, e->value);
 			strcat(newstr, "</unknown>");
 			break;
 	}
-	free(e->value);
 	e->value = newstr;
 }
 
 gen_status
 epp_gen_response(
+		void *pool,
 		int validate,
 		void *schema,
 		epp_lang lang,
 		epp_command_data *cdata,
-		epp_gen *gen,
-		unsigned long long *timestart,
-		unsigned long long *timeend)
+		char **response,
+		struct circ_list **valerr)
 {
 	xmlBufferPtr buf;
 	xmlTextWriterPtr writer;
 	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	res_code[5];
 	char	error_seen = 1;
-	struct timeval	tv; /* for meassuring of time spent in parser */
 	gen_status	ret;
 
-	/* get current time with microsecond resulution */
-	*timestart = 0;
-	*timeend = 0;
-	timerclear(&tv);
-	if (gettimeofday(&tv, NULL) == 0)
-		*timestart = tv.tv_sec * 1000000 + tv.tv_usec;
-
+	assert(pool != NULL);
 	assert(schema != NULL);
 	assert(cdata != NULL);
 
 	/* initialize default return values */
-	gen->response = NULL;
-	gen->valerr = NULL;
+	*response = NULL;
+	*valerr = NULL;
 
 	// make up response
 	buf = xmlBufferCreate();
@@ -747,7 +739,7 @@ epp_gen_response(
 		 * by &lt;, &gt; respectively.
 		 */
 		START_ELEMENT(writer, simple_err, "value");
-		if (!e->standalone) complete_tags(e);
+		if (!e->standalone) complete_tags(pool, e);
 		if (xmlTextWriterWriteRaw(writer, BAD_CAST e->value) < 0)
 			goto simple_err;
 		END_ELEMENT(writer, simple_err); /* value */
@@ -1029,7 +1021,7 @@ simple_err:
 		return GEN_EBUILD;
 	}
 
-	gen->response = strdup((char *) buf->content);
+	*response = epp_strdup(pool, (char *) buf->content);
 	xmlBufferFree(buf);
 
 	ret = GEN_OK;
@@ -1040,20 +1032,20 @@ simple_err:
 		valid_status	val_ret;
 
 		/* parse xml request */
-		doc = xmlParseMemory(gen->response, strlen(gen->response));
+		doc = xmlParseMemory(*response, strlen(*response));
 		if (doc == NULL) return GEN_NOT_XML;
 
 		/*
 		 * create validation error callback and initialize list which is used
 		 * for error cumulation.
 		 */
-		if ((gen->valerr = malloc(sizeof (*gen->valerr))) == NULL) {
+		if ((*valerr = epp_malloc(pool, sizeof (**valerr))) == NULL) {
 			xmlFreeDoc(doc);
 			return GEN_EINTERNAL;
 		}
-		CL_NEW(gen->valerr);
+		CL_NEW(*valerr);
 
-		val_ret = validate_doc((xmlSchemaPtr) schema, doc, gen->valerr);
+		val_ret = validate_doc(pool, (xmlSchemaPtr) schema, doc, *valerr);
 		switch (val_ret) {
 			case VAL_OK:
 				ret = GEN_OK;
@@ -1075,31 +1067,7 @@ simple_err:
 		xmlFreeDoc(doc);
 	}
 
-	/* get end time */
-	timerclear(&tv);
-	if (gettimeofday(&tv, NULL) == 0)
-		*timeend = tv.tv_sec * 1000000 + tv.tv_usec;
-
 	return ret;
 }
 
-void epp_free_gen(epp_gen *gen)
-{
-	assert(gen != NULL);
-	if (gen->response != NULL) free(gen->response);
-	if (gen->valerr != NULL) {
-		CL_FOREACH(gen->valerr) {
-			epp_error	*e = CL_CONTENT(gen->valerr);
-			free(e->value);
-			free(e->reason);
-			free(e);
-		}
-		cl_purge(gen->valerr);
-	}
-}
-
-void epp_free_greeting(char *greeting)
-{
-	assert(greeting != NULL);
-	free(greeting);
-}
+/* vim: set ts=4 sw=4: */

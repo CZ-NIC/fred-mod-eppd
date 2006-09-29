@@ -456,7 +456,7 @@ typedef struct {
 		}check;
 		/* additional info contact parameters */
 		struct {
-			char    *handle;
+			char	*handle;
 			char	*roid;
 			struct circ_list	*status;
 			epp_postalInfo	*postalInfo;
@@ -499,7 +499,7 @@ typedef struct {
 		}info_domain;
 		/* additional info nsset parameters */
 		struct {
-			char    *handle;
+			char	*handle;
 			char	*roid;
 			struct circ_list	*status;
 			char	*clID;

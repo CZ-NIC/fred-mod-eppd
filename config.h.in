@@ -24,6 +24,9 @@
 /* SVN revision */
 #undef SVN_REV
 
+/* Profiling support */
+#undef EPP_PERF
+
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const
 

@@ -29,21 +29,3 @@ inline void cl_purge(struct circ_list *cl)
 		free(cl);
 }
 
-void *epp_malloc(void *pool, unsigned size)
-{
-	/* noop */
-	return NULL;
-}
-
-void *epp_calloc(void *pool, unsigned size)
-{
-	/* noop */
-	return NULL;
-}
-
-void *epp_strdup(void *pool, char *str)
-{
-	/* noop */
-	return NULL;
-}
-

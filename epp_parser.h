@@ -50,31 +50,21 @@ void epp_parser_init_cleanup(void *schema);
 /**
  * This is the main workhorse of parser component. It's task is to parse
  * request and get data saved in structure.
+ * @param pool	Pool to allocate memory from.
  * @param session	Client's session identifier.
  * @param schema	Parsed xml schema used for validation.
  * @param request	Request to be processed.
  * @param bytes	Length of the request.
- * @param cdata Output of parsing stage (xml converted to structure).
- * @param timestart Time in microseconds at begining of function (perf data).
- * @param timeend Time in microseconds at end of function (perf data).
+ * @param cdata Output of parsing stage (xml data converted to structure).
  * @return Status of parsing.
  */
 parser_status
 epp_parse_command(
+		void *pool,
 		int session,
 		void *schema,
 		const char *request,
 		unsigned bytes,
-		epp_command_data *cdata,
-		unsigned long long *timestart,
-		unsigned long long *timeend);
-
-/**
- * Cleanup routine taking care of releasing resources pointed by pointers
- * inside cdata structure. All members except the output values (products
- * of corba component) are expected to have value (to be non-NULL).
- * @param cdata Structure containing resources which should be released.
- */
-void epp_command_data_cleanup(epp_command_data *cdata);
+		epp_command_data **cdata);
 
 #endif /* EPP_PARSER_H */

@@ -145,6 +145,60 @@ static apr_global_mutex_t *epp_log_lock;
 #endif
 
 /**
+ * Wrapper around apache's apr_palloc() which allocates memory from
+ * a pool.
+ *
+ * This function is exported in header file to be used
+ * by other modules which are not aware of apache pools.
+ *
+ * @param pool Apache pool pointer.
+ * @param size Size of chunk to allocate.
+ * @return     Allocated chunk.
+ */
+void *epp_malloc(void *pool, unsigned size)
+{
+	apr_pool_t	*p = (apr_pool_t *) pool;
+
+	return apr_palloc(p, size);
+}
+
+/**
+ * Wrapper around apache's apr_pcalloc() which allocates memory from
+ * a pool.
+ *
+ * This function is exported in header file to be used
+ * by other modules which are not aware of apache pools.
+ *
+ * @param pool Apache pool pointer.
+ * @param size Size of chunk to allocate.
+ * @return     Allocated chunk.
+ */
+void *epp_calloc(void *pool, unsigned size)
+{
+	apr_pool_t	*p = (apr_pool_t *) pool;
+
+	return apr_pcalloc(p, size);
+}
+
+/**
+ * Wrapper around apache's apr_strdup() which allocates memory from
+ * a pool.
+ *
+ * This function is exported in header file to be used
+ * by other modules which are not aware of apache pools.
+ *
+ * @param pool Apache pool pointer.
+ * @param str  String which is going to be duplicated.
+ * @return     Duplicated string.
+ */
+void *epp_strdup(void *pool, char *str)
+{
+	apr_pool_t	*p = (apr_pool_t *) pool;
+
+	return apr_pstrdup(p, str);
+}
+
+/**
  * Get well formatted time used in log file as a timestamp.
  *
  * @param buf Buffer to print time into.
@@ -446,7 +500,7 @@ static int get_md5(char *cert_md5, char *pem)
  */
 static int epp_process_connection(conn_rec *c)
 {
-	int	session;	/* session = 0 when not autenticated yet */
+	int	session;	/* session = 0 when not authenticated yet */
 	unsigned	lang;	/* session's language */
 	int	logout;	/* if true, terminate request loop */
 	int	firsttime;	/* if true, generate greeting in request loop */
@@ -480,12 +534,23 @@ static int epp_process_connection(conn_rec *c)
 	logout = 0;
 	while (!logout) {
 		apr_pool_t	*rpool;	/* memory pool used for duration of a request */
-		epp_command_data	cdata;	/* self-descriptive data structure */
-		epp_gen	gen;	/* generated answer and possibly encountered errors */
+		epp_command_data	*cdata;	/* self-descriptive data structure */
+		char	*response;	/* generated XML answer to client */
+		struct circ_list	*valerr; /* possibly encountered errors when
+			validating response */
 		parser_status	pstat;	/* parser's return code */
-		unsigned long long	times[6]; /* array of times for perf measurement */
+#ifdef EPP_PERF
+		/*
+		 * array of timestamps for perf measurement:
+		 *     time[0] - before parsing
+		 *     time[1] - after parsing and before corba call
+		 *     time[2] - after corba call and before response generation
+		 *     time[3] - after response generation
+		 */
+		apr_time_t	times[4];
 
-		bzero(times, 6 * sizeof(unsigned long long));
+		bzero(times, 4 * sizeof(times[0]));
+#endif
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
 		apr_pool_tag(rpool, "EPP_request");
@@ -515,15 +580,18 @@ static int epp_process_connection(conn_rec *c)
 				break;
 			}
 
-			/* initialize cdata structure */
-			bzero(&cdata, sizeof cdata);
-
+#ifdef EPP_PERF
+			times[0] = apr_time_now();
+#endif
 			/*
 			 * deliver request to XML parser, the task of parser is to fill
 			 * cdata structure with data
 			 */
-			pstat = epp_parse_command(session, sc->schema, request, bytes,
-					&cdata, &times[0], &times[1]);
+			pstat = epp_parse_command((void *) rpool, session, sc->schema,
+					request, bytes, &cdata);
+#ifdef EPP_PERF
+			times[1] = apr_time_now();
+#endif
 		}
 
 		switch (pstat) {
@@ -559,13 +627,12 @@ static int epp_process_connection(conn_rec *c)
 		/* is it <hello> frame? */
 		if (pstat == PARSER_HELLO) {
 			int	rc;
-			char	version_buf[101];
-			char	curdate_buf[51];
+			char	*version;
+			char	*curdate;
 			gen_status	gstat;	/* generator's return code */
 
 			/* get info from CR used in <greeting> frame */
-			rc = epp_call_hello(sc->corba_globs, version_buf, 100,
-					curdate_buf, 50);
+			rc = epp_call_hello(rpool, sc->corba_globs, &version, &curdate);
 
 			if (rc == 0) {
 				epplog(c, rpool, session, EPP_ERROR,
@@ -573,20 +640,23 @@ static int epp_process_connection(conn_rec *c)
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 
+#ifdef EPP_PERF
+			times[2] = apr_time_now();
+#endif
 			/*
 			 * generate greeting (server name is concatenation of string
 			 * given in apache's configuration file and string retrieved
 			 * from corba server through version() function)
 			 */
-			gstat = epp_gen_greeting(
-					apr_pstrcat(rpool,sc->servername," (",version_buf,")",NULL),
-					curdate_buf, &gen.response);
+			gstat = epp_gen_greeting(rpool,
+					apr_pstrcat(rpool,sc->servername, " (", version, ")", NULL),
+					curdate, &response);
 			if (gstat != GEN_OK) {
 				epplog(c, rpool, session, EPP_FATAL,
 						"Error when creating epp greeting");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-			gen.valerr = NULL;
+			valerr = NULL;
 		}
 		/* it is a command */
 		else {
@@ -618,7 +688,6 @@ static int epp_process_connection(conn_rec *c)
 							"Error when getting client's PEM certificate. "
 							"Did you forget \"SSLVerifyClient require\" "
 							"directive in apache's conf?");
-					epp_command_data_cleanup(&cdata);
 					return HTTP_INTERNAL_SERVER_ERROR;
 				}
 
@@ -634,22 +703,20 @@ static int epp_process_connection(conn_rec *c)
 				 *     side of central repository. The identifing parameter
 				 *     is md5 digest of client's certificate.
 				 */
-				cstat = epp_call_login(sc->corba_globs, &session, &lang,
-						cert_md5, &cdata);
+				cstat = epp_call_login(rpool, sc->corba_globs, &session, &lang,
+						cert_md5, cdata);
 			}
 			else if (pstat == PARSER_CMD_LOGOUT) {
-				cstat = epp_call_logout(sc->corba_globs, session,
-						&cdata, &logout);
+				cstat = epp_call_logout(rpool, sc->corba_globs, session,
+						cdata, &logout);
 			}
 			else {
 				/* go ahead to generic corba function call */
-				cstat = epp_call_cmd(sc->corba_globs, session, &cdata,
-						&times[2], &times[3]);
+				cstat = epp_call_cmd(rpool, sc->corba_globs, session, cdata);
 			}
 
 			/* catch corba failures */
 			if (cstat != CORBA_OK) {
-				epp_command_data_cleanup(&cdata);
 				switch (cstat) {
 					case CORBA_ERROR:
 						epplog(c, rpool, session, EPP_ERROR,
@@ -672,11 +739,12 @@ static int epp_process_connection(conn_rec *c)
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 
+#ifdef EPP_PERF
+			times[2] = apr_time_now();
+#endif
 			/* generate xml response */
-			gstat = epp_gen_response(sc->valid_resp, sc->schema,
-					lang, &cdata, &gen, &times[4], &times[5]);
-
-			epp_command_data_cleanup(&cdata); /* not needed anymore */
+			gstat = epp_gen_response(rpool, sc->valid_resp, sc->schema,
+					lang, cdata, &response, &valerr);
 
 			switch (gstat) {
 				case GEN_OK:
@@ -712,9 +780,9 @@ static int epp_process_connection(conn_rec *c)
 					epplog(c, rpool, session, EPP_ERROR,
 							"Generated response does not validate");
 					/* print more detailed information about validation errors */
-					if (gen.valerr != NULL) {
-						CL_FOREACH(gen.valerr) {
-							epp_error	*e = CL_CONTENT(gen.valerr);
+					if (valerr != NULL) {
+						CL_FOREACH(valerr) {
+							epp_error	*e = CL_CONTENT(valerr);
 							epplog(c, rpool, session, EPP_ERROR,
 									"Element: %s", e->value);
 							epplog(c, rpool, session, EPP_ERROR,
@@ -729,23 +797,25 @@ static int epp_process_connection(conn_rec *c)
 			}
 		}
 
+#ifdef EPP_PERF
+		times[3] = apr_time_now();
+#endif
 		/* send response back to client */
-		apr_brigade_puts(bb, NULL, NULL, gen.response);
-		epplog(c, rpool, session, EPP_DEBUG, "Response content: %s",
-				gen.response);
+		apr_brigade_puts(bb, NULL, NULL, response);
+		epplog(c, rpool, session, EPP_DEBUG, "Response content: %s", response);
+#ifdef EPP_PERF
 		/*
 		 * record perf data
 		 * apache 2.0 has problem with processing %llu formating, therefore
 		 * we overtype the results to a more common numeric values
 		 */
-		epplog(c, rpool, session, EPP_DEBUG, "Perf data: %u, %u, %u, "
-				"%u, %u",
-				(unsigned int) (times[1] - times[0]), /* parser */
-				(unsigned int) (times[2] - times[1]),   /* the between */
-				(unsigned int) (times[3] - times[2]), /* CORBA */
-				(unsigned int) (times[4] - times[3]),   /* the between */
-				(unsigned int) (times[5] - times[4]));/* generator */
-		epp_free_gen(&gen);
+		epplog(c, rpool, session, EPP_DEBUG, "Perf data: p(%u), c(%u), "
+				"g(%u), s(%u)",
+				(unsigned) (times[1] - times[0]), /* parser */
+				(unsigned) (times[2] - times[1]), /* CORBA */
+				(unsigned) (times[3] - times[2]), /* generator */
+				(unsigned) (apr_time_now() - times[3]));/* send */
+#endif
 		status = ap_fflush(c->output_filters, bb);
 		if (status != APR_SUCCESS) {
 			epplog(c, rpool, session, EPP_FATAL,

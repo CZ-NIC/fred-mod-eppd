@@ -1,5 +1,7 @@
-#include <stdio.h>
+#define _GNU_SOURCE
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #include "epp_common.h"
 #include "epp_parser.h"
@@ -8,6 +10,119 @@
 
 #define MAX_LENGTH	10000
 #define MAX_FILE_NAME   256
+
+#define INITIAL_CHUNK 1024
+#define MAX_STR_LEN	100000
+#define DEBUG_ALLOC 1
+
+/* memory pool structure */
+typedef struct {
+	struct circ_list *chunks;
+#ifdef DEBUG_ALLOC
+	unsigned count;
+	unsigned bytes;
+#endif
+}pool_t;
+
+/*
+ * Memory Pool routines
+ */
+static void *create_pool(void)
+{
+	pool_t	*p;
+
+	p = (pool_t *) malloc(sizeof *p);
+	if (p == NULL) return NULL;
+	p->chunks = (struct circ_list *) malloc(sizeof (*p->chunks));
+	if (p->chunks == NULL) {
+		free(p);
+		return NULL;
+	}
+	CL_NEW(p->chunks);
+#ifdef DEBUG_ALLOC
+	p->count = 0;
+	p->bytes = 0;
+#endif
+	return (void *) p;
+}
+
+static void destroy_pool(void *pool)
+{
+	pool_t	*p = (pool_t *) pool;
+
+#ifdef DEBUG_ALLOC
+	fprintf(stderr, "Destroying pool:\n");
+	fprintf(stderr, "    Allocated:   %8u B\n", p->bytes);
+	fprintf(stderr, "    # of allocs: %8u\n", p->count);
+#endif
+
+	CL_RESET(p->chunks);
+	CL_FOREACH(p->chunks) free(CL_CONTENT(p->chunks));
+	cl_purge(p->chunks);
+	free(p);
+}
+
+static void *epp_alloc(pool_t *p, unsigned size, int prezero)
+{
+	struct circ_list	*item;
+	void	*chunk;
+
+	item = (struct circ_list *) malloc(sizeof *item);
+	if (item == NULL)
+		return NULL;
+
+	chunk = (void *) malloc(size);
+	if (chunk == NULL) {
+		free(item);
+		return NULL;
+	}
+
+	if (prezero)
+		memset(chunk, 0, size);
+
+	CL_CONTENT(item) = chunk;
+	CL_ADD(p->chunks, item);
+#ifdef DEBUG_ALLOC
+	p->bytes += size;
+	p->count++;
+#endif
+
+	return chunk;
+}
+
+void *epp_malloc(void *pool, unsigned size)
+{
+	pool_t *p = (pool_t *) pool;
+
+	return epp_alloc(p, size, 0);
+}
+
+void *epp_calloc(void *pool, unsigned size)
+{
+	pool_t *p = (pool_t *) pool;
+
+	return epp_alloc(p, size, 1);
+}
+
+void *epp_strdup(void *pool, char *str)
+{
+	pool_t	*p = (pool_t *) pool;
+	unsigned	len;
+	char	*new_str;
+
+	if (str == NULL)
+		return NULL;
+	len = strnlen(str, MAX_STR_LEN);
+	if (len == MAX_STR_LEN)
+		return NULL;
+	new_str = (char *) epp_alloc(p, len + 1, 0);
+	if (new_str == NULL)
+		return NULL;
+	memcpy(new_str, str, len);
+	new_str[len] = '\0';
+	return new_str;
+}
+
 
 typedef enum {
 	CMD_UNKNOWN,
@@ -82,8 +197,6 @@ int readfile(char *text)
 	return 1;
 }
 
-
-
 int openfile(char *text , char *filename )
 {
 	int c;
@@ -116,19 +229,18 @@ int main(int argc, char *argv[])
 	char	*greeting;
 	int	session;
 	epp_lang	lang;
-	epp_command_data cdata;
+	epp_command_data *cdata;
 	char text[MAX_LENGTH];
 	char quit = 0;
-        int ar = 1; 
+	int ar = 1; 
 	cmd_t cmd;
 	parser_status	pstat;
 	corba_status	cstat;
 	gen_status	gstat;
-	char version_buf[101];
-	char curdate_buf[51];
 	char fp[] = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
-	unsigned long long notused1, notused2;
 	void	*schema;
+	void	*pool;
+	int	firsttime;
 
 	/* API: init parser */
 	schema = epp_parser_init(SCHEMA);
@@ -139,29 +251,23 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	/* API: greeting */
-	if (epp_call_hello(corba_globs, version_buf, 100, curdate_buf, 50) == 0) {
-		fputs("Could not get version from CR\n", stderr);
-		return 1;
-	}
-	gstat = epp_gen_greeting(version_buf, curdate_buf, &greeting);
-	if (gstat != GEN_OK) {
-		fputs("Error in greeting generator\n", stderr);
-		return 1;
-	}
-	else {
-		puts(greeting);
-
-		/* API: free greeting data */
-		epp_free_greeting(greeting);
-	}
-
 	session = 0;
 	lang = LANG_EN;
+	firsttime = 1;
 
 	while (1) {
-		 if( argc == 1 ) /* interaktivni rezim */
-		 {
+
+		if ((pool = create_pool()) == NULL) {
+			fputs("Could not create memory pool\n", stderr);
+			return 1;
+		}
+		if (firsttime) {
+			firsttime = 0;
+			pstat = PARSER_HELLO;
+		}
+		else {
+		  if( argc == 1 ) /* interaktivni rezim */
+		  {
 
 			fputs("Command: ", stderr);
 			switch (cmd = getcmd()) 
@@ -178,76 +284,85 @@ int main(int argc, char *argv[])
 					break;
 				default:
 					fputs("Unknown command\n", stderr);
+					destroy_pool(pool);
 					continue;
 			}
-			if (quit) break;
+			if (quit) {
+				destroy_pool(pool);
+				break;
+			}
 		  }
 		  else { 
 			  cmd = CMD_FILE;
 			  if( ar < argc ) 
-				{
-				  openfile(text , argv[ar] );
-				  ar ++ ; 
-				 } 
-			  else {  quit = 1; break;   } 
+			  {
+				  openfile(text , argv[ar++] );
+			  } 
+			  else {
+				  destroy_pool(pool);
+				  break;
+			  } 
 		  }
 
-		bzero(&cdata, sizeof cdata);
-
-		// show file
-		if( argc > 1 ) {
+		  // show file
+		  if( argc > 1 ) {
 			fprintf( stderr ,  "epp_parse_command\n" );
 			printf("\n%s\n" ,   text );
-		}
+		  }
 
-		/* API: process command */
-		pstat = epp_parse_command(session, schema , text,
-				strlen(text), &cdata, &notused1, &notused2);
+		  /* API: process command */
+		  pstat = epp_parse_command(pool, session, schema , text,
+				strlen(text), &cdata);
+		}
 		if (pstat == PARSER_HELLO) {
+			char *version;
+			char *curdate;
+
 			/* API: greeting */
-			if (epp_call_hello(corba_globs, version_buf, 100, curdate_buf, 50)
-					== 0) {
+			if (epp_call_hello(pool, corba_globs, &version, &curdate) == 0) {
 				fputs("Could not get version from CR\n", stderr);
+				destroy_pool(pool);
 				return 1;
 			}
-			gstat = epp_gen_greeting(version_buf, curdate_buf, &greeting);
+			gstat = epp_gen_greeting(pool, version, curdate, &greeting);
 			if (gstat != GEN_OK) {
 				fputs("Error when creating epp greeting\n", stderr);
+				destroy_pool(pool);
 				return 1;
 			}
 			puts(greeting);
 
 			/* API: free greeting data */
-			epp_free_greeting(greeting);
+			destroy_pool(pool);
 			continue;
 		}
 		else if (pstat == PARSER_CMD_LOGOUT) {
 			int logout; // not used
 
 			/* API: corba call */
-			cstat = epp_call_logout(corba_globs, session, &cdata, &logout);
+			cstat = epp_call_logout(pool, corba_globs, session, cdata, &logout);
 		}
 		else if (pstat == PARSER_CMD_LOGIN) {
 			/* API: corba call */
-			cstat = epp_call_login(corba_globs, &session, &lang, fp, &cdata);
+			cstat = epp_call_login(pool, corba_globs, &session, &lang, fp, cdata);
 		}
-		else if (pstat == PARSER_CMD_OTHER || pstat == PARSER_NOT_VALID)
-		{
+		else if (pstat == PARSER_CMD_OTHER || pstat == PARSER_NOT_VALID) {
 			/* API: corba call */
-			cstat = epp_call_cmd(corba_globs, session, &cdata, &notused1,
-					&notused2);
+			cstat = epp_call_cmd(pool, corba_globs, session, cdata);
 		}
 		else {
 			fputs("XML PARSER error\n", stderr);
+			destroy_pool(pool);
 			continue;
 		}
 
 		if (cstat == CORBA_OK) {
-			epp_gen	gen;
+			char	*response;
+			struct circ_list	*valerr;
 
 			/* API: generate response */
-			gstat = epp_gen_response(1, schema , lang, &cdata,
-					&gen, &notused1, &notused2);
+			gstat = epp_gen_response(pool, 1, schema , lang, cdata,
+					&response, &valerr);
 			switch (gstat) {
 				/*
 				 * following errors are serious and response cannot be sent
@@ -265,42 +380,36 @@ int main(int argc, char *argv[])
 				 */
 				case GEN_NOT_XML:
 					fputs("Response is not XML!!\n", stderr);
-					puts(gen.response);
-					epp_free_gen(&gen);
+					puts(response);
 					break;
 				case GEN_EINTERNAL:
 					fputs("Internal error when validating response\n", stderr);
-					puts(gen.response);
-					epp_free_gen(&gen);
+					puts(response);
 					break;
 				case GEN_ESCHEMA:
 					fputs("Error when parsing schema\n", stderr);
-					puts(gen.response);
-					epp_free_gen(&gen);
+					puts(response);
 					break;
 				case GEN_NOT_VALID:
 					fputs("Server response does not validate\n", stderr);
-					if (gen.valerr != NULL) {
-						CL_FOREACH(gen.valerr) {
-							epp_error	*e = CL_CONTENT(gen.valerr);
+					if (valerr != NULL) {
+						CL_FOREACH(valerr) {
+							epp_error	*e = CL_CONTENT(valerr);
 							fprintf(stderr, "\tElement: %s\n", e->value);
 							fprintf(stderr, "\tReason: %s\n", e->reason);
 						}
 					}
-					puts(gen.response);
-					epp_free_gen(&gen);
+					puts(response);
 					break;
 				default:
 					/* GEN_OK */
-					puts(gen.response);
-					epp_free_gen(&gen);
+					puts(response);
 					break;
 			}
 		}
 		else fputs("Corba call failed\n", stderr);
 
-		/* API: clean up command data */
-		epp_command_data_cleanup(&cdata);
+		destroy_pool(pool);
 	}
 
 	/* API: clean up globs */
@@ -309,3 +418,5 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+
+/* vim: set ts=4 sw=4: */
