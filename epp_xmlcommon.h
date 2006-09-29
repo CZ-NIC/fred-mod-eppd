@@ -37,20 +37,20 @@
  * Enumaration of statuses returned by validator.
  */
 typedef enum {
-	VAL_OK,	/**< Document is valid. */
-	VAL_NOT_VALID,	/**< Document does not validate. */
-	VAL_ESCHEMA,	/**< Error when loading or parsing schema. */
-	VAL_EINTERNAL,	/**< Internal error (malloc failed). */
+	VAL_OK,        /**< Document is valid. */
+	VAL_NOT_VALID, /**< Document does not validate. */
+	VAL_ESCHEMA,   /**< Error when loading or parsing schema. */
+	VAL_EINTERNAL, /**< Internal error (malloc failed). */
 }valid_status;
 
 /**
  * Function for validating xml document.
  *
- * @param pool Pool to allocate memory from.
- * @param url_schema Location of schema used for validation.
- * @param doc XML document.
+ * @param pool     Pool to allocate memory from.
+ * @param schema   Schema used for validation.
+ * @param doc      XML document.
  * @param err_list Initialized and empty list for storing encountered errors.
- * @return Status (see #valid_status).
+ * @return         Status.
  */
 valid_status validate_doc(void *pool,
 		xmlSchemaPtr schema,

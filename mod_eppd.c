@@ -105,31 +105,29 @@ module AP_MODULE_DECLARE_DATA eppd_module;
  */
 static APR_OPTIONAL_FN_TYPE(ssl_var_lookup) *epp_ssl_lookup = NULL;
 
-/**
- * Log levels used for logging to eppd log file.
- */
+/** Log levels used for logging to eppd log file. */
 typedef enum {
-	EPP_FATAL = 1,	/**< Serious error, the module is not in operational state.*/
-	EPP_ERROR,	/**< Error caused usually by client, module is operational. */
-	EPP_WARNING,	/**< Errors which are not serious but should be logged. */
-	EPP_INFO,	/**< This is the default log level. */
-	EPP_DEBUG	/**< Contents of requests and responses are logged. */
+	EPP_FATAL = 1, /**< Serious error, the module is not in operational state. */
+	EPP_ERROR,     /**< Error caused usually by client, module is operational. */
+	EPP_WARNING,   /**< Errors which are not serious but should be logged. */
+	EPP_INFO,      /**< This is the default log level. */
+	EPP_DEBUG      /**< Contents of requests and responses are logged. */
 }epp_loglevel;
 
 /**
  * Configuration structure of eppd module.
  */
 typedef struct {
-	int	epp_enabled;	/**< Decides whether mod_eppd is enabled for host. */
-	char	*servername;	/**< Epp server name used in <greeting> frame. */
-	char	*ns_loc;	/**< Location of CORBA nameservice. */
-	char	*object;	/**< Name under which is object known to nameservice. */
-	void	*schema;	/**< URL of EPP schema (use just path). */
-	int	valid_resp;	/**< Validate responses before sending them to client. */
-	epp_corba_globs	*corba_globs;	/**< Variables needed for corba submodule. */
-	char	*epplog;	/**< Epp log filename. */
-	apr_file_t	*epplogfp;	/**< File descriptor of epp log file. */
-	epp_loglevel	loglevel;	/**< Epp log level. */
+	int	epp_enabled;     /**< Decides whether mod_eppd is enabled for host. */
+	char	*servername; /**< Epp server name used in <greeting> frame. */
+	char	*ns_loc;     /**< Location of CORBA nameservice. */
+	char	*object;     /**< Name under which is object known to nameservice. */
+	void	*schema;     /**< URL of EPP schema (use just path). */
+	int	valid_resp;      /**< Validate responses before sending them to client.*/
+	epp_corba_globs	*corba_globs; /**< Variables needed for corba submodule. */
+	char	*epplog;              /**< Epp log filename. */
+	apr_file_t	*epplogfp;        /**< File descriptor of epp log file. */
+	epp_loglevel	loglevel;     /**< Epp log level. */
 }eppd_server_conf;
 
 /** Used for access serialization to epp log file. */
@@ -220,20 +218,20 @@ static void current_logtime(char *buf, int nbytes)
 /**
  * Write a log message to eppd log file.
  *
- * @param c Connection record.
- * @param p A pool from which to allocate strings for internal use.
+ * @param c       Connection record.
+ * @param p       A pool from which to allocate strings for internal use.
  * @param session Session ID of the client.
- * @param level Log level #epp_loglevel.
- * @param fmt Printf-style format string.
+ * @param level   Log level.
+ * @param fmt     Printf-style format string.
  */
 static void epplog(conn_rec *c, apr_pool_t *p, int session, epp_loglevel level,
 						const char *fmt, ...)
 {
-    char	*logline;	/* the actual text written to log file */
-	char	*text;	/* log message as passed from client */
-	char	timestr[80];	/* buffer for timestamp */
-    const char	*rhost;	/* ip address of remote host */
-    apr_size_t	nbytes;	/* length of logline */
+    char	*logline;    /* the actual text written to log file */
+	char	*text;       /* log message as passed from client */
+	char	timestr[80]; /* buffer for timestamp */
+    const char	*rhost;  /* ip address of remote host */
+    apr_size_t	nbytes;  /* length of logline */
     apr_status_t	rv;
     va_list	ap;
     eppd_server_conf *sc = (eppd_server_conf *)
@@ -1144,13 +1142,14 @@ static const char *set_epp_object(cmd_parms *cmd, void *dummy,
 
 /**
  * Handler for apache's configuration directive "EPPschema".
+ *
  * The xml schema file is herewith read and parsed and stays in use for life-time
  * of apache. So you have to restart the apache if you want to change schema.
  *
- * @param cmd Command structure.
- * @param dummy Not used parameter.
- * @param a1 The file with xml schema of EPP protocol.
- * @return Error string in case of failure otherwise NULL.
+ * @param cmd       Command structure.
+ * @param dummy     Not used parameter.
+ * @param schemaurl The file with xml schema of EPP protocol.
+ * @return          Error string in case of failure otherwise NULL.
  */
 static const char *set_schema(cmd_parms *cmd, void *dummy,
 		const char *schemaurl)

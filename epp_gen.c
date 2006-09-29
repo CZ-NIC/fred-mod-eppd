@@ -2,7 +2,9 @@
  * @file epp_gen.c
  *
  * Component for generating greeting frame and responses to EPP commands
- * in form of xml documents. Result of generator is the generated string
+ * in form of xml documents.
+ *
+ * Result of generator is the generated string
  * and validation errors if validation of responses is turned on. Greeting
  * frame is not validated, therefore only string is returned (without the list
  * of validation errors).
@@ -512,8 +514,9 @@ simple_err:
  * provided, when it is done this way. But untill we find better solution
  * this is sufficient.
  *
- * @param e Error specification (the field e->value is changed inside
- * the function).
+ * @param pool   Pool to allocate memory from.
+ * @param e      Error specification (the field e->value is changed inside
+ *               the function).
  */
 static void
 complete_tags(void *pool, epp_error	*e)

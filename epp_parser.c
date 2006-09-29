@@ -1,7 +1,8 @@
-/*
+/**
  * @file epp_parser.c
  *
  * Component for parsing EPP requests in form of xml documents.
+ *
  * The product is a data structure which contains data from xml document.
  * This file also contains routine which handles deallocation of this
  * structure. Currently the component is based on libxml library.
@@ -288,14 +289,17 @@ xpath_get_attr(
 
 /**
  * Into list are put the values of attributes of elements described by xpath
- * expression. There may be more elements matching xpath expression, their
+ * expression.
+ *
+ * There may be more elements matching xpath expression, their
  * content is copied in a list.
  *
- * @param pool Memory pool to allocate memory from.
- * @param list Allocated list where the list items will be added.
- * @param ctx  XPath context pointer.
- * @param expr XPath expression which describes a xml node.
- * @return If succesfull 1, in case of failure 0.
+ * @param pool   Memory pool to allocate memory from.
+ * @param list   Allocated list where the list items will be added.
+ * @param ctx    XPath context pointer.
+ * @param expr   XPath expression which describes a xml node.
+ * @param attr   Attribute name.
+ * @return       If succesfull 1, in case of failure 0.
  */
 static int
 xpath_getn_attrs(
@@ -1563,16 +1567,16 @@ parse_update_contact(
 	XCHK(cdata->in->update_contact.ssn = xpath_get1_upd(pool, xpathCtx,
 			"contact:chg/contact:ssn"), error);
 	cdata->in->update_contact.ssntype = SSN_UNKNOWN;
-	if (*cdata->in->create_contact.ssn != '\0' ||
-			*cdata->in->create_contact.ssn != BS_CHAR) {
+	if (*cdata->in->update_contact.ssn != '\0' &&
+			*cdata->in->update_contact.ssn != BS_CHAR) {
 		char	*str;
 
 		XCHK(str = xpath_get_attr(pool, xpathCtx, "contact:chg/contact:ssn",
 				"type", 1), error);
 		if (*str != '\0') {
-			cdata->in->create_contact.ssntype = string2ssntype(str);
+			cdata->in->update_contact.ssntype = string2ssntype(str);
 			/* schema and source code is out of sync if following error occurs */
-			assert(cdata->in->create_contact.ssntype != SSN_UNKNOWN);
+			assert(cdata->in->update_contact.ssntype != SSN_UNKNOWN);
 		}
 		else {
 			/* create our custom error */
@@ -1668,6 +1672,8 @@ parse_update_contact(
 		is_addr = xpath_exists(xpathCtx,
 				"contact:chg/contact:postalInfo/contact:addr");
 	}
+	else
+		is_addr = 0;
 	XCHK(cdata->in->update_contact.postalInfo->name = (is_pi) ?
 			xpath_get1_upd(pool, xpathCtx,
 				"contact:chg/contact:postalInfo/contact:name"):
@@ -1704,7 +1710,7 @@ parse_update_contact(
 			{
 				cdata->in->update_contact.postalInfo->street[i] =
 						epp_strdup(pool, TEXT_CONTENT(xpathObj, i));
-				if (cdata->in->create_contact.postalInfo->street[i] == NULL) {
+				if (cdata->in->update_contact.postalInfo->street[i] == NULL) {
 					xmlXPathFreeObject(xpathObj);
 					goto error;
 				}
@@ -1724,7 +1730,7 @@ parse_update_contact(
 		xmlXPathFreeObject(xpathObj);
 	}
 	else {
-		/* fill empty strings in address fields */
+		/* fill empty strings in street fields */
 		XCHK(cdata->in->update_contact.postalInfo->street[0] =
 				epp_strdup(pool, ""), error);
 		XCHK(cdata->in->update_contact.postalInfo->street[1] =

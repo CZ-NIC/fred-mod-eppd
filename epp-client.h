@@ -1,5 +1,6 @@
 /**
  * @file epp-client.h
+ *
  * Interface definition of corba module.
  */
 #ifndef EPP_CLIENT_H
@@ -63,7 +64,7 @@ epp_corba_init_cleanup(epp_corba_globs *corba_globs);
  */
 int
 epp_call_hello(void *pool,
-		epp_corba_globs *globs,
+		epp_corba_globs *corba_globs,
 		char **version,
 		char **curdate);
 

@@ -1,7 +1,10 @@
 /**
  * @file epp-client.c
+ *
  * Corba component is used for communication between apache module and
- * central repository. Input are self-descriptive data stored in structure
+ * central repository.
+ *
+ * Input are self-descriptive data stored in structure
  * ussually called cdata. Output data are returned via the same structure.
  * Purpose of this module is to hide the complexity of communication behind
  * simple API defined in epp-client.h. The function names are analogical
@@ -146,9 +149,9 @@ epp_corba_init_cleanup(epp_corba_globs *globs)
  * This function helps to convert error codes for incorrect parameter location
  * used in IDL to error codes understandable by the rest of the module.
  *
- * @param pool    Pool for memory allocations.
- * @param cerrors Buffer of errors used as input.
- * @param errors  List of errors - converted errors (output).
+ * @param pool     Pool for memory allocations.
+ * @param errors   List of errors - converted errors (output).
+ * @param c_errors Buffer of errors used as input.
  */
 static void get_errors(void *pool,
 		struct circ_list *errors,
