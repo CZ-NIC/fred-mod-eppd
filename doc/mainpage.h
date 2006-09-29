@@ -48,6 +48,7 @@
  *   - context:      global config, virtual host
  *   - description:
  *         Activates epp module.
+ *   .
  * 
  *   name: EPPnameservice
  *   - value:        host[:port]
@@ -57,6 +58,7 @@
  *         A location of CORBA nameservice where the module asks for EPP object.
  *         Obtained reference is used for lifetime of process so it is best
  *         to restart the apache when you change the object on other side.
+ *   .
  * 
  *   name: EPPobject
  *   - value:        token
@@ -64,6 +66,7 @@
  *   - context:      global config, virtual host
  *   - description:
  *         Name under which is the EPP object known to CORBA nameservice.
+ *   .
  * 
  *   name: EPPschema
  *   - value:        path
@@ -72,6 +75,7 @@
  *   - description:
  *         A location of xsd file (xml schema) describing EPP protocol. It is
  *         used for validation of incomming and outcomming messages.
+ *   .
  * 
  *   name: EPPservername
  *   - value:        quoted string
@@ -79,6 +83,7 @@
  *   - context:      global config, virtual host
  *   - description:
  *         Name of the server used in EPP greeting frame.
+ *   .
  * 
  *   name: EPPlog
  *   - value:        path
@@ -87,6 +92,7 @@
  *   - description:
  *         Log file of mod_eppd. It is not an error not to set log file,
  *         in that case all messages will be logged to apache's error log.
+ *   .
  * 
  *   name: EPPloglevel
  *   - value:        fatal, error, warning, info, debug
@@ -94,6 +100,7 @@
  *   - context:      global config, virtual host
  *   - description:
  *         Log verbosity.
+ *   .
  * 
  *   name: EPPvalidResponse
  *   - value:        On, Off
@@ -105,6 +112,7 @@
  *         proceeds as normaly. This is very handy for verifing good operation
  *         of the server. On the other hand it will slow down server quite a
  *         bit.
+ *   .
  * 
  * Example configuration suited for production might look like this:
  *
@@ -132,4 +140,54 @@
    SSLCACertificateFile  /etc/apache2/certs/server.crt
  </VirtualHost>
  @endverbatim
+ *
+ * @section memory Memory management
+ *
+ * Apache introduces memory pools, which should minimize danger of memory
+ * leaks. Of course libraries which we use (libxml and ORBit) are not
+ * aware of these pools and they allocate memory by traditional malloc.
+ * But everywhere where it is possible, we try to use apache pools for
+ * allocations. Apache header files are not included directly in theese
+ * files but rather mod_eppd.c exports wrappers for memory allocations
+ * to be used in other files. For each request is created dedicated pool,
+ * which is destroyed when the request is answered.
+ *
+ * @section make Building and installing the module
+ *
+ * Module comes with configure script, which should hide differences
+ * among Fedora, Gentoo, Debian and Ubuntu linux distributions. Other
+ * distribution let alone UNIX-like operating systems where not tested.
+ * The following parameters in addition to standard ones are recognized
+ * by the configure script:
+ *
+ *     - --with-profiling       Enable simple profiling support.
+ *     - --with-idl             Location of IDL file.
+ *     - --with-schema          Location of epp xmlschema.
+ *     .
+ * Following options doesn't have to be ussualy specified since tools'
+ * location is automatically found by configure:
+ *
+ *     - --with-apr-config      Location of apr-config tool.
+ *     - --with-apu-config      Location of apu-config tool.
+ *     - --with-apxs            Location of apxs tool.
+ *     - --with-orbit-idl       Location of ORBit IDL compiler.
+ *     - --with-pkg-config      Location of pkg-config tool.
+ *     - --with-pkg-config      Location of pkg-config tool.
+ *     - --with-pkg-config      Location of doxygen tool.
+ *     .
+ *
+ * The module is built by the traditional way: ./configure && make && make
+ * install. The module is installed in directory where reside other apache
+ * modules. Together with module are installed xmlschema files in subdirectory
+ * "schemas" in apache configuration directory.
+ *
+ * @section trouble Troubleshooting
+ *
+ * The best friend is mod_eppd's log (the one configured in apache's config).
+ * In case of serious error the message is written to stderr instead of the
+ * log, so you will find it in apache's error log. If you can't still localize
+ * the problem, module comes with test program "test". This binary is easy
+ * to debug in gdb and in 99% of cases are the bugs from mod_eppd reproducible
+ * by this binary.
+ *
  */

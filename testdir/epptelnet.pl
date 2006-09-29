@@ -168,9 +168,6 @@ while(1)
 			{
 			Net::SSLeay::write($ssl, ($header . $_));
 			my $tmp = $header . $_;
-			open(DAT,">temp") || die("Cannot Open File");
-			print DAT "$tmp";
-			close (DAT);
 			}
 		else
 			{ print S $header, $_; }
