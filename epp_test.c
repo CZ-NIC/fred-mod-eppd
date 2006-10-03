@@ -223,6 +223,23 @@ int openfile(char *text , char *filename )
 	return 1;
 }
 
+void usage(void)
+{
+	fprintf(stderr, "Usage:\n    epp_test [options] [file1 file2 ...]\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Options:\n");
+	fprintf(stderr, "      -f fingerprint\n");
+	fprintf(stderr, "      -h host\n");
+	fprintf(stderr, "      -s schema\n");
+	fprintf(stderr, "      -t           (run in test mode)\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Return codes:\n");
+	fprintf(stderr, "       0    Success\n");
+	fprintf(stderr, "       1    Internal error\n");
+	fprintf(stderr, "       2    Nameservice failure\n");
+	fprintf(stderr, "       3    CORBA call failed\n");
+}
+
 int main(int argc, char *argv[])
 {
 	void	*corba_globs;
@@ -232,42 +249,92 @@ int main(int argc, char *argv[])
 	epp_command_data *cdata;
 	char text[MAX_LENGTH];
 	char quit = 0;
-	int ar = 1; 
 	cmd_t cmd;
 	parser_status	pstat;
 	corba_status	cstat;
 	gen_status	gstat;
-	char fp[] = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
 	void	*schema;
 	void	*pool;
 	int	firsttime;
+	int	ar;
+	int interactive;
+	int	test = 0;
+	const char *host = NULL;
+	const char *fp = NULL;
+	const char *schemafile = NULL;
+	int	ret;
 
-	/* API: init parser */
-	schema = epp_parser_init(SCHEMA);
+	/* parse parameters */
+	for (ar = 1; ar < argc; ar++) {
+		if (*argv[ar] != '-') break;
+		switch (argv[ar][1]) {
+			case 'f':
+				if (fp == NULL && ++ar < argc) fp = argv[ar];
+				else {
+					usage();
+					return 1;
+				}
+				break;
+			case 'h':
+				if (host == NULL && ++ar < argc) host = argv[ar];
+				else {
+					usage();
+					return 1;
+				}
+				break;
+			case 't':
+				test = 1;
+				break;
+			case 's':
+				if (schemafile == NULL && ++ar < argc) schemafile = argv[++ar];
+				else {
+					usage();
+					return 1;
+				}
+				break;
+			default:
+				fprintf(stderr, "Unknown option '%s'\n", argv[ar]);
+				usage();
+				return 1;
+		}
+	}
+	interactive = (ar >= argc);
+	if (fp == NULL)
+		fp = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
+	if (host == NULL)
+		host = "localhost";
+	if (schemafile == NULL)
+		schemafile = "schemas/all-1.0.xsd";
+
+	if (!test)
+		/* API: init parser */
+		schema = epp_parser_init(schemafile);
 
 	/* API: init corba */
-	if ((corba_globs = epp_corba_init("curlew", "EPP")) == NULL) {
-		fputs("Error in corba initialization\n", stderr);
-		return 1;
+	if ((corba_globs = epp_corba_init(host, "EPP")) == NULL) {
+		fputs("Nameservice error\n", stderr);
+		return 2;
 	}
 
 	session = 0;
 	lang = LANG_EN;
 	firsttime = 1;
+	ret = 0;
 
 	while (1) {
 
 		if ((pool = create_pool()) == NULL) {
 			fputs("Could not create memory pool\n", stderr);
-			return 1;
+			ret = 1;
+			break;
 		}
+
 		if (firsttime) {
 			firsttime = 0;
 			pstat = PARSER_HELLO;
 		}
 		else {
-		  if( argc == 1 ) /* interaktivni rezim */
-		  {
+		  if (interactive) {
 
 			fputs("Command: ", stderr);
 			switch (cmd = getcmd()) 
@@ -314,21 +381,30 @@ int main(int argc, char *argv[])
 		  pstat = epp_parse_command(pool, session, schema , text,
 				strlen(text), &cdata);
 		}
+
 		if (pstat == PARSER_HELLO) {
 			char *version;
 			char *curdate;
 
 			/* API: greeting */
 			if (epp_call_hello(pool, corba_globs, &version, &curdate) == 0) {
-				fputs("Could not get version from CR\n", stderr);
+				fputs("Corba call failed (greeting)\n", stderr);
 				destroy_pool(pool);
-				return 1;
+				ret = 3;
+				break;
+			}
+			if (test) {
+				printf("version: %s, date: %s\n", version, curdate);
+				destroy_pool(pool);
+				ret = 0;
+				break;
 			}
 			gstat = epp_gen_greeting(pool, version, curdate, &greeting);
 			if (gstat != GEN_OK) {
 				fputs("Error when creating epp greeting\n", stderr);
 				destroy_pool(pool);
-				return 1;
+				ret = 1;
+				break;
 			}
 			puts(greeting);
 
@@ -416,7 +492,9 @@ int main(int argc, char *argv[])
 	epp_parser_init_cleanup(schema);
 	epp_corba_init_cleanup(corba_globs);
 
-	return 0;
+	if (ret == 0 && test == 1)
+		printf("Exiting without errors\n");
+	return ret;
 }
 
 /* vim: set ts=4 sw=4: */
