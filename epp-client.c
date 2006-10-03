@@ -426,7 +426,7 @@ epp_call_login(void *pool,
 		epp_corba_globs *globs,
 		int *session,
 		epp_lang *lang,
-		char *certID,
+		const char *certID,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];

@@ -22,11 +22,11 @@ PKG_TARNAME = @PACKAGE_TARNAME@
 PKG_VERSION = @PACKAGE_VERSION@
 
 DISTFILES = configure.ac install-sh Makefile.in mod_eppd.c epp-client.c epp-client.h epp_common.c epp_common.h epp_gen.c epp_gen.h epp_parser.c epp_parser.h epp_xmlcommon.c epp_xmlcommon.h doxy.conf README TODO
-EXECFILES = mod_eppd.so test
+EXECFILES = mod_eppd.so epp_test
 IDLOUT    = ${IDLPREFIX}.h ${IDLPREFIX}-common.c ${IDLPREFIX}-stubs.c
 OBJS      = epp_common.o epp_xmlcommon.o epp_parser.o epp_gen.o epp-client.o ${IDLPREFIX}-common.o ${IDLPREFIX}-stubs.o
 MOD_OBJS  = mod_eppd.o $(OBJS)
-ALL_OBJS  = test.o $(MOD_OBJS)
+ALL_OBJS  = epp_test.o $(MOD_OBJS)
 TARDIR    = $(PKG_TARNAME)-$(PKG_VERSION)
 
 ORB_LDFLAGS := $(shell $(PKG-CONFIG) --libs ORBit-2.0)
@@ -52,7 +52,7 @@ AP_LIBS     := $(shell $(APR-CONFIG) --libs)
 
 INSTALLDIR  := $(shell $(APXS) -q LIBEXECDIR)
 
-.PHONY: all build install uninstall clean distclean realclean doc dist
+.PHONY: all build install uninstall clean distclean realclean doc dist test
 .SUFFIXES:
 
 all: build
@@ -70,6 +70,9 @@ install: mod_eppd.so
 
 uninstall:
 	-rm -f $(INSTALLDIR)/mod_eppd.so
+
+test: epp_test
+	./epp_test -h curlew -t
 
 mod_eppd.so: $(MOD_OBJS)
 	$(CC) -Wl,-rpath $(AP_INSTALLDIR) -Bshareable -shared -o mod_eppd.so $(LDFLAGS) $(LIBS) $(AP_LDFLAGS) $(ORB_LDFLAGS) $(AP_LIBS) $(XML_LIBS) $(MOD_OBJS)
@@ -98,11 +101,11 @@ ${IDLPREFIX}-common.o: ${IDLPREFIX}-common.c ${IDLPREFIX}.h
 ${IDLPREFIX}-stubs.o: ${IDLPREFIX}-stubs.c ${IDLPREFIX}.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(ORB_CFLAGS) $(DEFS) -c ${IDLPREFIX}-stubs.c
 
-test: test.o $(OBJS)
-	$(CC) $(LDFLAGS) $(LIBS) $(ORB_LDFLAGS) $(XML_LIBS) -o test test.o $(OBJS)
+epp_test: epp_test.o $(OBJS)
+	$(CC) $(LDFLAGS) $(LIBS) $(ORB_LDFLAGS) $(XML_LIBS) -o epp_test epp_test.o $(OBJS)
 
-test.o: test.c epp_common.h epp_parser.h epp_gen.h epp-client.h config.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEFS) -DSCHEMA=\"$(SCHEMA)\" -c test.c
+epp_test.o: epp_test.c epp_common.h epp_parser.h epp_gen.h epp-client.h config.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEFS) -c epp_test.c
 
 $(IDLOUT): $(IDL)
 	$(ORBIT-IDL) --noskels $(IDL)

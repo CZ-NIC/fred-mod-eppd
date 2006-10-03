@@ -86,7 +86,7 @@ epp_call_login(void *pool,
 		epp_corba_globs *corba_globs,
 		int *session,
 		epp_lang *lang,
-		char *fingerprint,
+		const char *fingerprint,
 		epp_command_data *cdata);
 
 /**
