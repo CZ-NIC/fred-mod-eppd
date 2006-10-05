@@ -821,9 +821,13 @@ epp_gen_response(
 				WRITE_STRING(writer, simple_err,
 						CL_CONTENT(cdata->in->check.ids));
 				END_ELEMENT(writer, simple_err); /* name */
-				if (!avail->avail)
-					WRITE_ELEMENT(writer, simple_err, "domain:reason",
-							avail->reason);
+				if (!avail->avail) {
+					START_ELEMENT(writer, simple_err, "domain:reason");
+					if (lang != LANG_EN)
+						WRITE_ATTRIBUTE(writer, simple_err, "lang", "cs");
+					WRITE_STRING(writer, simple_err, avail->reason);
+					END_ELEMENT(writer, simple_err); /* reason */
+				}
 				END_ELEMENT(writer, simple_err); /* cd (check data) */
 			}
 			END_ELEMENT(writer, simple_err); /* chkData */
