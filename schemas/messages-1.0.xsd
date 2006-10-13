@@ -24,9 +24,9 @@
     their description.
     -->
     <!-- Transfers -->
-    <element name="domainTransferred" type="msg:transferType"/>
-    <element name="contactTransferred" type="msg:transferType"/>
-    <element name="nssetTransferred" type="msg:transferType"/>
+    <element name="domainTransferred" type="msg:handleDateT"/>
+    <element name="contactTransferred" type="msg:handleDateT"/>
+    <element name="nssetTransferred" type="msg:handleDateT"/>
     <!-- Creates -->
     <element name="domainCreated" type="msg:handleDateT"/>
     <element name="contactCreated" type="msg:handleDateT"/>
@@ -55,23 +55,10 @@
     <!-- Domain validation will expired -->
     <element name="domainValWillExpire" type="msg:handleDateT"/>
 
-    <complexType name="transferType">
-      <sequence>
-        <!--
-	handle type (eppcom:labelType) is general enough to hold
-	domain, contact, nsset name.
-	-->
-        <element name="handle" type="eppcom:labelType"/>
-        <element name="trID" type="eppcom:clIDType"/>
-        <element name="date" type="dateTime"/>
-      </sequence>
-    </complexType>
-
     <complexType name="handleDateT">
       <sequence>
         <element name="handle" type="eppcom:labelType"/>
         <element name="date" type="dateTime"/>
       </sequence>
     </complexType>
-
   </schema>
