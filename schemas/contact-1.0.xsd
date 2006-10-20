@@ -81,7 +81,8 @@
         <element name="fax" type="contact:e164StringType"
          minOccurs="0"/>
         <element name="email" type="eppcom:minTokenType"/>
-        <element name="authInfo" type="contact:authInfoType"/>
+        <element name="authInfo" type="contact:authInfoType"
+         minOccurs="0"/>
         <element name="disclose" type="contact:discloseType"
          minOccurs="0"/>
         <element name="vat" type="contact:vatT"

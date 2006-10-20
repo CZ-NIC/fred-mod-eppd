@@ -40,7 +40,7 @@
  * You have to copy the string in returned pointer if you want to manipulate
  * with string, you have to make yout own copy.
  */
-#define TEXT_CONTENT(_xpathObj, _i)	((char *) ((xmlXPathNodeSetItem((_xpathObj)->nodesetval, (_i))->xmlChildrenNode)->content))
+#define TEXT_CONTENT(_xpathObj, _i)	((char *) ((xmlXPathNodeSetItem((_xpathObj)->nodesetval, (_i))->xmlChildrenNode) ? (xmlXPathNodeSetItem((_xpathObj)->nodesetval, (_i))->xmlChildrenNode)->content : NULL))
 
 /**
  * Fast check for return value of xpath utility functions.
@@ -66,7 +66,7 @@ get_attr(xmlXPathObjectPtr xpathObj, int i, const char *name)
 	node = xmlXPathNodeSetItem(xpathObj->nodesetval, i);
 	prop = node->properties;
 	while (prop != NULL) {
-		if (xmlStrEqual(prop->name, name)) {
+		if (xmlStrEqual(prop->name, BAD_CAST name)) {
 			return (char *) prop->children->content;
 		}
 		prop = prop->next;
