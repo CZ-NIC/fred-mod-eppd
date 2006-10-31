@@ -1,19 +1,21 @@
-2006-09-26 Jan Kryl <jan.kryl@nic.cz>
+2006-09-26 Jan Kryl (version 1.1.1)
+
+	* authInfo element pri vytvoreni objektu (domain, contact, nsset)
+	je od ted nepovinny (V pripade neuvedeni je serverem automaticky
+	vygenerovan).
 
 	* pwAuthInfoType ma nyni omezenou delku (300 znaku). Toho bylo
 	docileno novou definici typu ve fredcom a zmenou referenci v ostatnich
 	schematech tak, aby neukazovaly do eppcom, ale na novy typ ve fredcom.
 	Pro uzivatele schemat se nic nemeni.
 
-2006-09-21 Jan Kryl <jan.kryl@nic.cz>
+2006-09-21 Jan Kryl (version 1.1.0)
+
+	* Zalozeni tohoto ChangeLogu pro ucely dokumentace zmen do schemat.
 
 	* Oficialni specifikace systemu rika ze v nssetu muze byt 1 az 10
 	nameserveru. Do ted to bylo 1 az 9. Nekonzistence opravena, pocet
 	zvysen o 1.
-
-2006-09-20 Jan Kryl <jan.kryl@nic.cz>
-
-	* Zalozeni tohoto ChangeLogu pro ucely dokumentace zmen do schemat.
 
 	* Pridani souboru fredcom-1.0.xsd, ktery je urcen pro definice
 	typu vyuzivanych napric schematy. Obdoba eppcom-1.0.xsd, ktery

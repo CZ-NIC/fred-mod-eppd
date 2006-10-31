@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
   <schema targetNamespace="http://www.nic.cz/xml/epp/fredcom-1.0"
-          xmlns:eppcom="http://www.nic.cz/xml/epp/fredcom-1.0"
+          xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.0"
           xmlns="http://www.w3.org/2001/XMLSchema"
           elementFormDefault="qualified">
 
@@ -22,15 +22,35 @@
       </restriction>
     </simpleType>
 
+    <simpleType name="objIDChgType">
+      <restriction base="token">
+        <minLength value="0"/>
+        <maxLength value="63"/>
+      </restriction>
+    </simpleType>
+
   <!--
   Object authorization information type.
   -->
+    <complexType name="authInfoType">
+      <choice>
+        <element name="pw" type="fredcom:pwAuthInfoType"/>
+        <element name="ext" type="fredcom:extAuthInfoType"/>
+      </choice>
+    </complexType>
+
     <simpleType name="pwAuthInfoType">
       <restriction base="normalizedString">
         <minLength value="0"/>
         <maxLength value="300"/>
       </restriction>
     </simpleType>
+
+    <complexType name="extAuthInfoType">
+      <sequence>
+        <any namespace="##other"/>
+      </sequence>
+    </complexType>
 
   <!--
   End of schema.

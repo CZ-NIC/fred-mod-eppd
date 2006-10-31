@@ -81,7 +81,7 @@
         <element name="fax" type="contact:e164StringType"
          minOccurs="0"/>
         <element name="email" type="eppcom:minTokenType"/>
-        <element name="authInfo" type="contact:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
         <element name="disclose" type="contact:discloseType"
          minOccurs="0"/>
@@ -116,12 +116,6 @@
       </sequence>
     </complexType>
 
-    <complexType name="authInfoType">
-      <choice>
-        <element name="pw" type="fredcom:pwAuthInfoType"/>
-        <element name="ext" type="eppcom:extAuthInfoType"/>
-      </choice>
-    </complexType>
     <complexType name="discloseType">
       <sequence>
         <element name="name" minOccurs="0"/>
@@ -199,7 +193,7 @@
     <complexType name="authIDType">
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
-        <element name="authInfo" type="contact:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
       </sequence>
     </complexType>
@@ -242,7 +236,7 @@
          minOccurs="0"/>
         <element name="email" type="eppcom:minTokenType"
          minOccurs="0"/>
-        <element name="authInfo" type="contact:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
         <element name="disclose" type="contact:discloseType"
          minOccurs="0"/>
@@ -340,7 +334,7 @@
          minOccurs="0"/>
         <element name="trDate" type="dateTime"
          minOccurs="0"/>
-        <element name="authInfo" type="contact:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
         <element name="disclose" type="contact:discloseType"
          minOccurs="0"/>
@@ -371,10 +365,10 @@
     <simpleType name="statusValueType">
       <restriction base="token">
         <enumeration value="clientDeleteProhibited"/>
+        <enumeration value="clientTransferProhibited"/>
         <enumeration value="clientUpdateProhibited"/>
         <enumeration value="linked"/>
         <enumeration value="ok"/>
-        <enumeration value="clientTransferProhibited"/>
 	<!--
         <enumeration value="pendingCreate"/>
         <enumeration value="pendingDelete"/>

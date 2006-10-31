@@ -41,7 +41,7 @@
     <complexType name="transferType">
       <sequence>
         <element name="id" type="eppcom:labelType"/>
-        <element name="authInfo" type="nsset:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
       </sequence>
     </complexType>
@@ -51,7 +51,7 @@
   -->
     <complexType name="updateType">
       <sequence>
-        <element name="id" type="nsset:nssT"/>
+        <element name="id" type="fredcom:objIDType"/>
         <element name="add" type="nsset:addType"
          minOccurs="0"/>
         <element name="rem" type="nsset:remType"
@@ -107,22 +107,15 @@
   -->
     <complexType name="crType">
       <sequence>
-        <element name="id" type="nsset:nssT"/>
+        <element name="id" type="fredcom:objIDType"/>
         <element name="ns" type="nsset:nsT"
 	 maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
-        <element name="authInfo" type="nsset:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
       </sequence>
     </complexType>
-
-    <simpleType name="nssT">
-      <restriction base="normalizedString">
-        <minLength value="1"/>
-        <maxLength value="100"/>
-      </restriction>
-    </simpleType>
 
     <complexType name="nsT">
       <sequence>
@@ -171,7 +164,7 @@
   -->
     <complexType name="sIDType">
       <sequence>
-        <element name="id" type="nsset:nssT"/>
+        <element name="id" type="fredcom:objIDType"/>
       </sequence>
     </complexType>
 
@@ -180,7 +173,7 @@
   -->
     <complexType name="mNameType">
       <sequence>
-        <element name="id" type="nsset:nssT"
+        <element name="id" type="fredcom:objIDType"
          maxOccurs="unbounded"/>
       </sequence>
     </complexType>
@@ -214,7 +207,7 @@
 
     <complexType name="checkNameType">
       <simpleContent>
-        <extension base="nsset:nssT">
+        <extension base="fredcom:objIDType">
           <attribute name="avail" type="boolean" use="required"/>
         </extension>
       </simpleContent>
@@ -225,14 +218,14 @@
   -->
     <complexType name="creDataType">
       <sequence>
-        <element name="id" type="nsset:nssT"/>
+        <element name="id" type="fredcom:objIDType"/>
         <element name="crDate" type="dateTime"/>
       </sequence>
     </complexType>
 
     <complexType name="infDataType">
       <sequence>
-        <element name="id" type="nsset:nssT"/>
+        <element name="id" type="fredcom:objIDType"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="nsset:statusType"
          minOccurs="0" maxOccurs="7"/>
@@ -247,7 +240,7 @@
          minOccurs="0"/>
         <element name="trDate" type="dateTime"
          minOccurs="0"/>
-        <element name="authInfo" type="nsset:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
         <element name="ns" type="nsset:nsT" minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
@@ -255,16 +248,9 @@
       </sequence>
     </complexType>
 
-    <complexType name="authInfoType">
-      <choice>
-        <element name="pw" type="fredcom:pwAuthInfoType"/>
-        <element name="ext" type="eppcom:extAuthInfoType"/>
-      </choice>
-    </complexType>
-
     <complexType name="listDataType">
       <sequence>
-        <element name="id" type="nsset:nssT"
+        <element name="id" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
     </complexType>

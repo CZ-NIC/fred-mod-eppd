@@ -1,0 +1,36 @@
+This directory contains XML schemas defining EPP protokol and its extensions.
+
+Content:
+
+  1. Versioning
+  2. Compat
+
+
+ 1. Versioning
+------------------
+
+The versioning of schemas is a bit confusing and will be explained in this
+text. Each schema file has its own version, major and minor. Client and
+server must always adhere to the same version of particular schema in order
+to avoid any misunderstanding and proper operation. The version of schemas
+is announced in greeting from server.
+
+ChangeLog is currently maintained only in czech language and versions in
+ChangeLog are derived from versions of mod_eppd. If you want to know if
+your particular client of version x.y.z is compatible with server (mod_eppd)
+of version a.b.c, check Compat chapter in this README.
+
+
+ 2. Compat
+------------
+
+ _______________________________________________________________________ 
+|   Server's (mod_eppd's) version    |   Compatible client's version    |
+|____________________________________|__________________________________|
+|------------------------------------|----------------------------------|
+|       ... dark ages                |       ... dark ages              |
+|------------------------------------|----------------------------------|
+|           1.1.1                    |           1.0.0                  |
+|____________________________________|__________________________________|
+
+

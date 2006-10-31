@@ -42,12 +42,12 @@
         <element name="name" type="eppcom:labelType"/>
         <element name="period" type="domain:periodType"
          minOccurs="0"/>
-        <element name="nsset" type="eppcom:labelType"
+        <element name="nsset" type="fredcom:objIDType"
          minOccurs="0"/>
         <element name="registrant" type="fredcom:objIDType"/>
         <element name="admin" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
-        <element name="authInfo" type="domain:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
 	minOccurs="0"/>
       </sequence>
     </complexType>
@@ -75,13 +75,6 @@
       </restriction>
     </simpleType>
 
-    <complexType name="authInfoType">
-      <choice>
-        <element name="pw" type="fredcom:pwAuthInfoType"/>
-        <element name="ext" type="eppcom:extAuthInfoType"/>
-      </choice>
-    </complexType>
-
   <!--
   Child element of commands that require a single name.
   -->
@@ -106,7 +99,7 @@
     <complexType name="infoType">
       <sequence>
         <element name="name" type="eppcom:labelType"/>
-        <element name="authInfo" type="domain:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
       </sequence>
     </complexType>
@@ -133,7 +126,7 @@
         <element name="period" type="domain:periodType"
          minOccurs="0"/>
 	 -->
-        <element name="authInfo" type="domain:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
       </sequence>
     </complexType>
@@ -171,9 +164,9 @@
 
     <complexType name="chgType">
       <sequence>
-        <element name="nsset" type="eppcom:labelType"
+        <element name="nsset" type="fredcom:objIDChgType"
          minOccurs="0"/>
-        <element name="registrant" type="domain:clIDChgType"
+        <element name="registrant" type="eppcom:clIDType"
          minOccurs="0"/>
         <element name="authInfo" type="domain:authInfoChgType"
          minOccurs="0"/>
@@ -284,7 +277,7 @@
          minOccurs="0"/>
         <element name="trDate" type="dateTime"
          minOccurs="0"/>
-        <element name="authInfo" type="domain:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
       </sequence>
     </complexType>
