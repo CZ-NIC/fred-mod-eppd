@@ -45,7 +45,7 @@
  */
 struct epp_corba_globs_t {
 	CORBA_ORB	corba;	/**< corba is global corba object. */
-	ccReg_EPP	service;	/**< service is ccReg object stub */
+	ccReg_EPP	service;/**< service is ccReg object stub */
 };
 
 epp_corba_globs *

@@ -30,15 +30,20 @@
     </simpleType>
 
   <!--
-  Object authorization information type.
+  Generic msg type of unbounded length (now used only in check-reason)
   -->
-    <complexType name="authInfoType">
-      <choice>
-        <element name="pw" type="fredcom:pwAuthInfoType"/>
-        <element name="ext" type="fredcom:extAuthInfoType"/>
-      </choice>
+    <complexType name="msgType">
+      <simpleContent>
+        <extension base="normalizedString">
+          <attribute name="lang" type="language"
+           default="en"/>
+        </extension>
+      </simpleContent>
     </complexType>
 
+  <!--
+  Object authorization information type.
+  -->
     <simpleType name="pwAuthInfoType">
       <restriction base="normalizedString">
         <minLength value="0"/>
