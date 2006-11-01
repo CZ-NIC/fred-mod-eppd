@@ -39,26 +39,212 @@
 /** True if exception is COMM_FAILURE, which is used in retry loop. */
 #define IS_NOT_COMM_FAILURE_EXCEPTION(_ev)                             \
 	(strcmp((_ev)->_id, "IDL:omg.org/CORBA/COMM_FAILURE:1.0"))
+/** True if exception is INT_ERROR (internal error on server's side). */
+#define IS_INTSERV_ERROR(_ev)                             \
+	(!strcmp((_ev)->_id, "IDL:ccReg/EPP/ServerIntError:1.0"))
 
 /**
  * Persistent structure initialized at startup, needed for corba function calls.
  */
 struct epp_corba_globs_t {
-	CORBA_ORB	corba;	/**< corba is global corba object. */
-	ccReg_EPP	service;/**< service is ccReg object stub */
+	CORBA_ORB	corba;   /**< Corba is global corba object. */
+	ccReg_EPP	service; /**< Service is ccReg object stub. */
 };
+
+/**
+ * Error code translation table.
+ */
+static int error_translator[][2] =
+{
+  {ccReg_unknow,                   errspec_unknown},
+  {ccReg_pollAck_msgID,            errspec_pollAck_msgID},
+  {ccReg_pollAck_msgID_missing,    errspec_pollAck_msgID_missing},
+  {ccReg_contactCreate_handle,     errspec_contactCreate_handle},
+  {ccReg_contactCreate_cc,         errspec_contactCreate_cc},
+  {ccReg_contactInfo_handle,       errspec_contactInfo_handle},
+  {ccReg_contactUpdate_cc,         errspec_contactUpdate_cc},
+  {ccReg_contactUpdate_status_add, errspec_contactUpdate_status_add},
+  {ccReg_contactUpdate_status_rem, errspec_contactUpdate_status_rem},
+  {ccReg_contactUpdate_ssntype_missing, errspec_contactUpdate_ssntype_missing},
+  {ccReg_nssetCreate_handle,       errspec_nssetCreate_handle},
+  {ccReg_nssetCreate_tech,         errspec_nssetCreate_tech},
+  {ccReg_nssetCreate_ns_name,      errspec_nssetCreate_ns_name},
+  {ccReg_nssetCreate_ns_addr,      errspec_nssetCreate_ns_addr},
+  {ccReg_nssetInfo_handle,         errspec_nssetInfo_handle},
+  {ccReg_nssetUpdate_ns_name_add,  errspec_nssetUpdate_ns_name_add},
+  {ccReg_nssetUpdate_ns_addr_add,  errspec_nssetUpdate_ns_addr_add},
+  {ccReg_nssetUpdate_ns_name_rem,  errspec_nssetUpdate_ns_name_rem},
+  {ccReg_nssetUpdate_ns_addr_rem,  errspec_nssetUpdate_ns_addr_rem},
+  {ccReg_nssetUpdate_tech_add,     errspec_nssetUpdate_tech_add},
+  {ccReg_nssetUpdate_tech_rem,     errspec_nssetUpdate_tech_rem},
+  {ccReg_nssetUpdate_status_add,   errspec_nssetUpdate_status_add},
+  {ccReg_nssetUpdate_status_rem,   errspec_nssetUpdate_status_rem},
+  {ccReg_domainCreate_fqdn,        errspec_domainCreate_fqdn},
+  {ccReg_domainCreate_registrant,  errspec_domainCreate_registrant},
+  {ccReg_domainCreate_nsset,       errspec_domainCreate_nsset},
+  {ccReg_domainCreate_period,      errspec_domainCreate_period},
+  {ccReg_domainCreate_admin,       errspec_domainCreate_admin},
+  {ccReg_domainCreate_ext_valDate, errspec_domainCreate_ext_valDate},
+  {ccReg_domainInfo_fqdn,          errspec_domainInfo_fqdn},
+  {ccReg_domainRenew_fqdn,         errspec_domainRenew_fqdn},
+  {ccReg_domainRenew_curExpDate,   errspec_domainRenew_curExpDate},
+  {ccReg_domainRenew_period,       errspec_domainRenew_period},
+  {ccReg_domainRenew_ext_valDate,  errspec_domainRenew_ext_valDate},
+  {ccReg_domainUpdate_fqdn,        errspec_domainUpdate_fqdn},
+  {ccReg_domainUpdate_registrant,  errspec_domainUpdate_registrant},
+  {ccReg_domainUpdate_nsset,       errspec_domainUpdate_nsset},
+  {ccReg_domainUpdate_admin_add,   errspec_domainUpdate_admin_add},
+  {ccReg_domainUpdate_admin_rem,   errspec_domainUpdate_admin_rem},
+  {ccReg_domainUpdate_status_add,  errspec_domainUpdate_status_add},
+  {ccReg_domainUpdate_status_rem,  errspec_domainUpdate_status_rem},
+  {ccReg_domainUpdate_ext_valDate, errspec_domainUpdate_ext_valDate},
+  {ccReg_transfer_op,              errspec_transfer_op},
+  {-1, -1}
+};
+
+/**
+ * Translate error code from IDL code to mod_eppd's code.
+ *
+ * @param idlcode   IDL code.
+ * @return          mod_eppd's code.
+ */
+static int
+err_idl2epp(int idlcode)
+{
+	int	i = 0;
+	int	var;
+
+	while ((var = error_translator[i][0]) != -1)
+		if (var == idlcode)
+			return error_translator[i][1];
+
+	return -1;
+}
+
+/**
+ * Translate error code from mod_eppd's code to IDL code.
+ *
+ * @param eppcode   mod_eppd's code.
+ * @return          IDL code.
+ */
+static int
+err_epp2idl(int eppcode)
+{
+	int	i = 0;
+	int	var;
+
+	while ((var = error_translator[i][1]) != -1)
+		if (var == eppcode)
+			return error_translator[i][0];
+
+	return -1;
+}
+
+/**
+ * Function wraps strings passed from XML parser into strings accepted
+ * by CORBA.
+ *
+ * Null strings are transformed to empty strings. The resulting string
+ * must be freed with CORBA_free().
+ *
+ * @param str	Input string.
+ * @return      Output string.
+ */
+static char *
+wrap_str(const char *str)
+{
+	if (str == NULL)
+		return CORBA_string_dup("");
+
+	return CORBA_string_dup(str);
+}
+
+/**
+ * Function works the same way as wrap_str(), but empty strings are substituted
+ * by IDL-defined string with special meaning.
+ *
+ * In update functions we need to distinguish between empty string and NULL.
+ *
+ * @param str	Input string.
+ * @return      Output string.
+ */
+static char *
+wrap_str_upd(const char *str)
+{
+	if (str == NULL)
+		return CORBA_string_dup("");
+
+	if (*str == '\0')
+		/* XXX what to put instead of \b?? */
+		return CORBA_string_dup("\b");
+
+	return CORBA_string_dup(str);
+}
+
+/**
+ * Function unwraps strings passed through CORBA - empty strings are
+ * transformed to NULL strings.
+ *
+ * @param pool	 Memory pool.
+ * @param str	 Input string.
+ * @param cerrno Set to 1 if malloc failed.
+ * @return       Output string.
+ */
+static char *
+unwrap_str(void *pool, const char *str, int *cerrno)
+{
+	char	*res;
+
+	assert(str != NULL);
+
+	if (*str == '\0')
+		return NULL;
+
+	res = epp_strdup(pool, str);
+	if (res == NULL)
+		*cerrno = 1;
+
+	return res;
+}
+
+/**
+ * Does the same thing as unwrap_str() but in addition input string is
+ * required not to be empty.
+ *
+ * @param pool	  Memory pool.
+ * @param str	  Input string.
+ * @param cerrno  Set to 1 if malloc failed and to 2 if string is empty.
+ * @return        Output string.
+ */
+static char *
+unwrap_str_req(void *pool, const char *str, int *cerrno)
+{
+	char	*res;
+
+	assert(str != NULL);
+
+	if (*str == '\0') {
+		*cerrno = 2;
+		return NULL;
+	}
+	res = epp_strdup(pool, str);
+	if (res == NULL)
+		*cerrno = 1;
+
+	return res;
+}
 
 epp_corba_globs *
 epp_corba_init(const char *ns_loc, const char *obj_name)
 {
-	CORBA_ORB  global_orb = CORBA_OBJECT_NIL;	/* global orb */
-	ccReg_EPP service = CORBA_OBJECT_NIL;	/* object's stub */
+	CORBA_ORB	global_orb = CORBA_OBJECT_NIL;	/* global orb */
+	ccReg_EPP	service = CORBA_OBJECT_NIL;	/* object's stub */
 	epp_corba_globs	*globs;	/* used to store global_orb and service */
-	CORBA_Environment ev[1];
-	CosNaming_NamingContext ns; /* used for nameservice */
-	CosNaming_NameComponent *name_component; /* EPP's name */
-	CosNaming_Name *cos_name; /* Cos name used in service lookup */
-	char ns_string[150];
+	CORBA_Environment	ev[1];
+	CosNaming_NamingContext	ns; /* used for nameservice */
+	CosNaming_NameComponent	*name_component; /* EPP's name */
+	CosNaming_Name	*cos_name; /* Cos name used in service lookup */
+	char	ns_string[150];
  
 	CORBA_exception_init(ev);
 
@@ -152,173 +338,41 @@ epp_corba_init_cleanup(epp_corba_globs *globs)
  * @param pool     Pool for memory allocations.
  * @param errors   List of errors - converted errors (output).
  * @param c_errors Buffer of errors used as input.
+ * @return         0 if successful, 1 otherwise.
  */
-static void get_errors(void *pool,
-		struct circ_list *errors,
-		ccReg_Error *c_errors)
+static int
+get_errors(void *pool, qhead *errors, ccReg_Error *c_errors)
 {
-	struct circ_list	*item;
-	epp_error	*err_item;
-	int	i;
-	ccReg_Error_seq *c_error;
 	CORBA_Environment ev[1];
+	int	i;
 
 	CORBA_exception_init(ev);
 
 	/* process all errors one by one */
 	for (i = 0; i < c_errors->_length; i++) {
-		if ((item = epp_malloc(pool, sizeof *item)) == NULL ||
-			(err_item = epp_malloc(pool, sizeof *err_item)) == NULL)
-		{
-			break;
-		}
-		c_error = &c_errors->_buffer[i];
-		err_item->reason = epp_strdup(pool, c_error->reason);
-		err_item->standalone = 0; /* the surrounding tags are missing */
+		int	cerrno;
+		epp_error	*err_item;
+		ccReg_Error_seq *c_error = &c_errors->_buffer[i];
 
-		/* convert "any" type (short, long, string) to string */
-		if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_string, ev))
-			err_item->value = epp_strdup(pool,
-					* ((char **) c_error->value._value));
-		else if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_long, ev))
-		{
-			err_item->value = epp_malloc(pool, 10); /* should be enough for any number */
-			snprintf(err_item->value, 10, "%ld",
-					*((long *) c_error->value._value));
+		err_item = epp_malloc(pool, sizeof *err_item);
+		if (err_item == NULL) {
+			return 1;
 		}
-		else if (CORBA_TypeCode_equal(c_error->value._type, TC_CORBA_short, ev))
-		{
-			err_item->value = epp_malloc(pool, 10); /* should be enough for any number */
-			snprintf(err_item->value, 10, "%d",
-					*((short *) c_error->value._value));
-		}
-		else
-			err_item->value = epp_strdup(pool, "Unknown value type");
+		err_item->reason = unwrap_str_req(pool, c_error->reason,&cerrno);
+		if (cerrno != 0)
+			return 1;
+
+		err_item->value = unwrap_str_req(pool, c_error->value, &cerrno);
+		if (cerrno != 0) return 1;
 
 		/* convert error code */
-		switch (c_error->code) {
-			case ccReg_pollAck_msgID:
-				err_item->spec = errspec_pollAck_msgID;
-				break;
-			case ccReg_contactInfo_handle:
-				err_item->spec = errspec_contactInfo_handle;
-				break;
-			case ccReg_contactCreate_cc:
-				err_item->spec = errspec_contactCreate_cc;
-				break;
-			case ccReg_contactCreate_handle:
-				err_item->spec = errspec_contactCreate_handle;
-				break;
-			case ccReg_contactUpdate_cc:
-				err_item->spec = errspec_contactUpdate_cc;
-				break;
-			case ccReg_contactUpdate_status_add:
-				err_item->spec = errspec_contactUpdate_status_add;
-				break;
-			case ccReg_contactUpdate_status_rem:
-				err_item->spec = errspec_contactUpdate_status_rem;
-				break;
-			case ccReg_nssetInfo_handle:
-				err_item->spec = errspec_nssetInfo_handle;
-				break;
-			case ccReg_nssetCreate_handle:
-				err_item->spec = errspec_nssetCreate_handle;
-				break;
-			case ccReg_nssetCreate_ns_name:
-				err_item->spec = errspec_nssetCreate_ns_name;
-				break;
-			case ccReg_nssetCreate_ns_addr:
-				err_item->spec = errspec_nssetCreate_ns_addr;
-				break;
-			case ccReg_nssetCreate_tech:
-				err_item->spec = errspec_nssetCreate_tech;
-				break;
-			case ccReg_nssetUpdate_status_add:
-				err_item->spec = errspec_nssetUpdate_status_add;
-				break;
-			case ccReg_nssetUpdate_status_rem:
-				err_item->spec = errspec_nssetUpdate_status_rem;
-				break;
-			case ccReg_nssetUpdate_tech_add:
-				err_item->spec = errspec_nssetUpdate_tech_add;
-				break;
-			case ccReg_nssetUpdate_tech_rem:
-				err_item->spec = errspec_nssetUpdate_tech_rem;
-				break;
-			case ccReg_nssetUpdate_ns_name_add:
-				err_item->spec = errspec_nssetUpdate_ns_name_add;
-				break;
-			case ccReg_nssetUpdate_ns_name_rem:
-				err_item->spec = errspec_nssetUpdate_ns_name_rem;
-				break;
-			case ccReg_nssetUpdate_ns_addr_add:
-				err_item->spec = errspec_nssetUpdate_ns_addr_add;
-				break;
-			case ccReg_nssetUpdate_ns_addr_rem:
-				err_item->spec = errspec_nssetUpdate_ns_addr_rem;
-				break;
-			case ccReg_domainInfo_fqdn:
-				err_item->spec = errspec_domainInfo_fqdn;
-				break;
-			case ccReg_domainCreate_fqdn:
-				err_item->spec = errspec_domainCreate_fqdn;
-				break;
-			case ccReg_domainCreate_registrant:
-				err_item->spec = errspec_domainCreate_registrant;
-				break;
-			case ccReg_domainCreate_nsset:
-				err_item->spec = errspec_domainCreate_nsset;
-				break;
-			case ccReg_domainCreate_period:
-				err_item->spec = errspec_domainCreate_period;
-				break;
-			case ccReg_domainCreate_admin:
-				err_item->spec = errspec_domainCreate_admin;
-				break;
-			case ccReg_domainCreate_ext_valDate:
-				err_item->spec = errspec_domainCreate_ext_valdate;
-				break;
-			case ccReg_domainUpdate_registrant:
-				err_item->spec = errspec_domainUpdate_registrant;
-				break;
-			case ccReg_domainUpdate_nsset:
-				err_item->spec = errspec_domainUpdate_nsset;
-				break;
-			case ccReg_domainUpdate_admin_add:
-				err_item->spec = errspec_domainUpdate_admin_add;
-				break;
-			case ccReg_domainUpdate_admin_rem:
-				err_item->spec = errspec_domainUpdate_admin_rem;
-				break;
-			case ccReg_domainUpdate_status_add:
-				err_item->spec = errspec_domainUpdate_status_add;
-				break;
-			case ccReg_domainUpdate_status_rem:
-				err_item->spec = errspec_domainUpdate_status_rem;
-				break;
-			case ccReg_domainUpdate_ext_valDate:
-				err_item->spec = errspec_domainUpdate_ext_valdate;
-				break;
-			case ccReg_domainRenew_curExpDate:
-				err_item->spec = errspec_domainRenew_curExpDate;
-				break;
-			case ccReg_domainRenew_period:
-				err_item->spec = errspec_domainRenew_period;
-				break;
-			case ccReg_domainRenew_ext_valDate:
-				err_item->spec = errspec_domainRenew_ext_valDate;
-				break;
-			default:
-				err_item->spec = errspec_unknow;
-				break;
-		}
-		CL_CONTENT(item) = (void *) err_item;
-		CL_ADD(errors, item);
+		err_item->spec = err_idl2epp(c_error->code);
+
+		if (q_add(pool, errors, err_item))
+			return 1;
 	}
 
-	if (i < c_errors->_length) {
-		/* XXX what should we do? */
-	}
+	return 0;
 }
 
 int
@@ -330,7 +384,7 @@ epp_call_hello(void *pool,
 	CORBA_Environment ev[1];
 	CORBA_char	*c_version;
 	CORBA_char	*c_curdate;
-	int	retr;
+	int	retr, cerrno;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -338,24 +392,74 @@ epp_call_hello(void *pool,
 
 		c_version = ccReg_EPP_version(globs->service, &c_curdate, ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return 0;
+		return ret;
 	}
-	CORBA_exception_free(ev);
 
-	*version = epp_strdup(pool, c_version);
-	*curdate = epp_strdup(pool, c_curdate);
-
+	*version = unwrap_str(pool, c_version, &cerrno);
+	if (cerrno != 0) {
+		CORBA_free(c_version);
+		CORBA_free(c_curdate);
+		return CORBA_INT_ERROR;
+	}
+	*curdate = unwrap_str(pool, c_curdate, &cerrno);
+	if (cerrno != 0) {
+		CORBA_free(c_version);
+		CORBA_free(c_curdate);
+		return CORBA_INT_ERROR;
+	}
 	CORBA_free(c_version);
 	CORBA_free(c_curdate);
-	return 1;
+	return CORBA_OK;
+}
+
+/**
+ * This is common routine for all corba function calls (except hello call)
+ * executed at the end of command.
+ *
+ * Structure response is freed in any case (success or failure).
+ *
+ * @param pool     Memory pool for allocations.
+ * @param cdata    Command input and output data.
+ * @param response Response returned from CORBA call.
+ * @return         0 in case of success, 1 otherwise.
+ */
+static int
+corba_call_epilog(void *pool, epp_command_data *cdata, ccReg_Response *response)
+{
+	int	cerrno;
+
+	if (get_errors(pool, &cdata->errors, &response->errors)) {
+		CORBA_free(response);
+		return 1;
+	}
+	cdata->svTRID = unwrap_str_req(pool, response->svTRID, &cerrno);
+	if (cerrno != 0) {
+		CORBA_free(response);
+		return 1;
+	}
+	cdata->msg = unwrap_str_req(pool, response->errMsg, &cerrno);
+	if (cerrno != 0) {
+		CORBA_free(response);
+		return 1;
+	}
+	cdata->rc = response->errCode;
+	return 0;
 }
 
 /**
@@ -377,47 +481,103 @@ epp_call_dummy(void *pool,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
+	CORBA_char	*c_clTRID;
+	ccReg_Error	*c_errors;
 	ccReg_Response	*response;
-	int	retr;
+	int	len, i, retr;
+
+	/*
+	 * Input parameters:
+	 *    cdata->rc
+	 *    c_errors (*)
+	 *    session
+	 *    c_clTRID (*)
+	 * Output parameters: none
+	 */
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+
+	/* get number of errors */
+	c_errors = ccReg_Error__alloc();
+	if (c_errors == NULL) {
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	len = q_length(cdata->errors);
+	c_errors->_buffer = ccReg_Error_allocbuf(len);
+	if (c_errors->_buffer == NULL) {
+		CORBA_free(c_clTRID);
+		CORBA_free(c_errors);
+		return CORBA_INT_ERROR;
+	}
+	c_errors->_maximum = c_errors->_length = len;
+	c_errors->_release = CORBA_TRUE;
+
+	/* copy each error in corba buffer */
+	i = 0;
+	q_foreach(&cdata->errors) {
+		epp_error	*err_item;
+
+		err_item = q_content(&cdata->errors);
+		c_errors->_buffer[i].code = err_epp2idl(err_item->spec);
+		c_errors->_buffer[i].value = wrap_str(err_item->value);
+		if (c_errors->_buffer[i].value == NULL) {
+			CORBA_free(c_errors);
+			CORBA_free(c_clTRID);
+			return CORBA_INT_ERROR;
+		}
+		c_errors->_buffer[i].reason = wrap_str(err_item->reason);
+		if (c_errors->_buffer[i].reason == NULL) {
+			CORBA_free(c_errors);
+			CORBA_free(c_clTRID);
+			return CORBA_INT_ERROR;
+		}
+		i++;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
 		CORBA_exception_init(ev);
 
 		response = ccReg_EPP_GetTransaction(globs->service,
-				session,
-				cdata->clTRID,
 				cdata->rc,
+				c_errors,
+				session,
+				c_clTRID,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+	CORBA_free(c_clTRID);
+	CORBA_free(c_errors);
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
+		return ret;
 	}
-	CORBA_exception_free(ev);
 
 	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
+	 * Simply get rid of old errors, don't bother with free() - memory
+	 * pool will handle that.
 	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
-	}
+	cdata->errors.body  = NULL;
+	cdata->errors.count = 0;
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	/* rc is known */
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	CORBA_free(response);
 	return CORBA_OK;
 }
 
@@ -431,59 +591,95 @@ epp_call_login(void *pool,
 {
 	CORBA_Environment ev[1];
 	CORBA_long	c_session;
+	CORBA_char	*c_clID, *c_pw, *c_newPW, *c_clTRID;
 	ccReg_Languages	c_lang;
 	ccReg_Response *response;
 	int	retr;
+	epps_login	*login;
 
-	c_lang = (cdata->in->login.lang == LANG_EN) ? ccReg_EN : ccReg_CS;
+	login = cdata->data;
+	/*
+	 * Input parameters:
+	 *    c_clID (*)
+	 *    c_pw (*)
+	 *    c_newPW (*)
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 *    certID (a)
+	 *    c_lang
+	 * Output parameters:
+	 *    c_session
+	 */
+	assert(cdata->xml_in != NULL);
+	assert(certID != NULL);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+	c_clID = wrap_str(login->clID);
+	if (c_clID == NULL) {
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_pw = wrap_str(login->pw);
+	if (c_pw == NULL) {
+		CORBA_free(c_clID);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_newPW = wrap_str(login->newPW);
+	if (c_newPW == NULL) {
+		CORBA_free(c_pw);
+		CORBA_free(c_clID);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_lang = (login->lang == LANG_EN) ? ccReg_EN : ccReg_CS;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
 		CORBA_exception_init(ev);
 
 		response = ccReg_EPP_ClientLogin(globs->service,
-				cdata->in->login.clID,
-				cdata->in->login.pw,
-				cdata->in->login.newPW,
-				cdata->clTRID,
+				c_clID,
+				c_pw,
+				c_newPW,
+				c_clTRID,
 				cdata->xml_in,
 				&c_session,
 				certID,
 				c_lang,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+	CORBA_free(c_newPW);
+	CORBA_free(c_pw);
+	CORBA_free(c_clID);
+	CORBA_free(c_clTRID);
 
 	/* if it is exception then return */
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
 	if (cdata->rc == 1000) {
 		*session = c_session;
-		*lang = cdata->in->login.lang;
+		*lang = login->lang;
 	}
 
 	return CORBA_OK;
@@ -497,50 +693,59 @@ epp_call_logout(void *pool,
 		int *logout)
 {
 	CORBA_Environment ev[1];
+	CORBA_char	*c_clTRID;
 	ccReg_Response *response;
 	int	retr;
 
+	/*
+	 * Input parameters:
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters: none
+	 */
+	assert(cdata->xml_in != NULL);
 	*logout = 0;
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
 		CORBA_exception_init(ev);
 
 		response = ccReg_EPP_ClientLogout(globs->service,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
 	/* propagate information about logout upwards */
-	if (cdata->rc == 1500) *logout = 1;
+	if (cdata->rc == 1500)
+		*logout = 1;
 
 	return CORBA_OK;
 }
@@ -564,25 +769,54 @@ epp_call_check(void *pool,
 		epp_object_type obj)
 {
 	CORBA_Environment ev[1];
+	CORBA_char	*c_clTRID;
 	ccReg_CheckResp	*c_avails;
 	ccReg_Check	*c_ids;
 	ccReg_Response *response;
-	struct circ_list	*item;
 	int	len, i;
-	int	retr;
+	int	retr, cerrno;
+	epps_check	*check;
+
+	check = cdata->data;
+	/*
+	 * Input parameters:
+	 *    c_ids (*)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_avails (f)
+	 */
+	assert(cdata->xml_in != NULL);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
 
 	/* get number of contacts */
-	len = cl_length(cdata->in->check.ids);
+	len = q_length(check->ids);
 	c_ids = ccReg_Check__alloc();
+	if (c_ids == NULL) {
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
 	c_ids->_buffer = ccReg_Check_allocbuf(len);
+	if (c_ids->_buffer == NULL) {
+		CORBA_free(c_ids);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
 	c_ids->_maximum = c_ids->_length = len;
 	c_ids->_release = CORBA_TRUE;
-
 	/* copy each requested object in corba buffer */
 	i = 0;
-	CL_FOREACH(cdata->in->check.ids)
-		c_ids->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->check.ids));
+	q_foreach(&check->ids) {
+		c_ids->_buffer[i] = wrap_str(q_content(&check->ids));
+		if (c_ids->_buffer[i++] == NULL) {
+			CORBA_free(c_ids);
+			CORBA_free(c_clTRID);
+			return CORBA_INT_ERROR;
+		}
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -593,7 +827,7 @@ epp_call_check(void *pool,
 					c_ids,
 					&c_avails,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		else if (obj == EPP_DOMAIN)
@@ -601,7 +835,7 @@ epp_call_check(void *pool,
 					c_ids,
 					&c_avails,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		else {
@@ -610,84 +844,72 @@ epp_call_check(void *pool,
 					c_ids,
 					&c_avails,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		}
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
-
+	CORBA_free(c_clTRID);
 	CORBA_free(c_ids);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
+		return ret;
 	}
-	CORBA_exception_free(ev);
 
 	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
+	 * Length of results returned should be same as lenght of input
+	 * objects.
+	 *
+	 * TODO: after logging will be in place, turn assert into error!
 	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(c_avails);
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
-	}
+	assert(len == c_avails->_length);
 
-	/* alloc necessary structures */
-	if (!(cdata->out = epp_calloc(pool, sizeof (*cdata->out)))
-		|| !(cdata->out->check.avails = epp_malloc(pool, sizeof *item)))
-	{
+	for (i = 0; i < c_avails->_length; i++) {
+		epp_avail	*avail;
+
+		avail = epp_malloc(pool, sizeof *avail);
+		if (avail == NULL)
+			break;
+
+		avail->avail =
+			(c_avails->_buffer[i].avail == ccReg_NotExist) ? 1 : 0;
+		avail->reason = unwrap_str(pool, c_avails->_buffer[i].reason,
+				&cerrno);
+		if (cerrno != 0)
+			break;
+
+		/*
+		 * TODO: after logging will be in place, turn assert into error!
+		 */
+		assert(avail->avail || (!avail->avail && avail->reason != NULL));
+		if (q_add(pool, &check->avails, avail))
+			break;
+	}
+	/* handle situation when allocation in for-cycle above failed */
+	if (i < c_avails->_length) {
 		CORBA_free(c_avails);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
-	}
-	CL_NEW(cdata->out->check.avails);
-
-	/*
-	 * length of results returned should be same as lenght of input
-	 * objects
-	 */
-	assert(len == c_avails->_length); /* XXX change this in production release */
-	/*
-	 * circular list stores items in reversed order.
-	 * Therefore we have reverse processing order of items in
-	 * c_avails->_buffer array
-	 */
-	for (i = c_avails->_length - 1; i >= 0; i--) {
-		epp_avail	*avail;
-
-		if ((item = epp_malloc(pool, sizeof *item)) == NULL ||
-			(avail = epp_malloc(pool, sizeof *avail)) == NULL)
-		{
-			break;
-		}
-		avail->avail =
-			(c_avails->_buffer[i].avail == ccReg_NotExist) ? 1 : 0;
-		avail->reason = epp_strdup(pool, c_avails->_buffer[i].reason);
-		if (avail->avail) assert(*avail->reason == '\0');
-		CL_CONTENT(item) = (void *) avail;
-		CL_ADD(cdata->out->check.avails, item);
 	}
 	CORBA_free(c_avails);
 
-	/* handle situation when item allocation above failed */
-	if (i > 0) {
-		CORBA_free(response);
+	if (corba_call_epilog(pool, cdata, response))
 		return CORBA_INT_ERROR;
-	}
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
 	return CORBA_OK;
 }
 
@@ -707,12 +929,27 @@ epp_call_info_contact(void *pool,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
+	CORBA_char	*c_clTRID;
 	ccReg_Contact	*c_contact;
 	ccReg_Response	*response;
-	epp_postalInfo	*pi;
-	epp_discl	*discl;
-	struct circ_list	*item;
-	int	i, retr;
+	int	i, retr, cerrno;
+	epps_info_contact	*info_contact;
+
+	info_contact = cdata->data;
+	/*
+	 * Input parameters:
+	 *    id (a)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_contact (*)
+	 */
+	assert(cdata->xml_in);
+	assert(info_contact->id);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -720,134 +957,154 @@ epp_call_info_contact(void *pool,
 
 		/* get information about contact from central repository */
 		response = ccReg_EPP_ContactInfo(globs->service,
-				cdata->in->info.id,
+				info_contact->id,
 				&c_contact,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				ev);
 
-
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(c_contact);
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
-	}
-
-	/* first allocate all necessary structures */
-	if (!(cdata->out = epp_calloc(pool, sizeof (*cdata->out)))
-		|| !(cdata->out->info_contact.postalInfo =
-			epp_calloc(pool, sizeof *pi))
-		|| !(cdata->out->info_contact.discl =
-			epp_calloc(pool, sizeof *discl))
-		|| !(cdata->out->info_contact.status =
-			epp_malloc(pool, sizeof *item)))
-	{
-		CORBA_free(c_contact);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
+		return ret;
 	}
 
 	/* ok, now everything was successfully allocated */
-	cdata->out->info_contact.roid = epp_strdup(pool, c_contact->ROID);
-	cdata->out->info_contact.handle = epp_strdup(pool, c_contact->handle);
-	cdata->out->info_contact.authInfo = epp_strdup(pool, c_contact->AuthInfoPw);
-	cdata->out->info_contact.clID = epp_strdup(pool, c_contact->ClID);
-	cdata->out->info_contact.crID = epp_strdup(pool, c_contact->CrID);
-	cdata->out->info_contact.upID = epp_strdup(pool, c_contact->UpID);
-	cdata->out->info_contact.crDate = epp_strdup(pool, c_contact->CrDate);
-	cdata->out->info_contact.upDate = epp_strdup(pool, c_contact->UpDate);
-	cdata->out->info_contact.trDate = epp_strdup(pool, c_contact->TrDate);
+	info_contact->roid = unwrap_str_req(pool, c_contact->ROID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->handle = unwrap_str_req(pool, c_contact->handle, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->authInfo = unwrap_str(pool, c_contact->AuthInfoPw,&cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->clID = unwrap_str_req(pool, c_contact->ClID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->crID = unwrap_str_req(pool, c_contact->CrID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->upID = unwrap_str(pool, c_contact->UpID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->crDate = unwrap_str_req(pool, c_contact->CrDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->upDate = unwrap_str(pool, c_contact->UpDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->trDate = unwrap_str(pool, c_contact->TrDate, &cerrno);
+	if (cerrno != 0) goto error;
 	/* contact status */
-	CL_NEW(cdata->out->info_contact.status);
 	for (i = 0; i < c_contact->stat._length; i++) {
-		item = epp_malloc(pool, sizeof *item);
-		CL_CONTENT(item) =
-			(void *) epp_strdup(pool, c_contact->stat._buffer[i]);
-		CL_ADD(cdata->out->info_contact.status, item);
+		char	*status;
+
+		status = unwrap_str_req(pool, c_contact->stat._buffer[i],
+						&cerrno);
+		if (cerrno != 0) goto error;
+		if (q_add(pool, &info_contact->status, status))
+			goto error;
 	}
 	/* postal info */
-	pi = cdata->out->info_contact.postalInfo;
-	pi->name = epp_strdup(pool, c_contact->Name);
-	pi->org = epp_strdup(pool, c_contact->Organization);
-	pi->street[0] = epp_strdup(pool, c_contact->Street1);
-	pi->street[1] = epp_strdup(pool, c_contact->Street2);
-	pi->street[2] = epp_strdup(pool, c_contact->Street3);
-	pi->city = epp_strdup(pool, c_contact->City);
-	pi->sp = epp_strdup(pool, c_contact->StateOrProvince);
-	pi->pc = epp_strdup(pool, c_contact->PostalCode);
-	pi->cc = epp_strdup(pool, c_contact->CountryCode);
+	info_contact->pi.name = unwrap_str_req(pool, c_contact->Name, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->pi.org = unwrap_str(pool, c_contact->Organization,&cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->pi.street[0] = unwrap_str(pool, c_contact->Street1,
+			&cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->pi.street[1] = unwrap_str(pool, c_contact->Street2,
+			&cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->pi.street[2] = unwrap_str(pool, c_contact->Street3,
+			&cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->pi.city = unwrap_str_req(pool, c_contact->City, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->pi.sp = unwrap_str(pool, c_contact->StateOrProvince,
+			&cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->pi.pc = unwrap_str(pool, c_contact->PostalCode, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->pi.cc = unwrap_str_req(pool, c_contact->CountryCode,
+			&cerrno);
+	if (cerrno != 0) goto error;
 	/* other attributes */
-	cdata->out->info_contact.voice = epp_strdup(pool, c_contact->Telephone);
-	cdata->out->info_contact.fax = epp_strdup(pool, c_contact->Fax);
-	cdata->out->info_contact.email = epp_strdup(pool, c_contact->Email);
-	cdata->out->info_contact.notify_email =
-		epp_strdup(pool, c_contact->NotifyEmail);
-	cdata->out->info_contact.vat = epp_strdup(pool, c_contact->VAT);
-	cdata->out->info_contact.ssn = epp_strdup(pool, c_contact->SSN);
+	info_contact->voice = unwrap_str(pool, c_contact->Telephone, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->fax = unwrap_str(pool, c_contact->Fax, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->email = unwrap_str_req(pool, c_contact->Email, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->notify_email = unwrap_str(pool, c_contact->NotifyEmail,
+			&cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->vat = unwrap_str(pool, c_contact->VAT, &cerrno);
+	if (cerrno != 0) goto error;
+	info_contact->ssn = unwrap_str(pool, c_contact->SSN, &cerrno);
+	if (cerrno != 0) goto error;
 	/* convert ssntype from idl's enum to our enum */
 	switch (c_contact->SSNtype) {
 		case ccReg_RC:
-			cdata->out->info_contact.ssntype = SSN_RC;
+			info_contact->ssntype = SSN_RC;
 			break;
 		case ccReg_OP:
-			cdata->out->info_contact.ssntype = SSN_OP;
+			info_contact->ssntype = SSN_OP;
 			break;
 		case ccReg_PASS:
-			cdata->out->info_contact.ssntype = SSN_PASSPORT;
+			info_contact->ssntype = SSN_PASSPORT;
 			break;
 		case ccReg_MPSV:
-			cdata->out->info_contact.ssntype = SSN_MPSV;
+			info_contact->ssntype = SSN_MPSV;
 			break;
 		case ccReg_ICO:
-			cdata->out->info_contact.ssntype = SSN_ICO;
+			info_contact->ssntype = SSN_ICO;
 			break;
 		default:
-			cdata->out->info_contact.ssntype = SSN_UNKNOWN;
+			info_contact->ssntype = SSN_UNKNOWN;
 			break;
 	}
 	/* disclose info */
-	discl = cdata->out->info_contact.discl;
 	if (c_contact->DiscloseFlag == ccReg_DISCL_HIDE)
-		discl->flag = 0;
+		info_contact->discl.flag = 0;
 	else if (c_contact->DiscloseFlag == ccReg_DISCL_DISPLAY)
-		discl->flag = 1;
-	else discl->flag = -1;
+		info_contact->discl.flag = 1;
+	else
+		info_contact->discl.flag = -1;
 	/* init discl values only if there is exceptional behaviour */
-	if (discl->flag != -1) {
-		discl->name = (c_contact->DiscloseName == CORBA_TRUE) ? 1 : 0;
-		discl->org = (c_contact->DiscloseOrganization == CORBA_TRUE) ? 1 : 0;
-		discl->addr = (c_contact->DiscloseAddress == CORBA_TRUE) ? 1 : 0;
-		discl->voice = (c_contact->DiscloseTelephone == CORBA_TRUE) ? 1 : 0;
-		discl->fax = (c_contact->DiscloseFax == CORBA_TRUE) ? 1 : 0;
-		discl->email = (c_contact->DiscloseEmail == CORBA_TRUE) ? 1 : 0;
+	if (info_contact->discl.flag != -1) {
+		info_contact->discl.name =
+			(c_contact->DiscloseName == CORBA_TRUE) ? 1 : 0;
+		info_contact->discl.org =
+			(c_contact->DiscloseOrganization == CORBA_TRUE) ? 1 : 0;
+		info_contact->discl.addr =
+			(c_contact->DiscloseAddress == CORBA_TRUE) ? 1 : 0;
+		info_contact->discl.voice =
+			(c_contact->DiscloseTelephone == CORBA_TRUE) ? 1 : 0;
+		info_contact->discl.fax =
+			(c_contact->DiscloseFax == CORBA_TRUE) ? 1 : 0;
+		info_contact->discl.email =
+			(c_contact->DiscloseEmail == CORBA_TRUE) ? 1 : 0;
 	}
 
 	CORBA_free(c_contact);
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
 	return CORBA_OK;
+
+error:
+	CORBA_free(c_contact);
+	CORBA_free(response);
+	return CORBA_INT_ERROR;
 }
 
 /**
@@ -866,10 +1123,27 @@ epp_call_info_domain(void *pool,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
+	CORBA_char	*c_clTRID;
 	ccReg_Response	*response;
 	ccReg_Domain	*c_domain;
-	struct circ_list	*item;
-	int	i, retr;
+	int	i, retr, cerrno;
+	epps_info_domain	*info_domain;
+
+	info_domain = cdata->data;
+	/*
+	 * Input parameters:
+	 *    name (a)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_domain (*)
+	 */
+	assert(info_domain->name);
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -877,109 +1151,110 @@ epp_call_info_domain(void *pool,
 
 		/* get information about domain */
 		response = ccReg_EPP_DomainInfo(globs->service,
-				cdata->in->info.id,
+				info_domain->name,
 				&c_domain,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(c_domain);
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	/* allocate necessary structures */
-	if (!(cdata->out = epp_calloc(pool, sizeof (*cdata->out)))
-		|| !(cdata->out->info_domain.status =
-			epp_malloc(pool, sizeof *item))
-		|| !(cdata->out->info_domain.admin =
-			epp_malloc(pool, sizeof *item))
-		|| !(cdata->out->info_domain.ds =
-			epp_malloc(pool, sizeof *item)))
-	{
-		CORBA_free(c_domain);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-
-	/* ok, now everything was successfully allocated */
-	cdata->out->info_domain.roid   = epp_strdup(pool, c_domain->ROID);
-	cdata->out->info_domain.handle = epp_strdup(pool, c_domain->name);
-	cdata->out->info_domain.clID   = epp_strdup(pool, c_domain->ClID);
-	cdata->out->info_domain.crID   = epp_strdup(pool, c_domain->CrID);
-	cdata->out->info_domain.upID   = epp_strdup(pool, c_domain->UpID);
-	cdata->out->info_domain.crDate = epp_strdup(pool, c_domain->CrDate);
-	cdata->out->info_domain.upDate = epp_strdup(pool, c_domain->UpDate);
-	cdata->out->info_domain.trDate = epp_strdup(pool, c_domain->TrDate);
-	cdata->out->info_domain.exDate = epp_strdup(pool, c_domain->ExDate);
-	cdata->out->info_domain.registrant = epp_strdup(pool,
-			c_domain->Registrant);
-	cdata->out->info_domain.nsset  = epp_strdup(pool, c_domain->nsset);
-	cdata->out->info_domain.authInfo = epp_strdup(pool,
-			c_domain->AuthInfoPw);
+	/* copy output parameters */
+	info_domain->roid   = unwrap_str_req(pool, c_domain->ROID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->handle = unwrap_str_req(pool, c_domain->name, &cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->clID   = unwrap_str_req(pool, c_domain->ClID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->crID   = unwrap_str_req(pool, c_domain->CrID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->upID   = unwrap_str(pool, c_domain->UpID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->crDate = unwrap_str_req(pool, c_domain->CrDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->upDate = unwrap_str(pool, c_domain->UpDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->trDate = unwrap_str(pool, c_domain->TrDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->exDate = unwrap_str(pool, c_domain->ExDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->registrant = unwrap_str(pool, c_domain->Registrant,&cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->nsset  = unwrap_str(pool, c_domain->nsset, &cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->authInfo = unwrap_str(pool, c_domain->AuthInfoPw, &cerrno);
+	if (cerrno != 0) goto error;
 
 	/* allocate and initialize status, admin lists */
-	CL_NEW(cdata->out->info_domain.status);
 	for (i = 0; i < c_domain->stat._length; i++) {
-		item = epp_malloc(pool, sizeof *item);
-		CL_CONTENT(item) =
-			(void *) epp_strdup(pool, c_domain->stat._buffer[i]);
-		CL_ADD(cdata->out->info_domain.status, item);
+		char	*status;
+
+		status = unwrap_str_req(pool, c_domain->stat._buffer[i],&cerrno);
+		if (cerrno != 0) goto error;
+		if (q_add(pool, &info_domain->status, status))
+			goto error;
 	}
-	CL_NEW(cdata->out->info_domain.admin);
 	for (i = 0; i < c_domain->admin._length; i++) {
-		item = epp_malloc(pool, sizeof *item);
-		CL_CONTENT(item) =
-			(void *) epp_strdup(pool, c_domain->admin._buffer[i]);
-		CL_ADD(cdata->out->info_domain.admin, item);
+		char	*admin;
+
+		admin = unwrap_str_req(pool, c_domain->admin._buffer[i],&cerrno);
+		if (cerrno != 0) goto error;
+		if (q_add(pool, &info_domain->admin, admin))
+			goto error;
 	}
-	/* temporary stub until dnssec will be implemented */
-	CL_NEW(cdata->out->info_domain.ds);
 
 	/* look for extensions */
 	for (i = 0; i < c_domain->ext._length; i++) {
+		epp_ext_item	*ext_item;
+
 		/* is it enumval extension? */
 		if (CORBA_TypeCode_equal(c_domain->ext._buffer[i]._type,
 				TC_ccReg_ENUMValidationExtension, ev))
 		{
-			ccReg_ENUMValidationExtension	*c_enumval =
-				c_domain->ext._buffer[i]._value;
+			ccReg_ENUMValidationExtension	*c_enumval;
 
-			cdata->out->info_domain.valExDate =
-				epp_strdup(pool, c_enumval->valExDate);
+			c_enumval = c_domain->ext._buffer[i]._value;
+
+			ext_item = epp_malloc(pool, sizeof *ext_item);
+			if (ext_item == NULL) goto error;
+			ext_item->extType = EPP_EXT_ENUMVAL;
+			ext_item->ext.ext_enumval = unwrap_str_req(pool,
+					c_enumval->valExDate, &cerrno);
+			if (cerrno != 0) goto error;
+			if (q_add(pool, &info_domain->extensions, ext_item))
+				goto error;
 		}
 	}
-	/* if valExDate was not given, then fill it with empty value */
-	if (cdata->out->info_domain.valExDate == NULL)
-		cdata->out->info_domain.valExDate = epp_strdup(pool, "");
 
 	CORBA_free(c_domain);
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
 	return CORBA_OK;
+
+error:
+	CORBA_free(c_domain);
+	CORBA_free(response);
+	return CORBA_INT_ERROR;
 }
 
 /**
@@ -998,10 +1273,27 @@ epp_call_info_nsset(void *pool,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
+	CORBA_char	*c_clTRID;
 	ccReg_NSSet	*c_nsset;
 	ccReg_Response	*response;
-	struct circ_list	*item;
-	int i, j, retr;
+	int	i, retr, cerrno;
+	epps_info_nsset	*info_nsset;
+
+	info_nsset = cdata->data;
+	/*
+	 * Input parameters:
+	 *    id (a)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_contact (*)
+	 */
+	assert(info_nsset->id);
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -1009,109 +1301,108 @@ epp_call_info_nsset(void *pool,
 
 		/* get information about nsset */
 		response = ccReg_EPP_NSSetInfo(globs->service,
-				cdata->in->info.id,
+				info_nsset->id,
 				&c_nsset,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
-		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
+		int	ret;
 
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(c_nsset);
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
-	}
-
-	/* allocate needed structures */
-	if (!(cdata->out = epp_calloc(pool, sizeof (*cdata->out)))
-		|| !(cdata->out->info_nsset.status =
-				epp_malloc(pool, sizeof *item))
-		|| !(cdata->out->info_nsset.ns =
-				epp_malloc(pool, sizeof *item))
-		|| !(cdata->out->info_nsset.tech =
-				epp_malloc(pool, sizeof *item)))
-	{
-		CORBA_free(c_nsset);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-
-	/* ok, now alomost everything was successfully allocated */
-	cdata->out->info_nsset.roid   = epp_strdup(pool, c_nsset->ROID);
-	cdata->out->info_nsset.handle = epp_strdup(pool, c_nsset->handle);
-	cdata->out->info_nsset.clID   = epp_strdup(pool, c_nsset->ClID);
-	cdata->out->info_nsset.crID   = epp_strdup(pool, c_nsset->CrID);
-	cdata->out->info_nsset.upID   = epp_strdup(pool, c_nsset->UpID);
-	cdata->out->info_nsset.crDate = epp_strdup(pool, c_nsset->CrDate);
-	cdata->out->info_nsset.upDate = epp_strdup(pool, c_nsset->UpDate);
-	cdata->out->info_nsset.trDate = epp_strdup(pool, c_nsset->TrDate);
-	cdata->out->info_nsset.authInfo = epp_strdup(pool, c_nsset->AuthInfoPw);
-
-	/* allocate and initialize status list */
-	CL_NEW(cdata->out->info_nsset.status);
-	for (i = 0; i < c_nsset->stat._length; i++) {
-		item = epp_malloc(pool, sizeof *item);
-		CL_CONTENT(item) =
-			(void *) epp_strdup(pool, c_nsset->stat._buffer[i]);
-		CL_ADD(cdata->out->info_nsset.status, item);
-	}
-	/* allocate and initialize tech list */
-	CL_NEW(cdata->out->info_nsset.tech);
-	for (i = 0; i < c_nsset->tech._length; i++) {
-		item = epp_malloc(pool, sizeof *item);
-		CL_CONTENT(item) =
-			(void *) epp_strdup(pool, c_nsset->tech._buffer[i]);
-		CL_ADD(cdata->out->info_nsset.tech, item);
-	}
-	/*
-	 * allocate and initialize required number of ns items
-	 */
-	CL_NEW(cdata->out->info_nsset.ns);
-	for (i = 0; i < c_nsset->dns._length; i++) {
-		epp_ns	*item_ns;
-
-		/* ns item */
-		item = epp_malloc(pool, sizeof *item);
-		item_ns = epp_malloc(pool, sizeof *item_ns);
-		CL_CONTENT(item) = (void *) item_ns;
-		CL_ADD(cdata->out->info_nsset.ns, item);
-		/* content of ns item */
-		item_ns->name = epp_strdup(pool, c_nsset->dns._buffer[i].fqdn);
-		item_ns->addr = epp_malloc(pool, sizeof (struct circ_list));
-		CL_NEW(item_ns->addr);
-		for (j = 0; j < c_nsset->dns._buffer[i].inet._length; j++) {
-			item = epp_malloc(pool, sizeof *item);
-			CL_CONTENT(item) = (void *)
-				epp_strdup(pool, c_nsset->dns._buffer[i].inet._buffer[j]);
-			CL_ADD(item_ns->addr, item);
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
 		}
+		else {
+			ret  = CORBA_ERROR;
+		}
+		CORBA_exception_free(ev);
+		return ret;
+	}
+
+	/* copy output data */
+	info_nsset->roid   = unwrap_str_req(pool, c_nsset->ROID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_nsset->handle = unwrap_str_req(pool, c_nsset->handle, &cerrno);
+	if (cerrno != 0) goto error;
+	info_nsset->clID   = unwrap_str_req(pool, c_nsset->ClID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_nsset->crID   = unwrap_str_req(pool, c_nsset->CrID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_nsset->upID   = unwrap_str(pool, c_nsset->UpID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_nsset->crDate = unwrap_str_req(pool, c_nsset->CrDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_nsset->upDate = unwrap_str(pool, c_nsset->UpDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_nsset->trDate = unwrap_str(pool, c_nsset->TrDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_nsset->authInfo = unwrap_str(pool, c_nsset->AuthInfoPw, &cerrno);
+	if (cerrno != 0) goto error;
+
+	/* initialize status list */
+	for (i = 0; i < c_nsset->stat._length; i++) {
+		char	*status;
+
+		status = unwrap_str_req(pool, c_nsset->stat._buffer[i], &cerrno);
+		if (cerrno != 0) goto error;
+		if (q_add(pool, &info_nsset->status, status))
+			goto error;
+	}
+	/* initialize tech list */
+	for (i = 0; i < c_nsset->tech._length; i++) {
+		char	*tech;
+
+		tech = unwrap_str_req(pool, c_nsset->tech._buffer[i], &cerrno);
+		if (cerrno != 0) goto error;
+		if (q_add(pool, &info_nsset->tech, tech))
+			goto error;
+	}
+	/* initialize required number of ns items */
+	for (i = 0; i < c_nsset->dns._length; i++) {
+		epp_ns	*ns_item;
+		int	j;
+
+		ns_item = epp_calloc(pool, sizeof *ns_item);
+		if (ns_item == NULL) goto error;
+
+		/* process of ns item */
+		ns_item->name = unwrap_str_req(pool,
+				c_nsset->dns._buffer[i].fqdn, &cerrno);
+		if (cerrno != 0) goto error;
+		for (j = 0; j < c_nsset->dns._buffer[i].inet._length; j++) {
+			char	*addr;
+
+			addr = unwrap_str_req(pool,
+					c_nsset->dns._buffer[i].inet._buffer[j],
+					&cerrno);
+			if (cerrno != 0) goto error;
+			if (q_add(pool, &ns_item->addr, addr))
+				goto error;
+		}
+		/* enqueue ns item */
+		if (q_add(pool, &info_nsset->ns, ns_item))
+			goto error;
 	}
 
 	CORBA_free(c_nsset);
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
 	return CORBA_OK;
+
+error:
+	CORBA_free(c_nsset);
+	CORBA_free(response);
+	return CORBA_INT_ERROR;
 }
 
 /**
@@ -1132,10 +1423,26 @@ epp_call_poll_req(void *pool,
 	ccReg_Response	*response;
 	CORBA_Environment	ev[1];
 	CORBA_short	c_count;
-	CORBA_long	c_msgID;
-	CORBA_char	*c_qdate;
-	CORBA_char	*c_msg;
-	int	retr;
+	CORBA_char	*c_qdate, *c_msg, *c_clTRID, *c_msgID;
+	int	retr, cerrno;
+	epps_poll_req	*poll_req;
+
+	poll_req = cdata->data;
+	/*
+	 * Input parameters:
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_msgID (*)
+	 *    c_count
+	 *    c_qdate (*)
+	 *    c_msg (*)
+	 */
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -1148,53 +1455,50 @@ epp_call_poll_req(void *pool,
 				&c_qdate,
 				&c_msg,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(c_msg);
-		CORBA_free(c_qdate);
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(c_msg);
-		CORBA_free(c_qdate);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
+	poll_req->count = c_count;
+	poll_req->msgid = unwrap_str_req(pool, c_msgID, &cerrno);
+	if (cerrno != 0) goto error;
+	poll_req->qdate = unwrap_str_req(pool, c_qdate, &cerrno);
+	if (cerrno != 0) goto error;
+	poll_req->msg = unwrap_str_req(pool, c_msg, &cerrno);
+	if (cerrno != 0) goto error;
 
-	cdata->out->poll_req.count = c_count;
-	cdata->out->poll_req.msgid = c_msgID;
-	cdata->out->poll_req.qdate = epp_strdup(pool, c_qdate);
-	cdata->out->poll_req.msg = epp_strdup(pool, c_msg);
-
+	CORBA_free(c_msgID);
 	CORBA_free(c_msg);
 	CORBA_free(c_qdate);
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
+	return CORBA_OK;
 
+error:
+	CORBA_free(c_msgID);
+	CORBA_free(c_qdate);
+	CORBA_free(c_msg);
 	CORBA_free(response);
 	return CORBA_OK;
 }
@@ -1215,12 +1519,29 @@ epp_call_poll_ack(void *pool,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	CORBA_long	c_msgID;
-	CORBA_short	c_count;
-	ccReg_Response *response;
-	int	retr;
+	CORBA_char	*c_msgID;
+	CORBA_short	 c_count;
+	CORBA_char	*c_clTRID;
+	ccReg_Response	*response;
+	int	retr, cerrno;
+	epps_poll_ack	*poll_ack;
 
-	assert(cdata->in != NULL);
+	poll_ack = cdata->data;
+	/*
+	 * Input parameters:
+	 *    msgid (a)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_count
+	 *    c_msgID (*)
+	 */
+	assert(poll_ack->msgid);
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -1228,50 +1549,48 @@ epp_call_poll_ack(void *pool,
 
 		/* send acknoledgement */
 		response = ccReg_EPP_PollAcknowledgement(globs->service,
-				cdata->in->poll_ack.msgid,
+				poll_ack->msgid,
 				&c_count,
 				&c_msgID,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(response);
+	poll_ack->count = c_count;
+	poll_ack->msgid = unwrap_str_req(pool, c_msgID, &cerrno);
+	if (cerrno != 0) goto error;
+
+	CORBA_free(c_msgID);
+	if (corba_call_epilog(pool, cdata, response))
 		return CORBA_INT_ERROR;
-	}
 
-	cdata->out->poll_ack.count = c_count;
-	cdata->out->poll_ack.msgid = c_msgID;
-
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
 	return CORBA_OK;
+
+error:
+	CORBA_free(c_msgID);
+	CORBA_free(response);
+	return CORBA_INT_ERROR;
 }
 
 /**
@@ -1290,43 +1609,92 @@ epp_call_create_domain(void *pool,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	CORBA_char	*c_crDate;
-	CORBA_char	*c_exDate;
-	ccReg_Response *response;
+	CORBA_char	*c_crDate, *c_exDate;
+	CORBA_char	*c_registrant, *c_nsset, *c_authInfo, *c_clTRID;
+	ccReg_Response	*response;
 	ccReg_AdminContact	*c_admin;
 	ccReg_ExtensionList	*c_ext_list;
-	int	len, i, retr;
+	int	len, i, retr, cerrno;
+	epps_create_domain	*create_domain;
 
-	assert(cdata->in != NULL);
-
-	/* fill in corba input parameters */
+	create_domain = cdata->data;
+	/* init corba input parameters to NULL, because CORBA_free(NULL) is ok */
+	c_ext_list = NULL;
+	c_admin = NULL;
+	c_authInfo = NULL;
+	c_nsset = NULL;
+	c_registrant = NULL;
+	c_clTRID = NULL;
+	c_admin = NULL;
+	c_ext_list = NULL;
+	/*
+	 * Input parameters:
+	 *    name (a)
+	 *    c_registrant (*)
+	 *    c_nsset    (*)
+	 *    c_authInfo (*)
+	 *    period
+	 *    c_admin  (*)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 *    c_ext_list (*)
+	 * Output parameters:
+	 *    c_crDate (*)
+	 *    c_exDate (*)
+	 */
+	assert(create_domain->name);
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL) goto error_input;
+	c_registrant = wrap_str(create_domain->registrant);
+	if (c_registrant == NULL) goto error_input;
+	c_nsset = wrap_str(create_domain->nsset);
+	if (c_nsset == NULL) goto error_input;
+	c_authInfo = wrap_str(create_domain->authInfo);
+	if (c_authInfo == NULL) goto error_input;
 	c_admin = ccReg_AdminContact__alloc();
-	len = cl_length(cdata->in->create_domain.admin);
+	if (c_admin == NULL) goto error_input;
+	len = q_length(create_domain->admin);
 	c_admin->_buffer = ccReg_AdminContact_allocbuf(len);
+	if (c_admin->_buffer == NULL) goto error_input;
 	c_admin->_maximum = c_admin->_length = len;
 	c_admin->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->create_domain.admin)
-		c_admin->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->create_domain.admin));
-	c_ext_list = ccReg_ExtensionList__alloc();
-	/* fill extension list if needed */
-	if (*cdata->in->create_domain.valExDate != '\0') {
-		ccReg_ENUMValidationExtension	*c_enumval;
-
-		c_enumval = ccReg_ENUMValidationExtension__alloc();
-		c_enumval->valExDate =
-			CORBA_string_dup(cdata->in->create_domain.valExDate);
-		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
-		c_ext_list->_maximum = c_ext_list->_length = 1;
-		c_ext_list->_release = CORBA_TRUE;
-		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
-		c_ext_list->_buffer[0]._value = c_enumval;
-		c_ext_list->_buffer[0]._release = CORBA_TRUE;
+	q_foreach(&create_domain->admin) {
+		c_admin->_buffer[i] = wrap_str(q_content(&create_domain->admin));
+		if (c_admin->_buffer[i++] == NULL) goto error_input;
 	}
-	else {
-		c_ext_list->_maximum = c_ext_list->_length = 0;
-		c_ext_list->_release = CORBA_TRUE;
+	c_ext_list = ccReg_ExtensionList__alloc();
+	if (c_ext_list == NULL) goto error_input;
+	len = q_length(create_domain->extensions);
+	c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(len);
+	if (c_ext_list->_buffer == NULL) goto error_input;
+	c_ext_list->_release = CORBA_TRUE;
+	c_ext_list->_maximum = c_ext_list->_length = len;
+	/* fill extension list */
+	i = 0;
+	q_foreach(&create_domain->extensions) {
+		epp_ext_item	*ext_item;
+
+		ext_item = q_content(&create_domain->extensions);
+		if (ext_item->extType == EPP_EXT_ENUMVAL) {
+			ccReg_ENUMValidationExtension	*c_enumval;
+
+			c_enumval = ccReg_ENUMValidationExtension__alloc();
+			if (c_enumval == NULL) goto error_input;
+			c_enumval->valExDate =
+				wrap_str(ext_item->ext.ext_enumval);
+			if (c_enumval->valExDate == NULL) {
+				CORBA_free(c_enumval);
+				goto error_input;
+			}
+			c_ext_list->_buffer[i]._type =
+				TC_ccReg_ENUMValidationExtension;
+			c_ext_list->_buffer[i]._value = c_enumval;
+			c_ext_list->_buffer[i]._release = CORBA_TRUE;
+		}
+		i++;
 	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
@@ -1335,64 +1703,75 @@ epp_call_create_domain(void *pool,
 
 		/* send new domain in central repository */
 		response = ccReg_EPP_DomainCreate(globs->service,
-				cdata->in->create_domain.name,
-				cdata->in->create_domain.registrant,
-				cdata->in->create_domain.nsset,
-				cdata->in->create_domain.authInfo,
-				cdata->in->create_domain.period,
+				create_domain->name,
+				c_registrant,
+				c_nsset,
+				c_authInfo,
+				create_domain->period,
 				c_admin,
 				&c_crDate,
 				&c_exDate,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				c_ext_list,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
-
+	CORBA_free(c_ext_list);
+	CORBA_free(c_admin);
+	CORBA_free(c_authInfo);
+	CORBA_free(c_nsset);
+	CORBA_free(c_registrant);
+	CORBA_free(c_clTRID);
 	CORBA_free(c_admin);
 	CORBA_free(c_ext_list);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		CORBA_free(c_crDate);
-		CORBA_free(c_exDate);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-
-	cdata->out->create.crDate = epp_strdup(pool, c_crDate);
-	cdata->out->create.exDate = epp_strdup(pool, c_exDate);
+	create_domain->crDate = unwrap_str_req(pool, c_crDate, &cerrno);
+	if (cerrno != 0) goto error;
+	create_domain->exDate = unwrap_str_req(pool, c_exDate, &cerrno);
+	if (cerrno != 0) goto error;
 
 	CORBA_free(c_crDate);
 	CORBA_free(c_exDate);
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
 	return CORBA_OK;
+
+error:
+	CORBA_free(c_crDate);
+	CORBA_free(c_exDate);
+	CORBA_free(response);
+	return CORBA_INT_ERROR;
+
+error_input:
+	CORBA_free(c_ext_list);
+	CORBA_free(c_admin);
+	CORBA_free(c_authInfo);
+	CORBA_free(c_nsset);
+	CORBA_free(c_registrant);
+	CORBA_free(c_clTRID);
+	CORBA_free(c_admin);
+	CORBA_free(c_ext_list);
+	return CORBA_INT_ERROR;
 }
 
 /**
@@ -1449,55 +1828,150 @@ epp_call_create_contact(void *pool,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	CORBA_char	*c_crDate;
+	CORBA_char	*c_crDate, *c_clTRID;
 	ccReg_ContactChange	*c_contact;
 	ccReg_Response *response;
-	int	retr;
+	int	retr, cerrno;
+	epps_create_contact	*create_contact;
 
-	assert(cdata->in != NULL);
+	create_contact = cdata->data;
+	/*
+	 * Input parameters:
+	 *    id (a)
+	 *    c_contact (*)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_crDate (*)
+	 */
+	assert(create_contact->id);
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
 
 	/* fill in corba input values */
 	c_contact = ccReg_ContactChange__alloc();
-	c_contact->AuthInfoPw = CORBA_string_dup(cdata->in->create_contact.authInfo);
-	c_contact->Telephone = CORBA_string_dup(cdata->in->create_contact.voice);
-	c_contact->Fax = CORBA_string_dup(cdata->in->create_contact.fax);
-	c_contact->Email = CORBA_string_dup(cdata->in->create_contact.email);
+	if (c_contact == NULL) {
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->AuthInfoPw = wrap_str(create_contact->authInfo);
+	if (c_contact->AuthInfoPw == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->Telephone = wrap_str(create_contact->voice);
+	if (c_contact->AuthInfoPw == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->Fax = wrap_str(create_contact->fax);
+	if (c_contact->Fax == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->Email = wrap_str(create_contact->email);
+	if (c_contact->Email == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
 	c_contact->NotifyEmail =
-			CORBA_string_dup(cdata->in->create_contact.notify_email);
-	c_contact->VAT = CORBA_string_dup(cdata->in->create_contact.vat);
-	c_contact->SSN = CORBA_string_dup(cdata->in->create_contact.ssn);
-	c_contact->SSNtype = convSSNType(cdata->in->create_contact.ssntype);
+			wrap_str(create_contact->notify_email);
+	if (c_contact->NotifyEmail == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->VAT = wrap_str(create_contact->vat);
+	if (c_contact->VAT == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->SSN = wrap_str(create_contact->ssn);
+	if (c_contact->SSN == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->SSNtype = convSSNType(create_contact->ssntype);
 	/* disclose */
-	c_contact->DiscloseFlag = convDiscl(cdata->in->create_contact.discl->flag);
+	c_contact->DiscloseFlag = convDiscl(create_contact->discl.flag);
 	if (c_contact->DiscloseFlag != ccReg_DISCL_EMPTY) {
-		epp_discl	*discl = cdata->in->create_contact.discl;
-
-		c_contact->DiscloseName = (discl->name ? CORBA_TRUE : CORBA_FALSE);
-		c_contact->DiscloseOrganization = (discl->org ? CORBA_TRUE :CORBA_FALSE);
-		c_contact->DiscloseAddress = (discl->addr ? CORBA_TRUE : CORBA_FALSE);
-		c_contact->DiscloseTelephone = (discl->voice ? CORBA_TRUE : CORBA_FALSE);
-		c_contact->DiscloseFax = (discl->fax ? CORBA_TRUE : CORBA_FALSE);
-		c_contact->DiscloseEmail = (discl->email ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseName =
+			(create_contact->discl.name ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseOrganization =
+			(create_contact->discl.org ? CORBA_TRUE :CORBA_FALSE);
+		c_contact->DiscloseAddress =
+			(create_contact->discl.addr ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseTelephone =
+			(create_contact->discl.voice ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseFax =
+			(create_contact->discl.fax ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseEmail =
+			(create_contact->discl.email ? CORBA_TRUE : CORBA_FALSE);
 	}
 	/* postal info */
-	c_contact->Name =
-		CORBA_string_dup(cdata->in->create_contact.postalInfo->name);
-	c_contact->Organization =
-		CORBA_string_dup(cdata->in->create_contact.postalInfo->org);
-	c_contact->Street1 =
-		CORBA_string_dup(cdata->in->create_contact.postalInfo->street[0]);
-	c_contact->Street2 =
-		CORBA_string_dup(cdata->in->create_contact.postalInfo->street[1]);
-	c_contact->Street3 =
-		CORBA_string_dup(cdata->in->create_contact.postalInfo->street[2]);
-	c_contact->City =
-		CORBA_string_dup(cdata->in->create_contact.postalInfo->city);
-	c_contact->StateOrProvince =
-		CORBA_string_dup(cdata->in->create_contact.postalInfo->sp);
-	c_contact->PostalCode =
-		CORBA_string_dup(cdata->in->create_contact.postalInfo->pc);
-	c_contact->CC =
-		CORBA_string_dup(cdata->in->create_contact.postalInfo->cc);
+	c_contact->Name = wrap_str(create_contact->pi.name);
+	if (c_contact->Name == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->Organization = wrap_str(create_contact->pi.org);
+	if (c_contact->Organization == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->Street1 = wrap_str(create_contact->pi.street[0]);
+	if (c_contact->Street1 == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->Street2 = wrap_str(create_contact->pi.street[1]);
+	if (c_contact->Street2 == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->Street3 = wrap_str(create_contact->pi.street[2]);
+	if (c_contact->Street3 == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->City = wrap_str(create_contact->pi.city);
+	if (c_contact->City == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->StateOrProvince = wrap_str(create_contact->pi.sp);
+	if (c_contact->StateOrProvince == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->PostalCode = wrap_str(create_contact->pi.pc);
+	if (c_contact->PostalCode == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_contact->CC = wrap_str(create_contact->pi.cc);
+	if (c_contact->CC == NULL) {
+		CORBA_free(c_contact);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -1505,52 +1979,46 @@ epp_call_create_contact(void *pool,
 
 		/* send new contact in repository */
 		response = ccReg_EPP_ContactCreate(globs->service,
-				cdata->in->create_contact.id,
+				create_contact->id,
 				c_contact,
 				&c_crDate,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
-
+	CORBA_free(c_clTRID);
 	CORBA_free(c_contact);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
+		return ret;
 	}
-	CORBA_exception_free(ev);
 
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
+	create_contact->crDate = unwrap_str_req(pool, c_crDate, &cerrno);
+	if (cerrno != 0) {
 		CORBA_free(c_crDate);
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
-	}
-
-	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 
-	cdata->out->create.crDate = epp_strdup(pool, c_crDate);
 	CORBA_free(c_crDate);
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
 	return CORBA_OK;
 }
 
@@ -1573,42 +2041,121 @@ epp_call_create_nsset(void *pool,
 	ccReg_Response *response;
 	ccReg_DNSHost	*c_dnshost;
 	ccReg_TechContact	*c_tech;
-	CORBA_char	*c_crDate;
-	int	len, i, j, retr;
+	CORBA_char	*c_crDate, *c_clTRID, *c_authInfo;
+	int	len, i, retr, cerrno;
+	epps_create_nsset	*create_nsset;
 
-	assert(cdata->in != NULL);
+	create_nsset = cdata->data;
+	/*
+	 * Input parameters:
+	 *    id (a)
+	 *    c_authInfo (*)
+	 *    c_tech (*)
+	 *    c_dnshost (*)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_crDate (*)
+	 */
+	assert(create_nsset->id != NULL);
+	assert(cdata->xml_in != NULL);
+
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+	c_authInfo = wrap_str(create_nsset->authInfo);
+	if (c_authInfo == NULL) {
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
 
 	/* alloc & init sequence of nameservers */
 	c_dnshost = ccReg_DNSHost__alloc();
-	len = cl_length(cdata->in->create_nsset.ns);
+	if (c_dnshost == NULL) {
+		CORBA_free(c_authInfo);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	len = q_length(create_nsset->ns);
 	c_dnshost->_buffer = ccReg_DNSHost_allocbuf(len);
+	if (c_dnshost->_buffer == NULL) {
+		CORBA_free(c_dnshost);
+		CORBA_free(c_authInfo);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
 	c_dnshost->_maximum = c_dnshost->_length = len;
 	c_dnshost->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->create_nsset.ns) {
-		/* alloc & init sequence of ns's addresses */
-		epp_ns *ns = (epp_ns *) CL_CONTENT(cdata->in->create_nsset.ns);
-		len = cl_length(ns->addr);
-		c_dnshost->_buffer[i].inet._buffer = ccReg_InetAddress_allocbuf(len);
+	q_foreach(&create_nsset->ns) {
+		epp_ns	*ns;
+		int	 j;
+
+		ns = q_content(&create_nsset->ns);
+		c_dnshost->_buffer[i].fqdn = wrap_str(ns->name);
+		if (c_dnshost->_buffer[i].fqdn == NULL) {
+			CORBA_free(c_dnshost);
+			CORBA_free(c_authInfo);
+			CORBA_free(c_clTRID);
+			return CORBA_INT_ERROR;
+		}
+		/* initialize sequence of addresses */
+		len = q_length(ns->addr);
+		c_dnshost->_buffer[i].inet._buffer =
+			ccReg_InetAddress_allocbuf(len);
+		if (c_dnshost->_buffer[i].inet._buffer == NULL) {
+			CORBA_free(c_dnshost);
+			CORBA_free(c_authInfo);
+			CORBA_free(c_clTRID);
+			return CORBA_INT_ERROR;
+		}
 		c_dnshost->_buffer[i].inet._maximum =
 			c_dnshost->_buffer[i].inet._length = len;
 		c_dnshost->_buffer[i].inet._release = CORBA_TRUE;
 		j = 0;
-		CL_FOREACH(ns->addr)
-			c_dnshost->_buffer[i].inet._buffer[j++] =
-					CORBA_string_dup(CL_CONTENT(ns->addr));
-		c_dnshost->_buffer[i++].fqdn = CORBA_string_dup(ns->name);
+		q_foreach(&ns->addr) {
+			c_dnshost->_buffer[i].inet._buffer[j] =
+					wrap_str(q_content(&ns->addr));
+			if (c_dnshost->_buffer[i].inet._buffer[j++] == NULL) {
+				CORBA_free(c_dnshost);
+				CORBA_free(c_authInfo);
+				CORBA_free(c_clTRID);
+				return CORBA_INT_ERROR;
+			}
+		}
+		i++;
 	}
 	/* alloc & init sequence of tech contacts */
 	c_tech = ccReg_TechContact__alloc();
-	len = cl_length(cdata->in->create_nsset.tech);
+	if (c_tech == NULL) {
+		CORBA_free(c_dnshost);
+		CORBA_free(c_authInfo);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	len = q_length(create_nsset->tech);
 	c_tech->_buffer = ccReg_TechContact_allocbuf(len);
-	c_tech->_maximum = c_tech->_length = len;
+	if (c_tech->_buffer == NULL) {
+		CORBA_free(c_tech);
+		CORBA_free(c_dnshost);
+		CORBA_free(c_authInfo);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
 	c_tech->_release = CORBA_TRUE;
+	c_tech->_maximum = c_tech->_length = len;
 	i = 0;
-	CL_FOREACH(cdata->in->create_nsset.tech)
-		c_tech->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->create_nsset.tech));
+	q_foreach(&create_nsset->tech) {
+		c_tech->_buffer[i] = wrap_str(q_content(&create_nsset->tech));
+		if (c_tech->_buffer[i++] == NULL) {
+			CORBA_free(c_tech);
+			CORBA_free(c_dnshost);
+			CORBA_free(c_authInfo);
+			CORBA_free(c_clTRID);
+			return CORBA_INT_ERROR;
+		}
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -1616,55 +2163,50 @@ epp_call_create_nsset(void *pool,
 
 		/* send new nsset to repository */
 		response = ccReg_EPP_NSSetCreate(globs->service,
-				cdata->in->create_nsset.id,
-				cdata->in->create_nsset.authInfo,
+				create_nsset->id,
+				c_authInfo,
 				c_tech,
 				c_dnshost,
 				&c_crDate,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
-
 	CORBA_free(c_tech);
 	CORBA_free(c_dnshost);
+	CORBA_free(c_authInfo);
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
+		return ret;
 	}
-	CORBA_exception_free(ev);
 
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
+	create_nsset->crDate = unwrap_str(pool, c_crDate, &cerrno);
+	if (cerrno != 0) {
 		CORBA_free(c_crDate);
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
-	}
-
-	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
 
-	cdata->out->create.crDate = epp_strdup(pool, c_crDate);
 	CORBA_free(c_crDate);
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
 	return CORBA_OK;
 }
 
@@ -1686,11 +2228,26 @@ epp_call_delete(void *pool,
 		epp_command_data *cdata,
 		epp_object_type obj)
 {
-	ccReg_Response *response;
+	CORBA_char	*c_clTRID;
 	CORBA_Environment ev[1];
+	ccReg_Response *response;
 	int	retr;
+	epps_delete	*delete;
 
-	assert(cdata->in != NULL);
+	delete = cdata->data;
+	/*
+	 * Input parameters:
+	 *    id (a)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters: none
+	 */
+	assert(delete->id);
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -1698,55 +2255,50 @@ epp_call_delete(void *pool,
 
 		if (obj == EPP_DOMAIN)
 			response = ccReg_EPP_DomainDelete(globs->service,
-					cdata->in->delete.id,
+					delete->id,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		else if (obj == EPP_CONTACT)
 			response = ccReg_EPP_ContactDelete(globs->service,
-					cdata->in->delete.id,
+					delete->id,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		else {
 			assert(obj == EPP_NSSET);
 			response = ccReg_EPP_NSSetDelete(globs->service,
-					cdata->in->delete.id,
+					delete->id,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		}
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	CORBA_free(response);
 	return CORBA_OK;
 }
 
@@ -1767,29 +2319,82 @@ epp_call_renew_domain(void *pool,
 {
 	CORBA_Environment ev[1];
 	ccReg_Response	*response;
-	CORBA_char	*c_exDate;
+	CORBA_char	*c_exDateIN, *c_exDateOUT, *c_clTRID;
 	ccReg_ExtensionList	*c_ext_list;
-	int	retr;
+	int	len, i, retr, cerrno;
+	epps_renew	*renew;
 
-	assert(cdata->in != NULL);
-	c_ext_list = ccReg_ExtensionList__alloc();
-	/* fill extension list if needed */
-	if (*cdata->in->renew.valExDate != '\0') {
-		ccReg_ENUMValidationExtension	*c_enumval;
+	renew = cdata->data;
+	/*
+	 * Input parameters:
+	 *    name (a)
+	 *    c_exDateIN (*)
+	 *    period
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 *    c_ext_list (*)
+	 * Output parameters:
+	 *    c_exDateOUT (*)
+	 */
+	assert(renew->name);
+	assert(cdata->xml_in);
 
-		c_enumval = ccReg_ENUMValidationExtension__alloc();
-		c_enumval->valExDate =
-			CORBA_string_dup(cdata->in->renew.valExDate);
-		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
-		c_ext_list->_maximum = c_ext_list->_length = 1;
-		c_ext_list->_release = CORBA_TRUE;
-		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
-		c_ext_list->_buffer[0]._value = c_enumval;
-		c_ext_list->_buffer[0]._release = CORBA_TRUE;
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+	c_exDateIN = wrap_str(renew->curExDate);
+	if (c_exDateIN == NULL) {
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
 	}
-	else {
-		c_ext_list->_maximum = c_ext_list->_length = 0;
-		c_ext_list->_release = CORBA_FALSE;
+	/* fill extension list */
+	c_ext_list = ccReg_ExtensionList__alloc();
+	if (c_ext_list == NULL) {
+		CORBA_free(c_exDateIN);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	len = q_length(renew->extensions);
+	c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(len);
+	if (c_ext_list->_buffer == NULL) {
+		CORBA_free(c_ext_list);
+		CORBA_free(c_exDateIN);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_ext_list->_maximum = c_ext_list->_length = len;
+	c_ext_list->_release = CORBA_TRUE;
+	i = 0;
+	q_foreach(&renew->extensions) {
+		epp_ext_item	*ext_item;
+
+		ext_item = q_content(&renew->extensions);
+		if (ext_item->extType == EPP_EXT_ENUMVAL) {
+			ccReg_ENUMValidationExtension	*c_enumval;
+
+			c_enumval = ccReg_ENUMValidationExtension__alloc();
+			if (c_enumval == NULL) {
+				CORBA_free(c_ext_list);
+				CORBA_free(c_exDateIN);
+				CORBA_free(c_clTRID);
+				return CORBA_INT_ERROR;
+			}
+			c_enumval->valExDate =
+				wrap_str(ext_item->ext.ext_enumval);
+			if (c_enumval->valExDate == NULL) {
+				CORBA_free(c_enumval);
+				CORBA_free(c_ext_list);
+				CORBA_free(c_exDateIN);
+				CORBA_free(c_clTRID);
+				return CORBA_INT_ERROR;
+			}
+			c_ext_list->_buffer[i]._type =
+				TC_ccReg_ENUMValidationExtension;
+			c_ext_list->_buffer[i]._value = c_enumval;
+			c_ext_list->_buffer[i]._release = CORBA_TRUE;
+		}
+		i++;
 	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
@@ -1798,54 +2403,49 @@ epp_call_renew_domain(void *pool,
 
 		/* send renew request to repository */
 		response = ccReg_EPP_DomainRenew(globs->service,
-				cdata->in->renew.name,
-				cdata->in->renew.exDate,
-				cdata->in->renew.period,
-				&c_exDate,
+				renew->name,
+				c_exDateIN,
+				renew->period,
+				&c_exDateOUT,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				c_ext_list,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
-
 	CORBA_free(c_ext_list);
+	CORBA_free(c_exDateIN);
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(c_exDate);
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	if ((cdata->out = epp_calloc(pool, sizeof (*cdata->out))) == NULL) {
-		CORBA_free(c_exDate);
+	renew->exDate = unwrap_str_req(pool, c_exDateOUT, &cerrno);
+	if (cerrno != 0) {
+		CORBA_free(c_exDateOUT);
 		CORBA_free(response);
 		return CORBA_INT_ERROR;
 	}
-	cdata->out->renew.exDate = epp_strdup(pool, c_exDate);
-	CORBA_free(c_exDate);
+	CORBA_free(c_exDateOUT);
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	CORBA_free(response);
 	return CORBA_OK;
 }
 
@@ -1865,76 +2465,147 @@ epp_call_update_domain(void *pool,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
+	CORBA_char	*c_clTRID, *c_registrant, *c_authInfo, *c_nsset;
 	ccReg_Response	*response;
-	ccReg_AdminContact	*c_admin_add;
-	ccReg_AdminContact	*c_admin_rem;
-	ccReg_Status	*c_status_add;
-	ccReg_Status	*c_status_rem;
+	ccReg_Status	*c_status_add, *c_status_rem;
+	ccReg_AdminContact	*c_admin_add, *c_admin_rem;
 	ccReg_ExtensionList	*c_ext_list;
 	int	i, len, retr;
+	epps_update_domain	*update_domain;
 
-	assert(cdata->in != NULL);
+	update_domain = cdata->data;
+	c_clTRID     = NULL;
+	c_registrant = NULL;
+	c_authInfo   = NULL;
+	c_nsset      = NULL;
+	c_status_rem = NULL;
+	c_status_add = NULL;
+	c_admin_rem  = NULL;
+	c_admin_add  = NULL;
+	c_ext_list   = NULL;
+	/*
+	 * Input parameters:
+	 *    name         (a)
+	 *    c_registrant (*)
+	 *    c_authInfo   (*)
+	 *    c_nsset      (*)
+	 *    c_admin_add  (*)
+	 *    c_admin_rem  (*)
+	 *    c_status_add (*)
+	 *    c_status_rem (*)
+	 *    session
+	 *    c_clTRID     (*)
+	 *    xml_in       (a)
+	 *    c_ext_list   (*)
+	 * Output parameters: none
+	 */
+	assert(update_domain->name);
+	assert(cdata->xml_in);
+
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+	c_registrant = wrap_str_upd(update_domain->registrant);
+	if (c_registrant == NULL) goto error_input;
+	c_authInfo = wrap_str_upd(update_domain->authInfo);
+	if (c_authInfo == NULL) goto error_input;
+	c_nsset = wrap_str_upd(update_domain->nsset);
+	if (c_nsset == NULL) goto error_input;
 
 	/* admin add */
 	c_admin_add = ccReg_AdminContact__alloc();
-	len = cl_length(cdata->in->update_domain.add_admin);
+	if (c_admin_add == NULL) goto error_input;
+	len = q_length(update_domain->add_admin);
 	c_admin_add->_buffer = ccReg_AdminContact_allocbuf(len);
+	if (c_admin_add->_buffer == NULL) goto error_input;
 	c_admin_add->_maximum = c_admin_add->_length = len;
 	c_admin_add->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_domain.add_admin)
-		c_admin_add->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->update_domain.add_admin));
+	q_foreach(&update_domain->add_admin) {
+		char	*admin;
+
+		admin = wrap_str(q_content(&update_domain->add_admin));
+		if (admin == NULL) goto error_input;
+		c_admin_add->_buffer[i++] = admin;
+	}
 	/* admin rem */
 	c_admin_rem = ccReg_AdminContact__alloc();
-	len = cl_length(cdata->in->update_domain.rem_admin);
+	if (c_admin_rem == NULL) goto error_input;
+	len = q_length(update_domain->rem_admin);
 	c_admin_rem->_buffer = ccReg_AdminContact_allocbuf(len);
+	if (c_admin_rem->_buffer == NULL) goto error_input;
 	c_admin_rem->_maximum = c_admin_rem->_length = len;
 	c_admin_rem->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_domain.rem_admin)
-		c_admin_rem->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->update_domain.rem_admin));
+	q_foreach(&update_domain->rem_admin) {
+		char	*admin;
+
+		admin = wrap_str(q_content(&update_domain->rem_admin));
+		if (admin == NULL) goto error_input;
+		c_admin_rem->_buffer[i++] = admin;
+	}
+
 	/* status add */
 	c_status_add = ccReg_Status__alloc();
-	len = cl_length(cdata->in->update_domain.add_status);
+	if (c_status_add == NULL) goto error_input;
+	len = q_length(update_domain->add_status);
 	c_status_add->_buffer = ccReg_Status_allocbuf(len);
+	if (c_status_add->_buffer == NULL) goto error_input;
 	c_status_add->_maximum = c_status_add->_length = len;
 	c_status_add->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_domain.add_status)
-		c_status_add->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->update_domain.add_status));
+	q_foreach(&update_domain->add_status) {
+		char	*status;
+
+		status = wrap_str(q_content(&update_domain->add_status));
+		if (status == NULL) goto error_input;
+		c_status_add->_buffer[i++] = status;
+	}
 	/* status rem */
 	c_status_rem = ccReg_Status__alloc();
-	len = cl_length(cdata->in->update_domain.rem_status);
+	if (c_status_rem == NULL) goto error_input;
+	len = q_length(update_domain->rem_status);
 	c_status_rem->_buffer = ccReg_Status_allocbuf(len);
+	if (c_status_rem->_buffer == NULL) goto error_input;
 	c_status_rem->_maximum = c_status_rem->_length = len;
 	c_status_rem->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_domain.rem_status)
-		c_status_rem->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->update_domain.rem_status));
+	q_foreach(&update_domain->rem_status) {
+		char	*status;
+
+		status = wrap_str(q_content(&update_domain->rem_status));
+		if (status == NULL) goto error_input;
+		c_status_rem->_buffer[i++] = status;
+	}
+
 	c_ext_list = ccReg_ExtensionList__alloc();
+	if (c_ext_list == NULL) goto error_input;
+	len = q_length(update_domain->extensions);
+	c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(len);
+	if (c_ext_list->_buffer == NULL) goto error_input;
+	c_ext_list->_maximum = c_ext_list->_length = len;
+	c_ext_list->_release = CORBA_TRUE;
 	/* fill extension list if needed */
-	if (*cdata->in->create_domain.valExDate != '\0') {
-		ccReg_ENUMValidationExtension	*c_enumval;
+	i = 0;
+	q_foreach(&update_domain->extensions) {
+		epp_ext_item	*ext_item;
 
-		c_enumval = ccReg_ENUMValidationExtension__alloc();
-		c_enumval->valExDate =
-			CORBA_string_dup(cdata->in->update_domain.valExDate);
-		c_ext_list->_buffer = ccReg_ExtensionList_allocbuf(1);
-		c_ext_list->_maximum = c_ext_list->_length = 1;
-		c_ext_list->_release = CORBA_TRUE;
-		c_ext_list->_buffer[0]._type = TC_ccReg_ENUMValidationExtension;
-		c_ext_list->_buffer[0]._value = c_enumval;
-		c_ext_list->_buffer[0]._release = CORBA_TRUE;
-	}
-	else {
-		c_ext_list->_maximum = c_ext_list->_length = 0;
-		c_ext_list->_release = CORBA_FALSE;
-	}
+		ext_item = q_content(&update_domain->extensions);
+		if (ext_item->extType == EPP_EXT_ENUMVAL) {
+			ccReg_ENUMValidationExtension	*c_enumval;
 
+			c_enumval = ccReg_ENUMValidationExtension__alloc();
+			if (c_enumval == NULL) goto error_input;
+			c_enumval->valExDate =
+				wrap_str(ext_item->ext.ext_enumval);
+			if (c_enumval->valExDate == NULL) goto error_input;
+			c_ext_list->_buffer[i]._type =
+				TC_ccReg_ENUMValidationExtension;
+			c_ext_list->_buffer[i]._value = c_enumval;
+			c_ext_list->_buffer[i]._release = CORBA_TRUE;
+		}
+		i++;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -1942,26 +2613,29 @@ epp_call_update_domain(void *pool,
 
 		/* send the updates to repository */
 		response = ccReg_EPP_DomainUpdate(globs->service,
-				cdata->in->update_domain.name,
-				cdata->in->update_domain.registrant,
-				cdata->in->update_domain.authInfo,
-				cdata->in->update_domain.nsset,
+				update_domain->name,
+				c_registrant,
+				c_authInfo,
+				c_nsset,
 				c_admin_add,
 				c_admin_rem,
 				c_status_add,
 				c_status_rem,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				c_ext_list,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
-
+	CORBA_free(c_clTRID);
+	CORBA_free(c_registrant);
+	CORBA_free(c_authInfo);
+	CORBA_free(c_nsset);
 	CORBA_free(c_status_rem);
 	CORBA_free(c_status_add);
 	CORBA_free(c_admin_rem);
@@ -1969,27 +2643,35 @@ epp_call_update_domain(void *pool,
 	CORBA_free(c_ext_list);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
 	CORBA_free(response);
 	return CORBA_OK;
+
+error_input:
+	CORBA_free(c_clTRID);
+	CORBA_free(c_registrant);
+	CORBA_free(c_authInfo);
+	CORBA_free(c_nsset);
+	CORBA_free(c_status_rem);
+	CORBA_free(c_status_add);
+	CORBA_free(c_admin_rem);
+	CORBA_free(c_admin_add);
+	CORBA_free(c_ext_list);
+	return CORBA_INT_ERROR;
 }
 
 /**
@@ -2008,73 +2690,140 @@ epp_call_update_contact(void *pool,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
+	CORBA_char	*c_clTRID;
 	ccReg_Response	*response;
 	ccReg_Status	*c_status_add;
 	ccReg_Status	*c_status_rem;
 	ccReg_ContactChange	*c_contact;
 	int	i, len, retr;
+	epps_update_contact	*update_contact;
 
-	assert(cdata->in != NULL);
+	update_contact = cdata->data;
+	c_contact    = NULL;
+	c_status_rem = NULL;
+	c_status_add = NULL;
+	c_clTRID     = NULL;
+	/*
+	 * Input parameters:
+	 *    id (a)
+	 *    c_contact (*)
+	 *    c_status_add (*)
+	 *    c_status_rem (*)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters: none
+	 */
+	assert(update_contact->id);
+	assert(cdata->xml_in);
+
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
 
 	/* status add */
 	c_status_add = ccReg_Status__alloc();
-	len = cl_length(cdata->in->update_contact.add_status);
+	if (c_status_add == NULL) goto error_input;
+	len = q_length(update_contact->add_status);
 	c_status_add->_buffer = ccReg_Status_allocbuf(len);
+	if (c_status_add->_buffer == NULL) goto error_input;
 	c_status_add->_maximum = c_status_add->_length = len;
 	c_status_add->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_contact.add_status)
-		c_status_add->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->update_contact.add_status));
+	q_foreach(&update_contact->add_status) {
+		char	*status;
+
+		status = wrap_str(q_content(&update_contact->add_status));
+		if (status == NULL) goto error_input;
+		c_status_add->_buffer[i++] = status;
+	}
 	/* status rem */
 	c_status_rem = ccReg_Status__alloc();
-	len = cl_length(cdata->in->update_contact.rem_status);
+	if (c_status_rem == NULL) goto error_input;
+	len = q_length(update_contact->rem_status);
 	c_status_rem->_buffer = ccReg_Status_allocbuf(len);
+	if (c_status_rem->_buffer == NULL) goto error_input;
 	c_status_rem->_maximum = c_status_rem->_length = len;
 	c_status_rem->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_contact.rem_status)
-		c_status_rem->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->update_contact.rem_status));
+	q_foreach(&update_contact->rem_status) {
+		char	*status;
+
+		status = wrap_str(q_content(&update_contact->rem_status));
+		if (status == NULL) goto error_input;
+		c_status_rem->_buffer[i++] = status;
+	}
+
 	/* c_contact */
 	c_contact = ccReg_ContactChange__alloc();
-	c_contact->Name =
-		CORBA_string_dup(cdata->in->update_contact.postalInfo->name);
-	c_contact->Organization =
-		CORBA_string_dup(cdata->in->update_contact.postalInfo->org);
-	c_contact->Street1 =
-		CORBA_string_dup(cdata->in->update_contact.postalInfo->street[0]);
-	c_contact->Street2 =
-		CORBA_string_dup(cdata->in->update_contact.postalInfo->street[1]);
-	c_contact->Street3 =
-		CORBA_string_dup(cdata->in->update_contact.postalInfo->street[2]);
-	c_contact->City =
-		CORBA_string_dup(cdata->in->update_contact.postalInfo->city);
-	c_contact->StateOrProvince =
-		CORBA_string_dup(cdata->in->update_contact.postalInfo->sp);
-	c_contact->PostalCode =
-		CORBA_string_dup(cdata->in->update_contact.postalInfo->pc);
-	c_contact->CC =
-		CORBA_string_dup(cdata->in->update_contact.postalInfo->cc);
-	c_contact->AuthInfoPw = CORBA_string_dup(cdata->in->update_contact.authInfo);
-	c_contact->Telephone = CORBA_string_dup(cdata->in->update_contact.voice);
-	c_contact->Fax = CORBA_string_dup(cdata->in->update_contact.fax);
-	c_contact->Email = CORBA_string_dup(cdata->in->update_contact.email);
-	c_contact->NotifyEmail =
-		CORBA_string_dup(cdata->in->update_contact.notify_email);
-	c_contact->VAT = CORBA_string_dup(cdata->in->update_contact.vat);
-	c_contact->SSN = CORBA_string_dup(cdata->in->update_contact.ssn);
-	c_contact->SSNtype = convSSNType(cdata->in->update_contact.ssntype);
+	if (c_contact == NULL) goto error_input;
+	/*
+	 * Here we will change allocation schema: first do all allocs and then
+	 * check success.
+	 */
+	if (update_contact->pi != NULL) {
+		c_contact->Name    = wrap_str(update_contact->pi->name);
+		c_contact->Organization = wrap_str_upd(update_contact->pi->org);
+		c_contact->Street1 = wrap_str_upd(update_contact->pi->street[0]);
+		c_contact->Street2 = wrap_str_upd(update_contact->pi->street[1]);
+		c_contact->Street3 = wrap_str_upd(update_contact->pi->street[2]);
+		c_contact->City    = wrap_str_upd(update_contact->pi->city);
+		c_contact->StateOrProvince =wrap_str_upd(update_contact->pi->sp);
+		c_contact->PostalCode = wrap_str_upd(update_contact->pi->pc);
+		c_contact->CC      = wrap_str_upd(update_contact->pi->cc);
+	}
+	else {
+		c_contact->Name = wrap_str(NULL);
+		c_contact->Organization = wrap_str(NULL);
+		c_contact->Street1 = wrap_str(NULL);
+		c_contact->Street2 = wrap_str(NULL);
+		c_contact->Street3 = wrap_str(NULL);
+		c_contact->City = wrap_str(NULL);
+		c_contact->StateOrProvince = wrap_str(NULL);
+		c_contact->PostalCode = wrap_str(NULL);
+		c_contact->CC = wrap_str(NULL);
+	}
+	if (c_contact->Name == NULL ||
+	    c_contact->Organization == NULL ||
+	    c_contact->Street1 == NULL ||
+	    c_contact->Street2 == NULL ||
+	    c_contact->Street3 == NULL ||
+	    c_contact->City == NULL ||
+	    c_contact->StateOrProvince == NULL ||
+	    c_contact->PostalCode == NULL ||
+	    c_contact->CC == NULL)
+		goto error_input;
+
+	c_contact->AuthInfoPw = wrap_str_upd(update_contact->authInfo);
+	if (c_contact->AuthInfoPw == NULL) goto error_input;
+	c_contact->Telephone = wrap_str_upd(update_contact->voice);
+	if (c_contact->Telephone == NULL) goto error_input;
+	c_contact->Fax = wrap_str_upd(update_contact->fax);
+	if (c_contact->Fax == NULL) goto error_input;
+	c_contact->Email = wrap_str_upd(update_contact->email);
+	if (c_contact->Email == NULL) goto error_input;
+	c_contact->NotifyEmail = wrap_str_upd(update_contact->notify_email);
+	if (c_contact->NotifyEmail == NULL) goto error_input;
+	c_contact->VAT = wrap_str_upd(update_contact->vat);
+	if (c_contact->VAT == NULL) goto error_input;
+	c_contact->SSN = wrap_str_upd(update_contact->ssn);
+	if (c_contact->SSN == NULL) goto error_input;
+	c_contact->SSNtype = convSSNType(update_contact->ssntype);
 	/* disclose */
-	c_contact->DiscloseFlag = convDiscl(cdata->in->update_contact.discl->flag);
+	c_contact->DiscloseFlag = convDiscl(update_contact->discl.flag);
 	if (c_contact->DiscloseFlag != ccReg_DISCL_EMPTY) {
-		epp_discl	*discl = cdata->in->update_contact.discl;
-		c_contact->DiscloseName = (discl->name ? CORBA_TRUE : CORBA_FALSE);
-		c_contact->DiscloseOrganization = (discl->org ? CORBA_TRUE :CORBA_FALSE);
-		c_contact->DiscloseAddress = (discl->addr ? CORBA_TRUE : CORBA_FALSE);
-		c_contact->DiscloseTelephone = (discl->voice ? CORBA_TRUE : CORBA_FALSE);
-		c_contact->DiscloseFax = (discl->fax ? CORBA_TRUE : CORBA_FALSE);
-		c_contact->DiscloseEmail = (discl->email ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseName =
+			(update_contact->discl.name ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseOrganization =
+			(update_contact->discl.org ? CORBA_TRUE :CORBA_FALSE);
+		c_contact->DiscloseAddress =
+			(update_contact->discl.addr ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseTelephone =
+			(update_contact->discl.voice ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseFax =
+			(update_contact->discl.fax ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseEmail =
+			(update_contact->discl.email ? CORBA_TRUE : CORBA_FALSE);
 	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
@@ -2083,47 +2832,49 @@ epp_call_update_contact(void *pool,
 
 		/* send the updates to repository */
 		response = ccReg_EPP_ContactUpdate(globs->service,
-				cdata->in->update_contact.id,
+				update_contact->id,
 				c_contact,
 				c_status_add,
 				c_status_rem,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
-
+	CORBA_free(c_contact);
 	CORBA_free(c_status_rem);
 	CORBA_free(c_status_add);
-	CORBA_free(c_contact);
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	CORBA_free(response);
 	return CORBA_OK;
+
+error_input:
+	CORBA_free(c_contact);
+	CORBA_free(c_status_rem);
+	CORBA_free(c_status_add);
+	CORBA_free(c_clTRID);
+	return CORBA_INT_ERROR;
 }
 
 /**
@@ -2142,90 +2893,167 @@ epp_call_update_nsset(void *pool,
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
-	ccReg_Response *response;
+	CORBA_char	*c_clTRID, *c_authInfo;
+	ccReg_Response	*response;
 	ccReg_DNSHost	*c_dnshost_add;
 	ccReg_DNSHost	*c_dnshost_rem;
 	ccReg_TechContact	*c_tech_add;
 	ccReg_TechContact	*c_tech_rem;
 	ccReg_Status	*c_status_add;
 	ccReg_Status	*c_status_rem;
-	epp_ns	*ns;
-	int	i, j, len, retr;
+	int	i, len, retr;
+	epps_update_nsset	*update_nsset;
 
-	assert(cdata->in != NULL);
+	update_nsset = cdata->data;
+	c_dnshost_rem = NULL;
+	c_dnshost_add = NULL;
+	c_status_rem = NULL;
+	c_status_add = NULL;
+	c_tech_rem = NULL;
+	c_tech_add = NULL;
+	c_authInfo = NULL;
+	c_clTRID = NULL;
+	/*
+	 * Input parameters:
+	 *    id            (a)
+	 *    c_authInfo    (*)
+	 *    c_dnshost_add (*)
+	 *    c_dnshost_rem (*)
+	 *    c_tech_add    (*)
+	 *    c_tech_rem    (*)
+	 *    c_status_add  (*)
+	 *    c_status_rem  (*)
+	 *    session
+	 *    c_clTRID      (*)
+	 *    xml_in        (a)
+	 * Output parameters: none
+	 */
+	assert(update_nsset->id);
+	assert(cdata->xml_in);
+
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+	c_authInfo = wrap_str_upd(update_nsset->authInfo);
+	if (c_authInfo == NULL) goto error_input;
 
 	/* tech add */
 	c_tech_add = ccReg_TechContact__alloc();
-	len = cl_length(cdata->in->update_nsset.add_tech);
+	if (c_tech_add == NULL) goto error_input;
+	len = q_length(update_nsset->add_tech);
 	c_tech_add->_buffer = ccReg_TechContact_allocbuf(len);
+	if (c_tech_add->_buffer == NULL) goto error_input;
 	c_tech_add->_maximum = c_tech_add->_length = len;
 	c_tech_add->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_nsset.add_tech)
-		c_tech_add->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->update_nsset.add_tech));
-	/* Tech rem */
+	q_foreach(&update_nsset->add_tech) {
+		char	*tech;
+
+		tech = wrap_str(q_content(&update_nsset->add_tech));
+		if (tech == NULL) goto error_input;
+		c_tech_add->_buffer[i++] = tech;
+	}
+	/* tech rem */
 	c_tech_rem = ccReg_TechContact__alloc();
-	len = cl_length(cdata->in->update_nsset.rem_tech);
+	if (c_tech_rem == NULL) goto error_input;
+	len = q_length(update_nsset->rem_tech);
 	c_tech_rem->_buffer = ccReg_TechContact_allocbuf(len);
+	if (c_tech_rem->_buffer == NULL) goto error_input;
 	c_tech_rem->_maximum = c_tech_rem->_length = len;
 	c_tech_rem->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_nsset.rem_tech)
-		c_tech_rem->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->update_nsset.rem_tech));
+	q_foreach(&update_nsset->rem_tech) {
+		char	*tech;
+
+		tech = wrap_str(q_content(&update_nsset->rem_tech));
+		if (tech == NULL) goto error_input;
+		c_tech_rem->_buffer[i++] = tech;
+	}
+
 	/* status add */
 	c_status_add = ccReg_Status__alloc();
-	len = cl_length(cdata->in->update_nsset.add_status);
+	if (c_status_add == NULL) goto error_input;
+	len = q_length(update_nsset->add_status);
 	c_status_add->_buffer = ccReg_Status_allocbuf(len);
+	if (c_status_add->_buffer == NULL) goto error_input;
 	c_status_add->_maximum = c_status_add->_length = len;
 	c_status_add->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_nsset.add_status)
-		c_status_add->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->update_nsset.add_status));
+	q_foreach(&update_nsset->add_status) {
+		char	*status;
+
+		status = wrap_str(q_content(&update_nsset->add_status));
+		if (status == NULL) goto error_input;
+		c_status_add->_buffer[i++] = status;
+	}
 	/* status rem */
 	c_status_rem = ccReg_Status__alloc();
-	len = cl_length(cdata->in->update_nsset.rem_status);
+	if (c_status_rem == NULL) goto error_input;
 	c_status_rem->_buffer = ccReg_Status_allocbuf(len);
+	if (c_status_rem->_buffer == NULL) goto error_input;
+	len = q_length(update_nsset->rem_status);
 	c_status_rem->_maximum = c_status_rem->_length = len;
 	c_status_rem->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_nsset.rem_status)
-		c_status_rem->_buffer[i++] = CORBA_string_dup(
-				CL_CONTENT(cdata->in->update_nsset.rem_status));
+	q_foreach(&update_nsset->rem_status) {
+		char	*status;
+
+		status = wrap_str(q_content(&update_nsset->rem_status));
+		if (status == NULL) goto error_input;
+		c_status_rem->_buffer[i++] = status;
+	}
+
 	/* name servers add */
 	c_dnshost_add = ccReg_DNSHost__alloc();
-	len = cl_length(cdata->in->update_nsset.add_ns);
+	if (c_dnshost_add == NULL) goto error_input;
+	len = q_length(update_nsset->add_ns);
 	c_dnshost_add->_buffer = ccReg_DNSHost_allocbuf(len);
+	if (c_dnshost_add->_buffer == NULL) goto error_input;
 	c_dnshost_add->_maximum = c_dnshost_add->_length = len;
 	c_dnshost_add->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_nsset.add_ns) {
+	q_foreach(&update_nsset->add_ns) {
+		epp_ns	*ns;
+		int	 j;
+
+		ns = q_content(&update_nsset->add_ns);
+		c_dnshost_add->_buffer[i].fqdn = wrap_str(ns->name);
+		if (c_dnshost_add->_buffer[i].fqdn == NULL) goto error_input;
 		/* alloc & init sequence of ns's addresses */
-		ns = (epp_ns *) CL_CONTENT(cdata->in->update_nsset.add_ns);
-		len = cl_length(ns->addr);
-		c_dnshost_add->_buffer[i].inet._buffer = ccReg_InetAddress_allocbuf(len);
+		len = q_length(ns->addr);
+		c_dnshost_add->_buffer[i].inet._buffer =
+			ccReg_InetAddress_allocbuf(len);
+		if (c_dnshost_add->_buffer[i].inet._buffer == NULL)
+			goto error_input;
 		c_dnshost_add->_buffer[i].inet._maximum =
 			c_dnshost_add->_buffer[i].inet._length = len;
 		c_dnshost_add->_buffer[i].inet._release = CORBA_TRUE;
 		j = 0;
-		CL_FOREACH(ns->addr)
-			c_dnshost_add->_buffer[i].inet._buffer[j++] =
-					CORBA_string_dup(CL_CONTENT(ns->addr));
-		c_dnshost_add->_buffer[i++].fqdn = CORBA_string_dup(ns->name);
+		q_foreach(&ns->addr) {
+			char	*addr;
+
+			addr = wrap_str(q_content(&ns->addr));
+			if (addr == NULL) goto error_input;
+			c_dnshost_add->_buffer[i].inet._buffer[j++] = addr;
+		}
+		i++;
 	}
+
 	/* name servers rem */
 	c_dnshost_rem = ccReg_DNSHost__alloc();
-	len = cl_length(cdata->in->update_nsset.rem_ns);
+	if (c_dnshost_rem == NULL) goto error_input;
+	len = q_length(update_nsset->rem_ns);
 	c_dnshost_rem->_buffer = ccReg_DNSHost_allocbuf(len);
+	if (c_dnshost_rem->_buffer == NULL) goto error_input;
 	c_dnshost_rem->_maximum = c_dnshost_rem->_length = len;
 	c_dnshost_rem->_release = CORBA_TRUE;
 	i = 0;
-	CL_FOREACH(cdata->in->update_nsset.rem_ns) {
-		/* alloc & init sequence of ns's addresses */
-		c_dnshost_rem->_buffer[i++].fqdn =
-			CORBA_string_dup(CL_CONTENT(cdata->in->update_nsset.rem_ns));
+	q_foreach(&update_nsset->rem_ns) {
+		char	*fqdn;
+
+		fqdn = wrap_str(q_content(&update_nsset->rem_ns));
+		if (fqdn == NULL) goto error_input;
+		c_dnshost_rem->_buffer[i].fqdn = fqdn;
 	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
@@ -2234,8 +3062,8 @@ epp_call_update_nsset(void *pool,
 
 		/* send the updates to repository */
 		response = ccReg_EPP_NSSetUpdate(globs->service,
-				cdata->in->update_nsset.id,
-				cdata->in->update_nsset.authInfo,
+				update_nsset->id,
+				c_authInfo,
 				c_dnshost_add,
 				c_dnshost_rem,
 				c_tech_add,
@@ -2243,45 +3071,52 @@ epp_call_update_nsset(void *pool,
 				c_status_add,
 				c_status_rem,
 				session,
-				cdata->clTRID,
+				c_clTRID,
 				cdata->xml_in,
 				ev);
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
-
+	CORBA_free(c_dnshost_rem);
+	CORBA_free(c_dnshost_add);
 	CORBA_free(c_status_rem);
 	CORBA_free(c_status_add);
 	CORBA_free(c_tech_rem);
 	CORBA_free(c_tech_add);
-	CORBA_free(c_dnshost_rem);
-	CORBA_free(c_dnshost_add);
+	CORBA_free(c_authInfo);
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	CORBA_free(response);
 	return CORBA_OK;
+
+error_input:
+	CORBA_free(c_dnshost_rem);
+	CORBA_free(c_dnshost_add);
+	CORBA_free(c_status_rem);
+	CORBA_free(c_status_add);
+	CORBA_free(c_tech_rem);
+	CORBA_free(c_tech_add);
+	CORBA_free(c_authInfo);
+	CORBA_free(c_clTRID);
+	return CORBA_INT_ERROR;
 }
 
 /**
@@ -2303,8 +3138,32 @@ epp_call_transfer(void *pool,
 		epp_object_type obj)
 {
 	CORBA_Environment ev[1];
-	ccReg_Response *response;
+	CORBA_char	*c_clTRID, *c_authInfo;
+	ccReg_Response	*response;
 	int	retr;
+	epps_transfer	*transfer;
+
+	transfer = cdata->data;
+	/*
+	 * Input parameters:
+	 *    id (a)
+	 *    c_authInfo (*)
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters: none
+	 */
+	assert(transfer->id);
+	assert(cdata->xml_in);
+
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+	c_authInfo = wrap_str(transfer->authInfo);
+	if (c_authInfo == NULL) {
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -2312,60 +3171,57 @@ epp_call_transfer(void *pool,
 
 		if (obj == EPP_DOMAIN) {
 			response = ccReg_EPP_DomainTransfer(globs->service,
-					cdata->in->transfer.id,
-					cdata->in->transfer.authInfo,
+					transfer->id,
+					c_authInfo,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		}
 		else if (obj == EPP_CONTACT) {
 			response = ccReg_EPP_ContactTransfer(globs->service,
-					cdata->in->transfer.id,
-					cdata->in->transfer.authInfo,
+					transfer->id,
+					c_authInfo,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		}
 		else {
 			assert(obj == EPP_NSSET);
 			response = ccReg_EPP_NSSetTransfer(globs->service,
-					cdata->in->transfer.id,
-					cdata->in->transfer.authInfo,
+					transfer->id,
+					c_authInfo,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		}
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+	CORBA_free(c_authInfo);
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
-	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return ret;
 	}
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	CORBA_free(response);
 	return CORBA_OK;
 }
 
@@ -2388,10 +3244,25 @@ epp_call_list(void *pool,
 		epp_object_type obj)
 {
 	CORBA_Environment	 ev[1];
+	CORBA_char	*c_clTRID;
 	ccReg_Response	*response;
 	ccReg_Lists	*c_handles;
-	struct circ_list	*item;
-	int	 i, retr;
+	int	 i, retr, cerrno;
+	epps_list	*list;
+
+	list = cdata->data;
+	/*
+	 * Input parameters:
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_handles (*)
+	 */
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -2401,7 +3272,7 @@ epp_call_list(void *pool,
 			response = ccReg_EPP_DomainList(globs->service,
 					&c_handles,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		}
@@ -2409,7 +3280,7 @@ epp_call_list(void *pool,
 			response = ccReg_EPP_ContactList(globs->service,
 					&c_handles,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		}
@@ -2418,57 +3289,49 @@ epp_call_list(void *pool,
 			response = ccReg_EPP_NSSetList(globs->service,
 					&c_handles,
 					session,
-					cdata->clTRID,
+					c_clTRID,
 					cdata->xml_in,
 					ev);
 		}
 
-		/* if COMM_FAILURE exception is not raised then quit retry loop */
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+	CORBA_free(c_clTRID);
 
 	if (raised_exception(ev)) {
-		/* do NOT try to free response even if not NULL -> segfault */
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
 		CORBA_exception_free(ev);
-		return CORBA_ERROR;
+		return ret;
 	}
-	CORBA_exception_free(ev);
-
-	/*
-	 * in case of an error of EPP server (CR) the svTRID field is
-	 * empty string
-	 */
-	if (*response->svTRID == '\0') {
-		CORBA_free(response);
-		CORBA_free(c_handles);
-		return CORBA_REMOTE_ERROR;
-	}
-
-	if (!(cdata->out = epp_calloc(pool, sizeof (*cdata->out)))
-		|| !(cdata->out->list.handles = epp_malloc(pool, sizeof *item)))
-	{
-		CORBA_free(response);
-		CORBA_free(c_handles);
-		return CORBA_INT_ERROR;
-	}
-	CL_NEW(cdata->out->list.handles);
 
 	for (i = 0; i < c_handles->_length; i++) {
-		/* if malloc fails we will silently ignore the rest of handles */
-		if ((item = epp_malloc(pool, sizeof *item)) == NULL) break;
-		CL_CONTENT(item) = epp_strdup(pool, c_handles->_buffer[i]);
-		CL_ADD(cdata->out->list.handles, item);
+		char	*handle;
+
+		handle = unwrap_str(pool, c_handles->_buffer[i], &cerrno);
+		if (cerrno != 0) {
+			CORBA_free(response);
+			return CORBA_INT_ERROR;
+		}
+		if (q_add(pool, &list->handles, handle)) {
+			CORBA_free(response);
+			return CORBA_INT_ERROR;
+		}
 	}
+
 	CORBA_free(c_handles);
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
 
-	get_errors(pool, cdata->errors, &response->errors);
-	cdata->svTRID = epp_strdup(pool, response->svTRID);
-	cdata->msg = epp_strdup(pool, response->errMsg);
-	cdata->rc = response->errCode;
-
-	CORBA_free(response);
 	return CORBA_OK;
 }
 
@@ -2485,31 +3348,39 @@ epp_call_cmd(void *pool,
 			cstat = epp_call_dummy(pool, globs, session, cdata);
 			break;
 		case EPP_CHECK_CONTACT:
-			cstat = epp_call_check(pool, globs, session, cdata, EPP_CONTACT);
+			cstat = epp_call_check(pool, globs, session, cdata,
+					EPP_CONTACT);
 			break;
 		case EPP_CHECK_DOMAIN:
-			cstat = epp_call_check(pool, globs, session, cdata, EPP_DOMAIN);
+			cstat = epp_call_check(pool, globs, session, cdata,
+					EPP_DOMAIN);
 			break;
 		case EPP_CHECK_NSSET:
-			cstat = epp_call_check(pool, globs, session, cdata, EPP_NSSET);
+			cstat = epp_call_check(pool, globs, session, cdata,
+					EPP_NSSET);
 			break;
 		case EPP_INFO_CONTACT:
-			cstat = epp_call_info_contact(pool, globs, session, cdata);
+			cstat = epp_call_info_contact(pool, globs, session,
+					cdata);
 			break;
 		case EPP_INFO_DOMAIN:
-			cstat = epp_call_info_domain(pool, globs, session, cdata);
+			cstat = epp_call_info_domain(pool, globs, session,
+					cdata);
 			break;
 		case EPP_INFO_NSSET:
 			cstat = epp_call_info_nsset(pool, globs, session, cdata);
 			break;
 		case EPP_LIST_CONTACT:
-			cstat = epp_call_list(pool, globs, session, cdata, EPP_CONTACT);
+			cstat = epp_call_list(pool, globs, session, cdata,
+					EPP_CONTACT);
 			break;
 		case EPP_LIST_DOMAIN:
-			cstat = epp_call_list(pool, globs, session, cdata, EPP_DOMAIN);
+			cstat = epp_call_list(pool, globs, session, cdata,
+					EPP_DOMAIN);
 			break;
 		case EPP_LIST_NSSET:
-			cstat = epp_call_list(pool, globs, session, cdata, EPP_NSSET);
+			cstat = epp_call_list(pool, globs, session, cdata,
+					EPP_NSSET);
 			break;
 		case EPP_POLL_REQ:
 			cstat = epp_call_poll_req(pool, globs, session, cdata);
@@ -2518,43 +3389,56 @@ epp_call_cmd(void *pool,
 			cstat = epp_call_poll_ack(pool, globs, session, cdata);
 			break;
 		case EPP_CREATE_CONTACT:
-			cstat = epp_call_create_contact(pool, globs, session, cdata);
+			cstat = epp_call_create_contact(pool, globs, session,
+					cdata);
 			break;
 		case EPP_CREATE_DOMAIN:
-			cstat = epp_call_create_domain(pool, globs, session, cdata);
+			cstat = epp_call_create_domain(pool, globs, session,
+					cdata);
 			break;
 		case EPP_CREATE_NSSET:
-			cstat = epp_call_create_nsset(pool, globs, session, cdata);
+			cstat = epp_call_create_nsset(pool, globs, session,
+					cdata);
 			break;
 		case EPP_DELETE_CONTACT:
-			cstat = epp_call_delete(pool, globs, session, cdata, EPP_CONTACT);
+			cstat = epp_call_delete(pool, globs, session, cdata,
+					EPP_CONTACT);
 			break;
 		case EPP_DELETE_DOMAIN:
-			cstat = epp_call_delete(pool, globs, session, cdata, EPP_DOMAIN);
+			cstat = epp_call_delete(pool, globs, session, cdata,
+					EPP_DOMAIN);
 			break;
 		case EPP_DELETE_NSSET:
-			cstat = epp_call_delete(pool, globs, session, cdata, EPP_NSSET);
+			cstat = epp_call_delete(pool, globs, session, cdata,
+					EPP_NSSET);
 			break;
 		case EPP_RENEW_DOMAIN:
-			cstat = epp_call_renew_domain(pool, globs, session, cdata);
+			cstat = epp_call_renew_domain(pool, globs, session,
+					cdata);
 			break;
 		case EPP_UPDATE_DOMAIN:
-			cstat = epp_call_update_domain(pool, globs, session, cdata);
+			cstat = epp_call_update_domain(pool, globs, session,
+					cdata);
 			break;
 		case EPP_UPDATE_CONTACT:
-			cstat = epp_call_update_contact(pool, globs, session, cdata);
+			cstat = epp_call_update_contact(pool, globs, session,
+					cdata);
 			break;
 		case EPP_UPDATE_NSSET:
-			cstat = epp_call_update_nsset(pool, globs, session, cdata);
+			cstat = epp_call_update_nsset(pool, globs, session,
+					cdata);
 			break;
 		case EPP_TRANSFER_CONTACT:
-			cstat = epp_call_transfer(pool, globs, session, cdata, EPP_CONTACT);
+			cstat = epp_call_transfer(pool, globs, session, cdata,
+					EPP_CONTACT);
 			break;
 		case EPP_TRANSFER_DOMAIN:
-			cstat = epp_call_transfer(pool, globs, session, cdata, EPP_DOMAIN);
+			cstat = epp_call_transfer(pool, globs, session, cdata,
+					EPP_DOMAIN);
 			break;
 		case EPP_TRANSFER_NSSET:
-			cstat = epp_call_transfer(pool, globs, session, cdata, EPP_NSSET);
+			cstat = epp_call_transfer(pool, globs, session, cdata,
+					EPP_NSSET);
 			break;
 		default:
 			cstat = CORBA_INT_ERROR;

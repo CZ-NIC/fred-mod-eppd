@@ -55,6 +55,6 @@ typedef enum {
 valid_status validate_doc(void *pool,
 		xmlSchemaPtr schema,
 		xmlDocPtr doc,
-		struct circ_list *err_list);
+		qhead *err_list);
 
 #endif /* EPP_XMLCOMMON_H */

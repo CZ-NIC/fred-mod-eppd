@@ -1,5 +1,6 @@
 /**
  * @file epp_common.h
+ *
  * The most important structures, function definitions and routine declarations
  * are found in this file. Since they are used by all components of mod_eppd,
  * they are most important and should be read first when trying to understand
@@ -10,8 +11,8 @@
 #define EPP_COMMON_H
 
 /**
- * Enumeration of all EPP commands this module is able to handle.
- * The object specific commands are expanded to (EPP_{command}_{object}.
+ * Enumeration of codes of all EPP commands this module is able to handle.
+ * The object specific commands are written as EPP_{command}_{object}.
  */
 typedef enum {
 	EPP_UNKNOWN_CMD = 0,
@@ -52,6 +53,13 @@ typedef enum {
 }epp_command_type;
 
 /**
+ * Enumeration of implemented extensions.
+ */
+typedef enum {
+	EPP_EXT_ENUMVAL
+}domain_ext_type;
+
+/**
  * Enumeration of EPP objects which this server operates on.
  */
 typedef enum {
@@ -78,19 +86,21 @@ typedef enum {
  * which tags.
  */
 typedef enum {
-	errspec_unknow, 
+	errspec_unknown = 0, 
 	errspec_pollAck_msgID,
+	errspec_pollAck_msgID_missing,
 	errspec_contactCreate_handle,
-	errspec_contactInfo_handle,
 	errspec_contactCreate_cc,
+	errspec_contactInfo_handle,
 	errspec_contactUpdate_cc,
+	errspec_contactUpdate_ssntype_missing,
 	errspec_contactUpdate_status_add,
 	errspec_contactUpdate_status_rem,
 	errspec_nssetCreate_handle,
-	errspec_nssetInfo_handle,
 	errspec_nssetCreate_tech,
 	errspec_nssetCreate_ns_name,
 	errspec_nssetCreate_ns_addr,
+	errspec_nssetInfo_handle,
 	errspec_nssetUpdate_ns_name_add,
 	errspec_nssetUpdate_ns_addr_add,
 	errspec_nssetUpdate_ns_name_rem,
@@ -100,22 +110,25 @@ typedef enum {
 	errspec_nssetUpdate_status_add,
 	errspec_nssetUpdate_status_rem,
 	errspec_domainCreate_fqdn,
-	errspec_domainInfo_fqdn,
 	errspec_domainCreate_registrant,
 	errspec_domainCreate_nsset,
 	errspec_domainCreate_period,
 	errspec_domainCreate_admin,
-	errspec_domainCreate_ext_valdate,
+	errspec_domainCreate_ext_valDate,
+	errspec_domainInfo_fqdn,
+	errspec_domainRenew_fqdn,
+	errspec_domainRenew_curExpDate,
+	errspec_domainRenew_period,
+	errspec_domainRenew_ext_valDate,
+	errspec_domainUpdate_fqdn,
 	errspec_domainUpdate_registrant,
 	errspec_domainUpdate_nsset,
 	errspec_domainUpdate_admin_add,
 	errspec_domainUpdate_admin_rem,
 	errspec_domainUpdate_status_add,
 	errspec_domainUpdate_status_rem,
-	errspec_domainUpdate_ext_valdate,
-	errspec_domainRenew_curExpDate,
-	errspec_domainRenew_period,
-	errspec_domainRenew_ext_valDate
+	errspec_domainUpdate_ext_valDate,
+	errspec_transfer_op
 }epp_errorspec;
 
 /**
@@ -127,97 +140,93 @@ typedef enum {
  */
 typedef struct {
 	char	*value; /**< Client provided input which caused the error. */
-	int	standalone;	/**< The surrounding tags are included (1) or not (0). */
-	char	*reason;	/**< Human readable reason of error. */
-	epp_errorspec	spec;	/**< Specification of surrounding XML tags */
+	/**
+	 * Specification of surrounding XML tags.
+	 *
+	 * For validation errors this is set to errspec_unknown.
+	 */
+	epp_errorspec spec;
+	/**
+	 * Human readable reason of error.
+	 *
+	 * For schema validity errors it is filled by mod_eppd (by message from
+	 * libxml), which is send to server which transforms libxml message and
+	 * returns the result of transformation (by transformation is ment
+	 * prefixing by localized text). In all other cases it is left empty
+	 * and filled wholly by CR.
+	 */
+	char	*reason;
 }epp_error;
 
 /**
- * @defgroup circgroup Circular list structure and utilities
+ * @defgroup queuegroup Queue structure and utilities
  * @{
  */
 
 /**
- * Circular list structure used on countless places throughout the module.
- * The understanding of how this implementation of circular list works
- * is essential for understanding the module's code. It is one way linked
- * list of items, which is never ending because the last item points to
- * the first item of the list. The way how to recognize the so called
- * sentinel, which is the first and last item of the list, is that its
- * content is NULL.
+ * Definition of queue item type.
  */
-struct circ_list {
-	struct circ_list	*next;	/**< Link to next item in the list. */
-	void	*content;	/**< Pointer to content of item. */
+typedef struct queue_item_t qitem;
+struct queue_item_t {
+	qitem   *next;	  /**< Link to next item in a queue. */
+	void	*content; /**< Pointer to content of item. */
 };
 
 /**
- * Macro for initialization of list. The item has to be already
- * allocated. The item will become sentinel and stay so forever. You
- * don't have to call this macro for item, which is going to be only
- * added to existing list.
+ * Queue structure used on countless places throughout the program.
+ *
+ * It is one way linked list of items, consisting of two parts: head and body.
  */
-#define CL_NEW(cl)	\
-	do {				\
-		(cl)->next = (cl);	\
-		(cl)->content = NULL;	\
-	} while(0)
+typedef struct {
+	int	 count;     /**< Optimization for length() function. */
+	qitem	*body;      /**< Items in a queue. */
+	qitem	*cur;       /**< Currently selected item. */
+}qhead;
 
-/** Macro to add item to existing list. */
-#define CL_ADD(cl, newcl)	\
-	do { 				\
-		(newcl)->next = (cl)->next;	\
-		(cl)->next = (newcl);		\
-	} while(0)
-
-/** Get next item in a list. */
-#define CL_NEXT(cl)	((cl) = (cl)->next)
-/** Get content pointer of item. */
-#define CL_CONTENT(cl)	(cl)->content
-
+/** Get length of a queue. */
+#define q_length(_qhead)	((_qhead).count)
+/** Shift to next item in a queue. */
+#define q_next(_qhead)	\
+	((_qhead)->cur = ((_qhead)->cur) ? (_qhead)->cur->next : NULL)
+/** Get content of current item. */
+#define q_content(_qhead)	((_qhead)->cur->content)
+/** Reset current item to the first one. */
+#define q_reset(_qhead)	((_qhead)->cur = (_qhead)->body)
 /**
  * Iterate through items in a list. cl advances each round to next item in
  * list, until the sentinel is encountered. Caller must be sure that the
- * list pointer is at the beginning when using this macro - use CL_RESET
+ * list pointer is at the beginning when using this macro - use cl_reset
  * for that.
  */
-#define CL_FOREACH(cl)	\
-	for ((cl) = (cl)->next; (cl)->content != NULL; (cl) = (cl)->next)
-
-/** Move pointer to the beginning of a list (it will point to sentinel) */
-#define CL_RESET(cl)	\
-	do { 				\
-		if ((cl)->content == NULL) break;	\
-		while (((cl) = (cl)->next)->content != NULL);	\
-	} while(0)
-
-
-/** Return the number of items in the list */
-inline unsigned cl_length(struct circ_list *cl);
-/** If the list is empty return value is 1, otherwise 0 */
-#define CL_EMPTY(cl)	((cl) == (cl)->next)
-
+#define q_foreach(_qhead)	\
+	for ((_qhead)->cur = (_qhead)->body; (_qhead)->cur != NULL; (_qhead)->cur = (_qhead)->cur->next)
 /**
- * Free circular list, note that content of all items must be freed
- * before using this function. List pointer must be at the beginning
- * upon start (use CL_RESET for that if you are not sure).
+ * Add new item to a queue (the item will be enqueued at the end of queue).
  *
- * @param cl List to purge.
+ * @param pool    Pool from which the new item will be allocated.
+ * @param head    The queue.
+ * @param data    Pointer to data which shoud be enqueued.
+ * @return        0 if successfull, otherwise 1.
  */
-inline void cl_purge(struct circ_list *cl);
+int q_add(void *pool, qhead *head, void *data);
+
 /** @} */
+
+
+/* ********************************************************************* */
+
 
 /**
  * Structure gathers postal info about contact.
  */
 typedef struct {
-	char	*name;
-	char	*org;	/**< organization */
-	char	*street[3];
-	char	*city;
-	char	*sp;	/**< state or province */
-	char	*pc;	/**< postal code */
-	char	*cc;	/**< country code */
+	char	*name;  /**< Name. */
+	char	*org;	/**< Organization. */
+	char	*street[3]; /**< 3x street. */
+	char	*city;  /**< City. */
+	char	*sp;	/**< State or province. */
+	char	*pc;	/**< Postal code. */
+	char	*cc;	/**< Country code. */
 }epp_postalInfo;
 
 /**
@@ -239,19 +248,19 @@ typedef struct {
 	 */
 	char	flag;
 	unsigned char	name; /**< Contact's name is exceptional. */
-	unsigned char	org; /**< Contact's organization is exceptional. */
+	unsigned char	org;  /**< Contact's organization is exceptional. */
 	unsigned char	addr; /**< Contact's address is exceptional. */
-	unsigned char	voice; /**< Contact's voice (tel. number) is exceptional. */
-	unsigned char	fax; /**< Contact's fax number is exceptional. */
-	unsigned char	email; /**< Contact's email address is exceptional. */
+	unsigned char	voice;/**< Contact's voice (tel. number) is exceptional. */
+	unsigned char	fax;  /**< Contact's fax number is exceptional. */
+	unsigned char	email;/**< Contact's email address is exceptional. */
 }epp_discl;
 
 /**
  * Nameserver has a name and possibly more than one ip address.
  */
 typedef struct {
-	char	*name;	/**< fqdn of nameserver. */
-	struct circ_list	*addr;	/**< List of ip addresses. */
+	char	*name;	 /**< fqdn of nameserver. */
+	qhead	 addr; /**< List of ip addresses. */
 }epp_ns;
 
 /**
@@ -272,25 +281,238 @@ typedef struct {
 	char	*pubkey;
 }epp_ds;
 
-/**
- * Type of identification number used in contact object.
- */
+/** Type of identification number used in contact object. */
 typedef enum {
-	SSN_UNKNOWN,	/**< Unknown value means also undefined in some contexts. */
-	SSN_OP,	/**< Number of ID card. */
-	SSN_RC,	/**< Born number (rodne cislo). */
-	SSN_PASSPORT,	/**< Number of passport. */
-	SSN_MPSV,	/**< Number assigned by "ministerstvo prace a soc. veci". */
-	SSN_ICO	/**< ICO. */
+	SSN_UNKNOWN, /**< Unknown value means also undefined in some contexts. */
+	SSN_OP,	     /**< Number of ID card. */
+	SSN_RC,	     /**< Born number (rodne cislo). */
+	SSN_PASSPORT,/**< Number of passport. */
+	SSN_MPSV,    /**< Number assigned by "ministerstvo prace a soc. veci". */
+	SSN_ICO      /**< ICO. */
 }epp_ssnType;
 
-/**
- * Structure holding answer to EPP check command.
- */
+/** Structure holding answer to EPP check command. */
 typedef struct {
-	int	avail;	/**< True if object is available, false otherwise. */
-	char	*reason;	/**< If object is not available, here is the reason. */
+	int	avail;   /**< True if object is available, false otherwise. */
+	char	*reason; /**< If object is not available, here is the reason. */
 }epp_avail;
+
+/** DNSSEC extension used for updates. */
+typedef struct {
+	qhead	chg_ds; /**< Signatures to be changed. */
+	qhead	add_ds; /**< Signatures to be added. */
+	qhead	rem_ds; /**< Signatures to be removed. */
+}epp_ext_domain_upd_dnssec;
+
+typedef struct {
+	domain_ext_type extType; /**< Identifier of extension. */
+	union {
+		char	*ext_enumval; /**< Domain validation.*/
+		qhead	 ext_dnssec_cr; /** List of digital sigs for domain. */
+		epp_ext_domain_upd_dnssec ext_dnssec_upd; /**< DNSSEC. */
+	}ext; /**< Extension. */
+}epp_ext_item;
+
+
+/* ********************************************************************* */
+
+
+/** Login parameters. */
+typedef struct {
+	char	*clID;   /**< Client ID. */
+	char	*pw;     /**< Password. */
+	char	*newPW;  /**< New password. */
+	qhead	 objuri; // currently not used
+	qhead	 exturi; // currently not used
+	unsigned lang;   /**< Language. */
+}epps_login;
+
+/** Check contact, domain and nsset parameters. */
+typedef struct {
+	qhead	ids;    /**< IDs of checked objects. */
+	qhead	avails; /**< Booleans + reasons. */
+}epps_check;
+
+/** Info contact parameters. */
+typedef struct {
+	char	*id;       /**< Id of wanted contact (input). */
+	char	*handle;   /**< Id of wanted contact (output).*/
+	char	*roid;     /**< ROID of object. */
+	qhead	 status;   /**< Contact's status. */
+	epp_postalInfo pi; /**< Postal info. */
+	char	*voice;    /**< Telephone number. */
+	char	*fax;      /**< Fax number. */
+	char	*email;    /**< Email address. */
+	char	*clID;     /**< Owner's ID. */
+	char	*crID;     /**< ID of creator. */
+	char	*crDate;   /**< Creation date. */
+	char	*upID;     /**< ID of last updater. */
+	char	*upDate;   /**< Last updated. */
+	char	*trDate;   /**< Last transfered. */
+	char	*authInfo; /**< Authorization information. */
+	epp_discl discl;   /**< Disclose information section. */
+	char	*vat;      /**< VAT tax ID. */
+	char	*ssn;      /**< Contact's unique ident. */
+	epp_ssnType ssntype;   /**< Type of unique ident. */
+	char	*notify_email; /**< Notification email. */
+}epps_info_contact;
+
+/* Info domain parameters. */
+typedef struct {
+	char	*name;    /**< FQDN of wanted domain (input). */
+	char	*handle;  /**< FQDN of wanted domain (output). */
+	char	*roid;    /**< ROID of object. */
+	qhead	 status;  /**< Domain's status. */
+	char	*registrant; /**< Registrant of domain. */
+	qhead	 admin;   /**< Admin contact for domain. */
+	char	*nsset;   /**< Nsset of domain. */
+	char	*clID;    /**< Owner's ID. */
+	char	*crID;    /**< ID of creator. */
+	char	*crDate;  /**< Creation date. */
+	char	*exDate;  /**< Expiration date. */
+	char	*upID;    /**< ID of last updater. */
+	char	*upDate;  /**< Last updated. */
+	char	*trDate;  /**< Last transfered. */
+	char	*authInfo;/**< Authorization information. */
+	qhead	 extensions; /**< List of domain extensions. */
+}epps_info_domain;
+
+/* Info nsset parameters. */
+typedef struct {
+	char	*id;      /**< Id of wanted nsset (input). */
+	char	*handle;  /**< Id of wanted nsset (output). */
+	char	*roid;    /**< ROID of object. */
+	qhead	 status;  /**< Nsset's status. */
+	char	*clID;    /**< Owner's ID. */
+	char	*crID;    /**< ID of creator. */
+	char	*crDate;  /**< Creation date. */
+	char	*upID;    /**< ID of last updater. */
+	char	*upDate;  /**< Last updated. */
+	char	*trDate;  /**< Last transfered. */
+	char	*authInfo;/**< Authorization information. */
+	qhead	 ns;      /**< List of nameservers. */
+	qhead	 tech;    /**< List of technical contacts for nsset. */
+}epps_info_nsset;
+
+/** Poll request parameters. */
+typedef struct {
+	int	count;   /**< Count of waiting messages. */
+	char	*msgid;  /**< ID of next message in a queue. */
+	char	*msg;    /**< Text of message. */
+	char	*qdate;  /**< Date of message submission. */
+}epps_poll_req;
+
+/** Poll acknoledge parameters. */
+typedef struct {
+	char	*msgid;   /**< ID of acknoledged message. */
+	int	 count;   /**< Count of waiting messages. */
+	char	*newmsgid;/**< ID of first message in a queue. */
+}epps_poll_ack;
+
+/** Create contact parameters. */
+typedef struct {
+	char	*id;       /**< Id of wanted contact (input). */
+	epp_postalInfo pi; /**< Postal info. */
+	char	*voice;    /**< Telephone number. */
+	char	*fax;      /**< Fax number. */
+	char	*email;    /**< Email address. */
+	char	*authInfo; /**< Authorization information. */
+	epp_discl discl;   /**< Disclose information section. */
+	char	*vat;      /**< VAT tax ID. */
+	char	*ssn;      /**< Contact's unique ident. */
+	epp_ssnType ssntype;   /**< Type of unique ident. */
+	char	*notify_email; /**< Notification email. */
+	char	*crDate;   /**< Creation date of contact. */
+}epps_create_contact;
+
+/** Create domain parameters. */
+typedef struct {
+	char	*name;    /**< FQDN of wanted domain (input). */
+	char	*registrant;   /**< Registrant of domain. */
+	qhead	 admin;   /**< Admin contact for domain. */
+	char	*nsset;   /**< Nsset of domain. */
+	int	 period;  /**< Registration period in months. */
+	char	*authInfo;/**< Authorization information. */
+	qhead	 extensions; /**< List of domain extensions. */
+	char	*crDate;  /**< Creation date of domain. */
+	char	*exDate;  /**< Expiration date of domain. */
+}epps_create_domain;
+
+/** Create nsset parameters. */
+typedef struct {
+	char	*id;      /**< Id of wanted nsset (input). */
+	char	*authInfo;/**< Authorization information. */
+	qhead	 ns;      /**< List of nameservers. */
+	qhead	 tech;    /**< List of technical contacts for nsset. */
+	char	*crDate;  /**< Creation date of nsset. */
+}epps_create_nsset;
+
+/** Delete parameters. */
+typedef struct {
+	char	*id;      /**< ID of object to be deleted. */
+}epps_delete;
+
+/** Renew domain parameters. */
+typedef struct {
+	char	*name;      /**< Name of renewed domain. */
+	char	*curExDate; /**< Current expiration date. */
+	int	 period;     /**< Renew period. */
+	qhead	 extensions;/**< List of domain extensions. */
+	char	*exDate;    /**< New expiration date. */
+}epps_renew;
+
+/** Update contact parameters. */
+typedef struct {
+	char	*id;            /**< Id of wanted contact (input). */
+	qhead	 add_status;    /**< Contact statuses to be added. */
+	qhead	 rem_status;    /**< Contact statuses to be removed. */
+	epp_postalInfo *pi;     /**< Postal info. */
+	char	*voice;         /**< Telephone number. */
+	char	*fax;           /**< Fax number. */
+	char	*email;         /**< Email address. */
+	char	*authInfo;      /**< Authorization information. */
+	epp_discl discl;        /**< Disclose information section. */
+	char	*vat;           /**< VAT tax ID. */
+	char	*ssn;           /**< Contact's unique ident. */
+	epp_ssnType ssntype;    /**< Type of unique ident. */
+	char	*notify_email;  /**< Notification email. */
+}epps_update_contact;
+
+/** Update domain parameters. */
+typedef struct {
+	char	*name;         /**< FQDN of wanted domain (input). */
+	char	*registrant;   /**< Registrant of domain. */
+	qhead	 add_admin;    /**< Admin contacts to be added. */
+	qhead	 rem_admin;    /**< Admin contacts to be removed. */
+	qhead	 add_status;   /**< Domain statuses to be added. */
+	qhead	 rem_status;   /**< Domain statuses to be removed. */
+	char	*nsset;        /**< Nsset of domain. */
+	char	*authInfo;     /**< Authorization information. */
+	qhead	 extensions;   /**< List of domain extensions. */
+}epps_update_domain;
+
+/** Update nsset parameters. */
+typedef struct {
+	char	*id;           /**< Id of wanted nsset (input). */
+	qhead	 add_tech;     /**< Technical contacts to be added. */
+	qhead	 rem_tech;     /**< Technical contacts to be removed. */
+	qhead	 add_status;   /**< Nsset statuses to be added. */
+	qhead	 rem_status;   /**< Nsset statuses to be removed. */
+	qhead	 add_ns;       /**< Nameservers to be added. */
+	qhead	 rem_ns;       /**< Nameservers to be removed. */
+	char	*authInfo;     /**< Authorization information. */
+}epps_update_nsset;
+
+/** Transfer parameters. */
+typedef struct {
+	char	*id;           /**< Id of transfered object. */
+	char	*authInfo;     /**< Authorization information. */
+}epps_transfer;
+
+/** Parameters of command list. */
+typedef struct {
+	qhead	 handles;     /**< List of handles. */
+}epps_list;
 
 /**
  * This structure is central to the concept of the whole module. The
@@ -303,242 +525,29 @@ typedef struct {
  */
 typedef struct {
 	/* theese items are same for all possible epp commands */
-	char	*clTRID;	/**< client's TRID */
-	char	*svTRID;	/**< server's TRID */
-	int	rc;	/**< EPP return code defined in standard. */
-	char	*msg;	/**< Text message coresponding to return code. */
+	char	*clTRID;/**< client's TRID */
+	char	*svTRID;/**< server's TRID */
+	int	rc;     /**< EPP return code defined in standard. */
+	char	*msg;   /**< Text message coresponding to return code. */
+	char	*xml_in;/**< XML as it is received from client. */
 	/** List of validation errors or errors from central repository. */
-	struct circ_list	*errors;
-	char	*xml_in;	/**< XML as it is received from client. */
+	qhead	 errors;
 
 	/**
 	 * Identification of epp command. This value influences selection
 	 * from in and out union.
 	 */
 	epp_command_type type;
-
-	/* logout and dummy commands have no additional parameters */
-
 	/**
-	 * Input parameters for all possible epp commands.
-	 * This part is allocated and initialized during parsing stage.
+	 * Command data
+	 * (Input + output parameters for all possible epp commands).
 	 */
-	union {
-		/* additional login parameters */
-		struct {
-			char *clID;
-			char *pw;
-			char *newPW;
-			struct circ_list	*objuri; // currently not used
-			struct circ_list	*exturi; // currently not used
-			/* pseudo parameter lang - not used in corba call but only localy */
-			unsigned lang;
-		}login;
-		/* additional check contact, domain and nsset parameters */
-		struct {
-			struct circ_list	*ids; /* ids of objects */
-		}check;
-		/* additional info contact, domain and nsset parameters */
-		struct {
-			char	*id;
-		}info;
-		/* additional poll acknoledge parameters */
-		struct {
-			int	msgid;
-		}poll_ack;
-		/* additional create domain parameters */
-		struct {
-			char	*name;
-			char	*registrant;
-			struct circ_list	*admin;
-			char	*nsset;
-			int	period;	/* in months */
-			char	*authInfo;
-			/* dnssec extension */
-			struct circ_list	*ds;
-			/* enum validation extension */
-			char	*valExDate;
-		}create_domain;
-		/* additional create contact parameters */
-		struct {
-			char	*id;
-			epp_postalInfo	*postalInfo;
-			char	*voice;
-			char	*fax;
-			char	*email;
-			char	*authInfo;
-			char	*notify_email;
-			char	*vat;
-			char	*ssn;
-			epp_ssnType	ssntype;
-			epp_discl	*discl;
-		}create_contact;
-		/* additional create nsset parameters */
-		struct {
-			char	*id;
-			char	*authInfo;
-			struct circ_list	*tech;
-			struct circ_list	*ns;
-		}create_nsset;
-		/* additional delete parameters */
-		struct {
-			char	*id;
-		}delete;
-		/* additional renew domain parameters */
-		struct {
-			char	*name;
-			char	*exDate;
-			int	period;
-			/* enum validation extension */
-			char	*valExDate;
-		}renew;
-		/* additional update domain parameters */
-		struct {
-			char	*name;
-			struct circ_list	*add_admin;
-			struct circ_list	*rem_admin;
-			struct circ_list	*add_status;
-			struct circ_list	*rem_status;
-			char	*registrant;
-			char	*nsset;
-			char	*authInfo;
-			/* dnssec extension */
-			struct circ_list	*chg_ds;
-			struct circ_list	*add_ds;
-			struct circ_list	*rem_ds;
-			/* enum validation extension */
-			char	*valExDate;
-		}update_domain;
-		/* additional update contact parameters */
-		struct {
-			char	*id;
-			struct circ_list	*add_status;
-			struct circ_list	*rem_status;
-			epp_postalInfo	*postalInfo;
-			char	*voice;
-			char	*fax;
-			char	*email;
-			char	*authInfo;
-			char	*notify_email;
-			char	*vat;
-			char	*ssn;
-			epp_ssnType	ssntype;
-			epp_discl	*discl;
-		}update_contact;
-		/* additional update nsset parameters */
-		struct {
-			char	*id;
-			struct circ_list	*add_status;
-			struct circ_list	*rem_status;
-			struct circ_list	*add_ns;
-			struct circ_list	*rem_ns;
-			struct circ_list	*add_tech;
-			struct circ_list	*rem_tech;
-			char	*authInfo;
-		}update_nsset;
-		/* additional transfer parameters */
-		struct {
-			char	*id;
-			char	*authInfo;
-		}transfer;
-	}*in;
-
-	/**
-	 * Output parameters for all possible epp commands.
-	 * They are allocated and initialized after corba function call
-	 * and used in response generator.
-	 */
-	union {
-		/* additional check contact and domain parameters */
-		struct {
-			/* booleans+reasons are answers to check */
-			struct circ_list	*avails;
-		}check;
-		/* additional info contact parameters */
-		struct {
-			char	*handle;
-			char	*roid;
-			struct circ_list	*status;
-			epp_postalInfo	*postalInfo;
-			char	*voice;
-			char	*fax;
-			char	*email;
-			char	*clID;
-			char	*crID;
-			char	*crDate;
-			char	*upID;
-			char	*upDate;
-			char	*trDate;
-			char	*authInfo;
-			epp_discl	*discl;
-			char	*vat;
-			char	*ssn;
-			epp_ssnType	ssntype;
-			char	*notify_email;
-		}info_contact;
-		/* additional info domain parameters */
-		struct {
-			char	*handle;
-			char	*roid;
-			struct circ_list	*status;
-			char	*registrant;
-			struct circ_list	*admin;
-			char	*nsset;
-			char	*clID;
-			char	*crID;
-			char	*crDate;
-			char	*exDate;
-			char	*upID;
-			char	*upDate;
-			char	*trDate;
-			char	*authInfo;
-			/* dnssec extension */
-			struct circ_list	*ds;
-			/* enum validation extension */
-			char	*valExDate;
-		}info_domain;
-		/* additional info nsset parameters */
-		struct {
-			char	*handle;
-			char	*roid;
-			struct circ_list	*status;
-			char	*clID;
-			char	*crID;
-			char	*upID;
-			char	*crDate;
-			char	*upDate;
-			char	*trDate;
-			char	*authInfo;
-			struct circ_list	*ns;
-			struct circ_list	*tech;
-		}info_nsset;
-		/* additional poll request parameters */
-		struct {
-			int	count;
-			int	msgid;
-			char	*qdate;
-			char	*msg;
-		}poll_req;
-		/* additional poll acknoledge parameters */
-		struct {
-			int	count;
-			int	msgid;
-		}poll_ack;
-		/* additional create contact, nsset or domain parameters */
-		struct {
-			char	*crDate;
-			char	*exDate; /* used only in domain object */
-		}create;
-		/* additional renew domain parameters */
-		struct {
-			char	*exDate;
-		}renew;
-		/* additional parameters of command "list" */
-		struct {
-			struct circ_list	*handles;
-		}list;
-	}*out;
+	void	*data;
 }epp_command_data;
+
+
+/* ********************************************************************* */
+
 
 /**
  * @defgroup allocgroup Functions for memory allocation.
@@ -551,30 +560,51 @@ typedef struct {
 
 /**
  * Allocate memory from memory pool.
- * @param pool Memory pool.
- * @param size Number of bytes to allocate.
- * @return Pointer to allocated memory.
+ *
+ * @param pool    Memory pool.
+ * @param size    Number of bytes to allocate.
+ * @return        Pointer to allocated memory.
  */
 void *epp_malloc(void *pool, unsigned size);
 
 /**
  * Allocate memory from memory pool and prezero it.
- * @param pool Memory pool.
- * @param size Number of bytes to allocate.
- * @return Pointer to allocated memory.
+ *
+ * @param pool   Memory pool.
+ * @param size   Number of bytes to allocate.
+ * @return       Pointer to allocated memory.
  */
 void *epp_calloc(void *pool, unsigned size);
 
 /**
  * Duplicate string from argument, the memory will be allocated from
  * memory pool.
- * @param pool Memory pool.
- * @param str String which is going to be duplicated.
- * @return Pointer duplicated string.
+ *
+ * @param pool   Memory pool.
+ * @param str    String which is going to be duplicated.
+ * @return       Pointer duplicated string.
  */
-void *epp_strdup(void *pool, char *str);
+void *epp_strdup(void *pool, const char *str);
+
+/**
+ * Duplicate string from argument, the memory will be allocated from
+ * memory pool.
+ *
+ * @param pool   Memory pool.
+ * @param str    String which is going to be duplicated.
+ * @return       Pointer duplicated string.
+ */
+void *epp_strdup(void *pool, const char *str);
 
 /**
  * @}
  */
+
+/**
+ * Log message formated in printf manner.
+ *
+ * @param fmt    Format of string.
+ */
+void *epp_log(const char *fmt, ...);
+
 #endif /* EPP_COMMON_H */

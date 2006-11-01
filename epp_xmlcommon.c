@@ -2,8 +2,9 @@
  * @file epp_xmlcommon.c
  *
  * This file gathers definitions of functions used by both libxml components
- * (parser and generator). Currently the components share only routine for
- * xml document validation.
+ * (parser and generator).
+ *
+ * Currently the components share only routine for xml document validation.
  */
 
 #include <string.h>
@@ -21,9 +22,9 @@
  * validator.
  */
 typedef struct {
-	void	*pool; /**< Pool to allocate memory from. */
-	struct circ_list	*err_list;	/**< List of encountered errors. */
-	xmlDocPtr	doc;	/**< XML document. */
+	void	*pool;      /**< Pool to allocate memory from. */
+	qhead	*err_list;  /**< List of encountered errors. */
+	xmlDocPtr doc;      /**< XML document. */
 }valerr_ctx;
 
 /**
@@ -34,27 +35,24 @@ typedef struct {
  * fails, the error is silently dropped and is not queued in the list of
  * errors. That makes algorithm a bit less complicated.
  *
- * @param ctx Hook's context pointer.
- * @param error Specification of encountered error.
+ * @param ctx     Hook's context pointer.
+ * @param error   Specification of encountered error.
  */
 static void
 validerr_callback(void *ctx, xmlErrorPtr error)
 {
 	/* used to get content of problematic xml tag */
-	xmlNodePtr	node;
 	xmlBufferPtr	buf;
 	int	len;
 	/* used for new list item creation */
-	struct circ_list	*new_item;
 	epp_error	*valerr;
 	/* get context parameters */
-	struct circ_list	*error_list = ((valerr_ctx *) ctx)->err_list;
+	qhead	*error_list = ((valerr_ctx *) ctx)->err_list;
 	xmlDocPtr	doc = ((valerr_ctx *) ctx)->doc;
 	void	*pool = ((valerr_ctx *) ctx)->pool;
 
 	/* in case of allocation failure simply don't log the error and exit */
 	if ((valerr = epp_malloc(pool, sizeof *valerr)) == NULL) return;
-	if ((new_item = epp_malloc(pool, sizeof *new_item)) == NULL) return;
 
 	/*
 	 * xmlError has quite a lot of fields, we are interested only in 3
@@ -72,47 +70,48 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 	 * truncate trailing newline)
 	 */
 	len = strlen(error->message);
-	if ((valerr->reason = (char *) epp_malloc(pool, len)) == NULL) return;
-	strncpy(valerr->reason, error->message, --len); /* truncate trailing \n */
+	valerr->reason = (char *) epp_malloc(pool, len);
+	if (valerr->reason == NULL)
+		return;
+	strncpy(valerr->reason, error->message, --len); /*truncate trailing \n */
 	(valerr->reason)[len] = '\0';
-	node = (xmlNodePtr) error->node;
+
 	/* XXX this needs to be done better way */
-		/*
-		 * recognized errors:
-		 *    unknown command (2000)
-		 *    required parameter missing (2003)
-		 *    Parameter value range error (2004)
-		 *    Parameter value syntax error (2005)
-		 *    Unimplemented extension (2103)
-		 *    ???Unimplemented command (2101)???
-		 *    ???Unimplemented option (2102)???
-		 * all other errors are reported as:
-		 *    command syntax error (2001)
-		 */
+	/*
+	 * recognized errors:
+	 *    unknown command (2000)
+	 *    required parameter missing (2003)
+	 *    Parameter value range error (2004)
+	 *    Parameter value syntax error (2005)
+	 *    Unimplemented extension (2103)
+	 *    ???Unimplemented command (2101)???
+	 *    ???Unimplemented option (2102)???
+	 * all other errors are reported as:
+	 *    command syntax error (2001)
+	 */
 
 	/* get content of problematic tag */
 	buf = xmlBufferCreate();
-	if (buf == NULL) return;
-	if (xmlNodeDump(buf, doc, node, 0, 0) < 0) return;
+	if (buf == NULL)
+		return;
+	if (xmlNodeDump(buf, doc, (xmlNodePtr) error->node, 0, 0) < 0)
+		return;
 	valerr->value = epp_strdup(pool, (char *) buf->content);
 	xmlBufferFree(buf);
-	if (valerr->value == NULL) return;
-	valerr->standalone = 1;	/* the surrounding tag is included */
+	if (valerr->value == NULL)
+		return;
+	valerr->spec = errspec_unknown;	/* surrounding tags are included */
 
 	/* enqueue new error item */
-	CL_CONTENT(new_item) = (void *) valerr;
-	CL_ADD(error_list, new_item);
+	q_add(pool, error_list, valerr);
 }
 
 valid_status
-validate_doc(void *pool,
-		xmlSchemaPtr schema,
-		xmlDocPtr doc,
-		struct circ_list *err_list)
+validate_doc(void *pool, xmlSchemaPtr schema, xmlDocPtr doc, qhead *err_list)
 {
-	xmlSchemaValidCtxtPtr	svctx;	/* schema validator context */
-	valerr_ctx	ctx;	/* context used for validator's error hook */
-	int	rc;	/* return code from xmllib's validator */
+	xmlSchemaValidCtxtPtr	svctx; /* schema validator context */
+	valerr_ctx	ctx;    /* context used for validator's error hook */
+	int	rc;             /* return code from xmllib's validator */
 
 	svctx = xmlSchemaNewValidCtxt(schema);
 	if (svctx == NULL) {
@@ -120,8 +119,8 @@ validate_doc(void *pool,
 	}
 	/* initialize error hook's context */
 	ctx.err_list = err_list;
-	ctx.doc = doc;
-	ctx.pool = pool;
+	ctx.doc      = doc;
+	ctx.pool     = pool;
 	xmlSchemaSetValidStructuredErrors(svctx, validerr_callback, &ctx);
 	/* validate request against schema */
 	rc = xmlSchemaValidateDoc(svctx, doc);
@@ -135,8 +134,7 @@ validate_doc(void *pool,
 	}
 	xmlSchemaFreeValidCtxt(svctx);
 
-	assert(CL_EMPTY(err_list));
 	return VAL_OK;
 }
 
-/* vim: set ts=4 sw=4: */
+/* vim: set ts=8 sw=8: */

@@ -1,0 +1,39 @@
+version 1.2.0
+
+	* New memory allocator. Memory is now allocated from pools and freed
+	all at once when request processing is over.
+
+	* Structure for lists 'circ_list' was replaced by 'qhead' and 'qitem'.
+
+	* The mega-structure containing all possible request was parted
+	in smaller peaces, which ease manipulation.
+
+	* The epp-client.c file (CORBA component) was made bullet-proof
+	against possible memory allocation failures.
+
+	* Exceptions in CORBA functions are used instead of the hack
+	(svTRID == 0).
+
+	* All errors are translated on CR side from now (even libxml errors).
+
+	* Extension handling mechanism was changed in order to make adding
+	of new extensions easier (DNSSEC extension was dropped for now).
+
+	* Changes in schema files (see ChangeLog in subdirectory schemas).
+
+	* ... major rebuild of all source files and code cleanup
+
+version 1.1.1
+
+	* AuthInfo parameter when creating an object is not mandatory parameter
+	anymore but optional.
+
+	* Missing attribute 'lang' in reason element in check response was
+	added.
+
+	* Schema changes (see ChangeLog in schema subdirectory).
+
+version 1.1.0
+
+	* First version targeted for production release (does not have a tag
+	in repository).

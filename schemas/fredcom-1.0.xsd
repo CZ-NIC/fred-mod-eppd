@@ -44,27 +44,15 @@
   <!--
   Object authorization information type.
   -->
-    <simpleType name="pwAuthInfoType">
+    <simpleType name="authInfoType">
       <restriction base="normalizedString">
         <minLength value="0"/>
         <maxLength value="300"/>
       </restriction>
-    </simpleType>
-
-    <complexType name="extAuthInfoType">
-      <sequence>
-        <any namespace="##other"/>
-      </sequence>
     </complexType>
 
   <!--
   End of schema.
   -->
   </schema>
-
-
-
-
-
-
 

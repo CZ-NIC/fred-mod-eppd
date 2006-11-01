@@ -189,7 +189,7 @@ void *epp_calloc(void *pool, unsigned size)
  * @param str  String which is going to be duplicated.
  * @return     Duplicated string.
  */
-void *epp_strdup(void *pool, char *str)
+void *epp_strdup(void *pool, const char *str)
 {
 	apr_pool_t	*p = (apr_pool_t *) pool;
 
@@ -534,8 +534,7 @@ static int epp_process_connection(conn_rec *c)
 		apr_pool_t	*rpool;	/* memory pool used for duration of a request */
 		epp_command_data	*cdata;	/* self-descriptive data structure */
 		char	*response;	/* generated XML answer to client */
-		struct circ_list	*valerr; /* possibly encountered errors when
-			validating response */
+		qhead	valerr; /* encountered errors when validating response */
 		parser_status	pstat;	/* parser's return code */
 #ifdef EPP_PERF
 		/*
@@ -549,6 +548,8 @@ static int epp_process_connection(conn_rec *c)
 
 		bzero(times, 4 * sizeof(times[0]));
 #endif
+		valerr.body = NULL;
+		valerr.count = 0;
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
 		apr_pool_tag(rpool, "EPP_request");
@@ -654,7 +655,6 @@ static int epp_process_connection(conn_rec *c)
 						"Error when creating epp greeting");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-			valerr = NULL;
 		}
 		/* it is a command */
 		else {
@@ -778,14 +778,12 @@ static int epp_process_connection(conn_rec *c)
 					epplog(c, rpool, session, EPP_ERROR,
 							"Generated response does not validate");
 					/* print more detailed information about validation errors */
-					if (valerr != NULL) {
-						CL_FOREACH(valerr) {
-							epp_error	*e = CL_CONTENT(valerr);
-							epplog(c, rpool, session, EPP_ERROR,
-									"Element: %s", e->value);
-							epplog(c, rpool, session, EPP_ERROR,
-									"Reason: %s", e->reason);
-						}
+					q_foreach(&valerr) {
+						epp_error	*e = q_content(&valerr);
+						epplog(c, rpool, session, EPP_ERROR,
+								"Element: %s", e->value);
+						epplog(c, rpool, session, EPP_ERROR,
+								"Reason: %s", e->reason);
 					}
 					break;
 				default:

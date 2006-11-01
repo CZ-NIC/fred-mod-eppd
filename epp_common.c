@@ -1,5 +1,6 @@
 /**
  * @file epp_common.c
+ *
  * Function definitions shared by all components of mod_eppd are here.
  */
 
@@ -9,23 +10,30 @@
 
 #include "epp_common.h"
 
-inline unsigned cl_length(struct circ_list *cl)
+int q_add(void *pool, qhead *head, void *data)
 {
-	unsigned	i = 0;
-	for (cl = cl->next; cl->content != NULL; cl = cl->next) ++i;
-	return i;
-}
+	qitem	*item;
 
-inline void cl_purge(struct circ_list *cl)
-{
-		struct circ_list	*temp;
+	item = epp_malloc(pool, sizeof *item);
+	if (item == NULL)
+		return 1;
 
-		cl = cl->next;
-		while (cl->content != NULL) {
-			temp = cl->next;
-			free(cl);
-			cl = temp;
-		}
-		free(cl);
+	item->next    = NULL;
+	item->content = data;
+
+	if (head->body == NULL) {
+		head->body = item;
+	}
+	else {
+		qitem	*iter;
+
+		iter = head->body;
+		while (iter->next != NULL)
+			iter = iter->next;
+
+		iter->next = item;
+	}
+	head->count++;
+	return 0;
 }
 

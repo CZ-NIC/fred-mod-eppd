@@ -17,7 +17,7 @@
 
 /* memory pool structure */
 typedef struct {
-	struct circ_list *chunks;
+	qhead	chunks;
 #ifdef DEBUG_ALLOC
 	unsigned count;
 	unsigned bytes;
@@ -31,14 +31,8 @@ static void *create_pool(void)
 {
 	pool_t	*p;
 
-	p = (pool_t *) malloc(sizeof *p);
+	p = (pool_t *) calloc(1, sizeof *p);
 	if (p == NULL) return NULL;
-	p->chunks = (struct circ_list *) malloc(sizeof (*p->chunks));
-	if (p->chunks == NULL) {
-		free(p);
-		return NULL;
-	}
-	CL_NEW(p->chunks);
 #ifdef DEBUG_ALLOC
 	p->count = 0;
 	p->bytes = 0;
@@ -49,6 +43,8 @@ static void *create_pool(void)
 static void destroy_pool(void *pool)
 {
 	pool_t	*p = (pool_t *) pool;
+	qitem	*iter;
+	qitem	*last;
 
 #ifdef DEBUG_ALLOC
 	fprintf(stderr, "Destroying pool:\n");
@@ -56,32 +52,53 @@ static void destroy_pool(void *pool)
 	fprintf(stderr, "    # of allocs: %8u\n", p->count);
 #endif
 
-	CL_RESET(p->chunks);
-	CL_FOREACH(p->chunks) free(CL_CONTENT(p->chunks));
-	cl_purge(p->chunks);
+	if ((last = p->chunks.body) != NULL) {
+		iter = last->next;
+		while (iter != NULL) {
+			free(last->content);
+			free(last);
+			last = iter;
+			iter = iter->next;
+		}
+		free(last->content);
+		free(last);
+	}
 	free(p);
 }
 
 static void *epp_alloc(pool_t *p, unsigned size, int prezero)
 {
-	struct circ_list	*item;
 	void	*chunk;
+	qitem	*item;
+	qitem	*iter;
 
-	item = (struct circ_list *) malloc(sizeof *item);
-	if (item == NULL)
+	chunk = malloc(size);
+	if (chunk == NULL)
 		return NULL;
 
-	chunk = (void *) malloc(size);
-	if (chunk == NULL) {
-		free(item);
+	item  = malloc(sizeof *item);
+	if (item == NULL) {
+		free(chunk);
 		return NULL;
 	}
 
 	if (prezero)
 		memset(chunk, 0, size);
 
-	CL_CONTENT(item) = chunk;
-	CL_ADD(p->chunks, item);
+	item->content = chunk;
+	item->next = NULL;
+
+	iter = p->chunks.body;
+	if (iter == NULL) {
+		p->chunks.body = item;
+	}
+	else {
+		while (iter->next != NULL)
+			iter = iter->next;
+		iter->next = item;
+	}
+	p->chunks.count++;
+
 #ifdef DEBUG_ALLOC
 	p->bytes += size;
 	p->count++;
@@ -104,7 +121,7 @@ void *epp_calloc(void *pool, unsigned size)
 	return epp_alloc(p, size, 1);
 }
 
-void *epp_strdup(void *pool, char *str)
+void *epp_strdup(void *pool, const char *str)
 {
 	pool_t	*p = (pool_t *) pool;
 	unsigned	len;
@@ -434,7 +451,10 @@ int main(int argc, char *argv[])
 
 		if (cstat == CORBA_OK) {
 			char	*response;
-			struct circ_list	*valerr;
+			qhead	valerr;
+
+			valerr.body  = NULL;
+			valerr.count = 0;
 
 			/* API: generate response */
 			gstat = epp_gen_response(pool, 1, schema , lang, cdata,
@@ -468,12 +488,10 @@ int main(int argc, char *argv[])
 					break;
 				case GEN_NOT_VALID:
 					fputs("Server response does not validate\n", stderr);
-					if (valerr != NULL) {
-						CL_FOREACH(valerr) {
-							epp_error	*e = CL_CONTENT(valerr);
-							fprintf(stderr, "\tElement: %s\n", e->value);
-							fprintf(stderr, "\tReason: %s\n", e->reason);
-						}
+					q_foreach(&valerr) {
+						epp_error	*e = q_content(&valerr);
+						fprintf(stderr, "\tElement: %s\n", e->value);
+						fprintf(stderr, "\tReason: %s\n", e->reason);
 					}
 					puts(response);
 					break;

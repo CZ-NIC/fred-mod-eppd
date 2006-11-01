@@ -1,3 +1,17 @@
+2006-10-31 Jan Kryl (version 1.2.0)
+
+	* Z povineni authInfo elementu pri transferech objektu. Nepredstavuje
+	az tak velkou zmenu, do ted bylo authInfo vyzadovano serverem, ted
+	je vyzadovano na urovni schemat.
+
+	* Obecnejsi typ authInfoType ktery mohl obsahovat jak plain text
+	heslo, tak libolnou jinou autorizacni informaci (tag ext), byl
+	zjednodusen. Od ted typ authInfoType obsahuje primo plain text heslo.
+
+	* Pri infu slo zadat authInfo objektu, jako dodatecnou autorizaci
+	k info prikazu. Vzhledem k tomu ze jsme to nepouzivali, byla vlastnost
+	odebrana.
+
 2006-09-26 Jan Kryl (version 1.1.1)
 
 	* authInfo element pri vytvoreni objektu (domain, contact, nsset)

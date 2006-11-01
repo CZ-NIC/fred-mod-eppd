@@ -43,9 +43,10 @@ gen_status
 epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting);
 
 /**
- * Generate command response in XML format. There is option that response
- * can be validated, the validation errors are then returned together with
- * generated string in form of a list.
+ * Generate command response in XML format.
+ *
+ * There is option that response can be validated, the validation errors
+ * are then returned together with generated string in form of a list.
  *
  * @param pool     Memory pool from which to allocate memory.
  * @param validate Tells if response should be validated or not (boolean).
@@ -57,14 +58,13 @@ epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting
  * @return         Generator status.
  */
 gen_status
-epp_gen_response(
-		void *pool,
+epp_gen_response(void *pool,
 		int validate,
 		void *schema,
 		epp_lang lang,
 		epp_command_data *cdata,
 		char **response,
-		struct circ_list **valerr);
+		qhead *valerr);
 
 #endif /* EPP_GEN_H */
 

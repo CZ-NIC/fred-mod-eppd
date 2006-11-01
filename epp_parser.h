@@ -13,11 +13,11 @@ typedef enum {
 	 * should be generated.
 	 */
 	PARSER_HELLO,
-	PARSER_CMD_LOGIN, /**< Login command */
-	PARSER_CMD_LOGOUT, /**< Logout command */
-	PARSER_CMD_OTHER, /**< A command other than login and logout. */
-	PARSER_NOT_VALID, /**< Request does not validate. */
-	PARSER_NOT_COMMAND, /**< Request is not a command nor hello frame. */
+	PARSER_CMD_LOGIN,  /**< Login command. */
+	PARSER_CMD_LOGOUT, /**< Logout command. */
+	PARSER_CMD_OTHER,  /**< A command other than login and logout. */
+	PARSER_NOT_VALID,  /**< Request does not validate. */
+	PARSER_NOT_COMMAND,/**< Request is not a command nor hello frame. */
 	/*
 	 * when following status values are returned, connection is closed
 	 */
@@ -34,8 +34,9 @@ typedef enum {
 /**
  * This routine initializes libxml's parser, hash table for command
  * recognition and parses xml schema, which is returned.
- * @param url_schema XML schema location.
- * @return Parsed xml schema.
+ *
+ * @param url_schema  XML schema location.
+ * @return            Parsed xml schema.
  */
 void *
 epp_parser_init(const char *url_schema);
@@ -43,24 +44,25 @@ epp_parser_init(const char *url_schema);
 /**
  * This will cleanup command hash table, libxml's parser and release
  * parsed xml schema.
- * @param schema Parsed xml schema.
+ *
+ * @param schema    Parsed xml schema.
  */
 void epp_parser_init_cleanup(void *schema);
 
 /**
  * This is the main workhorse of parser component. It's task is to parse
  * request and get data saved in structure.
- * @param pool	Pool to allocate memory from.
- * @param session	Client's session identifier.
- * @param schema	Parsed xml schema used for validation.
- * @param request	Request to be processed.
- * @param bytes	Length of the request.
- * @param cdata Output of parsing stage (xml data converted to structure).
- * @return Status of parsing.
+ *
+ * @param pool      Pool to allocate memory from.
+ * @param session   Client's session identifier.
+ * @param schema    Parsed xml schema used for validation.
+ * @param request   Request to be processed.
+ * @param bytes     Length of the request.
+ * @param cdata     Output of parsing stage (xml data converted to structure).
+ * @return          Status of parsing.
  */
 parser_status
-epp_parse_command(
-		void *pool,
+epp_parse_command(void *pool,
 		int session,
 		void *schema,
 		const char *request,

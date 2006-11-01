@@ -41,8 +41,7 @@
     <complexType name="transferType">
       <sequence>
         <element name="id" type="eppcom:labelType"/>
-        <element name="authInfo" type="nsset:authInfoType"
-         minOccurs="0"/>
+        <element name="authInfo" type="fredcom:authInfoType"/>
       </sequence>
     </complexType>
 
@@ -85,21 +84,9 @@
 
     <complexType name="chgType">
       <sequence>
-        <element name="authInfo" type="nsset:authInfoChgType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
       </sequence>
-    </complexType>
-
-  <!--
-  Allow the authInfo value to be nullified by including an
-  empty element within the choice.
-  -->
-    <complexType name="authInfoChgType">
-      <choice>
-        <element name="pw" type="fredcom:pwAuthInfoType"/>
-        <element name="ext" type="eppcom:extAuthInfoType"/>
-        <element name="null"/>
-      </choice>
     </complexType>
 
   <!--
@@ -112,7 +99,7 @@
 	 maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
-        <element name="authInfo" type="nsset:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
       </sequence>
     </complexType>
@@ -240,7 +227,7 @@
          minOccurs="0"/>
         <element name="trDate" type="dateTime"
          minOccurs="0"/>
-        <element name="authInfo" type="nsset:authInfoType"
+        <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
         <element name="ns" type="nsset:nsT" minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
@@ -253,13 +240,6 @@
         <element name="id" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
-    </complexType>
-
-    <complexType name="authInfoType">
-      <choice>
-        <element name="pw" type="fredcom:pwAuthInfoType"/>
-        <element name="ext" type="fredcom:extAuthInfoType"/>
-      </choice>
     </complexType>
 
   <!--
