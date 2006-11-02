@@ -336,10 +336,15 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 			 * cases, when client simply aborts the connection without
 			 * logging out first, which happens pretty often and is not
 			 * "fatal" at all.
-			 * TODO: the status should be further analysed in order to
-			 * distinguish between the two cases.
 			 */
-			epplog(c, p, session, EPP_INFO, "Error when reading epp header");
+			if (status == APR_EOF) {
+				epplog(c, p, session, EPP_INFO,
+						"Client disconnected without proper logout.");
+			}
+			else {
+				epplog(c, p, session, EPP_ERROR,
+						"Error when reading epp header (%d)", status);
+			}
 			return 0;
 		}
 
@@ -398,7 +403,7 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 									APR_BLOCK_READ, len);
 		if (status != APR_SUCCESS) {
 			epplog(c, p, session, EPP_ERROR,
-					"Error when reading epp request's body");
+					"Error when reading epp request's body (%d)", status);
 			apr_brigade_destroy(bb);
 			return 0;
 		}
@@ -429,7 +434,7 @@ epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
 }
 
 /**
- * Get md5 signiture of given PEM encoded certificate.
+ * Get md5 signature of given PEM encoded certificate.
  * The only function in module which uses openssl library.
  *
  * @param cert_md5 Allocated buffer for storing the resulting fingerprint
@@ -548,6 +553,7 @@ static int epp_process_connection(conn_rec *c)
 
 		bzero(times, 4 * sizeof(times[0]));
 #endif
+		/* possible previous content is gone with request pool */
 		valerr.body = NULL;
 		valerr.count = 0;
 		/* allocate new pool for request */
@@ -826,6 +832,12 @@ static int epp_process_connection(conn_rec *c)
 					"Could not cleanup bucket brigade used for response");
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
+
+		/*XXX
+		 * if server is going down non-gracefully we will try to say good-bye
+		 * before we will be killed.
+		if (ap_graceful_stop_signalled()
+		 */
 
 		apr_pool_destroy(rpool);
 	}

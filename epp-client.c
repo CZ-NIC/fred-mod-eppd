@@ -43,6 +43,9 @@
 #define IS_INTSERV_ERROR(_ev)                             \
 	(!strcmp((_ev)->_id, "IDL:ccReg/EPP/ServerIntError:1.0"))
 
+/** Clear errno variable to non-error state. */
+#define CLEAR_CERRNO(_cerrno)	(_cerrno = 0)
+
 /**
  * Persistent structure initialized at startup, needed for corba function calls.
  */
@@ -354,6 +357,8 @@ get_errors(void *pool, qhead *errors, ccReg_Error *c_errors)
 		epp_error	*err_item;
 		ccReg_Error_seq *c_error = &c_errors->_buffer[i];
 
+		CLEAR_CERRNO(cerrno);
+
 		err_item = epp_malloc(pool, sizeof *err_item);
 		if (err_item == NULL) {
 			return 1;
@@ -411,6 +416,8 @@ epp_call_hello(void *pool,
 		return ret;
 	}
 
+	CLEAR_CERRNO(cerrno);
+
 	*version = unwrap_str(pool, c_version, &cerrno);
 	if (cerrno != 0) {
 		CORBA_free(c_version);
@@ -443,6 +450,8 @@ static int
 corba_call_epilog(void *pool, epp_command_data *cdata, ccReg_Response *response)
 {
 	int	cerrno;
+
+	CLEAR_CERRNO(cerrno);
 
 	if (get_errors(pool, &cdata->errors, &response->errors)) {
 		CORBA_free(response);
@@ -773,8 +782,7 @@ epp_call_check(void *pool,
 	ccReg_CheckResp	*c_avails;
 	ccReg_Check	*c_ids;
 	ccReg_Response *response;
-	int	len, i;
-	int	retr, cerrno;
+	int	len, i, retr;
 	epps_check	*check;
 
 	check = cdata->data;
@@ -880,6 +888,9 @@ epp_call_check(void *pool,
 
 	for (i = 0; i < c_avails->_length; i++) {
 		epp_avail	*avail;
+		int	cerrno;
+
+		CLEAR_CERRNO(cerrno);
 
 		avail = epp_malloc(pool, sizeof *avail);
 		if (avail == NULL)
@@ -983,6 +994,8 @@ epp_call_info_contact(void *pool,
 		CORBA_exception_free(ev);
 		return ret;
 	}
+
+	CLEAR_CERRNO(cerrno);
 
 	/* ok, now everything was successfully allocated */
 	info_contact->roid = unwrap_str_req(pool, c_contact->ROID, &cerrno);
@@ -1178,6 +1191,8 @@ epp_call_info_domain(void *pool,
 		return ret;
 	}
 
+	CLEAR_CERRNO(cerrno);
+
 	/* copy output parameters */
 	info_domain->roid   = unwrap_str_req(pool, c_domain->ROID, &cerrno);
 	if (cerrno != 0) goto error;
@@ -1327,6 +1342,8 @@ epp_call_info_nsset(void *pool,
 		CORBA_exception_free(ev);
 		return ret;
 	}
+
+	CLEAR_CERRNO(cerrno);
 
 	/* copy output data */
 	info_nsset->roid   = unwrap_str_req(pool, c_nsset->ROID, &cerrno);
@@ -1479,6 +1496,8 @@ epp_call_poll_req(void *pool,
 		return ret;
 	}
 
+	CLEAR_CERRNO(cerrno);
+
 	poll_req->count = c_count;
 	poll_req->msgid = unwrap_str_req(pool, c_msgID, &cerrno);
 	if (cerrno != 0) goto error;
@@ -1576,6 +1595,8 @@ epp_call_poll_ack(void *pool,
 		CORBA_exception_free(ev);
 		return ret;
 	}
+
+	CLEAR_CERRNO(cerrno);
 
 	poll_ack->count = c_count;
 	poll_ack->msgid = unwrap_str_req(pool, c_msgID, &cerrno);
@@ -1743,6 +1764,8 @@ epp_call_create_domain(void *pool,
 		CORBA_exception_free(ev);
 		return ret;
 	}
+
+	CLEAR_CERRNO(cerrno);
 
 	create_domain->crDate = unwrap_str_req(pool, c_crDate, &cerrno);
 	if (cerrno != 0) goto error;
@@ -2008,6 +2031,8 @@ epp_call_create_contact(void *pool,
 		return ret;
 	}
 
+	CLEAR_CERRNO(cerrno);
+
 	create_contact->crDate = unwrap_str_req(pool, c_crDate, &cerrno);
 	if (cerrno != 0) {
 		CORBA_free(c_crDate);
@@ -2195,6 +2220,8 @@ epp_call_create_nsset(void *pool,
 		CORBA_exception_free(ev);
 		return ret;
 	}
+
+	CLEAR_CERRNO(cerrno);
 
 	create_nsset->crDate = unwrap_str(pool, c_crDate, &cerrno);
 	if (cerrno != 0) {
@@ -2434,6 +2461,8 @@ epp_call_renew_domain(void *pool,
 		CORBA_exception_free(ev);
 		return ret;
 	}
+
+	CLEAR_CERRNO(cerrno);
 
 	renew->exDate = unwrap_str_req(pool, c_exDateOUT, &cerrno);
 	if (cerrno != 0) {
@@ -3247,7 +3276,7 @@ epp_call_list(void *pool,
 	CORBA_char	*c_clTRID;
 	ccReg_Response	*response;
 	ccReg_Lists	*c_handles;
-	int	 i, retr, cerrno;
+	int	 i, retr;
 	epps_list	*list;
 
 	list = cdata->data;
@@ -3316,6 +3345,9 @@ epp_call_list(void *pool,
 
 	for (i = 0; i < c_handles->_length; i++) {
 		char	*handle;
+		int	cerrno;
+
+		CLEAR_CERRNO(cerrno);
 
 		handle = unwrap_str(pool, c_handles->_buffer[i], &cerrno);
 		if (cerrno != 0) {
