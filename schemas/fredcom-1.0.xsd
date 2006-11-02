@@ -49,7 +49,7 @@
         <minLength value="0"/>
         <maxLength value="300"/>
       </restriction>
-    </complexType>
+    </simpleType>
 
   <!--
   End of schema.
