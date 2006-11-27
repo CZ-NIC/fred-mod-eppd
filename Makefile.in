@@ -104,8 +104,8 @@ ${IDLPREFIX}-stubs.o: ${IDLPREFIX}-stubs.c ${IDLPREFIX}.h
 epp_test: epp_test.o $(OBJS)
 	$(CC) $(LDFLAGS) $(LIBS) $(ORB_LDFLAGS) $(XML_LIBS) -o epp_test epp_test.o $(OBJS)
 
-epp_test.o: epp_test.c epp_common.h epp_parser.h epp_gen.h epp-client.h config.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEFS) -c epp_test.c
+epp_test.o: epp_test.c epp_common.h epp_parser.h epp_gen.h epp-client.h $(IDLPREFIX).h config.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEFS) $(ORB_CFLAGS) -c epp_test.c
 
 $(IDLOUT): $(IDL)
 	$(ORBIT-IDL) --noskels $(IDL)

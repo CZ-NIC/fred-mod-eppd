@@ -55,6 +55,7 @@
 #include "apr_pools.h"
 #include "apr_strings.h"
 #include "apr_time.h"
+#include "apr_hash.h"
 
 #include "scoreboard.h"
 #include "util_filter.h"
@@ -121,10 +122,9 @@ typedef struct {
 	int	epp_enabled;     /**< Decides whether mod_eppd is enabled for host. */
 	char	*servername; /**< Epp server name used in <greeting> frame. */
 	char	*ns_loc;     /**< Location of CORBA nameservice. */
-	char	*object;     /**< Name under which is object known to nameservice. */
+	char	*object;     /**< Name under which is object known. */
 	void	*schema;     /**< URL of EPP schema (use just path). */
 	int	valid_resp;      /**< Validate responses before sending them to client.*/
-	epp_corba_globs	*corba_globs; /**< Variables needed for corba submodule. */
 	char	*epplog;              /**< Epp log filename. */
 	apr_file_t	*epplogfp;        /**< File descriptor of epp log file. */
 	epp_loglevel	loglevel;     /**< Epp log level. */
@@ -507,8 +507,12 @@ static int epp_process_connection(conn_rec *c)
 	unsigned	lang;	/* session's language */
 	int	logout;	/* if true, terminate request loop */
 	int	firsttime;	/* if true, generate greeting in request loop */
+	int	i;
 	apr_bucket_brigade	*bb;
 	apr_status_t	status;	/* used to store return code from apr functions */
+	service_EPP	EPPservice;
+	apr_hash_t	*references;
+	module	*corba_module;
 	server_rec	*s = c->base_server;
 	eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(s->module_config, &eppd_module);
@@ -516,6 +520,41 @@ static int epp_process_connection(conn_rec *c)
 	/* do nothing if eppd is disabled */
 	if (!sc->epp_enabled)
 		return DECLINED;
+
+	/*
+	 * get module structure for mod_corba, in order to retrieve service
+	 * stored by that module in connection config.
+	 */
+	corba_module = NULL;
+	for (i = 0; ap_loaded_modules[i] != NULL; i++)
+		if (!strcmp(ap_loaded_modules[i]->name, "mod_corba.c")) {
+			corba_module = ap_loaded_modules[i];
+			break;
+		}   
+
+	if (corba_module == NULL) {
+		ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+				"mod_corba module was not loaded - unable to handle an EPP "
+				"request");
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+	references = (apr_hash_t *)
+		ap_get_module_config(c->conn_config, corba_module);
+	if (references == NULL) {
+		ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+				"mod_corba is not enabled for this server though it "
+				"should be! Cannot handle EPP request.");
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	/* check that our reference is available */
+	EPPservice = (service_EPP) apr_hash_get(references, sc->object,
+			strlen(sc->object));
+	if (EPPservice == NULL) {
+		epplog(c, c->pool, 0, EPP_ERROR, "Could not obtain object reference for \
+				alias '%s'.", sc->object);
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
 
 	/* update scoreboard's information */
 	ap_update_child_status(c->sbh, SERVER_BUSY_READ, NULL);
@@ -530,6 +569,7 @@ static int epp_process_connection(conn_rec *c)
 	session = 0;
 	lang = LANG_EN;	/* default language is english */
 	firsttime = 1;	/* this will cause automatic generation of greeting */
+
 	/*
 	 * Loop in which are processed requests until client logs out or error
 	 * appears.
@@ -599,6 +639,9 @@ static int epp_process_connection(conn_rec *c)
 #endif
 		}
 
+		/* log request to CORBA logger */
+		//remote_log_request((void *) rpool, session, cdata);
+
 		switch (pstat) {
 			case PARSER_NOT_XML:
 				epplog(c, rpool, session, EPP_WARNING,
@@ -637,9 +680,9 @@ static int epp_process_connection(conn_rec *c)
 			gen_status	gstat;	/* generator's return code */
 
 			/* get info from CR used in <greeting> frame */
-			rc = epp_call_hello(rpool, sc->corba_globs, &version, &curdate);
+			rc = epp_call_hello(rpool, EPPservice, &version, &curdate);
 
-			if (rc == 0) {
+			if (rc != CORBA_OK) {
 				epplog(c, rpool, session, EPP_ERROR,
 						"Could not obtain version string from CR");
 				return HTTP_INTERNAL_SERVER_ERROR;
@@ -707,16 +750,16 @@ static int epp_process_connection(conn_rec *c)
 				 *     side of central repository. The identifing parameter
 				 *     is md5 digest of client's certificate.
 				 */
-				cstat = epp_call_login(rpool, sc->corba_globs, &session, &lang,
+				cstat = epp_call_login(rpool, EPPservice, &session, &lang,
 						cert_md5, cdata);
 			}
 			else if (pstat == PARSER_CMD_LOGOUT) {
-				cstat = epp_call_logout(rpool, sc->corba_globs, session,
+				cstat = epp_call_logout(rpool, EPPservice, session,
 						cdata, &logout);
 			}
 			else {
 				/* go ahead to generic corba function call */
-				cstat = epp_call_cmd(rpool, sc->corba_globs, session, cdata);
+				cstat = epp_call_cmd(rpool, EPPservice, session, cdata);
 			}
 
 			/* catch corba failures */
@@ -833,6 +876,9 @@ static int epp_process_connection(conn_rec *c)
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
+		/* log response to CORBA logger */
+		//remote_log_response((void *) rpool, session, cdata);
+
 		/*XXX
 		 * if server is going down non-gracefully we will try to say good-bye
 		 * before we will be killed.
@@ -908,18 +954,6 @@ static void epp_init_child_hook(apr_pool_t *p, server_rec *s)
 }
 
 /**
- * Cleanup routine, is merely wrapper around epp_corba_init_cleanup().
- *
- * @param data Corba globs.
- * @return Always 0.
- */
-static int epp_cleanup_corba(void *data)
-{
-	epp_corba_init_cleanup((epp_corba_globs *) data);
-	return 0;
-}
-
-/**
  * Cleanup routine, is merely wrapper around epp_parser_init_cleanup().
  *
  * @param data XML schema.
@@ -983,7 +1017,6 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 	 * open epp log file initialize components and do further checking
 	 */
 	while (s != NULL) {
-		epp_corba_globs	*corba_globs;
 		char	*fname;
 
 		sc = (eppd_server_conf *) ap_get_module_config(s->module_config,
@@ -1000,27 +1033,9 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 						"EPP schema not configured");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
-			/* register cleanup for xml */
-			apr_pool_cleanup_register(p, sc->schema, epp_cleanup_xml,
-					apr_pool_cleanup_null);
 			/* set default values for object lookup data */
-			if (sc->ns_loc == NULL)
-				sc->ns_loc = apr_pstrdup(p, "localhost");
 			if (sc->object == NULL)
 				sc->object = apr_pstrdup(p, "EPP");
-			/*
-			 * do initialization of corba
-			 */
-			corba_globs = epp_corba_init(sc->ns_loc, sc->object);
-			if (corba_globs == NULL) {
-				ap_log_error(APLOG_MARK, APLOG_CRIT, 0, s,
-						"Corba initialization failed");
-				return HTTP_INTERNAL_SERVER_ERROR;
-			}
-			sc->corba_globs = corba_globs;
-			/* register cleanup for corba globs */
-			apr_pool_cleanup_register(p, sc->corba_globs, epp_cleanup_corba,
-					apr_pool_cleanup_null);
 			/* set default loglevel */
 			if (sc->loglevel == 0) sc->loglevel = EPP_INFO;
 
@@ -1075,42 +1090,6 @@ static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
     }
 
     sc->epp_enabled = flag;
-    return NULL;
-}
-
-/**
- * Handler for apache's configuration directive "EPPNameservice".
- * Sets the host and optional port where nameservice runs.
- *
- * @param cmd Command structure.
- * @param dummy Not used parameter.
- * @param ns_loc The host [port] of nameservice.
- * @return Error string in case of failure otherwise NULL.
- */
-static const char *set_ns_loc(cmd_parms *cmd, void *dummy,
-		const char *ns_loc)
-{
-	const char *err;
-	server_rec *s = cmd->server;
-	eppd_server_conf *sc = (eppd_server_conf *)
-		ap_get_module_config(s->module_config, &eppd_module);
-
-	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
-    if (err) return err;
-
-	/*
-	 * catch double definition of location
-	 * that's not serious fault so we will just print message in log
-	 */
-	if (sc->ns_loc != NULL) {
-		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-			"mod_eppd: more than one definition of nameserice location. All but \
-			the first one will be ignored");
-		return NULL;
-	}
-
-	sc->ns_loc = apr_pstrdup(cmd->pool, ns_loc);
-
     return NULL;
 }
 
@@ -1191,9 +1170,14 @@ static const char *set_schema(cmd_parms *cmd, void *dummy,
 		return apr_psprintf(cmd->temp_pool,
 				"mod_eppd: error in xml parser initialization. "
 				"It is likely that xml schema '%s' is corupted, check it with "
-				"xmllint of other similar tool.",
+				"xmllint or other similar tool.",
 				schemaurl);
 	}
+	/*
+	 * Register cleanup for xml 
+	 */
+	apr_pool_cleanup_register(cmd->pool, sc->schema, epp_cleanup_xml,
+			apr_pool_cleanup_null);
 
     return NULL;
 }
@@ -1361,9 +1345,6 @@ static const command_rec eppd_cmds[] = {
 			 "Set to on, to validate every outcomming response."
 			 "This will slow down the server and should be used only for"
 			 " debugging purposes."),
-	AP_INIT_TAKE1("EPPnameservice", set_ns_loc, NULL, RSRC_CONF,
-			 "Location of CORBA nameservice (host[:port]). Default is "
-			 "localhost."),
 	AP_INIT_TAKE1("EPPobject", set_epp_object, NULL, RSRC_CONF,
 			 "Name under which is the EPP object known to nameserver. "
 			 "Default is \"EPP\"."),
@@ -1386,9 +1367,11 @@ static void *create_eppd_config(apr_pool_t *p, server_rec *s)
  */
 static void register_hooks(apr_pool_t *p)
 {
+	static const char * const aszPre[]={ "mod_corba.c", NULL };
+
 	ap_hook_child_init(epp_init_child_hook, NULL, NULL, APR_HOOK_MIDDLE);
 	ap_hook_post_config(epp_postconfig_hook, NULL, NULL, APR_HOOK_MIDDLE);
-	ap_hook_process_connection(epp_process_connection, NULL, NULL,
+	ap_hook_process_connection(epp_process_connection, aszPre, NULL,
 			APR_HOOK_MIDDLE);
 
 	/* register epp filters */

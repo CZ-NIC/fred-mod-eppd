@@ -10,12 +10,6 @@
        xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.0
        contact-1.0.xsd">
 		<contact:id>JOUDA</contact:id>
-		<contact:add>
-			<contact:status s="clientDeleteProhibited" />
-		</contact:add>
-		<contact:rem>
-			<contact:status s="clientUpdateProhibited" />
-		</contact:rem>
 		<contact:chg>
 		  <contact:postalInfo>
 			<contact:name>John Debil</contact:name>

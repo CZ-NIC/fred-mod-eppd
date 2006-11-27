@@ -87,7 +87,12 @@
          minOccurs="0"/>
         <element name="vat" type="contact:vatT"
 	minOccurs="0"/>
-        <element name="ssn" type="contact:ssnT"
+        <element name="ident" type="contact:identT"
+	minOccurs="0"/>
+	<!-- ssn element is obsolete and will be removed in future !!!
+	     Use ident element instead.
+	  -->
+        <element name="ssn" type="contact:identT"
 	minOccurs="0"/>
         <element name="notifyEmail" type="eppcom:minTokenType"
 	minOccurs="0"/>
@@ -154,30 +159,30 @@
       </restriction>
     </simpleType>
 
-    <!--  SSN type -->
-    <complexType name="ssnT">
+    <!--  ident type -->
+    <complexType name="identT">
       <simpleContent>
-        <extension base="contact:ssnValueT">
-          <attribute name="type" type="contact:ssnTypeT" use="required"/>
+        <extension base="contact:identValueT">
+          <attribute name="type" type="contact:identTypeT" use="required"/>
         </extension>
       </simpleContent>
     </complexType>
 
-    <complexType name="ssnUpdT">
+    <complexType name="identUpdT">
       <simpleContent>
-        <extension base="contact:ssnValueT">
-          <attribute name="type" type="contact:ssnTypeT"/>
+        <extension base="contact:identValueT">
+          <attribute name="type" type="contact:identTypeT"/>
         </extension>
       </simpleContent>
     </complexType>
 
-    <simpleType name="ssnValueT">
+    <simpleType name="identValueT">
       <restriction base="token">
         <maxLength value="32"/>
       </restriction>
     </simpleType>
 
-    <simpleType name="ssnTypeT">
+    <simpleType name="identTypeT">
       <restriction base="token">
         <enumeration value="op"/>
         <enumeration value="rc"/>
@@ -203,22 +208,8 @@
     <complexType name="updateType">
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
-        <element name="add" type="contact:addRemType"
-         minOccurs="0"/>
-        <element name="rem" type="contact:addRemType"
-         minOccurs="0"/>
         <element name="chg" type="contact:chgType"
          minOccurs="0"/>
-      </sequence>
-    </complexType>
-
-  <!--
-  Data elements that can be added or removed.
-  -->
-    <complexType name="addRemType">
-      <sequence>
-        <element name="status" type="contact:statusType"
-         maxOccurs="5"/>
       </sequence>
     </complexType>
 
@@ -241,7 +232,12 @@
          minOccurs="0"/>
         <element name="vat" type="contact:vatT"
 	 minOccurs="0"/>
-        <element name="ssn" type="contact:ssnUpdT"
+        <element name="ident" type="contact:identUpdT"
+	 minOccurs="0"/>
+	<!-- ssn element is obsolete and will be removed in future !!!
+	     Use ident element instead.
+	  -->
+        <element name="ssn" type="contact:identUpdT"
 	 minOccurs="0"/>
         <element name="notifyEmail" type="eppcom:minTokenType"
          minOccurs="0"/>
@@ -316,7 +312,7 @@
         <element name="id" type="fredcom:objIDType"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="contact:statusType"
-         maxOccurs="5"/>
+         minOccurs="0" maxOccurs="4"/>
         <element name="postalInfo" type="contact:postalInfoType"
          maxOccurs="2"/>
         <element name="voice" type="contact:e164StringType"
@@ -339,7 +335,7 @@
          minOccurs="0"/>
         <element name="vat" type="contact:vatT"
 	minOccurs="0"/>
-        <element name="ssn" type="contact:ssnT"
+        <element name="ident" type="contact:identT"
 	minOccurs="0"/>
         <element name="notifyEmail" type="eppcom:minTokenType"
 	minOccurs="0"/>
@@ -363,17 +359,8 @@
 
     <simpleType name="statusValueType">
       <restriction base="token">
-        <enumeration value="clientDeleteProhibited"/>
-        <enumeration value="clientTransferProhibited"/>
-        <enumeration value="clientUpdateProhibited"/>
-        <enumeration value="linked"/>
         <enumeration value="ok"/>
-	<!--
-        <enumeration value="pendingCreate"/>
-        <enumeration value="pendingDelete"/>
-        <enumeration value="pendingTransfer"/>
-        <enumeration value="pendingUpdate"/>
-	-->
+        <enumeration value="linked"/>
         <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
@@ -384,6 +371,30 @@
       <sequence>
         <element name="id" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  contact specific messages
+  -->
+    <element name="trnData" type="contact:handleDateT"/>
+
+    <complexType name="handleDateT">
+      <sequence>
+        <element name="id" type="fredcom:objIDType"/>
+        <element name="trDate" type="dateTime"/>
+        <element name="oldID" type="fredcom:objIDType"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  contact specific protocol extensions
+  -->
+    <element name="sendAuthInfo" type="contact:sendAuthInfoType"/>
+
+    <complexType name="sendAuthInfoType">
+      <sequence>
+        <element name="id" type="fredcom:objIDType"/>
       </sequence>
     </complexType>
 

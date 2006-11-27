@@ -88,7 +88,7 @@ get_attr(xmlNodePtr node, const char *name)
 
 	prop = node->properties;
 	while (prop != NULL) {
-		if (xmlStrEqual(prop->name, name)) {
+		if (xmlStrEqual(prop->name, BAD_CAST name)) {
 			return (char *) prop->children->content;
 		}
 		prop = prop->next;
@@ -334,67 +334,6 @@ xpath_get_attr(void *pool,
 
 	xmlXPathFreeObject(obj);
 	return attr_val;
-}
-
-/**
- * List is filled with values of attributes of elements described by xpath
- * expression (There may be more elements matching xpath expression). The
- * attributes are required to exist, otherwise xerr is set to error status.
- *
- * @param pool   Memory pool to allocate memory from.
- * @param list   Head of a list where the items will be added.
- * @param ctx    XPath context pointer.
- * @param expr   XPath expression which describes a xml node.
- * @param attr   Attribute name.
- * @param xerr   Error status of function (must be set to ok upon calling
- *               the function).
- * @return       If succesfull 1, in case of failure 0.
- */
-static void
-xpath_getn_attrs(void *pool,
-		qhead *list,
-		xmlXPathContextPtr ctx,
-		const char *expr,
-		const char *attr,
-		int *xerr)
-{
-	xmlXPathObjectPtr obj;
-	int	i;
-
-	obj = xmlXPathEvalExpression(BAD_CAST expr, ctx);
-	if (obj == NULL) {
-		*xerr = XERR_LIBXML;
-		return;
-	}
-
-	/* iterate through the results of search */
-	for (i = 0; i < xmlXPathNodeSetGetLength(obj->nodesetval); i++) {
-		char	*str;
-
-		str = get_attr(xmlXPathNodeSetItem(obj->nodesetval, i), attr);
-		/* attr must exist */
-		if (str == NULL) {
-			xmlXPathFreeObject(obj);
-			*xerr = XERR_CONSTR;
-			return;
-		}
-
-		/* copy value of attr */
-		str = epp_strdup(pool, str);
-		if (str == NULL) {
-			xmlXPathFreeObject(obj);
-			*xerr = XERR_ALLOC;
-			return;
-		}
-		if (q_add(pool, list, str)) {
-			xmlXPathFreeObject(obj);
-			*xerr = XERR_ALLOC;
-			return;
-		}
-	}
-
-	xmlXPathFreeObject(obj);
-	return;
 }
 /**
  * @}
@@ -802,7 +741,7 @@ parse_info(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 			goto error;
 		list = cdata->data;
 
-		cdata->type = EPP_LIST_DOMAIN;
+		cdata->type = EPP_LIST_NSSET;
 		return;
 	}
 
@@ -878,21 +817,24 @@ error:
 static void
 parse_poll(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
+	const char	*op;
 	char	*str;
 
 	/* get poll type - request or acknoledge */
-	if (get_attr(xpathCtx->node, "req") != NULL) {
+	op = get_attr(xpathCtx->node, "op");
+	assert(op != NULL);
+	if (!strcmp(op, "req")) {
 		epps_poll_req	*poll_req;
 
 		/* it is request */
-		if ((cdata->data = epp_calloc(pool, sizeof *poll_req)))
+		if ((cdata->data = epp_calloc(pool, sizeof *poll_req)) == NULL)
 			goto error;
 		cdata->type = EPP_POLL_REQ;
 		return;
 	}
 
 	/* it has to be acknowledge */
-	assert(get_attr(xpathCtx->node, "ack") != NULL);
+	assert(!strcmp(op, "ack"));
 
 	/* get value of attr msgID */
 	str = get_attr(xpathCtx->node, "msgID");
@@ -911,7 +853,7 @@ parse_poll(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 	else {
 		epps_poll_ack	*poll_ack;
 
-		if ((cdata->data = epp_calloc(pool, sizeof *poll_ack)))
+		if ((cdata->data = epp_calloc(pool, sizeof *poll_ack)) == NULL)
 			goto error;
 		poll_ack = cdata->data;
 
@@ -965,18 +907,17 @@ parse_create_domain(void *pool,
 	xpath_getn(pool, &create_domain->admin, xpathCtx, "domain:admin", &xerr);
 	CHK_XERR(xerr, error);
 	/* domain period handling is slightly more difficult */
-	str = xpath_get1(pool, xpathCtx, "domain:period", 0, &xerr);
+	str = xpath_get1(pool, xpathCtx, "domain:period[@unit='y']", 0, &xerr);
 	CHK_XERR(xerr, error);
-	if (str != NULL) {
-		int	years;
-
-		create_domain->period = atoi(str);
-		/* correct period value if given in years and not months */
-		years = xpath_count(xpathCtx, "domain:period[@unit='y']", &xerr);
+	create_domain->unit = TIMEUNIT_YEAR;
+	if (str == NULL) {
+		str = xpath_get1(pool, xpathCtx, "domain:period[@unit='m']",
+				0, &xerr);
 		CHK_XERR(xerr, error);
-		if (years)
-			create_domain->period *= 12;
+		create_domain->unit = TIMEUNIT_MONTH;
 	}
+	if (str != NULL)
+		create_domain->period = atoi(str);
 	else {
 		/*
 		 * value 0 means that the period was not given and default value
@@ -994,21 +935,21 @@ error:
 }
 
 /**
- * Routine converts string to ssn type.
+ * Routine converts string to ident type.
  *
  * @param str String to be compared and categorized.
- * @return If string is not matched, SSN_UNKNOWN is returned.
+ * @return If string is not matched, ident_UNKNOWN is returned.
  */
-static epp_ssnType
-string2ssntype(const char *str)
+static epp_identType
+string2identtype(const char *str)
 {
-	if (strcmp("op", str) == 0) return SSN_OP;
-	else if (strcmp("rc", str) == 0) return SSN_RC;
-	else if (strcmp("ico", str) == 0) return SSN_ICO;
-	else if (strcmp("mpsv", str) == 0) return SSN_MPSV;
-	else if (strcmp("passport", str) == 0) return SSN_PASSPORT;
+	if (strcmp("op", str) == 0) return ident_OP;
+	else if (strcmp("rc", str) == 0) return ident_RC;
+	else if (strcmp("ico", str) == 0) return ident_ICO;
+	else if (strcmp("mpsv", str) == 0) return ident_MPSV;
+	else if (strcmp("passport", str) == 0) return ident_PASSPORT;
 
-	return SSN_UNKNOWN;
+	return ident_UNKNOWN;
 }
 
 /**
@@ -1024,9 +965,7 @@ parse_create_contact(void *pool,
 		epp_command_data *cdata)
 {
 	epps_create_contact	*create_contact;
-	xmlXPathObjectPtr	 xpathObj;
 	int	xerr;
-	int	i;
 
 	RESET_XERR(xerr); /* clear value of errno */
 
@@ -1054,20 +993,41 @@ parse_create_contact(void *pool,
 	CHK_XERR(xerr, error);
 	create_contact->vat = xpath_get1(pool, xpathCtx, "contact:vat",0, &xerr);
 	CHK_XERR(xerr, error);
-	create_contact->ssn = xpath_get1(pool, xpathCtx, "contact:ssn",0, &xerr);
+	create_contact->ident = xpath_get1(pool, xpathCtx, "contact:ident",0, &xerr);
 	CHK_XERR(xerr, error);
-	create_contact->ssntype = SSN_UNKNOWN;
-	if (create_contact->ssn != NULL) {
+	create_contact->identtype = ident_UNKNOWN;
+	if (create_contact->ident != NULL) {
 		char	*str;
 
-		str = xpath_get_attr(pool, xpathCtx, "contact:ssn", "type", 1,
-				&xerr);
-		create_contact->ssntype = string2ssntype(str);
+		str = xpath_get_attr(pool, xpathCtx,
+				"contact:ident", "type", 1, &xerr);
+		CHK_XERR(xerr, error);
+		create_contact->identtype = string2identtype(str);
 		/*
 		 * schema and source code are out of sync if following error
 		 * occurs
 		 */
-		assert(create_contact->ssntype != SSN_UNKNOWN);
+		assert(create_contact->identtype != ident_UNKNOWN);
+	}
+	/* XXX Hack for obsolete "ssn" tag - to be removed in future */
+	if (create_contact->ident == NULL) {
+		create_contact->ident = xpath_get1(pool, xpathCtx,
+				"contact:ssn", 0, &xerr);
+		CHK_XERR(xerr, error);
+		create_contact->identtype = ident_UNKNOWN;
+		if (create_contact->ident != NULL) {
+			char	*str;
+
+			str = xpath_get_attr(pool, xpathCtx,
+					"contact:ssn", "type", 1, &xerr);
+			CHK_XERR(xerr, error);
+			create_contact->identtype = string2identtype(str);
+			/*
+			 * schema and source code is out of sync if following
+			 * assert does not hold
+			 */
+			assert(create_contact->identtype != ident_UNKNOWN);
+		}
 	}
 	/*
 	 * disclose flags - we don't interpret anyhow disclose flags, we just
@@ -1081,7 +1041,7 @@ parse_create_contact(void *pool,
 	else if (xerr == XERR_OK) {
 		char	*str;
 
-		str = get_attr(xpathCtx->node, "type");
+		str = get_attr(xpathCtx->node, "flag");
 		assert(str != NULL);
 		if (*str == '0') {
 			create_contact->discl.flag = 0;
@@ -1126,20 +1086,9 @@ parse_create_contact(void *pool,
 	/* address, change relative root */
 	xpath_chroot(xpathCtx, "contact:addr", 0, &xerr);
 	CHK_XERR(xerr, error);
-	xpathObj = xmlXPathEvalExpression(BAD_CAST "contact:street", xpathCtx);
-	if (xpathObj == NULL)
-		goto error;
-	/* parse streets */
-	for (i = 0; i < xmlXPathNodeSetGetLength(xpathObj->nodesetval); i++)
-	{
-		create_contact->pi.street[i] =
-				epp_strdup(pool, TEXT_CONTENT(xpathObj, i));
-		if (create_contact->pi.street[i] == NULL) {
-			xmlXPathFreeObject(xpathObj);
-			goto error;
-		}
-	}
-	xmlXPathFreeObject(xpathObj);
+	xpath_getn(pool, &create_contact->pi.streets, xpathCtx,
+			"contact:street", &xerr);
+	CHK_XERR(xerr, error);
 	create_contact->pi.city = xpath_get1(pool, xpathCtx,
 			"contact:city", 1, &xerr);
 	CHK_XERR(xerr, error);
@@ -1202,7 +1151,7 @@ parse_create_nsset(void *pool,
 		epp_ns	*ns;
 
 		/* allocate data structures */
-		if ((ns = epp_malloc(pool, sizeof *ns)) == NULL)
+		if ((ns = epp_calloc(pool, sizeof *ns)) == NULL)
 		{
 			xmlXPathFreeObject(xpathObj);
 			goto error;
@@ -1370,21 +1319,22 @@ parse_renew(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 	CHK_XERR(xerr, error);
 	renew->name = xpath_get1(pool, xpathCtx, "domain:name", 1, &xerr);
 	CHK_XERR(xerr, error);
-	renew->exDate = xpath_get1(pool, xpathCtx, "domain:curExpDate",1, &xerr);
+	renew->curExDate = xpath_get1(pool, xpathCtx,
+			"domain:curExpDate", 1, &xerr);
 	CHK_XERR(xerr, error);
 	/* domain period handling is slightly more difficult */
-	str = xpath_get1(pool, xpathCtx, "domain:period", 0, &xerr);
+	str = xpath_get1(pool, xpathCtx, "domain:period[@unit='y']", 0, &xerr);
 	CHK_XERR(xerr, error);
-	if (str != NULL) {
-		int	years;
-
-		renew->period = atoi(str);
+	renew->unit = TIMEUNIT_YEAR;
+	if (str == NULL) {
 		/* correct period value if given in years and not months */
-		years = xpath_count(xpathCtx, "domain:period[@unit='y']", &xerr);
+		str = xpath_get1(pool, xpathCtx, "domain:period[@unit='m']", 0,
+				&xerr);
 		CHK_XERR(xerr, error);
-		if (years)
-			renew->period *= 12;
+		renew->unit = TIMEUNIT_MONTH;
 	}
+	if (str != NULL)
+		renew->period = atoi(str);
 	else {
 		/*
 		 * value 0 means that the period was not given and default value
@@ -1451,9 +1401,6 @@ parse_update_domain(void *pool,
 		xpath_getn(pool, &update_domain->add_admin, xpathCtx,
 				"domain:admin", &xerr);
 		CHK_XERR(xerr, error);
-		xpath_getn_attrs(pool, &update_domain->add_status,
-				xpathCtx, "domain:status", "s", &xerr);
-		CHK_XERR(xerr, error);
 		xpathCtx->node = xpathCtx->node->parent;
 	}
 	else if (xerr == XERR_LIBXML)
@@ -1466,9 +1413,6 @@ parse_update_domain(void *pool,
 	if (xerr == XERR_OK) {
 		xpath_getn(pool, &update_domain->add_admin, xpathCtx,
 				"domain:admin", &xerr);
-		CHK_XERR(xerr, error);
-		xpath_getn_attrs(pool, &update_domain->add_status,
-				xpathCtx, "domain:status", "s", &xerr);
 		CHK_XERR(xerr, error);
 		xpathCtx->node = xpathCtx->node->parent;
 	}
@@ -1508,15 +1452,9 @@ parse_update_contact(void *pool,
 	update_contact = cdata->data;
 
 	/* get the update-contact data */
+	update_contact->id = xpath_get1(pool, xpathCtx, "contact:id", 1, &xerr);
+	CHK_XERR(xerr, error);
 
-	/* add data */
-	xpath_getn_attrs(pool, &update_contact->add_status, xpathCtx,
-			"contact:add/contact:status", "s", &xerr);
-	CHK_XERR(xerr, error);
-	/* rem data */
-	xpath_getn_attrs(pool, &update_contact->rem_status, xpathCtx,
-			"contact:rem/contact:status", "s", &xerr);
-	CHK_XERR(xerr, error);
 	/* chg data */
 	xpath_chroot(xpathCtx, "contact:chg", 0, &xerr);
 	if (xerr == XERR_LIBXML)
@@ -1527,15 +1465,16 @@ parse_update_contact(void *pool,
 		return;
 	}
 
-	/* the most difficult item comes first (ssn) */
-	update_contact->ssn = xpath_get1(pool, xpathCtx, "contact:ssn",0, &xerr);
+	/* the most difficult item comes first (ident) */
+	update_contact->ident = xpath_get1(pool, xpathCtx,
+			"contact:ident", 0, &xerr);
 	CHK_XERR(xerr, error);
-	update_contact->ssntype = SSN_UNKNOWN;
-	if (update_contact->ssn != NULL) {
+	update_contact->identtype = ident_UNKNOWN;
+	if (update_contact->ident != NULL) {
 		char	*str;
 
-		str = xpath_get_attr(pool, xpathCtx, "contact:ssn", "type", 1,
-				&xerr);
+		str = xpath_get_attr(pool, xpathCtx,
+				"contact:ident", "type", 1, &xerr);
 		CHK_XERR(xerr, error);
 		/*
 		 * attribute type might not be present, we have to explicitly
@@ -1543,7 +1482,7 @@ parse_update_contact(void *pool,
 		 */
 		if (str == NULL) {
 			if (new_error_item(pool, &cdata->errors,
-					errspec_contactUpdate_ssntype_missing))
+					errspec_contactUpdate_identtype_missing))
 				goto error;
 
 			cdata->rc = 2003;
@@ -1551,15 +1490,47 @@ parse_update_contact(void *pool,
 			return;
 		}
 
-		update_contact->ssntype = string2ssntype(str);
+		update_contact->identtype = string2identtype(str);
 		/*
 		 * schema and source code is out of sync if following
 		 * assert does not hold
 		 */
-		assert(update_contact->ssntype != SSN_UNKNOWN);
+		assert(update_contact->identtype != ident_UNKNOWN);
 	}
-	update_contact->id = xpath_get1(pool, xpathCtx, "contact:id", 1, &xerr);
-	CHK_XERR(xerr, error);
+	/* XXX Hack for obsolete "ssn" tag - to be removed in future */
+	if (update_contact->ident == NULL) {
+		update_contact->ident = xpath_get1(pool, xpathCtx,
+				"contact:ssn", 0, &xerr);
+		CHK_XERR(xerr, error);
+		update_contact->identtype = ident_UNKNOWN;
+		if (update_contact->ident != NULL) {
+			char	*str;
+
+			str = xpath_get_attr(pool, xpathCtx,
+					"contact:ssn", "type", 1, &xerr);
+			CHK_XERR(xerr, error);
+			/*
+			 * attribute type might not be present, we have to explicitly
+			 * check it
+			 */
+			if (str == NULL) {
+				if (new_error_item(pool, &cdata->errors,
+						errspec_contactUpdate_identtype_missing))
+					goto error;
+
+				cdata->rc = 2003;
+				cdata->type = EPP_DUMMY;
+				return;
+			}
+
+			update_contact->identtype = string2identtype(str);
+			/*
+			 * schema and source code is out of sync if following
+			 * assert does not hold
+			 */
+			assert(update_contact->identtype != ident_UNKNOWN);
+		}
+	}
 	update_contact->authInfo = xpath_get1(pool, xpathCtx,
 			"contact:authInfo", 0, &xerr);
 	CHK_XERR(xerr, error);
@@ -1587,7 +1558,7 @@ parse_update_contact(void *pool,
 	else if (xerr == XERR_OK) {
 		char	*str;
 
-		str = get_attr(xpathCtx->node, "type");
+		str = get_attr(xpathCtx->node, "flag");
 		assert(str != NULL);
 		if (*str == '0') {
 			update_contact->discl.flag = 0;
@@ -1638,9 +1609,6 @@ parse_update_contact(void *pool,
 		xpath_chroot(xpathCtx, "contact:addr", 0, &xerr);
 		if (xerr == XERR_LIBXML) goto error;
 		else if (xerr == XERR_OK) {
-			xmlXPathObjectPtr	xpathObj;
-			int	i;
-
 			update_contact->pi->city = xpath_get1(pool, xpathCtx,
 						"contact:city", 0, &xerr);
 			CHK_XERR(xerr, error);
@@ -1654,20 +1622,9 @@ parse_update_contact(void *pool,
 						"contact:cc", 0, &xerr);
 			CHK_XERR(xerr, error);
 
-			xpathObj = xmlXPathEvalExpression(BAD_CAST
-					"contact:street", xpathCtx);
-			if (xpathObj == NULL)
-				goto error;
-			for (i = 0; i < xmlXPathNodeSetGetLength(xpathObj->nodesetval); i++)
-			{
-				update_contact->pi->street[i] = epp_strdup(pool,
-						TEXT_CONTENT(xpathObj, i));
-				if (update_contact->pi->street[i] == NULL) {
-					xmlXPathFreeObject(xpathObj);
-					goto error;
-				}
-			}
-			xmlXPathFreeObject(xpathObj);
+			xpath_getn(pool, &update_contact->pi->streets, xpathCtx,
+					"contact:street", &xerr);
+			CHK_XERR(xerr, error);
 		}
 		else RESET_XERR(xerr); /* clear value of errno */
 	}
@@ -1719,9 +1676,6 @@ parse_update_nsset(void *pool,
 		xpath_getn(pool, &update_nsset->rem_tech, xpathCtx,
 				"nsset:tech", &xerr);
 		CHK_XERR(xerr, error);
-		xpath_getn_attrs(pool, &update_nsset->rem_status, xpathCtx,
-				"nsset:status", "s", &xerr);
-		CHK_XERR(xerr, error);
 		xpath_getn(pool, &update_nsset->rem_ns, xpathCtx,
 				"nsset:name", &xerr);
 		CHK_XERR(xerr, error);
@@ -1737,9 +1691,6 @@ parse_update_nsset(void *pool,
 		xpath_getn(pool, &update_nsset->add_tech, xpathCtx,
 				"nsset:tech", &xerr);
 		CHK_XERR(xerr, error);
-		xpath_getn_attrs(pool, &update_nsset->add_status, xpathCtx,
-				"nsset:status", "s", &xerr);
-		CHK_XERR(xerr, error);
 		/* add ns */
 		xpathObj = xmlXPathEvalExpression(BAD_CAST "nsset:ns", xpathCtx);
 		if (xpathObj == NULL)
@@ -1752,7 +1703,7 @@ parse_update_nsset(void *pool,
 			epp_ns	*ns;
 
 			/* allocate and initialize data structures */
-			if ((ns = epp_malloc(pool, sizeof *ns)) == NULL) {
+			if ((ns = epp_calloc(pool, sizeof *ns)) == NULL) {
 				xmlXPathFreeObject(xpathObj);
 				goto error;
 			}
@@ -1941,6 +1892,73 @@ error:
 	cdata->type = EPP_DUMMY;
 }
 
+static void
+parse_sendAuthInfo(void *pool,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	epps_sendAuthInfo	*sendAuthInfo;
+	int	xerr;
+
+	cdata->data = epp_calloc(pool, sizeof *sendAuthInfo);
+	if (cdata->data == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	sendAuthInfo = cdata->data;
+
+	/* get object type - domain, contact or nsset */
+	RESET_XERR(xerr); /* clear value of errno */
+	xpath_chroot(xpathCtx, "domain:sendAuthInfo", 0, &xerr);
+	if (xerr == XERR_OK) {
+		sendAuthInfo->id = xpath_get1(pool, xpathCtx,
+				"domain:name", 1, &xerr);
+		CHK_XERR(xerr, error);
+		cdata->type = EPP_SENDAUTHINFO_DOMAIN;
+		return;
+	}
+	else if (xerr == XERR_LIBXML)
+		goto error;
+	else
+		RESET_XERR(xerr);
+
+	xpath_chroot(xpathCtx, "contact:sendAuthInfo", 0, &xerr);
+	if (xerr == XERR_OK) {
+		sendAuthInfo->id = xpath_get1(pool, xpathCtx,
+				"contact:name", 1, &xerr);
+		CHK_XERR(xerr, error);
+		cdata->type = EPP_SENDAUTHINFO_CONTACT;
+		return;
+	}
+	else if (xerr == XERR_LIBXML)
+		goto error;
+	else
+		RESET_XERR(xerr);
+
+	xpath_chroot(xpathCtx, "nsset:sendAuthInfo", 0, &xerr);
+	if (xerr == XERR_OK) {
+		sendAuthInfo->id = xpath_get1(pool, xpathCtx,
+				"nsset:name", 1, &xerr);
+		CHK_XERR(xerr, error);
+		cdata->type = EPP_SENDAUTHINFO_NSSET;
+		return;
+	}
+	else if (xerr == XERR_LIBXML)
+		goto error;
+	else
+		RESET_XERR(xerr);
+
+	/* unexpected object type (should not happen) */
+	cdata->rc = 2000;
+	cdata->type = EPP_DUMMY;
+	return;
+
+error:
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
 /**
  * Parser of enumval extension in context of create domain command.
  *
@@ -1964,7 +1982,7 @@ parse_ext_enumval_create(void *pool,
 		return;
 	}
 
-	if ((ext_item = epp_malloc(pool, sizeof *ext_item)) == NULL)
+	if ((ext_item = epp_calloc(pool, sizeof *ext_item)) == NULL)
 		goto error;
 
 	create_domain = cdata->data;
@@ -2005,7 +2023,7 @@ parse_ext_enumval_update(void *pool,
 		return;
 	}
 
-	if ((ext_item = epp_malloc(pool, sizeof *ext_item)) == NULL)
+	if ((ext_item = epp_calloc(pool, sizeof *ext_item)) == NULL)
 		goto error;
 
 	update_domain = cdata->data;
@@ -2046,7 +2064,7 @@ parse_ext_enumval_renew(void *pool,
 		return;
 	}
 
-	if ((ext_item = epp_malloc(pool, sizeof *ext_item)) == NULL)
+	if ((ext_item = epp_calloc(pool, sizeof *ext_item)) == NULL)
 		goto error;
 
 	renew = cdata->data;
@@ -2064,6 +2082,237 @@ error:
 	cdata->type = EPP_DUMMY;
 }
 
+static parser_status
+parse_command(void *pool,
+		int session,
+		epp_command_data *cdata,
+		xmlXPathContextPtr xpathCtx)
+{
+	epp_red_command_type	 cmd;
+	xmlXPathObjectPtr	 xpathObj;
+	xmlNodePtr	 node;
+	int	 xerr;
+
+	/* backup relative root for later processing of clTRID and extensions */
+	node = xpathCtx->node;
+
+	/*
+	 * command recognition part
+	 */
+	xpathObj = xmlXPathEvalExpression(BAD_CAST "epp:*[position()=1]",
+			xpathCtx);
+	if (xpathObj == NULL)
+		return PARSER_EINTERNAL;
+
+	assert(xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1);
+
+	/* command lookup through hash table .. huraaa :) */
+	cmd = cmd_hash_lookup( (char *)
+			xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->name);
+	/* change relative root to command's node */
+	xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
+	xmlXPathFreeObject(xpathObj);
+
+	/*
+	 * Do validity checking for following cases:
+	 * 	- the user is not logged in and attempts to issue a command
+	 * 	- the user is already logged in and issues another login
+	 */
+	if ((cmd != EPP_RED_LOGIN && session == 0) ||
+		(cmd == EPP_RED_LOGIN && session != 0))
+	{
+		cdata->type = EPP_DUMMY;
+		cdata->rc = 2002;
+		return PARSER_CMD_OTHER;
+	}
+
+	switch (cmd) {
+		case EPP_RED_LOGIN:
+			parse_login(pool, xpathCtx, cdata);
+			break;
+		case EPP_RED_LOGOUT:
+			/*
+			 * logout is so simple that we don't use dedicated
+			 * parsing function
+			 */
+			if (session == 0) {
+				cdata->rc = 2002;
+				cdata->type = EPP_DUMMY;
+			}
+			else {
+				cdata->type = EPP_LOGOUT;
+			}
+			break;
+		case EPP_RED_CHECK:
+			parse_check(pool, xpathCtx, cdata);
+			break;
+		case EPP_RED_INFO:
+			parse_info(pool, xpathCtx, cdata);
+			break;
+		case EPP_RED_POLL:
+			parse_poll(pool, xpathCtx, cdata);
+			break;
+		case EPP_RED_CREATE:
+			parse_create(pool, xpathCtx, cdata);
+			break;
+		case EPP_RED_DELETE:
+			parse_delete(pool, xpathCtx, cdata);
+			break;
+		case EPP_RED_RENEW:
+			parse_renew(pool, xpathCtx, cdata);
+			break;
+		case EPP_RED_UPDATE:
+			parse_update(pool, xpathCtx, cdata);
+			break;
+		case EPP_RED_TRANSFER:
+			parse_transfer(pool, xpathCtx, cdata);
+			break;
+		case EPP_RED_UNKNOWN_CMD:
+		default:
+			cdata->rc = 2000; /* "Unknown command" */
+			cdata->type = EPP_DUMMY;
+			break;
+	}
+
+	/* parse command extensions only if error did not occur */
+	if (cdata->type != EPP_DUMMY) {
+		int	i;
+
+		/* restore relative root */
+		xpathCtx->node = node;
+
+		xpathObj = xmlXPathEvalExpression(BAD_CAST "epp:extension/*",
+				xpathCtx);
+		if (xpathObj == NULL) {
+			return PARSER_EINTERNAL;
+		}
+		/* iterate through extensions */
+		for (i = 0; i < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
+				i++)
+		{
+			const char	*ext_name;
+			const char	*ext_ns;
+			xmlNodePtr	 ext_node;
+
+			ext_node = xmlXPathNodeSetItem(xpathObj->nodesetval, i);
+			xpathCtx->node = ext_node;
+			ext_ns   = (ext_node->ns) ?
+				(char *) ext_node->ns->href : NULL;
+			if (ext_ns == NULL)
+				continue;
+			if (!strcmp(ext_ns, NS_ENUMVAL)) {
+				ext_name = (char *) ext_node->name;
+				if (!strcmp(ext_name, "create"))
+					parse_ext_enumval_create(pool, xpathCtx,
+							cdata);
+				else if (!strcmp(ext_name, "update"))
+					parse_ext_enumval_update(pool, xpathCtx,
+							cdata);
+				else if (!strcmp(ext_name, "renew"))
+					parse_ext_enumval_renew(pool, xpathCtx,
+							cdata);
+				else {
+					/* unknown enumval command */
+					xmlXPathFreeObject(xpathObj);
+					cdata->rc = 2000; /* "Unknown command" */
+					cdata->type = EPP_DUMMY;
+					break;
+				}
+			}
+			else {
+				/* unknown extension */
+				xmlXPathFreeObject(xpathObj);
+				cdata->rc = 2000; /* "Unknown command" */
+				cdata->type = EPP_DUMMY;
+				break;
+			}
+		}
+	}
+
+	/* restore relative root */
+	xpathCtx->node = node;
+
+	RESET_XERR(xerr); /* clear value of errno */
+	cdata->clTRID = xpath_get1(pool, xpathCtx, "epp:clTRID", 0, &xerr);
+	if (xerr != XERR_OK) {
+		return PARSER_EINTERNAL;
+	}
+
+	/* return code corection */
+	if (cdata->type == EPP_LOGIN)
+		return PARSER_CMD_LOGIN;
+	else if (cdata->type == EPP_LOGOUT)
+		return PARSER_CMD_LOGOUT;
+
+	return PARSER_CMD_OTHER;
+}
+
+static parser_status
+parse_extension(void *pool,
+		epp_command_data *cdata,
+		xmlXPathContextPtr xpathCtx)
+{
+	xmlNodePtr	 node;
+	int	 xerr;
+	const char	*elemname;
+
+	RESET_XERR(xerr); /* clear value of errno */
+	xpath_chroot(xpathCtx, "fred:extcommand", 0, &xerr);
+	if (xerr == XERR_LIBXML) {
+		return PARSER_EINTERNAL;
+	}
+	else if (xerr == XERR_CONSTR) {
+		/* unknown extension */
+		cdata->rc = 2000; /* "Unknown command" */
+		cdata->type = EPP_DUMMY;
+		return PARSER_CMD_OTHER;
+	}
+
+	/* backup relative root for later processing of clTRID */
+	node = xpathCtx->node;
+
+	/*
+	 * command recognition part
+	 */
+	xpath_chroot(xpathCtx, "fred:*[position()=1]", 0, &xerr);
+	if (xerr == XERR_LIBXML) {
+		return PARSER_EINTERNAL;
+	}
+	assert(xerr == XERR_OK);
+
+	elemname = (char *) xpathCtx->node->name;
+
+	switch (elemname[0]) {
+		case 's':
+			/* It is sendAuthInfo */
+			if (!strcmp(elemname, "sendAuthInfo")) {
+				parse_sendAuthInfo(pool, xpathCtx, cdata);
+				break;
+			}
+			/* fall-through if not matched */
+		case 'c':
+			/* It is cashInfo */
+			if (!strcmp(elemname, "cashInfo")) {
+				break;
+			}
+			/* fall-through if not matched */
+		default:
+			cdata->rc = 2000; /* "Unknown command" */
+			cdata->type = EPP_DUMMY;
+			break;
+	}
+
+	/* restore relative root */
+	xpathCtx->node = node;
+
+	cdata->clTRID = xpath_get1(pool, xpathCtx, "fred:clTRID", 0, &xerr);
+	if (xerr != XERR_OK) {
+		return PARSER_EINTERNAL;
+	}
+
+	return PARSER_CMD_OTHER;
+}
+
 parser_status
 epp_parse_command(void *pool,
 		int session,
@@ -2074,12 +2323,11 @@ epp_parse_command(void *pool,
 {
 	xmlXPathContextPtr	 xpathCtx;
 	xmlXPathObjectPtr	 xpathObj;
-	xmlNodePtr	 node;
 	epp_command_data	*cdata;
-	epp_red_command_type	 cmd;
 	xmlDocPtr	 doc;
 	valid_status	 val_ret;
-	int	 xerr, is_hello;
+	parser_status	 ret;
+	const char	*elemname;
 
 	/* check input parameters */
 	assert(pool != NULL);
@@ -2151,6 +2399,8 @@ epp_parse_command(void *pool,
 			BAD_CAST NS_DOMAIN) ||
 		xmlXPathRegisterNs(xpathCtx, BAD_CAST "nsset",
 			BAD_CAST NS_NSSET) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "fred",
+			BAD_CAST NS_FRED) ||
 #ifdef SECDNS_ENABLE
 #error "It is a terible error to enable SECDNS before code correction!"
 		xmlXPathRegisterNs(xpathCtx, BAD_CAST "secdns",
@@ -2164,200 +2414,68 @@ epp_parse_command(void *pool,
 		return PARSER_EINTERNAL;
 	}
 
-	/*
-	 * if it is a <hello> frame, we will send greeting and return.
-	 * This serves also to another purpose - relative root in xpath
-	 * context is initialized.
-	 */
-	RESET_XERR(xerr);
-	is_hello = xpath_count(xpathCtx, "/epp:epp/epp:hello", &xerr);
-	if (xerr != XERR_OK) {
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
-	}
-	if (is_hello) {
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_HELLO;
-	}
-
-	/* set relative root of xpath context */
-	xpath_chroot(xpathCtx, "/epp:epp/epp:command", 0, &xerr);
-	if (xerr == XERR_LIBXML) {
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
-	}
-	else if (xerr == XERR_CONSTR) {
-		/*
-		 * not all documents which are valid are commands (e.g. greeting,
-		 * response, extension). EPP standard does not describe any error
-		 * which should be returned in that case. Therefore we will
-		 * silently close connection in that case.
-		 */
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_NOT_COMMAND;
-	}
-
-	/* backup relative root for later processing of clTRID and extensions */
-	node = xpathCtx->node;
-
-	/*
-	 * command recognition part
-	 */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST "*[position()=1]", xpathCtx);
+	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:*", xpathCtx);
 	if (xpathObj == NULL) {
 		xmlXPathFreeContext(xpathCtx);
 		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
 	assert(xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1);
-
-	/* command lookup through hash table .. huraaa :) */
-	cmd = cmd_hash_lookup( (char *)
-			xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->name);
-	/* change relative root to command's node */
 	xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
 	xmlXPathFreeObject(xpathObj);
+	elemname = (char *) xpathCtx->node->name;
 
 	/*
-	 * Do validity checking for following cases:
-	 * 	- the user is not logged in and attempts to issue a command
-	 * 	- the user is already logged in and issues another login
+	 * See what we have. <hello>, <command>, <extension> are admittable.
+	 * NOTE: Recognition is optimized, we exploit the difference in first
+	 * letter of valid elements.
 	 */
-	if ((cmd != EPP_RED_LOGIN && session == 0) ||
-		(cmd == EPP_RED_LOGIN && session != 0))
-	{
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		cdata->type = EPP_DUMMY;
-		cdata->rc = 2002;
-		return PARSER_CMD_OTHER;
-	}
-
-	switch (cmd) {
-		case EPP_RED_LOGIN:
-			parse_login(pool, xpathCtx, cdata);
-			break;
-		case EPP_RED_LOGOUT:
-			/*
-			 * logout is so simple that we don't use dedicated
-			 * parsing function
-			 */
-			if (session == 0) {
-				cdata->rc = 2002;
-				cdata->type = EPP_DUMMY;
-			}
-			else {
-				cdata->type = EPP_LOGOUT;
-			}
-			break;
-		case EPP_RED_CHECK:
-			parse_check(pool, xpathCtx, cdata);
-			break;
-		case EPP_RED_INFO:
-			parse_info(pool, xpathCtx, cdata);
-			break;
-		case EPP_RED_POLL:
-			parse_poll(pool, xpathCtx, cdata);
-			break;
-		case EPP_RED_CREATE:
-			parse_create(pool, xpathCtx, cdata);
-			break;
-		case EPP_RED_DELETE:
-			parse_delete(pool, xpathCtx, cdata);
-			break;
-		case EPP_RED_RENEW:
-			parse_renew(pool, xpathCtx, cdata);
-			break;
-		case EPP_RED_UPDATE:
-			parse_update(pool, xpathCtx, cdata);
-			break;
-		case EPP_RED_TRANSFER:
-			parse_transfer(pool, xpathCtx, cdata);
-			break;
-		case EPP_RED_UNKNOWN_CMD:
-		default:
-			cdata->rc = 2000; /* "Unknown command" */
-			cdata->type = EPP_DUMMY;
-			break;
-	}
-
-	/* parse command extensions only if error did not occur */
-	if (cdata->type != EPP_DUMMY) {
-		int	i;
-
-		/* restore relative root */
-		xpathCtx->node = node;
-
-		xpathObj = xmlXPathEvalExpression(BAD_CAST "extension/*",
-				xpathCtx);
-		if (xpathObj == NULL) {
-			xmlXPathFreeContext(xpathCtx);
-			xmlFreeDoc(doc);
-			return PARSER_EINTERNAL;
-		}
-		/* iterate through extensions */
-		for (i = 0; i < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
-				i++)
-		{
-			const char	*ext_name;
-			const char	*ext_ns;
-			xmlNodePtr	 ext_node;
-
-			ext_node = xmlXPathNodeSetItem(xpathObj->nodesetval, i);
-			xpathCtx->node = ext_node;
-			ext_ns   = (ext_node->ns) ? (char *) ext_node->ns->href : NULL;
-			if (ext_ns == NULL)
-				continue;
-			if (!strcmp(ext_ns, NS_ENUMVAL)) {
-				ext_name = ext_node->name;
-				if (!strcmp(ext_name, "create"))
-					parse_ext_enumval_create(pool, xpathCtx,
-							cdata);
-				else if (!strcmp(ext_name, "update"))
-					parse_ext_enumval_update(pool, xpathCtx,
-							cdata);
-				else if (!strcmp(ext_name, "renew"))
-					parse_ext_enumval_renew(pool, xpathCtx,
-							cdata);
-				else {
-					/* unknown enumval command */
-					xmlXPathFreeObject(xpathObj);
-					cdata->rc = 2000; /* "Unknown command" */
-					cdata->type = EPP_DUMMY;
-					break;
-				}
-			}
-			else {
-				/* unknown extension */
-				xmlXPathFreeObject(xpathObj);
-				cdata->rc = 2000; /* "Unknown command" */
-				cdata->type = EPP_DUMMY;
+	switch (elemname[0]) {
+		case 'h':
+			/* It is a <hello> element. */
+			if (!strcmp(elemname, "hello")) {
+				ret = PARSER_HELLO;
 				break;
 			}
-		}
-	}
-
-	/* restore relative root */
-	xpathCtx->node = node;
-
-	cdata->clTRID = xpath_get1(pool, xpathCtx, "epp:clTRID", 0, &xerr);
-	if (xerr != XERR_OK) {
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
-		return PARSER_EINTERNAL;
+			/* fall through if not matched */
+		case 'c':
+			/* It is a <command> element. */
+			if (!strcmp(elemname, "command")) {
+				ret = parse_command(pool, session, cdata,
+						xpathCtx);
+				break;
+			}
+			/* fall through if not matched */
+		case 'e':
+			/* It is an <extension> element. */
+			if (!strcmp(elemname, "extension")) {
+				if (session == 0) {
+					cdata->type = EPP_DUMMY;
+					cdata->rc = 2002;
+					ret = PARSER_CMD_OTHER;
+				}
+				else {
+					ret = parse_extension(pool, cdata,
+							xpathCtx);
+				}
+				break;
+			}
+			/* fall through if not matched */
+		default:
+			/*
+			 * not all documents which are valid are commands
+			 * (e.g. greeting and response). EPP standard does
+			 * not describe any error which should be returned in
+			 * that case. Therefore we will silently close
+			 * connection in that case.
+			 */
+			ret = PARSER_NOT_COMMAND;
+			break;
 	}
 
 	xmlXPathFreeContext(xpathCtx);
 	xmlFreeDoc(doc);
-
-	if (cdata->type == EPP_LOGIN) return PARSER_CMD_LOGIN;
-	if (cdata->type == EPP_LOGOUT) return PARSER_CMD_LOGOUT;
-
-	return PARSER_CMD_OTHER;
+	return ret;
 }
 
 /* vim: set ts=8 sw=8: */

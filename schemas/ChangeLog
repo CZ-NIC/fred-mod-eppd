@@ -1,3 +1,33 @@
+2006-11-13 Jan Kryl
+
+	* Oprava typu registranta u domeny v updatu.
+
+	* Pridani "object-specific protocol extensionu" do schemat objektu.
+	Je to prikaz pro zaslani authInfa klientovi (soucast noveho zpusobu
+	transferu).
+
+	* Vybudovani zazemi pro ruzna rozsireni EPP ne na urovni existujicich
+	prikazu ale na urovni protokolu. Tato rozsireni budou definovat nove
+	operace nad objekty, ktere nebyly definovany v EPP standardu.
+	Rozsireni maji podobnou strukturu jako standardni prikazy (napr.
+	obsahuji clTRID udaj). Tento rozsirujici framework je definovan ve
+	schematu fred-1.0.xsd.
+
+	* Pridani "object-specific" zprav do schemat objektu, zatim je to
+	jen zprava o probehlem transferu.
+
+	* Zruseni statusu nastavovanych klientem a tim padem i zruseni
+	mechanismu pro jejich nastaveni.
+
+	* Prejmenovani ssn elementu na ident. Element ssn je i nadale
+	pripustny, ale je oznacen jako "obsolete" a v budoucnu bude odebran.
+	Vyznam a struktura tagu zustala zachovana.
+
+	* Zpovinneni technickeho kontaktu pri vytvareni nssetu a zrovna tak
+	v odpovedi na info.
+
+	* ExDate u domeny uz neni typ datetime ale pouze date.
+
 2006-10-31 Jan Kryl (version 1.2.0)
 
 	* Z povineni authInfo elementu pri transferech objektu. Nepredstavuje

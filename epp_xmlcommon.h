@@ -16,6 +16,8 @@
 #define NS_DOMAIN	"http://www.nic.cz/xml/epp/domain-1.0"
 /** Our custom namespace used for nsset object */
 #define NS_NSSET	"http://www.nic.cz/xml/epp/nsset-1.0"
+/** Our custom namespace used for extensions definition */
+#define NS_FRED	"http://www.nic.cz/xml/epp/fred-1.0"
 /** Standard namespace used for secDNS extension (currently not used) */
 #define NS_SECDNS	"urn:ietf:params:xml:ns:secDNS-1.0"
 /** Our custom namespace used for enum validation extension */
@@ -28,6 +30,8 @@
 #define LOC_DOMAIN	NS_DOMAIN " domain-1.0.xsd"
 /** Namespace + location of nsset xml schema */
 #define LOC_NSSET	NS_NSSET " nsset-1.0.xsd"
+/** Namespace + location of fred xml schema */
+#define LOC_FRED	NS_FRED " fred-1.0.xsd"
 /** Namespace + location of secDNS xml schema */
 #define LOC_SECDNS	NS_SECDNS " secDNS-1.0.xsd"
 /** Namespace + location of enumval xml schema */

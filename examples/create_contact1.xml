@@ -26,9 +26,7 @@
 	<contact:voice>+1.7035555555</contact:voice>
         <contact:fax>+1.7035555556</contact:fax>
         <contact:email>jdoe@example.com</contact:email>   
-	<contact:authInfo>
-		<contact:pw>hloupeAuthinfo</contact:pw>
-	</contact:authInfo>   
+	<contact:authInfo>hloupeAuthinfo</contact:authInfo>   
         <contact:disclose flag="0">
           <contact:name/>
           <contact:org/>
@@ -38,7 +36,7 @@
           <contact:email/>
         </contact:disclose>
         <contact:vat>7035555556</contact:vat>
-        <contact:ssn type="passport">8888888856</contact:ssn>
+        <contact:ident type="passport">8888888856</contact:ident>
         <contact:notifyEmail>jdoe.notify@example.com</contact:notifyEmail>   
       </contact:create>
     </create>

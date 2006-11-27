@@ -1,3 +1,19 @@
+version 1.3.0
+
+	* New reference manager mod_corba was added, mod_eppd was adapted
+	to changed reference management policy. Now each connection has
+	its own unique CORBA reference.
+
+	* As a side effect of changes in reference management code, the
+	apache can be started without omninames running. The object references
+	are obtained and resolved upon request arrival.
+
+	* Handling of period in renew and create was changed. The period
+	is now structured as 'value' and 'unit'. No conversion to months
+	is done on behalf of mod_eppd.
+
+	* Support for update of status flags was removed.
+
 version 1.2.0
 
 	* New memory allocator. Memory is now allocated from pools and freed

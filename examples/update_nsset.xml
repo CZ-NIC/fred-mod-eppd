@@ -9,27 +9,23 @@
        xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.0"
        xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.0
        nsset-1.0.xsd">
-        <nsset:id>exampleNsset</nsset:id>
-		<nsset:add>
-			<nsset:ns>
-				<nsset:name>ns99.bazmek.net</nsset:name>
-				<nsset:addr>194.23.54.1</nsset:addr>
-			</nsset:ns>
-			<nsset:tech>jouda</nsset:tech>
-			<nsset:status s="clientDeleteProhibited" />
-		</nsset:add>
-		<nsset:rem>
-			<nsset:name>ns1.bazmek.net</nsset:name>
-			<nsset:tech>regcontact2</nsset:tech>
-			<nsset:status s="clientUpdateProhibited" />
-		</nsset:rem>
-		<nsset:chg>
-			<nsset:authInfo>
-				<nsset:pw>blebleble</nsset:pw>
-			</nsset:authInfo>
-		</nsset:chg>
+        <nsset:id>NSSID:exampleNsset</nsset:id>
+	<nsset:add>
+		<nsset:ns>
+			<nsset:name>ns99.bazmek.net</nsset:name>
+			<nsset:addr>194.23.54.1</nsset:addr>
+		</nsset:ns>
+		<nsset:tech>jouda</nsset:tech>
+	</nsset:add>
+	<nsset:rem>
+		<nsset:name>ns1.bazmek.net</nsset:name>
+		<nsset:tech>regcontact2</nsset:tech>
+	</nsset:rem>
+	<nsset:chg>
+		<nsset:authInfo>blebleble</nsset:authInfo>
+	</nsset:chg>
       </nsset:update>
     </update>
     <clTRID>ABC-12345</clTRID>
-  </command> 
+  </command>
 </epp>

@@ -141,8 +141,6 @@
       <sequence>
         <element name="admin" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
-        <element name="status" type="domain:statusType"
-         minOccurs="0" maxOccurs="8"/>
       </sequence>
     </complexType>
 
@@ -154,7 +152,7 @@
       <sequence>
         <element name="nsset" type="fredcom:objIDChgType"
          minOccurs="0"/>
-        <element name="registrant" type="eppcom:clIDType"
+        <element name="registrant" type="fredcom:objIDType"
          minOccurs="0"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
@@ -216,7 +214,7 @@
       <sequence>
         <element name="name" type="eppcom:labelType"/>
         <element name="crDate" type="dateTime"/>
-        <element name="exDate" type="dateTime"
+        <element name="exDate" type="date"
          minOccurs="0"/>
       </sequence>
     </complexType>
@@ -229,7 +227,7 @@
         <element name="name" type="eppcom:labelType"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="domain:statusType"
-         minOccurs="0" maxOccurs="8"/>
+         minOccurs="0" maxOccurs="4"/>
 	<!--
 	optional registrant is hack for hiding indentity of e164
 	number holder
@@ -249,7 +247,7 @@
          minOccurs="0"/>
         <element name="upDate" type="dateTime"
          minOccurs="0"/>
-        <element name="exDate" type="dateTime"
+        <element name="exDate" type="date"
          minOccurs="0"/>
         <element name="trDate" type="dateTime"
          minOccurs="0"/>
@@ -275,11 +273,8 @@
 
     <simpleType name="statusValueType">
       <restriction base="token">
-        <enumeration value="clientDeleteProhibited"/>
-        <enumeration value="clientRenewProhibited"/>
-        <enumeration value="clientTransferProhibited"/>
-        <enumeration value="clientUpdateProhibited"/>
         <enumeration value="ok"/>
+        <enumeration value="serverHold"/>
         <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverRenewProhibited"/>
         <enumeration value="serverTransferProhibited"/>
@@ -293,7 +288,7 @@
     <complexType name="renDataType">
       <sequence>
         <element name="name" type="eppcom:labelType"/>
-        <element name="exDate" type="dateTime"
+        <element name="exDate" type="date"
          minOccurs="0"/>
       </sequence>
     </complexType>
@@ -302,6 +297,30 @@
       <sequence>
         <element name="name" type="eppcom:labelType"
          minOccurs="0" maxOccurs="unbounded"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  domain specific messages
+  -->
+    <element name="trnData" type="domain:handleDateT"/>
+
+    <complexType name="handleDateT">
+      <sequence>
+        <element name="name" type="eppcom:labelType"/>
+        <element name="trDate" type="dateTime"/>
+        <element name="oldID" type="fredcom:objIDType"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  domain specific protocol extensions
+  -->
+    <element name="sendAuthInfo" type="domain:sendAuthInfoType"/>
+
+    <complexType name="sendAuthInfoType">
+      <sequence>
+        <element name="name" type="eppcom:labelType"/>
       </sequence>
     </complexType>
 

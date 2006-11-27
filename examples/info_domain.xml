@@ -7,11 +7,10 @@
     <domain:info xmlns:domain="http://www.nic.cz/xml/epp/domain-1.0"
 	    xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.0
 	    domain-1.0.xsd">
-        <domain:name>emple.cz</domain:name>
+        <domain:name>super.cz</domain:name>
       </domain:info>
     </info>
     <clTRID>ABC-12346</clTRID>
   </command>
 </epp>
-
 

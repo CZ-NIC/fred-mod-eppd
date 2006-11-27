@@ -14,9 +14,7 @@
         <domain:nsset>exampleNsset</domain:nsset>
         <domain:registrant>jouda</domain:registrant>
         <domain:admin>regcontact</domain:admin>
-        <domain:authInfo>
-          <domain:pw>2fooBAR</domain:pw>
-        </domain:authInfo>
+        <domain:authInfo>2fooBAR</domain:authInfo>
       </domain:create>
     </create>
     <extension>

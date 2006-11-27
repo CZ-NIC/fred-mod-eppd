@@ -17,39 +17,39 @@
        xmlns:secdns="urn:ietf:params:xml:ns:secDNS-1.0"
        xsi:schemaLocation="urn:ietf:params:xml:ns:secDNS-1.0
        secDNS-1.0.xsd">
-		 <secdns:add>
+	 <secdns:add>
            <secdns:dsData>
-			 <secdns:keyTag>3</secdns:keyTag>
-			 <secdns:alg>1</secdns:alg>
-			 <secdns:digestType>1</secdns:digestType>
-			 <secdns:digest>aaa12409aaaaa098</secdns:digest>
-		   </secdns:dsData>
-		 </secdns:add>
-		 <!--
-		 POZOR pri updatu dnssecu muze byt pouzity pouze jeden z "add",
-		 "rem", "chg", nikoliv 2 nebo 3 zaroven - to je nestandardni lec
-		 vyzadovano schematem. Dale je uvedeno jak by vypadal zapis pro "rem"
-		 a "chg".
-		 -->
-		 <!--
+		 <secdns:keyTag>3</secdns:keyTag>
+		 <secdns:alg>1</secdns:alg>
+		 <secdns:digestType>1</secdns:digestType>
+		 <secdns:digest>aaa12409aaaaa098</secdns:digest>
+	   </secdns:dsData>
+	 </secdns:add>
+	 <!--
+	 POZOR pri updatu dnssecu muze byt pouzity pouze jeden z "add",
+	 "rem", "chg", nikoliv 2 nebo 3 zaroven - to je nestandardni lec
+	 vyzadovano schematem. Dale je uvedeno jak by vypadal zapis pro "rem"
+	 a "chg".
+	 -->
+	 <!--
          <secdns:rem>
-		   <secdns:keyTag>1</secdns:keyTag>
-		 </secdns:rem>
+	   <secdns:keyTag>1</secdns:keyTag>
+	 </secdns:rem>
          <secdns:chg>
-			<secdns:dsData>
-			 <secdns:keyTag>2</secdns:keyTag>
+		<secdns:dsData>
+		 <secdns:keyTag>2</secdns:keyTag>
+		 <secdns:alg>1</secdns:alg>
+		 <secdns:digestType>1</secdns:digestType>
+		 <secdns:digest>aaa12409aaaaa098</secdns:digest>
+		 <secdns:keyData>
+			 <secdns:flags>1</secdns:flags>
+			 <secdns:protocol>1</secdns:protocol>
 			 <secdns:alg>1</secdns:alg>
-			 <secdns:digestType>1</secdns:digestType>
-			 <secdns:digest>aaa12409aaaaa098</secdns:digest>
-			 <secdns:keyData>
-				 <secdns:flags>1</secdns:flags>
-				 <secdns:protocol>1</secdns:protocol>
-				 <secdns:alg>1</secdns:alg>
-				 <secdns:pubKey>123a1a235aa3a15aa31a</secdns:pubKey>
-			 </secdns:keyData>
-		   </secdns:dsData>
-		</secdns:chg>
-		-->
+			 <secdns:pubKey>123a1a235aa3a15aa31a</secdns:pubKey>
+		 </secdns:keyData>
+	   </secdns:dsData>
+	</secdns:chg>
+	-->
       </secdns:update>
     </extension>
     <clTRID>ABC-12345</clTRID>

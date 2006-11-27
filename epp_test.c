@@ -2,11 +2,19 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
+
+#include <orbit/orbit.h>
+#include <ORBitservices/CosNaming.h>
 
 #include "epp_common.h"
 #include "epp_parser.h"
 #include "epp_gen.h"
 #include "epp-client.h"
+
+#include "epp_common.h"
+#include "epp-client.h"
+#include "EPP.h"
 
 #define MAX_LENGTH	10000
 #define MAX_FILE_NAME   256
@@ -14,6 +22,8 @@
 #define INITIAL_CHUNK 1024
 #define MAX_STR_LEN	100000
 #define DEBUG_ALLOC 1
+
+#define raised_exception(ev)	((ev)->_major != CORBA_NO_EXCEPTION)
 
 /* memory pool structure */
 typedef struct {
@@ -140,6 +150,59 @@ void *epp_strdup(void *pool, const char *str)
 	return new_str;
 }
 
+ccReg_EPP
+get_service(CORBA_ORB orb, const char *ns_loc, const char *obj_name)
+{
+	ccReg_EPP	service = CORBA_OBJECT_NIL;	/* object's stub */
+	CORBA_Environment	ev[1];
+	CosNaming_NamingContext	ns; /* used for nameservice */
+	CosNaming_NameComponent	*name_component; /* EPP's name */
+	CosNaming_Name	*cos_name; /* Cos name used in service lookup */
+	char	ns_string[150];
+ 
+	CORBA_exception_init(ev);
+
+	assert(ns_loc != NULL);
+	assert(obj_name != NULL);
+
+	/* build a name of EPP object */
+	name_component = (CosNaming_NameComponent *)
+		malloc(2 * sizeof(CosNaming_NameComponent));
+	name_component[0].id = CORBA_string_dup("ccReg");
+	name_component[0].kind = CORBA_string_dup("context");
+	name_component[1].id = CORBA_string_dup(obj_name);
+	name_component[1].kind = CORBA_string_dup("Object");
+	cos_name = (CosNaming_Name *) malloc (sizeof(CosNaming_Name));
+	cos_name->_maximum = cos_name->_length = 2;
+	cos_name->_buffer = name_component;
+	CORBA_sequence_set_release(cos_name, CORBA_TRUE);
+
+	ns_string[149] = 0;
+	snprintf(ns_string, 149, "corbaloc::%s/NameService", ns_loc);
+	CORBA_exception_init(ev);
+
+	/* get nameservice */
+	ns = (CosNaming_NamingContext) CORBA_ORB_string_to_object(orb,
+			ns_string, ev);
+	if (ns == CORBA_OBJECT_NIL || raised_exception(ev)) {
+		CORBA_exception_free(ev);
+		return NULL;
+	}
+	/* get EPP object */
+	service =(ccReg_EPP) CosNaming_NamingContext_resolve(ns, cos_name, ev);
+	if (service == CORBA_OBJECT_NIL || raised_exception(ev)) {
+		CORBA_exception_free(ev);
+		/* release nameservice */
+		CORBA_Object_release(ns, ev);
+		CORBA_exception_free(ev);
+		return NULL;
+	}
+	/* release nameservice */
+	CORBA_Object_release(ns, ev);
+	CORBA_exception_free(ev);
+
+	return service;
+}
 
 typedef enum {
 	CMD_UNKNOWN,
@@ -259,13 +322,14 @@ void usage(void)
 
 int main(int argc, char *argv[])
 {
-	void	*corba_globs;
+	ccReg_EPP	service;
+	CORBA_ORB	orb;
 	char	*greeting;
 	int	session;
 	epp_lang	lang;
 	epp_command_data *cdata;
 	char text[MAX_LENGTH];
-	char quit = 0;
+	char quit;
 	cmd_t cmd;
 	parser_status	pstat;
 	corba_status	cstat;
@@ -280,6 +344,7 @@ int main(int argc, char *argv[])
 	const char *fp = NULL;
 	const char *schemafile = NULL;
 	int	ret;
+	CORBA_Environment ev[1];
 
 	/* parse parameters */
 	for (ar = 1; ar < argc; ar++) {
@@ -327,9 +392,12 @@ int main(int argc, char *argv[])
 		/* API: init parser */
 		schema = epp_parser_init(schemafile);
 
-	/* API: init corba */
-	if ((corba_globs = epp_corba_init(host, "EPP")) == NULL) {
-		fputs("Nameservice error\n", stderr);
+	/* create orb object */
+	CORBA_exception_init(ev);
+	orb = CORBA_ORB_init(0, NULL, "orbit-local-orb", ev);
+	if (raised_exception(ev)) {
+		CORBA_exception_free(ev);
+		fputs("ORB initialization error\n", stderr);
 		return 2;
 	}
 
@@ -337,12 +405,20 @@ int main(int argc, char *argv[])
 	lang = LANG_EN;
 	firsttime = 1;
 	ret = 0;
+	quit = 0;
 
-	while (1) {
+	while (!quit) {
 
 		if ((pool = create_pool()) == NULL) {
 			fputs("Could not create memory pool\n", stderr);
 			ret = 1;
+			break;
+		}
+
+		if ((service = get_service(orb, host, "EPP")) == NULL) {
+			fputs("Nameservice error\n", stderr);
+			destroy_pool(pool);
+			ret = 2;
 			break;
 		}
 
@@ -404,49 +480,47 @@ int main(int argc, char *argv[])
 			char *curdate;
 
 			/* API: greeting */
-			if (epp_call_hello(pool, corba_globs, &version, &curdate) == 0) {
+			if (epp_call_hello(pool, service, &version, &curdate) != CORBA_OK) {
 				fputs("Corba call failed (greeting)\n", stderr);
-				destroy_pool(pool);
 				ret = 3;
-				break;
+				quit = 1;
+				goto epilog;
 			}
 			if (test) {
 				printf("version: %s, date: %s\n", version, curdate);
-				destroy_pool(pool);
 				ret = 0;
-				break;
+				quit = 1;
+				goto epilog;
 			}
 			gstat = epp_gen_greeting(pool, version, curdate, &greeting);
 			if (gstat != GEN_OK) {
 				fputs("Error when creating epp greeting\n", stderr);
-				destroy_pool(pool);
 				ret = 1;
-				break;
+				quit = 1;
+				goto epilog;
 			}
 			puts(greeting);
 
 			/* API: free greeting data */
-			destroy_pool(pool);
-			continue;
+			goto epilog;
 		}
 		else if (pstat == PARSER_CMD_LOGOUT) {
 			int logout; // not used
 
 			/* API: corba call */
-			cstat = epp_call_logout(pool, corba_globs, session, cdata, &logout);
+			cstat = epp_call_logout(pool, service, session, cdata, &logout);
 		}
 		else if (pstat == PARSER_CMD_LOGIN) {
 			/* API: corba call */
-			cstat = epp_call_login(pool, corba_globs, &session, &lang, fp, cdata);
+			cstat = epp_call_login(pool, service, &session, &lang, fp, cdata);
 		}
 		else if (pstat == PARSER_CMD_OTHER || pstat == PARSER_NOT_VALID) {
 			/* API: corba call */
-			cstat = epp_call_cmd(pool, corba_globs, session, cdata);
+			cstat = epp_call_cmd(pool, service, session, cdata);
 		}
 		else {
 			fputs("XML PARSER error\n", stderr);
-			destroy_pool(pool);
-			continue;
+			goto epilog;
 		}
 
 		if (cstat == CORBA_OK) {
@@ -503,12 +577,16 @@ int main(int argc, char *argv[])
 		}
 		else fputs("Corba call failed\n", stderr);
 
+epilog:
+		CORBA_Object_release(service, ev);
+		CORBA_exception_free(ev);
 		destroy_pool(pool);
 	}
 
 	/* API: clean up globs */
 	epp_parser_init_cleanup(schema);
-	epp_corba_init_cleanup(corba_globs);
+	CORBA_ORB_destroy(orb, ev);
+	CORBA_exception_free(ev);
 
 	if (ret == 0 && test == 1)
 		printf("Exiting without errors\n");

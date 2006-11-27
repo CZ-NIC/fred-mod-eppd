@@ -10,12 +10,6 @@
        xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.0
        contact-1.0.xsd">
 		<contact:id>jouda</contact:id>
-		<contact:add>
-			<contact:status s="clientDeleteProhibited" />
-		</contact:add>
-		<contact:rem>
-			<contact:status s="clientUpdateProhibited" />
-		</contact:rem>
 		<contact:chg>
 		  <contact:postalInfo>
 			<contact:name>John Doe</contact:name>
@@ -39,7 +33,7 @@
 			  <contact:email />
 		  </contact:disclose>
 		  <contact:vat>7035555556</contact:vat>
-		  <contact:ssn type="rc">8888888856</contact:ssn>
+		  <contact:ident type="rc">8888888856</contact:ident>
 		  <contact:notifyEmail>novyjouda@example.com</contact:notifyEmail>
 		</contact:chg>
 	  </contact:update>

@@ -23,33 +23,7 @@ typedef enum {
 	CORBA_REMOTE_ERROR
 }corba_status;
 
-/**
- * Opaque structure which stores variables needed for corba function calls.
- */
-typedef struct epp_corba_globs_t epp_corba_globs;
-
-/**
- * Corba module initialization.
- *
- * The most important step in corba module initialization is EPP service
- * creation, which is specified by ior. This object reference is used
- * in all subsequent corba function calls, no matter to which connection
- * they belong.
- *
- * @param ns_loc   Location of nameservice in format "host[:port]".
- * @param obj_name Name under which is object known to nameservice.
- * @return         corba_globs or NULL in case of failure
- */
-epp_corba_globs *
-epp_corba_init(const char *ns_loc, const char *obj_name);
-
-/**
- * corba_init_cleanup releases resources allocated in epp_corba_init().
- *
- * @param corba_globs Corba context.
- */
-void
-epp_corba_init_cleanup(epp_corba_globs *corba_globs);
+typedef void *service_EPP;
 
 /**
  * Purpose of this function is to get version string of ccReg from
@@ -57,14 +31,14 @@ epp_corba_init_cleanup(epp_corba_globs *corba_globs);
  * frame.
  *
  * @param pool        Pool for memory allocations.
- * @param corba_globs Corba context.
+ * @param service     EPP service.
  * @param version     Output parameter version string.
  * @param curdate     Output parameter current date.
  * @return            If successfull 1 and 0 if corba function call failed.
  */
 int
 epp_call_hello(void *pool,
-		epp_corba_globs *corba_globs,
+		service_EPP  service,
 		char **version,
 		char **curdate);
 
@@ -72,7 +46,7 @@ epp_call_hello(void *pool,
  * Call corba login function, which sets up a session variables.
  *
  * @param pool        Pool for memory allocations.
- * @param corba_globs Corba context.
+ * @param service     EPP service.
  * @param session     If successfully logged in, the session identifier assigned
  *                    by server will be stored in this parameter.
  * @param lang        If successfully logged in, the selected language will be
@@ -83,7 +57,7 @@ epp_call_hello(void *pool,
  */
 corba_status
 epp_call_login(void *pool,
-		epp_corba_globs *corba_globs,
+		service_EPP service,
 		int *session,
 		epp_lang *lang,
 		const char *fingerprint,
@@ -93,7 +67,7 @@ epp_call_login(void *pool,
  * Call corba logout function.
  *
  * @param pool        Pool for memory allocations.
- * @param corba_globs Corba context.
+ * @param service     EPP service.
  * @param session     Session identifier.
  * @param cdata       Data from parsed xml command.
  * @param logout      Tells whether the client should be really logged out
@@ -101,7 +75,7 @@ epp_call_login(void *pool,
  */
 corba_status
 epp_call_logout(void *pool,
-		epp_corba_globs *corba_globs,
+		service_EPP service,
 		int session,
 		epp_command_data *cdata,
 		int *logout);
@@ -115,14 +89,14 @@ epp_call_logout(void *pool,
  * epp_call_logout(). For all other commands use this function.
  *
  * @param pool        Pool for memory allocations.
- * @param corba_globs Corba context.
+ * @param service     EPP service.
  * @param session     Session identifier
  * @param cdata       Data from parsed xml command.
  * @return            Status.
  */
 corba_status
 epp_call_cmd(void *pool,
-		epp_corba_globs *corba_globs,
+		service_EPP service,
 		int session,
 		epp_command_data *cdata);
 

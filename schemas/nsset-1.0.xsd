@@ -66,8 +66,6 @@
 		minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
-        <element name="status" type="nsset:statusType"
-         minOccurs="0" maxOccurs="6"/>
       </sequence>
     </complexType>
 
@@ -77,8 +75,6 @@
 		minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
-        <element name="status" type="nsset:statusType"
-         minOccurs="0" maxOccurs="6"/>
       </sequence>
     </complexType>
 
@@ -98,7 +94,7 @@
         <element name="ns" type="nsset:nsT"
 	 maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
-         minOccurs="0" maxOccurs="unbounded"/>
+         maxOccurs="unbounded"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
       </sequence>
@@ -136,10 +132,8 @@
 
     <simpleType name="statusValueType">
       <restriction base="token">
-        <enumeration value="clientDeleteProhibited"/>
-        <enumeration value="clientTransferProhibited"/>
-        <enumeration value="clientUpdateProhibited"/>
         <enumeration value="ok"/>
+        <enumeration value="linked"/>
         <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
@@ -215,7 +209,7 @@
         <element name="id" type="fredcom:objIDType"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="nsset:statusType"
-         minOccurs="0" maxOccurs="7"/>
+         minOccurs="0" maxOccurs="4"/>
         <element name="clID" type="eppcom:clIDType"/>
         <element name="crID" type="eppcom:clIDType"
          minOccurs="0"/>
@@ -231,7 +225,7 @@
          minOccurs="0"/>
         <element name="ns" type="nsset:nsT" minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
-         minOccurs="0" maxOccurs="unbounded"/>
+         maxOccurs="unbounded"/>
       </sequence>
     </complexType>
 
@@ -239,6 +233,30 @@
       <sequence>
         <element name="id" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  nsset specific messages
+  -->
+    <element name="trnData" type="nsset:handleDateT"/>
+
+    <complexType name="handleDateT">
+      <sequence>
+        <element name="id" type="fredcom:objIDType"/>
+        <element name="trDate" type="dateTime"/>
+        <element name="oldID" type="fredcom:objIDType"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  nsset specific protocol extensions
+  -->
+    <element name="sendAuthInfo" type="nsset:sendAuthInfoType"/>
+
+    <complexType name="sendAuthInfoType">
+      <sequence>
+        <element name="id" type="fredcom:objIDType"/>
       </sequence>
     </complexType>
 

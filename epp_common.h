@@ -49,7 +49,11 @@ typedef enum {
 	EPP_TRANSFER_CONTACT,
 	EPP_TRANSFER_DOMAIN,
 	EPP_TRANSFER_NSSET,
-	EPP_RENEW_DOMAIN
+	EPP_RENEW_DOMAIN,
+	/* protocol extensions */
+	EPP_SENDAUTHINFO_CONTACT,
+	EPP_SENDAUTHINFO_DOMAIN,
+	EPP_SENDAUTHINFO_NSSET
 }epp_command_type;
 
 /**
@@ -93,9 +97,7 @@ typedef enum {
 	errspec_contactCreate_cc,
 	errspec_contactInfo_handle,
 	errspec_contactUpdate_cc,
-	errspec_contactUpdate_ssntype_missing,
-	errspec_contactUpdate_status_add,
-	errspec_contactUpdate_status_rem,
+	errspec_contactUpdate_identtype_missing,
 	errspec_nssetCreate_handle,
 	errspec_nssetCreate_tech,
 	errspec_nssetCreate_ns_name,
@@ -107,8 +109,6 @@ typedef enum {
 	errspec_nssetUpdate_ns_addr_rem,
 	errspec_nssetUpdate_tech_add,
 	errspec_nssetUpdate_tech_rem,
-	errspec_nssetUpdate_status_add,
-	errspec_nssetUpdate_status_rem,
 	errspec_domainCreate_fqdn,
 	errspec_domainCreate_registrant,
 	errspec_domainCreate_nsset,
@@ -125,8 +125,6 @@ typedef enum {
 	errspec_domainUpdate_nsset,
 	errspec_domainUpdate_admin_add,
 	errspec_domainUpdate_admin_rem,
-	errspec_domainUpdate_status_add,
-	errspec_domainUpdate_status_rem,
 	errspec_domainUpdate_ext_valDate,
 	errspec_transfer_op
 }epp_errorspec;
@@ -217,12 +215,20 @@ int q_add(void *pool, qhead *head, void *data);
 
 
 /**
+ * Structure for holding status' names and values.
+ */
+typedef struct {
+	char	*value;
+	char	*text;
+}epp_status;
+
+/**
  * Structure gathers postal info about contact.
  */
 typedef struct {
 	char	*name;  /**< Name. */
 	char	*org;	/**< Organization. */
-	char	*street[3]; /**< 3x street. */
+	qhead	 streets; /**< 3x street. */
 	char	*city;  /**< City. */
 	char	*sp;	/**< State or province. */
 	char	*pc;	/**< Postal code. */
@@ -283,13 +289,18 @@ typedef struct {
 
 /** Type of identification number used in contact object. */
 typedef enum {
-	SSN_UNKNOWN, /**< Unknown value means also undefined in some contexts. */
-	SSN_OP,	     /**< Number of ID card. */
-	SSN_RC,	     /**< Born number (rodne cislo). */
-	SSN_PASSPORT,/**< Number of passport. */
-	SSN_MPSV,    /**< Number assigned by "ministerstvo prace a soc. veci". */
-	SSN_ICO      /**< ICO. */
-}epp_ssnType;
+	ident_UNKNOWN, /**< Unknown value can also mean undefined. */
+	ident_OP,      /**< Number of ID card. */
+	ident_RC,      /**< Born number (rodne cislo). */
+	ident_PASSPORT,/**< Number of passport. */
+	ident_MPSV,    /**< Number assigned by "ministry of work and ...". */
+	ident_ICO      /**< ICO. */
+}epp_identType;
+
+typedef enum {
+	TIMEUNIT_MONTH,
+	TIMEUNIT_YEAR
+}epp_timeunit;
 
 /** Structure holding answer to EPP check command. */
 typedef struct {
@@ -352,8 +363,8 @@ typedef struct {
 	char	*authInfo; /**< Authorization information. */
 	epp_discl discl;   /**< Disclose information section. */
 	char	*vat;      /**< VAT tax ID. */
-	char	*ssn;      /**< Contact's unique ident. */
-	epp_ssnType ssntype;   /**< Type of unique ident. */
+	char	*ident;      /**< Contact's unique ident. */
+	epp_identType identtype;   /**< Type of unique ident. */
 	char	*notify_email; /**< Notification email. */
 }epps_info_contact;
 
@@ -419,8 +430,8 @@ typedef struct {
 	char	*authInfo; /**< Authorization information. */
 	epp_discl discl;   /**< Disclose information section. */
 	char	*vat;      /**< VAT tax ID. */
-	char	*ssn;      /**< Contact's unique ident. */
-	epp_ssnType ssntype;   /**< Type of unique ident. */
+	char	*ident;      /**< Contact's unique ident. */
+	epp_identType identtype;   /**< Type of unique ident. */
 	char	*notify_email; /**< Notification email. */
 	char	*crDate;   /**< Creation date of contact. */
 }epps_create_contact;
@@ -432,6 +443,7 @@ typedef struct {
 	qhead	 admin;   /**< Admin contact for domain. */
 	char	*nsset;   /**< Nsset of domain. */
 	int	 period;  /**< Registration period in months. */
+	epp_timeunit unit;/**< Registration period's unit. */
 	char	*authInfo;/**< Authorization information. */
 	qhead	 extensions; /**< List of domain extensions. */
 	char	*crDate;  /**< Creation date of domain. */
@@ -456,7 +468,8 @@ typedef struct {
 typedef struct {
 	char	*name;      /**< Name of renewed domain. */
 	char	*curExDate; /**< Current expiration date. */
-	int	 period;     /**< Renew period. */
+	int	 period;    /**< Renew period. */
+	epp_timeunit unit;  /**< Registration period's unit. */
 	qhead	 extensions;/**< List of domain extensions. */
 	char	*exDate;    /**< New expiration date. */
 }epps_renew;
@@ -464,8 +477,6 @@ typedef struct {
 /** Update contact parameters. */
 typedef struct {
 	char	*id;            /**< Id of wanted contact (input). */
-	qhead	 add_status;    /**< Contact statuses to be added. */
-	qhead	 rem_status;    /**< Contact statuses to be removed. */
 	epp_postalInfo *pi;     /**< Postal info. */
 	char	*voice;         /**< Telephone number. */
 	char	*fax;           /**< Fax number. */
@@ -473,8 +484,8 @@ typedef struct {
 	char	*authInfo;      /**< Authorization information. */
 	epp_discl discl;        /**< Disclose information section. */
 	char	*vat;           /**< VAT tax ID. */
-	char	*ssn;           /**< Contact's unique ident. */
-	epp_ssnType ssntype;    /**< Type of unique ident. */
+	char	*ident;           /**< Contact's unique ident. */
+	epp_identType identtype;    /**< Type of unique ident. */
 	char	*notify_email;  /**< Notification email. */
 }epps_update_contact;
 
@@ -484,8 +495,6 @@ typedef struct {
 	char	*registrant;   /**< Registrant of domain. */
 	qhead	 add_admin;    /**< Admin contacts to be added. */
 	qhead	 rem_admin;    /**< Admin contacts to be removed. */
-	qhead	 add_status;   /**< Domain statuses to be added. */
-	qhead	 rem_status;   /**< Domain statuses to be removed. */
 	char	*nsset;        /**< Nsset of domain. */
 	char	*authInfo;     /**< Authorization information. */
 	qhead	 extensions;   /**< List of domain extensions. */
@@ -496,8 +505,6 @@ typedef struct {
 	char	*id;           /**< Id of wanted nsset (input). */
 	qhead	 add_tech;     /**< Technical contacts to be added. */
 	qhead	 rem_tech;     /**< Technical contacts to be removed. */
-	qhead	 add_status;   /**< Nsset statuses to be added. */
-	qhead	 rem_status;   /**< Nsset statuses to be removed. */
 	qhead	 add_ns;       /**< Nameservers to be added. */
 	qhead	 rem_ns;       /**< Nameservers to be removed. */
 	char	*authInfo;     /**< Authorization information. */
@@ -513,6 +520,11 @@ typedef struct {
 typedef struct {
 	qhead	 handles;     /**< List of handles. */
 }epps_list;
+
+/** SendAuthInfo parameters. */
+typedef struct {
+	char	*id;          /**< Handle of object. */
+}epps_sendAuthInfo;
 
 /**
  * This structure is central to the concept of the whole module. The

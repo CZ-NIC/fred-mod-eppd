@@ -188,9 +188,12 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "contact:id", info_contact->handle);
 	WRITE_ELEMENT(writer, simple_err, "contact:roid", info_contact->roid);
 	q_foreach(&info_contact->status) {
+		epp_status	*status;
+
+		status = q_content(&info_contact->status);
 		START_ELEMENT(writer, simple_err, "contact:status");
-		WRITE_ATTRIBUTE(writer, simple_err, "s",
-				q_content(&info_contact->status));
+		WRITE_ATTRIBUTE(writer, simple_err, "s", status->value);
+		WRITE_STRING(writer, simple_err, status->text);
 		END_ELEMENT(writer, simple_err);
 	}
 	// postal info
@@ -198,12 +201,10 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "contact:name", info_contact->pi.name);
 	WRITE_ELEMENT(writer, simple_err, "contact:org", info_contact->pi.org);
 	START_ELEMENT(writer, simple_err, "contact:addr");
-	WRITE_ELEMENT(writer, simple_err, "contact:street",
-			info_contact->pi.street[0]);
-	WRITE_ELEMENT(writer, simple_err, "contact:street",
-			info_contact->pi.street[1]);
-	WRITE_ELEMENT(writer, simple_err, "contact:street",
-			info_contact->pi.street[2]);
+	q_foreach(&info_contact->pi.streets) {
+		WRITE_ELEMENT(writer, simple_err, "contact:street",
+				q_content(&info_contact->pi.streets));
+	}
 	WRITE_ELEMENT(writer, simple_err, "contact:city", info_contact->pi.city);
 	WRITE_ELEMENT(writer, simple_err, "contact:sp", info_contact->pi.sp);
 	WRITE_ELEMENT(writer, simple_err, "contact:pc", info_contact->pi.pc);
@@ -255,23 +256,23 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 		END_ELEMENT(writer, simple_err); /* disclose */
 	}
 	WRITE_ELEMENT(writer, simple_err, "contact:vat", info_contact->vat);
-	if (info_contact->ssn != NULL) {
+	if (info_contact->ident != NULL) {
 		char	type[15];
 
-		switch (info_contact->ssntype) {
-			case SSN_OP:
+		switch (info_contact->identtype) {
+			case ident_OP:
 				snprintf(type, 15, "%s", "op");
 				break;
-			case SSN_RC:
+			case ident_RC:
 				snprintf(type, 15, "%s", "rc");
 				break;
-			case SSN_PASSPORT:
+			case ident_PASSPORT:
 				snprintf(type, 15, "%s", "passport");
 				break;
-			case SSN_MPSV:
+			case ident_MPSV:
 				snprintf(type, 15, "%s", "mpsv");
 				break;
-			case SSN_ICO:
+			case ident_ICO:
 				snprintf(type, 15, "%s", "ico");
 				break;
 			default:
@@ -283,10 +284,10 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 				break;
 		}
 		type[14] = '\0'; /* just to be sure */
-		START_ELEMENT(writer, simple_err, "contact:ssn");
+		START_ELEMENT(writer, simple_err, "contact:ident");
 		WRITE_ATTRIBUTE(writer, simple_err, "type", type);
-		WRITE_STRING(writer, simple_err, info_contact->ssn);
-		END_ELEMENT(writer, simple_err); /* ssn */
+		WRITE_STRING(writer, simple_err, info_contact->ident);
+		END_ELEMENT(writer, simple_err); /* ident */
 	}
 	WRITE_ELEMENT(writer, simple_err, "contact:notifyEmail",
 			info_contact->notify_email);
@@ -321,9 +322,12 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "domain:name", info_domain->handle);
 	WRITE_ELEMENT(writer, simple_err, "domain:roid", info_domain->roid);
 	q_foreach(&info_domain->status) {
+		epp_status	*status;
+
+		status = q_content(&info_domain->status);
 		START_ELEMENT(writer, simple_err, "domain:status");
-		WRITE_ATTRIBUTE(writer, simple_err, "s",
-				q_content(&info_domain->status));
+		WRITE_ATTRIBUTE(writer, simple_err, "s", status->value);
+		WRITE_STRING(writer, simple_err, status->text);
 		END_ELEMENT(writer, simple_err);
 	}
 	WRITE_ELEMENT(writer, simple_err, "domain:registrant",
@@ -396,9 +400,12 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "nsset:roid", info_nsset->roid);
 	/* status flags */
 	q_foreach(&info_nsset->status) {
+		epp_status	*status;
+
+		status = q_content(&info_nsset->status);
 		START_ELEMENT(writer, simple_err, "nsset:status");
-		WRITE_ATTRIBUTE(writer, simple_err, "s",
-				q_content(&info_nsset->status));
+		WRITE_ATTRIBUTE(writer, simple_err, "s", status->value);
+		WRITE_STRING(writer, simple_err, status->text);
 		END_ELEMENT(writer, simple_err);
 	}
 	WRITE_ELEMENT(writer, simple_err, "nsset:clID", info_nsset->clID);
@@ -472,13 +479,13 @@ complete_tags(void *pool, epp_error *e)
 		case errspec_pollAck_msgID_missing:
 			newstr = epp_strdup(pool, "<poll op=\"ack\"/>");
 			break;
-		case errspec_contactUpdate_ssntype_missing:
-			len += 2 * strlen("<ssn>") + 1;
+		case errspec_contactUpdate_identtype_missing:
+			len += 2 * strlen("<ident>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
-			strcat(newstr, "<ssn>");
+			strcat(newstr, "<ident>");
 			strcat(newstr, e->value);
-			strcat(newstr, "</ssn>");
+			strcat(newstr, "</ident>");
 			break;
 		case errspec_contactUpdate_cc:
 		case errspec_contactCreate_cc:
@@ -510,20 +517,6 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, "<name>");
 			strcat(newstr, e->value);
 			strcat(newstr, "</name>");
-			break;
-		case errspec_contactUpdate_status_add:
-		case errspec_contactUpdate_status_rem:
-		case errspec_nssetUpdate_status_add:
-		case errspec_nssetUpdate_status_rem:
-		case errspec_domainUpdate_status_add:
-		case errspec_domainUpdate_status_rem:
-			len += strlen("<status s=\"");
-			len += strlen("\"/>");
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<status s=\"");
-			strcat(newstr, e->value);
-			strcat(newstr, "\"/>");
 			break;
 		case errspec_nssetCreate_tech:
 		case errspec_nssetUpdate_tech_add:
@@ -725,8 +718,11 @@ epp_gen_response(void *pool,
 		case EPP_UPDATE_CONTACT:
 		case EPP_UPDATE_NSSET:
 		case EPP_TRANSFER_DOMAIN:
-		case EPP_TRANSFER_NSSET:
 		case EPP_TRANSFER_CONTACT:
+		case EPP_TRANSFER_NSSET:
+		case EPP_SENDAUTHINFO_DOMAIN:
+		case EPP_SENDAUTHINFO_CONTACT:
+		case EPP_SENDAUTHINFO_NSSET:
 			break;
 		/* commands with <msgQ> element */
 		case EPP_POLL_REQ:
@@ -778,7 +774,6 @@ epp_gen_response(void *pool,
 			q_foreach(&check->ids) {
 				epp_avail	*avail;
 
-				q_next(&check->avails);
 				avail = q_content(&check->avails);
 				START_ELEMENT(writer, simple_err, "domain:cd");
 				START_ELEMENT(writer, simple_err, "domain:name");
@@ -801,6 +796,7 @@ epp_gen_response(void *pool,
 					END_ELEMENT(writer, simple_err); /* reason */
 				}
 				END_ELEMENT(writer, simple_err); /* cd */
+				q_next(&check->avails);
 			}
 			END_ELEMENT(writer, simple_err); /* chkData */
 			END_ELEMENT(writer, simple_err); /* resData */
@@ -822,7 +818,6 @@ epp_gen_response(void *pool,
 			q_foreach(&check->ids) {
 				epp_avail	*avail;
 
-				q_next(&check->avails);
 				avail = q_content(&check->avails);
 				START_ELEMENT(writer, simple_err, "contact:cd");
 				START_ELEMENT(writer, simple_err, "contact:id");
@@ -840,6 +835,7 @@ epp_gen_response(void *pool,
 							"contact:reason",
 							avail->reason);
 				END_ELEMENT(writer, simple_err); /* cd (check data) */
+				q_next(&check->avails);
 			}
 			END_ELEMENT(writer, simple_err); /* chkData */
 			END_ELEMENT(writer, simple_err); /* resData */
@@ -861,7 +857,6 @@ epp_gen_response(void *pool,
 			q_foreach(&check->ids) {
 				epp_avail	*avail;
 
-				q_next(&check->avails);
 				avail = q_content(&check->avails);
 				START_ELEMENT(writer, simple_err, "nsset:cd");
 				START_ELEMENT(writer, simple_err, "nsset:id");
@@ -879,6 +874,7 @@ epp_gen_response(void *pool,
 							"nsset:reason",
 							avail->reason);
 				END_ELEMENT(writer, simple_err); /* cd (check data) */
+				q_next(&check->avails);
 			}
 			END_ELEMENT(writer, simple_err); /* chkData */
 			END_ELEMENT(writer, simple_err); /* resData */
@@ -1026,7 +1022,7 @@ epp_gen_response(void *pool,
 			}
 			break;
 		case EPP_LIST_NSSET:
-			if (cdata->rc != 1000) {
+			if (cdata->rc == 1000) {
 				epps_list	*list;
 
 				list = cdata->data;
@@ -1069,6 +1065,9 @@ simple_err:
 
 	*response = epp_strdup(pool, (char *) buf->content);
 	xmlBufferFree(buf);
+	if (*response == NULL) {
+		return GEN_EBUILD;
+	}
 
 	ret = GEN_OK;
 

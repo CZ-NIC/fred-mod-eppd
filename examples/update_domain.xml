@@ -9,22 +9,18 @@
        xmlns:domain="http://www.nic.cz/xml/epp/domain-1.0"
        xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.0
        domain-1.0.xsd">
-        <domain:name>e#a-ple.cz</domain:name>
+        <domain:name>example.cz</domain:name>
         <domain:add>
 		<domain:admin>jouda</domain:admin>
 		<domain:admin>regcontact2</domain:admin>
-		<domain:status s="clientRenewProhibited" />
 	</domain:add>
         <domain:rem>
 		<domain:admin>regcontact</domain:admin>
-		<domain:status s="clientUpdateProhibited" />
 	</domain:rem>
         <domain:chg>
 		<domain:nsset>exampleNsset</domain:nsset>
 		<domain:registrant>jouda</domain:registrant>
-		<domain:authInfo>
-			<domain:pw>FfooBAR</domain:pw>
-		</domain:authInfo>
+		<domain:authInfo>fooBAR</domain:authInfo>
 	</domain:chg>
       </domain:update>
     </update>

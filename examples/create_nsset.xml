@@ -24,9 +24,7 @@
 	<nsset:tech>regcontact</nsset:tech>
 	<nsset:tech>regcontact2</nsset:tech>
 	<nsset:tech>jouda</nsset:tech>
-        <nsset:authInfo>
-          <nsset:pw>2fooBAR</nsset:pw>               
-        </nsset:authInfo>
+        <nsset:authInfo>2fooBAR</nsset:authInfo>
       </nsset:create>
     </create>
     <clTRID>ABC-12345</clTRID>
