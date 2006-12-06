@@ -1926,7 +1926,7 @@ parse_sendAuthInfo(void *pool,
 	xpath_chroot(xpathCtx, "contact:sendAuthInfo", 0, &xerr);
 	if (xerr == XERR_OK) {
 		sendAuthInfo->id = xpath_get1(pool, xpathCtx,
-				"contact:name", 1, &xerr);
+				"contact:id", 1, &xerr);
 		CHK_XERR(xerr, error);
 		cdata->type = EPP_SENDAUTHINFO_CONTACT;
 		return;
@@ -1939,7 +1939,7 @@ parse_sendAuthInfo(void *pool,
 	xpath_chroot(xpathCtx, "nsset:sendAuthInfo", 0, &xerr);
 	if (xerr == XERR_OK) {
 		sendAuthInfo->id = xpath_get1(pool, xpathCtx,
-				"nsset:name", 1, &xerr);
+				"nsset:id", 1, &xerr);
 		CHK_XERR(xerr, error);
 		cdata->type = EPP_SENDAUTHINFO_NSSET;
 		return;

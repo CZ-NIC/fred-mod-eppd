@@ -3239,12 +3239,6 @@ epp_call_sendauthinfo(void *pool,
 	epps_sendAuthInfo	*sendAuthInfo;
 	int	 retr;
 
-	/* XXX temporary hack */
-	ccReg_Error	c_errors;
-	c_errors._buffer = NULL;
-	c_errors._length = c_errors._maximum = 0;
-	cdata->rc = 1000;
-
 	sendAuthInfo = cdata->data;
 	/*
 	 * Input parameters:
@@ -3270,28 +3264,28 @@ epp_call_sendauthinfo(void *pool,
 		CORBA_exception_init(ev);
 
 		if (obj == EPP_DOMAIN) {
-			response = ccReg_EPP_GetTransaction((ccReg_EPP) service,
-					cdata->rc,
-					&c_errors,
+			response = ccReg_EPP_domainSendAuthInfo((ccReg_EPP) service,
+					c_handle,
 					session,
 					c_clTRID,
+					cdata->xml_in,
 					ev);
 		}
 		else if (obj == EPP_CONTACT) {
-			response = ccReg_EPP_GetTransaction((ccReg_EPP) service,
-					cdata->rc,
-					&c_errors,
+			response = ccReg_EPP_contactSendAuthInfo((ccReg_EPP) service,
+					c_handle,
 					session,
 					c_clTRID,
+					cdata->xml_in,
 					ev);
 		}
 		else {
 			assert(obj == EPP_NSSET);
-			response = ccReg_EPP_GetTransaction((ccReg_EPP) service,
-					cdata->rc,
-					&c_errors,
+			response = ccReg_EPP_nssetSendAuthInfo((ccReg_EPP) service,
+					c_handle,
 					session,
 					c_clTRID,
+					cdata->xml_in,
 					ev);
 		}
 
