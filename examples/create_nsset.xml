@@ -9,21 +9,21 @@
        xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.0"
        xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.0
        nsset-1.0.xsd">
-        <nsset:id>exampleNsset</nsset:id>
+        <nsset:id>NSSID:BAZMEK</nsset:id>
 	<nsset:ns>
-		<nsset:name>ns1.bazmek.net</nsset:name>
-		<nsset:addr>194.23.54.1</nsset:addr>
+		<nsset:name>ns1.bazmek.cz</nsset:name>
+		<nsset:addr>214.23.54.1</nsset:addr>
 	</nsset:ns>
 	<nsset:ns>
-		<nsset:name>ns2.bazmek.net</nsset:name>
-		<nsset:addr>194.23.54.2</nsset:addr>
-		<nsset:addr>194.23.54.3</nsset:addr>
-		<nsset:addr>194.23.54.4</nsset:addr>
-		<nsset:addr>194.23.54.5</nsset:addr>
+		<nsset:name>ns2.bazmek.cz</nsset:name>
+		<nsset:addr>214.23.54.2</nsset:addr>
+		<nsset:addr>214.23.54.3</nsset:addr>
+		<nsset:addr>214.23.54.4</nsset:addr>
+		<nsset:addr>214.23.54.5</nsset:addr>
 	</nsset:ns>
-	<nsset:tech>regcontact</nsset:tech>
-	<nsset:tech>regcontact2</nsset:tech>
-	<nsset:tech>jouda</nsset:tech>
+	<nsset:tech>CID:KOKOT</nsset:tech>
+	<nsset:tech>CID:DEBIL</nsset:tech>
+	<nsset:tech>CID:JOUDA</nsset:tech>
         <nsset:authInfo>2fooBAR</nsset:authInfo>
       </nsset:create>
     </create>

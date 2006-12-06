@@ -11,9 +11,10 @@
        domain-1.0.xsd">
         <domain:name>example.cz</domain:name>
         <domain:period unit="y">2</domain:period>
-        <domain:nsset>exampleNsset</domain:nsset>
-        <domain:registrant>jouda</domain:registrant>
-        <domain:admin>regcontact</domain:admin>
+        <domain:nsset>NSSID:BAZMEK</domain:nsset>
+        <domain:registrant>cid:jouda</domain:registrant>
+        <domain:admin>cid:kokot</domain:admin>
+        <domain:admin>cid:debil</domain:admin>
         <domain:authInfo>2fooBAR</domain:authInfo>
       </domain:create>
     </create>
