@@ -4,9 +4,9 @@
      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
   <command>
     <info>
-    <domain:info xmlns:domain="http://www.nic.cz/xml/epp/domain-1.0"
-	    xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.0
-	    domain-1.0.xsd">
+    <domain:info xmlns:domain="http://www.nic.cz/xml/epp/domain-1.1"
+	    xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.1
+	    domain-1.1.xsd">
         <domain:name>1.1.1.1.1.1.1.1.1.0.2.4.e164.arpa</domain:name>
       </domain:info>
     </info>

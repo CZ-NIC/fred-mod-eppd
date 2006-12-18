@@ -53,7 +53,8 @@ typedef enum {
 	/* protocol extensions */
 	EPP_SENDAUTHINFO_CONTACT,
 	EPP_SENDAUTHINFO_DOMAIN,
-	EPP_SENDAUTHINFO_NSSET
+	EPP_SENDAUTHINFO_NSSET,
+	EPP_CREDITINFO
 }epp_command_type;
 
 /**
@@ -91,41 +92,28 @@ typedef enum {
  */
 typedef enum {
 	errspec_unknown = 0, 
-	errspec_pollAck_msgID,
-	errspec_pollAck_msgID_missing,
-	errspec_contactCreate_handle,
-	errspec_contactCreate_cc,
-	errspec_contactInfo_handle,
-	errspec_contactUpdate_cc,
-	errspec_contactUpdate_identtype_missing,
-	errspec_nssetCreate_handle,
-	errspec_nssetCreate_tech,
-	errspec_nssetCreate_ns_name,
-	errspec_nssetCreate_ns_addr,
-	errspec_nssetInfo_handle,
-	errspec_nssetUpdate_ns_name_add,
-	errspec_nssetUpdate_ns_addr_add,
-	errspec_nssetUpdate_ns_name_rem,
-	errspec_nssetUpdate_ns_addr_rem,
-	errspec_nssetUpdate_tech_add,
-	errspec_nssetUpdate_tech_rem,
-	errspec_domainCreate_fqdn,
-	errspec_domainCreate_registrant,
-	errspec_domainCreate_nsset,
-	errspec_domainCreate_period,
-	errspec_domainCreate_admin,
-	errspec_domainCreate_ext_valDate,
-	errspec_domainInfo_fqdn,
-	errspec_domainRenew_fqdn,
-	errspec_domainRenew_curExpDate,
-	errspec_domainRenew_period,
-	errspec_domainRenew_ext_valDate,
-	errspec_domainUpdate_fqdn,
-	errspec_domainUpdate_registrant,
-	errspec_domainUpdate_nsset,
-	errspec_domainUpdate_admin_add,
-	errspec_domainUpdate_admin_rem,
-	errspec_domainUpdate_ext_valDate,
+	errspec_poll_msgID,
+	errspec_poll_msgID_missing,
+	errspec_contact_handle,
+	errspec_contact_cc,
+	errspec_contact_identtype_missing,
+	errspec_nsset_handle,
+	errspec_nsset_tech,
+	errspec_nsset_dns_name,
+	errspec_nsset_dns_addr,
+	errspec_nsset_dns_name_add,
+	errspec_nsset_dns_name_rem,
+	errspec_nsset_tech_add,
+	errspec_nsset_tech_rem,
+	errspec_domain_fqdn,
+	errspec_domain_registrant,
+	errspec_domain_nsset,
+	errspec_domain_period,
+	errspec_domain_admin,
+	errspec_domain_ext_valDate,
+	errspec_domain_curExpDate,
+	errspec_domain_admin_add,
+	errspec_domain_admin_rem,
 	errspec_transfer_op
 }epp_errorspec;
 
@@ -304,9 +292,15 @@ typedef enum {
 
 /** Structure holding answer to EPP check command. */
 typedef struct {
-	int	avail;   /**< True if object is available, false otherwise. */
+	int	 avail;  /**< True if object is available, false otherwise. */
 	char	*reason; /**< If object is not available, here is the reason. */
 }epp_avail;
+
+/** Structure holding answer to EPP creditInfo command. */
+typedef struct {
+	char	*zone;   /**< True if object is available, false otherwise. */
+	unsigned long credit; /**< Credit in cents. */
+}epp_zonecredit;
 
 /** DNSSEC extension used for updates. */
 typedef struct {
@@ -525,6 +519,11 @@ typedef struct {
 typedef struct {
 	char	*id;          /**< Handle of object. */
 }epps_sendAuthInfo;
+
+/** CreditInfo parameters. */
+typedef struct {
+	qhead	 zonecredits; /**< List of credits for individual zones. */
+}epps_creditInfo;
 
 /**
  * This structure is central to the concept of the whole module. The

@@ -51,43 +51,30 @@
  */
 static int error_translator[][2] =
 {
-  {ccReg_unknow,                   errspec_unknown},
-  {ccReg_pollAck_msgID,            errspec_pollAck_msgID},
-  {ccReg_pollAck_msgID_missing,    errspec_pollAck_msgID_missing},
-  {ccReg_contactCreate_handle,     errspec_contactCreate_handle},
-  {ccReg_contactCreate_cc,         errspec_contactCreate_cc},
-  {ccReg_contactInfo_handle,       errspec_contactInfo_handle},
-  {ccReg_contactUpdate_cc,         errspec_contactUpdate_cc},
-  {ccReg_contactUpdate_identtype_missing, errspec_contactUpdate_identtype_missing},
-  {ccReg_nssetCreate_handle,       errspec_nssetCreate_handle},
-  {ccReg_nssetCreate_tech,         errspec_nssetCreate_tech},
-  {ccReg_nssetCreate_ns_name,      errspec_nssetCreate_ns_name},
-  {ccReg_nssetCreate_ns_addr,      errspec_nssetCreate_ns_addr},
-  {ccReg_nssetInfo_handle,         errspec_nssetInfo_handle},
-  {ccReg_nssetUpdate_ns_name_add,  errspec_nssetUpdate_ns_name_add},
-  {ccReg_nssetUpdate_ns_addr_add,  errspec_nssetUpdate_ns_addr_add},
-  {ccReg_nssetUpdate_ns_name_rem,  errspec_nssetUpdate_ns_name_rem},
-  {ccReg_nssetUpdate_ns_addr_rem,  errspec_nssetUpdate_ns_addr_rem},
-  {ccReg_nssetUpdate_tech_add,     errspec_nssetUpdate_tech_add},
-  {ccReg_nssetUpdate_tech_rem,     errspec_nssetUpdate_tech_rem},
-  {ccReg_domainCreate_fqdn,        errspec_domainCreate_fqdn},
-  {ccReg_domainCreate_registrant,  errspec_domainCreate_registrant},
-  {ccReg_domainCreate_nsset,       errspec_domainCreate_nsset},
-  {ccReg_domainCreate_period,      errspec_domainCreate_period},
-  {ccReg_domainCreate_admin,       errspec_domainCreate_admin},
-  {ccReg_domainCreate_ext_valDate, errspec_domainCreate_ext_valDate},
-  {ccReg_domainInfo_fqdn,          errspec_domainInfo_fqdn},
-  {ccReg_domainRenew_fqdn,         errspec_domainRenew_fqdn},
-  {ccReg_domainRenew_curExpDate,   errspec_domainRenew_curExpDate},
-  {ccReg_domainRenew_period,       errspec_domainRenew_period},
-  {ccReg_domainRenew_ext_valDate,  errspec_domainRenew_ext_valDate},
-  {ccReg_domainUpdate_fqdn,        errspec_domainUpdate_fqdn},
-  {ccReg_domainUpdate_registrant,  errspec_domainUpdate_registrant},
-  {ccReg_domainUpdate_nsset,       errspec_domainUpdate_nsset},
-  {ccReg_domainUpdate_admin_add,   errspec_domainUpdate_admin_add},
-  {ccReg_domainUpdate_admin_rem,   errspec_domainUpdate_admin_rem},
-  {ccReg_domainUpdate_ext_valDate, errspec_domainUpdate_ext_valDate},
-  {ccReg_transfer_op,              errspec_transfer_op},
+  {ccReg_unknow,                errspec_unknown},
+  {ccReg_poll_msgID,            errspec_poll_msgID},
+  {ccReg_poll_msgID_missing,    errspec_poll_msgID_missing},
+  {ccReg_contact_handle,        errspec_contact_handle},
+  {ccReg_contact_cc,            errspec_contact_cc},
+  {ccReg_contact_identtype_missing, errspec_contact_identtype_missing},
+  {ccReg_nsset_handle,          errspec_nsset_handle},
+  {ccReg_nsset_tech,            errspec_nsset_tech},
+  {ccReg_nsset_dns_name,        errspec_nsset_dns_name},
+  {ccReg_nsset_dns_addr,        errspec_nsset_dns_addr},
+  {ccReg_nsset_dns_name_add,    errspec_nsset_dns_name_add},
+  {ccReg_nsset_dns_name_rem,    errspec_nsset_dns_name_rem},
+  {ccReg_nsset_tech_add,        errspec_nsset_tech_add},
+  {ccReg_nsset_tech_rem,        errspec_nsset_tech_rem},
+  {ccReg_domain_fqdn,           errspec_domain_fqdn},
+  {ccReg_domain_registrant,     errspec_domain_registrant},
+  {ccReg_domain_nsset,          errspec_domain_nsset},
+  {ccReg_domain_period,         errspec_domain_period},
+  {ccReg_domain_admin,          errspec_domain_admin},
+  {ccReg_domain_ext_valDate,    errspec_domain_ext_valDate},
+  {ccReg_domain_curExpDate,     errspec_domain_curExpDate},
+  {ccReg_domain_admin_add,      errspec_domain_admin_add},
+  {ccReg_domain_admin_rem,      errspec_domain_admin_rem},
+  {ccReg_transfer_op,           errspec_transfer_op},
   {-1, -1}
 };
 
@@ -260,7 +247,8 @@ get_errors(void *pool, qhead *errors, ccReg_Error *c_errors)
 		if (cerrno != 0)
 			return 1;
 
-		err_item->value = unwrap_str_req(pool, c_error->value, &cerrno);
+		/* not _req because missing parts don't have a value */
+		err_item->value = unwrap_str(pool, c_error->value, &cerrno);
 		if (cerrno != 0) return 1;
 
 		/* convert error code */
@@ -3316,6 +3304,95 @@ epp_call_sendauthinfo(void *pool,
 	return CORBA_OK;
 }
 
+static corba_status
+epp_call_creditinfo(void *pool,
+		service_EPP service,
+		int session,
+		epp_command_data *cdata)
+{
+	CORBA_Environment	 ev[1];
+	CORBA_char	*c_clTRID;
+	ccReg_ZoneCredit	*c_zoneCredit;
+	ccReg_Response	*response;
+	epps_creditInfo	*creditInfo;
+	int	 retr, i;
+
+	creditInfo = cdata->data;
+	/*
+	 * Input parameters:
+	 *    session
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_zoneCredit (*)
+	 */
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev);
+		CORBA_exception_init(ev);
+
+		response = ccReg_EPP_ClientCredit((ccReg_EPP) service,
+				&c_zoneCredit,
+				session,
+				c_clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+	CORBA_free(c_clTRID);
+
+	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
+		CORBA_exception_free(ev);
+		return ret;
+	}
+
+	for (i = 0; i < c_zoneCredit->_length; i++) {
+		epp_zonecredit	*zonecredit;
+		int	cerrno;
+
+		zonecredit = epp_malloc(pool, sizeof *zonecredit);
+		if (zonecredit == NULL)
+			break;
+		CLEAR_CERRNO(cerrno);
+		zonecredit->zone = unwrap_str(pool,
+				c_zoneCredit->_buffer[i].zone_fqdn, &cerrno);
+		if (cerrno != 0)
+			break;
+		zonecredit->credit = c_zoneCredit->_buffer[i].price;
+		if (q_add(pool, &creditInfo->zonecredits, zonecredit))
+			break;
+	}
+
+	/* error occured ? */
+	if (i < c_zoneCredit->_length) {
+		CORBA_free(response);
+		CORBA_free(c_zoneCredit);
+		return CORBA_INT_ERROR;
+	}
+	CORBA_free(c_zoneCredit);
+
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
+
+	return CORBA_OK;
+}
+
 corba_status
 epp_call_cmd(void *pool,
 		service_EPP service,
@@ -3433,6 +3510,10 @@ epp_call_cmd(void *pool,
 		case EPP_SENDAUTHINFO_NSSET:
 			cstat = epp_call_sendauthinfo(pool, service, session,
 					cdata, EPP_NSSET);
+			break;
+		case EPP_CREDITINFO:
+			cstat = epp_call_creditinfo(pool, service, session,
+					cdata);
 			break;
 		default:
 			cstat = CORBA_INT_ERROR;

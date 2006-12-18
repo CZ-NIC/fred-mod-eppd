@@ -2,8 +2,15 @@
 
   <schema targetNamespace="http://www.nic.cz/xml/epp/fred-1.0"
           xmlns:fred="http://www.nic.cz/xml/epp/fred-1.0"
+          xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
           xmlns="http://www.w3.org/2001/XMLSchema"
           elementFormDefault="qualified">
+
+  <!--
+  Import common element types.
+  -->
+    <import namespace="urn:ietf:params:xml:ns:eppcom-1.0"
+            schemaLocation="eppcom-1.0.xsd"/>
 
     <annotation>
       <documentation>
@@ -20,12 +27,38 @@
       <sequence>
         <choice>
           <element name="sendAuthInfo" type="fred:readWriteType"/>
-          <element name="cashInfo"/>
+          <element name="creditInfo"/>
         </choice>
         <element name="clTRID" type="fred:trIDStringType"
          minOccurs="0"/>
       </sequence>
     </complexType>
+
+  <!--
+  Extension response types.
+  -->
+    <element name="resCreditInfo" type="fred:resCreditType"/>
+
+    <complexType name="resCreditType">
+      <sequence>
+        <element name="zoneCredit" type="fred:creditType"
+         minOccurs="0" maxOccurs="unbounded"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="creditType">
+      <sequence>
+        <element name="zone" type="eppcom:labelType"/>
+	<element name="credit" type="fred:amountType"/>
+      </sequence>
+    </complexType>
+
+    <simpleType name="amountType">
+      <restriction base="decimal">
+	<totalDigits value="10"/>
+	<fractionDigits value="2"/>
+      </restriction>
+    </simpleType>
 
   <!--
   All other object-centric commands. EPP doesn't specify the syntax or

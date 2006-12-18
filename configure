@@ -814,7 +814,7 @@ Optional Packages:
   --with-idl              location of idl file containing EPP interface
                           [idl/EPP.idl]
   --with-schema           xml schema defining EPP protocol
-                          [schemas/all-1.0.xsd]
+                          [schemas/all-1.1.xsd]
   --with-doc              location of doxygen executable used for html
                           documentation
 
@@ -3173,7 +3173,7 @@ if test "${with_schema+set}" = set; then
   SCHEMA=$with_schema
 
 else
-  SCHEMA=schemas/all-1.0.xsd
+  SCHEMA=schemas/all-1.1.xsd
 
 fi;
 as_ac_File=`echo "ac_cv_file_$SCHEMA" | $as_tr_sh`

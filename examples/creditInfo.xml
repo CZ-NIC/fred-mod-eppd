@@ -6,13 +6,7 @@
     <fred:extcommand xmlns:fred="http://www.nic.cz/xml/epp/fred-1.0"
 		  xsi:schemaLocation="http://www.nic.cz/xml/epp/fred-1.0
 		  fred-1.0.xsd">
-      <fred:sendAuthInfo>
-        <contact:sendAuthInfo xmlns:contact="http://www.nic.cz/xml/epp/contact-1.1"
-		    xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.1
-		    contact-1.1.xsd">
-	  <contact:id>example.cz</contact:id>
-	</contact:sendAuthInfo>
-      </fred:sendAuthInfo>
+      <fred:creditInfo />
       <fred:clTRID>ABC-12346</fred:clTRID>
     </fred:extcommand>
   </extension>

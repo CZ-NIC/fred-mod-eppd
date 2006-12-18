@@ -112,9 +112,9 @@ AC_SUBST([IDLPREFIX], [$idlprefix])
 # check schema file
 #
 AC_ARG_WITH([schema], [AS_HELP_STRING([--with-schema],
-			[xml schema defining EPP protocol [schemas/all-1.0.xsd]])],
+			[xml schema defining EPP protocol [schemas/all-1.1.xsd]])],
 			[AC_SUBST([SCHEMA], [$with_schema])],
-			[AC_SUBST([SCHEMA], [schemas/all-1.0.xsd])])
+			[AC_SUBST([SCHEMA], [schemas/all-1.1.xsd])])
 AC_CHECK_FILE([$SCHEMA], [], [AC_MSG_ERROR(
 			   [xml schema "$SCHEMA" does not exist (use --with-schema)])])
 

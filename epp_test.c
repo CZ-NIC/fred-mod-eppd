@@ -166,13 +166,12 @@ get_service(CORBA_ORB orb, const char *ns_loc, const char *obj_name)
 	assert(obj_name != NULL);
 
 	/* build a name of EPP object */
-	name_component = (CosNaming_NameComponent *)
-		malloc(2 * sizeof(CosNaming_NameComponent));
+	name_component = CORBA_sequence_CosNaming_NameComponent_allocbuf(2);
 	name_component[0].id = CORBA_string_dup("ccReg");
 	name_component[0].kind = CORBA_string_dup("context");
 	name_component[1].id = CORBA_string_dup(obj_name);
 	name_component[1].kind = CORBA_string_dup("Object");
-	cos_name = (CosNaming_Name *) malloc (sizeof(CosNaming_Name));
+	cos_name = CosNaming_Name__alloc();
 	cos_name->_maximum = cos_name->_length = 2;
 	cos_name->_buffer = name_component;
 	CORBA_sequence_set_release(cos_name, CORBA_TRUE);
@@ -182,23 +181,24 @@ get_service(CORBA_ORB orb, const char *ns_loc, const char *obj_name)
 	CORBA_exception_init(ev);
 
 	/* get nameservice */
-	ns = (CosNaming_NamingContext) CORBA_ORB_string_to_object(orb,
-			ns_string, ev);
+	ns = (CosNaming_NamingContext) CORBA_ORB_string_to_object(orb, ns_string,ev);
 	if (ns == CORBA_OBJECT_NIL || raised_exception(ev)) {
+		CORBA_free(cos_name);
 		CORBA_exception_free(ev);
 		return NULL;
 	}
 	/* get EPP object */
 	service =(ccReg_EPP) CosNaming_NamingContext_resolve(ns, cos_name, ev);
 	if (service == CORBA_OBJECT_NIL || raised_exception(ev)) {
-		CORBA_exception_free(ev);
 		/* release nameservice */
 		CORBA_Object_release(ns, ev);
+		CORBA_free(cos_name);
 		CORBA_exception_free(ev);
 		return NULL;
 	}
 	/* release nameservice */
 	CORBA_Object_release(ns, ev);
+	CORBA_free(cos_name);
 	CORBA_exception_free(ev);
 
 	return service;
@@ -220,7 +220,7 @@ cmd_t getcmd(void)
 	while ((c = getchar()) != '\n') {
 		cmd[i++] = (char) c;
 		if (i >= 29) {
-			fputs("Maximal allowed cmd lenght exceeded", stderr);
+			fputs("Maximal allowed cmd lenght exceeded\n", stderr);
 			break;
 		}
 	}
@@ -232,7 +232,7 @@ cmd_t getcmd(void)
 	return CMD_UNKNOWN;
 }
 
-void readinput(char *text)
+int readinput(char *text)
 {
 	int c;
 	int i = 0;
@@ -241,11 +241,12 @@ void readinput(char *text)
 	while ((c = getchar()) != EOF) {
 		text[i++] = (char) c;
 		if (i >= MAX_LENGTH - 1) {
-			fputs("Maximal allowed text lenght exceeded", stderr);
-			break;
+			fputs("Maximal allowed text lenght exceeded\n", stderr);
+			return 0;
 		}
 	}
 	text[i] = 0;
+	return 1;
 }
 
 int readfile(char *text)
@@ -270,6 +271,7 @@ int readfile(char *text)
 	}
 	if (i == MAX_LENGTH - 1) {
 		fputs("Maximal allowed text lenght exceeded", stderr);
+		return 0;
 	}
 	text[i] = 0;
 	fclose(f);
@@ -386,7 +388,7 @@ int main(int argc, char *argv[])
 	if (host == NULL)
 		host = "localhost";
 	if (schemafile == NULL)
-		schemafile = "schemas/all-1.0.xsd";
+		schemafile = "schemas/all-1.1.xsd";
 
 	if (!test)
 		/* API: init parser */
@@ -433,34 +435,36 @@ int main(int argc, char *argv[])
 			switch (cmd = getcmd()) 
 					{
 				case CMD_CUSTOM:
-					readinput(text);
+					if (!readinput(text)) {
+						goto epilog;
+					}
 					break;
 				case CMD_FILE:
-					if (!readfile(text)) continue;
+					if (!readfile(text)) {
+						goto epilog;
+					}
 					puts(text);
 					break;
 				case CMD_EXIT:
 					quit = 1;
-					break;
+					ret = 0;
+					goto epilog;
 				default:
 					fputs("Unknown command\n", stderr);
 					destroy_pool(pool);
 					continue;
-			}
-			if (quit) {
-				destroy_pool(pool);
-				break;
 			}
 		  }
 		  else { 
 			  cmd = CMD_FILE;
 			  if( ar < argc ) 
 			  {
-				  openfile(text , argv[ar++] );
+					openfile(text , argv[ar++] );
 			  } 
 			  else {
-				  destroy_pool(pool);
-				  break;
+					quit = 1;
+					ret = 0;
+					goto epilog;
 			  } 
 		  }
 

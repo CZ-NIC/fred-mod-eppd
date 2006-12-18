@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/all-1.0"
-          xmlns:all="http://www.nic.cz/xml/epp/all-1.0"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/all-1.1"
+          xmlns:all="http://www.nic.cz/xml/epp/all-1.1"
           xmlns="http://www.w3.org/2001/XMLSchema"
           elementFormDefault="qualified">
 
@@ -12,14 +12,14 @@
 	    schemaLocation="eppcom-1.0.xsd"/>
     <import namespace="urn:ietf:params:xml:ns:epp-1.0"
 	    schemaLocation="epp-1.0.xsd"/>
-    <import namespace="http://www.nic.cz/xml/epp/fredcom-1.0"
-	    schemaLocation="fredcom-1.0.xsd"/>
-    <import namespace="http://www.nic.cz/xml/epp/contact-1.0"
-	    schemaLocation="contact-1.0.xsd"/>
-    <import namespace="http://www.nic.cz/xml/epp/domain-1.0"
-	    schemaLocation="domain-1.0.xsd"/>
-    <import namespace="http://www.nic.cz/xml/epp/nsset-1.0"
-	    schemaLocation="nsset-1.0.xsd"/>
+    <import namespace="http://www.nic.cz/xml/epp/fredcom-1.1"
+	    schemaLocation="fredcom-1.1.xsd"/>
+    <import namespace="http://www.nic.cz/xml/epp/contact-1.1"
+	    schemaLocation="contact-1.1.xsd"/>
+    <import namespace="http://www.nic.cz/xml/epp/domain-1.1"
+	    schemaLocation="domain-1.1.xsd"/>
+    <import namespace="http://www.nic.cz/xml/epp/nsset-1.1"
+	    schemaLocation="nsset-1.1.xsd"/>
     <!--
     EPP protocol extensions
     -->

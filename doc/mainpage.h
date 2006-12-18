@@ -126,7 +126,7 @@
    EPPprotocol       On
    EPPnameservice    "nameservice-host.cz"
    EPPobject         "EPP"
-   EPPschema         "/etc/apache2/schemas/all-1.0.xsd"
+   EPPschema         "/etc/apache2/schemas/all-1.1.xsd"
    EPPservername     "EPP production server"
    EPPlog            "/var/log/apache2/epp.log"
    EPPloglevel       error

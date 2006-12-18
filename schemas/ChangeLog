@@ -28,6 +28,9 @@
 
 	* ExDate u domeny uz neni typ datetime ale pouze date.
 
+	* Povyseni verze u vsech schemat, ktere se zmenily od verze 1.1.1
+	mod_eppd (vsechny krome epp, eppcom, enumval a noveho schematu fred).
+
 2006-10-31 Jan Kryl (version 1.2.0)
 
 	* Z povineni authInfo elementu pri transferech objektu. Nepredstavuje

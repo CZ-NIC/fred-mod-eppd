@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/fredcom-1.0"
-          xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.0"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/fredcom-1.1"
+          xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
           xmlns="http://www.w3.org/2001/XMLSchema"
           elementFormDefault="qualified">
 

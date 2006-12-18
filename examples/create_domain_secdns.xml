@@ -6,9 +6,9 @@
   <command>
     <create>
       <domain:create
-       xmlns:domain="http://www.nic.cz/xml/epp/domain-1.0"
-       xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.0
-       domain-1.0.xsd">
+       xmlns:domain="http://www.nic.cz/xml/epp/domain-1.1"
+       xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.1
+       domain-1.1.xsd">
         <domain:name>example.cz</domain:name>
         <domain:period unit="y">2</domain:period>
         <domain:nsset>exampleNsset</domain:nsset>

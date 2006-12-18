@@ -817,8 +817,7 @@ error:
 static void
 parse_poll(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-	const char	*op;
-	char	*str;
+	const char	*op, *str;
 
 	/* get poll type - request or acknoledge */
 	op = get_attr(xpathCtx->node, "op");
@@ -845,7 +844,7 @@ parse_poll(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 	 */
 	if (str == NULL) {
 		if (new_error_item(pool, &cdata->errors,
-					errspec_pollAck_msgID_missing))
+					errspec_poll_msgID_missing))
 			goto error;
 		cdata->rc = 2003;
 		cdata->type = EPP_DUMMY;
@@ -1482,7 +1481,7 @@ parse_update_contact(void *pool,
 		 */
 		if (str == NULL) {
 			if (new_error_item(pool, &cdata->errors,
-					errspec_contactUpdate_identtype_missing))
+					errspec_contact_identtype_missing))
 				goto error;
 
 			cdata->rc = 2003;
@@ -1515,7 +1514,7 @@ parse_update_contact(void *pool,
 			 */
 			if (str == NULL) {
 				if (new_error_item(pool, &cdata->errors,
-						errspec_contactUpdate_identtype_missing))
+						errspec_contact_identtype_missing))
 					goto error;
 
 				cdata->rc = 2003;
@@ -1892,6 +1891,13 @@ error:
 	cdata->type = EPP_DUMMY;
 }
 
+/**
+ * Parser of command sendAuthInfo.
+ *
+ * @param pool Pool to allocate memory from.
+ * @param xpathCtx Xpath context.
+ * @param cdata Parsed data.
+ */
 static void
 parse_sendAuthInfo(void *pool,
 		xmlXPathContextPtr xpathCtx,
@@ -2213,7 +2219,6 @@ parse_command(void *pool,
 							cdata);
 				else {
 					/* unknown enumval command */
-					xmlXPathFreeObject(xpathObj);
 					cdata->rc = 2000; /* "Unknown command" */
 					cdata->type = EPP_DUMMY;
 					break;
@@ -2221,12 +2226,12 @@ parse_command(void *pool,
 			}
 			else {
 				/* unknown extension */
-				xmlXPathFreeObject(xpathObj);
 				cdata->rc = 2000; /* "Unknown command" */
 				cdata->type = EPP_DUMMY;
 				break;
 			}
 		}
+		xmlXPathFreeObject(xpathObj);
 	}
 
 	/* restore relative root */
@@ -2292,7 +2297,15 @@ parse_extension(void *pool,
 			/* fall-through if not matched */
 		case 'c':
 			/* It is cashInfo */
-			if (!strcmp(elemname, "cashInfo")) {
+			if (!strcmp(elemname, "creditInfo")) {
+				cdata->data = epp_calloc(pool,
+						sizeof (epps_creditInfo));
+				if (cdata->data == NULL) {
+					cdata->rc = 2400;
+					cdata->type = EPP_DUMMY;
+					return PARSER_CMD_OTHER;
+				}
+				cdata->type = EPP_CREDITINFO;
 				break;
 			}
 			/* fall-through if not matched */

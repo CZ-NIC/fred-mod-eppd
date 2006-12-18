@@ -4,9 +4,9 @@
      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
   <command>
     <check>
-    <nsset:check xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.0"
-	    xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.0
-	    nsset-1.0.xsd">
+    <nsset:check xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.1"
+	    xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.1
+	    nsset-1.1.xsd">
         <nsset:id>exampleNsset</nsset:id>
         <nsset:id>necocz</nsset:id>
         <nsset:id>xxxx</nsset:id>

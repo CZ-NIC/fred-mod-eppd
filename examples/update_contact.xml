@@ -6,9 +6,9 @@
   <command>
     <update>
       <contact:update
-       xmlns:contact="http://www.nic.cz/xml/epp/contact-1.0"
-       xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.0
-       contact-1.0.xsd">
+       xmlns:contact="http://www.nic.cz/xml/epp/contact-1.1"
+       xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.1
+       contact-1.1.xsd">
 		<contact:id>jouda</contact:id>
 		<contact:chg>
 		  <contact:postalInfo>

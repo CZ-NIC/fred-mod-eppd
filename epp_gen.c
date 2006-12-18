@@ -464,10 +464,13 @@ complete_tags(void *pool, epp_error *e)
 	int	len;
 
 	/* this is same for all switch cases, so we will do it here. */
-	len = strlen(e->value);
+	if (e->value != NULL)
+		len = strlen(e->value);
+	else
+		len = 0;
 
 	switch (e->spec) {
-		case errspec_pollAck_msgID:
+		case errspec_poll_msgID:
 			len += strlen("<poll op=\"ack\" msgID=\"");
 			len += strlen("\"/>");
 			newstr = epp_malloc(pool, len + 1);
@@ -476,10 +479,10 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "\"/>");
 			break;
-		case errspec_pollAck_msgID_missing:
+		case errspec_poll_msgID_missing:
 			newstr = epp_strdup(pool, "<poll op=\"ack\"/>");
 			break;
-		case errspec_contactUpdate_identtype_missing:
+		case errspec_contact_identtype_missing:
 			len += 2 * strlen("<ident>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -487,8 +490,7 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</ident>");
 			break;
-		case errspec_contactUpdate_cc:
-		case errspec_contactCreate_cc:
+		case errspec_contact_cc:
 			len += 2 * strlen("<cc>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -496,10 +498,8 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</cc>");
 			break;
-		case errspec_contactInfo_handle:
-		case errspec_contactCreate_handle:
-		case errspec_nssetInfo_handle:
-		case errspec_nssetCreate_handle:
+		case errspec_contact_handle:
+		case errspec_nsset_handle:
 			len += 2 * strlen("<id>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -507,10 +507,7 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</id>");
 			break;
-		case errspec_domainInfo_fqdn:
-		case errspec_domainCreate_fqdn:
-		case errspec_domainRenew_fqdn:
-		case errspec_domainUpdate_fqdn:
+		case errspec_domain_fqdn:
 			len += 2 * strlen("<name>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -518,9 +515,9 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</name>");
 			break;
-		case errspec_nssetCreate_tech:
-		case errspec_nssetUpdate_tech_add:
-		case errspec_nssetUpdate_tech_rem:
+		case errspec_nsset_tech:
+		case errspec_nsset_tech_add:
+		case errspec_nsset_tech_rem:
 			len += 2 * strlen("<tech>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -528,9 +525,9 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</tech>");
 			break;
-		case errspec_nssetCreate_ns_name:
-		case errspec_nssetUpdate_ns_name_add:
-		case errspec_nssetUpdate_ns_name_rem:
+		case errspec_nsset_dns_name:
+		case errspec_nsset_dns_name_add:
+		case errspec_nsset_dns_name_rem:
 			len += 2 * strlen("<name>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -538,9 +535,7 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</name>");
 			break;
-		case errspec_nssetCreate_ns_addr:
-		case errspec_nssetUpdate_ns_addr_add:
-		case errspec_nssetUpdate_ns_addr_rem:
+		case errspec_nsset_dns_addr:
 			len += 2 * strlen("<addr>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -548,8 +543,7 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</addr>");
 			break;
-		case errspec_domainCreate_registrant:
-		case errspec_domainUpdate_registrant:
+		case errspec_domain_registrant:
 			len += 2 * strlen("<registrant>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -557,8 +551,7 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</registrant>");
 			break;
-		case errspec_domainCreate_nsset:
-		case errspec_domainUpdate_nsset:
+		case errspec_domain_nsset:
 			len += 2 * strlen("<nsset>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -566,8 +559,7 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</nsset>");
 			break;
-		case errspec_domainCreate_period:
-		case errspec_domainRenew_period:
+		case errspec_domain_period:
 			len += 2 * strlen("<period>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -575,9 +567,9 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</period>");
 			break;
-		case errspec_domainCreate_admin:
-		case errspec_domainUpdate_admin_add:
-		case errspec_domainUpdate_admin_rem:
+		case errspec_domain_admin:
+		case errspec_domain_admin_add:
+		case errspec_domain_admin_rem:
 			len += 2 * strlen("<admin>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -585,9 +577,7 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</admin>");
 			break;
-		case errspec_domainCreate_ext_valDate:
-		case errspec_domainUpdate_ext_valDate:
-		case errspec_domainRenew_ext_valDate:
+		case errspec_domain_ext_valDate:
 			len += 2 * strlen("<valExDate>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -595,7 +585,7 @@ complete_tags(void *pool, epp_error *e)
 			strcat(newstr, e->value);
 			strcat(newstr, "</valExDate>");
 			break;
-		case errspec_domainRenew_curExpDate:
+		case errspec_domain_curExpDate:
 			len += 2 * strlen("<curExpDate>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
@@ -1039,6 +1029,40 @@ epp_gen_response(void *pool,
 							q_content(&list->handles));
 				}
 				END_ELEMENT(writer, simple_err); /* listData */
+				END_ELEMENT(writer, simple_err); /* resData */
+			}
+			break;
+		case EPP_CREDITINFO:
+			if (cdata->rc == 1000) {
+				epps_creditInfo	*creditInfo;
+				char	credit[50];
+
+				creditInfo = cdata->data;
+				START_ELEMENT(writer, simple_err, "resData");
+				START_ELEMENT(writer, simple_err,
+						"fred:resCreditInfo");
+				WRITE_ATTRIBUTE(writer, simple_err,
+						"xmlns:fred", NS_FRED);
+				WRITE_ATTRIBUTE(writer, simple_err,
+						"xsi:schemaLocation", LOC_FRED);
+				q_foreach(&creditInfo->zonecredits) {
+					epp_zonecredit	*zonecredit;
+
+					START_ELEMENT(writer, simple_err,
+							"fred:zoneCredit");
+					zonecredit = q_content(
+							&creditInfo->zonecredits);
+					snprintf(credit, 49, "%lu.%02lu",
+							zonecredit->credit /100,
+							zonecredit->credit %100);
+					WRITE_ELEMENT(writer, simple_err,
+							"fred:zone",
+							zonecredit->zone);
+					WRITE_ELEMENT(writer, simple_err,
+							"fred:credit", credit);
+					END_ELEMENT(writer, simple_err); /* zoneCredit */
+				}
+				END_ELEMENT(writer, simple_err);/*resCreditInfo*/
 				END_ELEMENT(writer, simple_err); /* resData */
 			}
 			break;
