@@ -1534,7 +1534,7 @@ epp_call_poll_ack(void *pool,
 	CLEAR_CERRNO(cerrno);
 
 	poll_ack->count = c_count;
-	poll_ack->msgid = unwrap_str_req(pool, c_msgID, &cerrno);
+	poll_ack->newmsgid = unwrap_str_req(pool, c_msgID, &cerrno);
 	if (cerrno != 0) goto error;
 
 	CORBA_free(c_msgID);

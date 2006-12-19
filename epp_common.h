@@ -424,16 +424,16 @@ typedef struct {
 	char	*authInfo; /**< Authorization information. */
 	epp_discl discl;   /**< Disclose information section. */
 	char	*vat;      /**< VAT tax ID. */
-	char	*ident;      /**< Contact's unique ident. */
-	epp_identType identtype;   /**< Type of unique ident. */
-	char	*notify_email; /**< Notification email. */
+	char	*ident;    /**< Contact's unique ident. */
+	epp_identType identtype;/**< Type of unique ident. */
+	char	*notify_email;  /**< Notification email. */
 	char	*crDate;   /**< Creation date of contact. */
 }epps_create_contact;
 
 /** Create domain parameters. */
 typedef struct {
 	char	*name;    /**< FQDN of wanted domain (input). */
-	char	*registrant;   /**< Registrant of domain. */
+	char	*registrant; /**< Registrant of domain. */
 	qhead	 admin;   /**< Admin contact for domain. */
 	char	*nsset;   /**< Nsset of domain. */
 	int	 period;  /**< Registration period in months. */
@@ -478,8 +478,8 @@ typedef struct {
 	char	*authInfo;      /**< Authorization information. */
 	epp_discl discl;        /**< Disclose information section. */
 	char	*vat;           /**< VAT tax ID. */
-	char	*ident;           /**< Contact's unique ident. */
-	epp_identType identtype;    /**< Type of unique ident. */
+	char	*ident;         /**< Contact's unique ident. */
+	epp_identType identtype;/**< Type of unique ident. */
 	char	*notify_email;  /**< Notification email. */
 }epps_update_contact;
 
