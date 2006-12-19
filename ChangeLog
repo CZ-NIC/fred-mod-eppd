@@ -1,25 +1,3 @@
-version 1.3.0
-
-	* New reference manager mod_corba was added, mod_eppd was adapted
-	to changed reference management policy. Now each connection has
-	its own unique CORBA reference.
-
-	* As a side effect of changes in reference management code, the
-	apache can be started without omninames running. The object references
-	are obtained and resolved upon request arrival.
-
-	* Handling of period in renew and create was changed. The period
-	is now structured as 'value' and 'unit'. No conversion to months
-	is done on behalf of mod_eppd.
-
-	* Support for update of status flags was removed.
-
-	* New EPP command 'sendAuthInfo' was implemented.
-
-	* Script for regular update of CRL.
-
-	* New command for credit balance retrieval (creditInfo) was added.
-
 version 1.2.0
 
 	* New memory allocator. Memory is now allocated from pools and freed
@@ -44,6 +22,26 @@ version 1.2.0
 	* Changes in schema files (see ChangeLog in subdirectory schemas).
 
 	* ... major rebuild of all source files and code cleanup
+
+	* New reference manager mod_corba was added, mod_eppd was adapted
+	to changed reference management policy. Now each connection has
+	its own unique CORBA reference.
+
+	* As a side effect of changes in reference management code, the
+	apache can be started without omninames running. The object references
+	are obtained and resolved upon request arrival.
+
+	* Handling of period in renew and create was changed. The period
+	is now structured as 'value' and 'unit'. No conversion to months
+	is done on behalf of mod_eppd.
+
+	* Support for update of status flags was removed.
+
+	* New EPP command 'sendAuthInfo' was implemented.
+
+	* Script for regular update of CRL.
+
+	* New command for credit balance retrieval (creditInfo) was added.
 
 version 1.1.1
 
