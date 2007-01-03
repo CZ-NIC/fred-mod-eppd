@@ -97,8 +97,18 @@
          maxOccurs="unbounded"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
+        <element name="reportlevel" type="nsset:reportlevelType"
+         minOccurs="0"/>
       </sequence>
     </complexType>
+
+    <simpleType name="reportlevelType">
+      <restriction base="token">
+        <enumeration value="error"/>
+        <enumeration value="warning"/>
+        <enumeration value="notice"/>
+      </restriction>
+    </simpleType>
 
     <complexType name="nsT">
       <sequence>
@@ -226,6 +236,8 @@
         <element name="ns" type="nsset:nsT" minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          maxOccurs="unbounded"/>
+        <element name="reportlevel" type="nsset:reportlevelType"
+         minOccurs="0"/>
       </sequence>
     </complexType>
 

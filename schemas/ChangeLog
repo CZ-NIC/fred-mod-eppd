@@ -1,4 +1,8 @@
-2006-11-13 Jan Kryl
+2006-01-02 Jan Kryl (version 1.2.0)
+
+	* New element 'reportlevel' in create command and info response was
+	added in schema nsset-1.2. Element's value influences level of
+	technical checks performed on nsset.
 
 	* Oprava typu registranta u domeny v updatu.
 
@@ -30,8 +34,6 @@
 
 	* Povyseni verze u vsech schemat, ktere se zmenily od verze 1.1.1
 	mod_eppd (vsechny krome epp, eppcom, enumval a noveho schematu fred).
-
-2006-10-31 Jan Kryl (version 1.2.0)
 
 	* Z povineni authInfo elementu pri transferech objektu. Nepredstavuje
 	az tak velkou zmenu, do ted bylo authInfo vyzadovano serverem, ted

@@ -25,6 +25,7 @@
 	<nsset:tech>CID:DEBIL</nsset:tech>
 	<nsset:tech>CID:JOUDA</nsset:tech>
         <nsset:authInfo>2fooBAR</nsset:authInfo>
+        <nsset:reportlevel>warning</nsset:reportlevel>
       </nsset:create>
     </create>
     <clTRID>ABC-12345</clTRID>

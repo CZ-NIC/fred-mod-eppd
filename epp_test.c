@@ -167,7 +167,7 @@ get_service(CORBA_ORB orb, const char *ns_loc, const char *obj_name)
 
 	/* build a name of EPP object */
 	name_component = CORBA_sequence_CosNaming_NameComponent_allocbuf(2);
-	name_component[0].id = CORBA_string_dup("ccReg");
+	name_component[0].id = CORBA_string_dup("fred");
 	name_component[0].kind = CORBA_string_dup("context");
 	name_component[1].id = CORBA_string_dup(obj_name);
 	name_component[1].kind = CORBA_string_dup("Object");
