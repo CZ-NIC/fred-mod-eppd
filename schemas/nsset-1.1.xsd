@@ -268,15 +268,17 @@
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
         <element name="name" type="eppcom:labelType"/>
-        <element name="unittest" type="fredcom:unittestType"
+        <element name="result" type="nsset:resultType"
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
     </complexType>
 
-    <complexType name="unittestType">
+    <complexType name="resultType">
       <sequence>
         <element name="name" type="eppcom:labelType"/>
         <element name="status" type="boolean"/>
+        <element name="note" type="string"
+	 minOccurs="0"/>
       </sequence>
     </complexType>
 
