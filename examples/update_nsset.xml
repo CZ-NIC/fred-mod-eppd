@@ -23,6 +23,7 @@
 	</nsset:rem>
 	<nsset:chg>
 		<nsset:authInfo>blebleble</nsset:authInfo>
+		<nsset:reportlevel>4</nsset:reportlevel>
 	</nsset:chg>
       </nsset:update>
     </update>
