@@ -1410,7 +1410,7 @@ parse_update_domain(void *pool,
 	/* rem data */
 	xpath_chroot(xpathCtx, "domain:rem", 0, &xerr);
 	if (xerr == XERR_OK) {
-		xpath_getn(pool, &update_domain->add_admin, xpathCtx,
+		xpath_getn(pool, &update_domain->rem_admin, xpathCtx,
 				"domain:admin", &xerr);
 		CHK_XERR(xerr, error);
 		xpathCtx->node = xpathCtx->node->parent;
