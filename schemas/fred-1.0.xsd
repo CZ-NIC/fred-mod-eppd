@@ -27,6 +27,7 @@
       <sequence>
         <choice>
           <element name="sendAuthInfo" type="fred:readWriteType"/>
+          <element name="test" type="fred:readWriteType"/>
           <element name="creditInfo"/>
         </choice>
         <element name="clTRID" type="fred:trIDStringType"
