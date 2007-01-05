@@ -54,6 +54,7 @@ typedef enum {
 	EPP_SENDAUTHINFO_CONTACT,
 	EPP_SENDAUTHINFO_DOMAIN,
 	EPP_SENDAUTHINFO_NSSET,
+	EPP_TEST_NSSET,
 	EPP_CREDITINFO
 }epp_command_type;
 
@@ -527,6 +528,12 @@ typedef struct {
 typedef struct {
 	qhead	 zonecredits; /**< List of credits for individual zones. */
 }epps_creditInfo;
+
+/** Test parameters. */
+typedef struct {
+	char	*id;   /**< ID of tested nsset. */
+	char	*name; /**< Name of domain to be tested with nsset. */
+}epps_test;
 
 /**
  * This structure is central to the concept of the whole module. The

@@ -3395,6 +3395,97 @@ epp_call_creditinfo(void *pool,
 	return CORBA_OK;
 }
 
+static corba_status
+epp_call_test_nsset(void *pool,
+		service_EPP service,
+		int session,
+		epp_command_data *cdata)
+{
+	CORBA_Environment	 ev[1];
+	CORBA_char	*c_clTRID, *c_handle, *c_name;
+	ccReg_Response	*response;
+	epps_test	*test;
+	int	 retr;
+
+	test = cdata->data;
+	/*
+	 * Input parameters:
+	 *    session
+	 *    c_clTRID (*)
+	 *    c_handle (*)
+	 *    c_name (*)
+	 *    xml_in (a)
+	 * Output parameters: none
+	 */
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+
+	c_handle = wrap_str(test->id);
+	if (c_handle == NULL) {
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+
+	c_name = wrap_str(test->name);
+	if (c_name == NULL) {
+		CORBA_free(c_clTRID);
+		CORBA_free(c_handle);
+		return CORBA_INT_ERROR;
+	}
+
+	/* XXX temp */
+	CORBA_exception_init(ev);
+	response = ccReg_Response__alloc();
+	response->errCode = 1000;
+	response->errMsg = CORBA_string_dup("Command completed successfully");
+	response->svTRID = CORBA_string_dup("-not implemented-");
+	response->errors._maximum = response->errors._length = 0;
+	response->errors._buffer = NULL;
+	response->errors._release = 0;
+	/*
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev);
+		CORBA_exception_init(ev);
+
+		response = ccReg_EPP_nssetTest((ccReg_EPP) service,
+				c_handle,
+				c_name,
+				session,
+				c_clTRID,
+				cdata->xml_in,
+				ev);
+
+		// if COMM_FAILURE exception is not raised quit retry loop
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+	*/
+	CORBA_free(c_handle);
+	CORBA_free(c_name);
+	CORBA_free(c_clTRID);
+
+	if (raised_exception(ev)) {
+		int	ret;
+
+		if (IS_INTSERV_ERROR(ev)) {
+			ret  = CORBA_REMOTE_ERROR;
+		}
+		else {
+			ret  = CORBA_ERROR;
+		}
+		CORBA_exception_free(ev);
+		return ret;
+	}
+
+	if (corba_call_epilog(pool, cdata, response))
+		return CORBA_INT_ERROR;
+
+	return CORBA_OK;
+}
+
 corba_status
 epp_call_cmd(void *pool,
 		service_EPP service,
@@ -3515,6 +3606,10 @@ epp_call_cmd(void *pool,
 			break;
 		case EPP_CREDITINFO:
 			cstat = epp_call_creditinfo(pool, service, session,
+					cdata);
+			break;
+		case EPP_TEST_NSSET:
+			cstat = epp_call_test_nsset(pool, service, session,
 					cdata);
 			break;
 		default:

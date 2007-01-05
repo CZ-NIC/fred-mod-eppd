@@ -1974,6 +1974,55 @@ error:
 }
 
 /**
+ * Parser of command test.
+ *
+ * @param pool Pool to allocate memory from.
+ * @param xpathCtx Xpath context.
+ * @param cdata Parsed data.
+ */
+static void
+parse_test(void *pool,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	epps_test	*test;
+	int	xerr;
+
+	cdata->data = epp_calloc(pool, sizeof *test);
+	if (cdata->data == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	test = cdata->data;
+
+	RESET_XERR(xerr); /* clear value of errno */
+	xpath_chroot(xpathCtx, "nsset:test", 0, &xerr);
+	if (xerr == XERR_LIBXML) {
+		goto error;
+	}
+	else if (xerr != XERR_OK) {
+		/* unexpected object type */
+		cdata->rc = 2000;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+
+	test->id = xpath_get1(pool, xpathCtx,
+			"nsset:id", 1, &xerr);
+	CHK_XERR(xerr, error);
+	test->name = xpath_get1(pool, xpathCtx,
+			"nsset:name", 1, &xerr);
+	CHK_XERR(xerr, error);
+	cdata->type = EPP_TEST_NSSET;
+	return;
+
+error:
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
+/**
  * Parser of enumval extension in context of create domain command.
  *
  * @param pool      Pool for memory allocations.
@@ -2300,6 +2349,13 @@ parse_extension(void *pool,
 			/* It is sendAuthInfo */
 			if (!strcmp(elemname, "sendAuthInfo")) {
 				parse_sendAuthInfo(pool, xpathCtx, cdata);
+				break;
+			}
+			/* fall-through if not matched */
+		case 't':
+			/* It is test */
+			if (!strcmp(elemname, "test")) {
+				parse_test(pool, xpathCtx, cdata);
 				break;
 			}
 			/* fall-through if not matched */

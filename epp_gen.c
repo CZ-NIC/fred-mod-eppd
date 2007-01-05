@@ -716,6 +716,7 @@ epp_gen_response(void *pool,
 		case EPP_SENDAUTHINFO_DOMAIN:
 		case EPP_SENDAUTHINFO_CONTACT:
 		case EPP_SENDAUTHINFO_NSSET:
+		case EPP_TEST_NSSET:
 			break;
 		/* commands with <msgQ> element */
 		case EPP_POLL_REQ:
