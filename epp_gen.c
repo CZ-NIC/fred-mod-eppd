@@ -389,6 +389,7 @@ static char
 gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
 	epps_info_nsset	*info_nsset;
+	char	level[3]; /* sufficient for reportlevel */
 
 	info_nsset = cdata->data;
 
@@ -434,6 +435,8 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 		WRITE_ELEMENT(writer, simple_err, "nsset:tech",
 				q_content(&info_nsset->tech));
 	}
+	snprintf(level, 3, "%d", info_nsset->level);
+	WRITE_ELEMENT(writer, simple_err, "nsset:reportlevel", level);
 	END_ELEMENT(writer, simple_err); /* infdata */
 	END_ELEMENT(writer, simple_err); /* resdata */
 	return 1;

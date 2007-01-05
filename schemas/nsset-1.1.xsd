@@ -32,8 +32,10 @@
     <element name="info" type="nsset:sIDType"/>
     <element name="update" type="nsset:updateType"/>
     <element name="transfer" type="nsset:transferType"/>
-    <!-- list contacts extension -->
+    <!-- extension list -->
     <element name="list"/>
+    <element name="sendAuthInfo" type="nsset:sendAuthInfoType"/>
+    <element name="test" type="nsset:testType"/>
 
   <!--
   Child elements of the <transfer> command.
@@ -260,14 +262,38 @@
       </sequence>
     </complexType>
 
+    <element name="testData" type="nsset:testDataT"/>
+
+    <complexType name="testDataT">
+      <sequence>
+        <element name="id" type="fredcom:objIDType"/>
+        <element name="name" type="eppcom:labelType"/>
+        <element name="unittest" type="fredcom:unittestType"
+         minOccurs="0" maxOccurs="unbounded"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="unittestType">
+      <sequence>
+        <element name="name" type="eppcom:labelType"/>
+        <element name="status" type="boolean"/>
+      </sequence>
+    </complexType>
+
   <!--
   nsset specific protocol extensions
   -->
-    <element name="sendAuthInfo" type="nsset:sendAuthInfoType"/>
 
     <complexType name="sendAuthInfoType">
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="testType">
+      <sequence>
+        <element name="id" type="fredcom:objIDType"/>
+        <element name="name" type="eppcom:labelType"/>
       </sequence>
     </complexType>
 

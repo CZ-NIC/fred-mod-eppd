@@ -397,6 +397,7 @@ typedef struct {
 	char	*authInfo;/**< Authorization information. */
 	qhead	 ns;      /**< List of nameservers. */
 	qhead	 tech;    /**< List of technical contacts for nsset. */
+	int	 level;   /**< Report level. */
 }epps_info_nsset;
 
 /** Poll request parameters. */
@@ -451,6 +452,7 @@ typedef struct {
 	qhead	 ns;      /**< List of nameservers. */
 	qhead	 tech;    /**< List of technical contacts for nsset. */
 	char	*crDate;  /**< Creation date of nsset. */
+	int	 level;   /**< Report level. */
 }epps_create_nsset;
 
 /** Delete parameters. */
@@ -502,6 +504,7 @@ typedef struct {
 	qhead	 add_ns;       /**< Nameservers to be added. */
 	qhead	 rem_ns;       /**< Nameservers to be removed. */
 	char	*authInfo;     /**< Authorization information. */
+	int	 level;        /**< Report level. */
 }epps_update_nsset;
 
 /** Transfer parameters. */

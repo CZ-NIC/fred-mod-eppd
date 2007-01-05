@@ -1,8 +1,7 @@
 2006-01-02 Jan Kryl (version 1.2.0)
 
-	* New element 'reportlevel' in create command and info response was
-	added in schema nsset-1.2. Element's value influences level of
-	technical checks performed on nsset.
+	* Novy element 'reportlevel' byl pridan do schemat nsset-1.1. Element
+	ovlivnuje podrobnost technickych testu vykonavanych na nssetu.
 
 	* Oprava typu registranta u domeny v updatu.
 

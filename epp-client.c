@@ -1283,6 +1283,8 @@ epp_call_info_nsset(void *pool,
 	if (cerrno != 0) goto error;
 	info_nsset->authInfo = unwrap_str(pool, c_nsset->AuthInfoPw, &cerrno);
 	if (cerrno != 0) goto error;
+	/* XXX temporary hack for reportlevel */
+	info_nsset->level = 0;
 
 	/* initialize status list */
 	for (i = 0; i < c_nsset->stat._length; i++) {

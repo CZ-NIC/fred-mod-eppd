@@ -1123,7 +1123,8 @@ parse_create_nsset(void *pool,
 {
 	epps_create_nsset	*create_nsset;
 	xmlXPathObjectPtr	 xpathObj;
-	int	j, xerr;
+	char	*level;
+	int	 j, xerr;
 
 	RESET_XERR(xerr); /* clear value of errno */
 
@@ -1138,6 +1139,9 @@ parse_create_nsset(void *pool,
 	create_nsset->authInfo = xpath_get1(pool, xpathCtx,
 			"nsset:authInfo", 0, &xerr);
 	CHK_XERR(xerr, error);
+	level = xpath_get1(pool, xpathCtx, "nsset:reportlevel", 0, &xerr);
+	CHK_XERR(xerr, error);
+	create_nsset->level = atoi(level);
 	/* process "unbounded" number of tech contacts */
 	xpath_getn(pool, &create_nsset->tech, xpathCtx, "nsset:tech", &xerr);
 	CHK_XERR(xerr, error);
@@ -1651,7 +1655,8 @@ parse_update_nsset(void *pool,
 {
 	epps_update_nsset	*update_nsset;
 	xmlXPathObjectPtr	xpathObj;
-	int	j, xerr;
+	int	 j, xerr;
+	char	*level;
 
 	RESET_XERR(xerr); /* clear value of errno */
 
@@ -1667,6 +1672,9 @@ parse_update_nsset(void *pool,
 	update_nsset->authInfo = xpath_get1(pool, xpathCtx,
 			"nsset:chg/nsset:authInfo", 0, &xerr);
 	CHK_XERR(xerr, error);
+	level = xpath_get1(pool, xpathCtx, "nsset:reportlevel", 0, &xerr);
+	CHK_XERR(xerr, error);
+	update_nsset->level = atoi(level);
 	/* rem data */
 	xpath_chroot(xpathCtx, "nsset:rem", 0, &xerr);
 	if (xerr == XERR_LIBXML)
