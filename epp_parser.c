@@ -1141,7 +1141,10 @@ parse_create_nsset(void *pool,
 	CHK_XERR(xerr, error);
 	level = xpath_get1(pool, xpathCtx, "nsset:reportlevel", 0, &xerr);
 	CHK_XERR(xerr, error);
-	create_nsset->level = atoi(level);
+	if (level != NULL)
+		create_nsset->level = atoi(level);
+	else
+		create_nsset->level = -1;
 	/* process "unbounded" number of tech contacts */
 	xpath_getn(pool, &create_nsset->tech, xpathCtx, "nsset:tech", &xerr);
 	CHK_XERR(xerr, error);
@@ -1674,7 +1677,10 @@ parse_update_nsset(void *pool,
 	CHK_XERR(xerr, error);
 	level = xpath_get1(pool, xpathCtx, "nsset:reportlevel", 0, &xerr);
 	CHK_XERR(xerr, error);
-	update_nsset->level = atoi(level);
+	if (level != NULL)
+		update_nsset->level = atoi(level);
+	else
+		update_nsset->level = -1;
 	/* rem data */
 	xpath_chroot(xpathCtx, "nsset:rem", 0, &xerr);
 	if (xerr == XERR_LIBXML)
