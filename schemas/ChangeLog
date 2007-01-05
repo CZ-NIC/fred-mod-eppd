@@ -1,5 +1,15 @@
 2006-01-02 Jan Kryl (version 1.2.0)
 
+	* Vybudovani zazemi pro ruzna rozsireni EPP ne na urovni existujicich
+	prikazu ale na urovni protokolu. Tato rozsireni budou definovat nove
+	operace nad objekty, ktere nebyly definovany v EPP standardu.
+	Rozsireni maji podobnou strukturu jako standardni prikazy (napr.
+	obsahuji clTRID udaj). Tento rozsirujici framework je definovan ve
+	schematu fred-1.0.xsd.
+
+	* Novy prikaz na vyvolani technicke kontroly a definice struktury
+	zpravy o probehle kontrole.
+
 	* Novy element 'reportlevel' byl pridan do schemat nsset-1.1. Element
 	ovlivnuje podrobnost technickych testu vykonavanych na nssetu.
 
@@ -8,13 +18,6 @@
 	* Pridani "object-specific protocol extensionu" do schemat objektu.
 	Je to prikaz pro zaslani authInfa klientovi (soucast noveho zpusobu
 	transferu).
-
-	* Vybudovani zazemi pro ruzna rozsireni EPP ne na urovni existujicich
-	prikazu ale na urovni protokolu. Tato rozsireni budou definovat nove
-	operace nad objekty, ktere nebyly definovany v EPP standardu.
-	Rozsireni maji podobnou strukturu jako standardni prikazy (napr.
-	obsahuji clTRID udaj). Tento rozsirujici framework je definovan ve
-	schematu fred-1.0.xsd.
 
 	* Pridani "object-specific" zprav do schemat objektu, zatim je to
 	jen zprava o probehlem transferu.
