@@ -51,7 +51,7 @@
  */
 static int error_translator[][2] =
 {
-  {ccReg_unknow,                errspec_unknown},
+  {ccReg_unknown,                errspec_unknown},
   {ccReg_poll_msgID,            errspec_poll_msgID},
   {ccReg_poll_msgID_missing,    errspec_poll_msgID_missing},
   {ccReg_contact_handle,        errspec_contact_handle},

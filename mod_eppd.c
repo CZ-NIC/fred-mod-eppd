@@ -232,6 +232,7 @@ static void epplog(conn_rec *c, apr_pool_t *p, int session, epp_loglevel level,
 	char	timestr[80]; /* buffer for timestamp */
     const char	*rhost;  /* ip address of remote host */
     apr_size_t	nbytes;  /* length of logline */
+	int	i;
     apr_status_t	rv;
     va_list	ap;
     eppd_server_conf *sc = (eppd_server_conf *)
@@ -244,6 +245,11 @@ static void epplog(conn_rec *c, apr_pool_t *p, int session, epp_loglevel level,
     text = apr_pvsprintf(p, fmt, ap);
     va_end(ap);
  
+	/* substitute newlines in text */
+	for (i = 0; text[i] != '\0'; i++) {
+		if (text[i] == '\n') text[i] = ' ';
+	}
+
 	/* if epp log file is not configured, log messages to apache's error log */
 	if (!sc->epplogfp) {
 		int	ap_level; /* apache's log level equivalent to eppd loglevel */
@@ -551,8 +557,8 @@ static int epp_process_connection(conn_rec *c)
 	EPPservice = (service_EPP) apr_hash_get(references, sc->object,
 			strlen(sc->object));
 	if (EPPservice == NULL) {
-		epplog(c, c->pool, 0, EPP_ERROR, "Could not obtain object reference for \
-				alias '%s'.", sc->object);
+		epplog(c, c->pool, 0, EPP_ERROR, "Could not obtain object reference for "
+				"alias '%s'.", sc->object);
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
@@ -752,6 +758,12 @@ static int epp_process_connection(conn_rec *c)
 				 */
 				cstat = epp_call_login(rpool, EPPservice, &session, &lang,
 						cert_md5, cdata);
+				/*
+				 * this event should be logged explicitly if login was
+				 * successfull
+				 */
+				if (session != 0)
+					epplog(c, rpool, session, EPP_INFO,"Logged in successfully");
 			}
 			else if (pstat == PARSER_CMD_LOGOUT) {
 				cstat = epp_call_logout(rpool, EPPservice, session,
