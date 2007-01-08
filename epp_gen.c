@@ -486,12 +486,14 @@ complete_tags(void *pool, epp_error *e)
 			newstr = epp_strdup(pool, "<poll op=\"ack\"/>");
 			break;
 		case errspec_contact_identtype_missing:
-			len += 2 * strlen("<ident>") + 1;
+			len += strlen("<ident/>") + 1;
 			newstr = epp_malloc(pool, len + 1);
 			*newstr = '\0';
-			strcat(newstr, "<ident>");
+			strcat(newstr, "<ident/>");
+			/*
 			strcat(newstr, e->value);
 			strcat(newstr, "</ident>");
+			*/
 			break;
 		case errspec_contact_cc:
 			len += 2 * strlen("<cc>") + 1;
