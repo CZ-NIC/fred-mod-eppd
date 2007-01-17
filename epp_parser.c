@@ -1675,7 +1675,8 @@ parse_update_nsset(void *pool,
 	update_nsset->authInfo = xpath_get1(pool, xpathCtx,
 			"nsset:chg/nsset:authInfo", 0, &xerr);
 	CHK_XERR(xerr, error);
-	level = xpath_get1(pool, xpathCtx, "nsset:reportlevel", 0, &xerr);
+	level = xpath_get1(pool, xpathCtx,
+			"nsset:chg/nsset:reportlevel", 0, &xerr);
 	CHK_XERR(xerr, error);
 	if (level != NULL)
 		update_nsset->level = atoi(level);
