@@ -47,25 +47,18 @@
  *   - default:      Off
  *   - context:      global config, virtual host
  *   - description:
- *         Activates epp module.
- *   .
- * 
- *   name: EPPnameservice
- *   - value:        host[:port]
- *   - default:      localhost
- *   - context:      global config, virtual host
- *   - description:
- *         A location of CORBA nameservice where the module asks for EPP object.
- *         Obtained reference is used for lifetime of process so it is best
- *         to restart the apache when you change the object on other side.
+ *         Activates epp module.  This means that any
+ *         data comming from network connection on ip address of virtual host
+ *         are assummed to be epp requests.
  *   .
  * 
  *   name: EPPobject
- *   - value:        token
+ *   - value:        alias
  *   - default:      EPP
  *   - context:      global config, virtual host
  *   - description:
- *         Name under which is the EPP object known to CORBA nameservice.
+ *         Alias under which is exported corba object reference from mod_corba
+ *         module.
  *   .
  * 
  *   name: EPPschema
@@ -74,7 +67,7 @@
  *   - context:      global config, virtual host
  *   - description:
  *         A location of xsd file (xml schema) describing EPP protocol. It is
- *         used for validation of incomming and outcomming messages.
+ *         used for validation of incomming and possibly outcomming messages.
  *   .
  * 
  *   name: EPPservername
@@ -92,6 +85,9 @@
  *   - description:
  *         Log file of mod_eppd. It is not an error not to set log file,
  *         in that case all messages will be logged to apache's error log.
+ *         This log file is espesially neat when tracing XML documents
+ *         exchanged between client and server. In that case epp log level
+ *         must be set to debug.
  *   .
  * 
  *   name: EPPloglevel
@@ -99,7 +95,7 @@
  *   - default:      info
  *   - context:      global config, virtual host
  *   - description:
- *         Log verbosity.
+ *         EPP log verbosity.
  *   .
  * 
  *   name: EPPvalidResponse
@@ -110,8 +106,7 @@
  *         Whether to validate responses from the mod_eppd. The line is dropped
  *         in log file if response does not validate, but otherwise the response
  *         proceeds as normaly. This is very handy for verifing good operation
- *         of the server. On the other hand it will slow down server quite a
- *         bit.
+ *         of the server. On the other hand it will notably slow down server.
  *   .
  * 
  * Example configuration suited for production might look like this:
@@ -124,7 +119,6 @@
  LoadModule eppd_module modules/mod_eppd.so
  <VirtualHost 192.168.2.1:700>
    EPPprotocol       On
-   EPPnameservice    "nameservice-host.cz"
    EPPobject         "EPP"
    EPPschema         "/etc/apache2/schemas/all-1.1.xsd"
    EPPservername     "EPP production server"
@@ -140,6 +134,10 @@
    SSLCACertificateFile  /etc/apache2/certs/server.crt
  </VirtualHost>
  @endverbatim
+ *
+ * The SSL configuration in virtual host is mandatory, since EPP works only
+ * over SSL. The configuration of mod_corba module must be part of virtual
+ * host's configuration. See documentation of mod_corba module.
  *
  * @section memory Memory management
  *

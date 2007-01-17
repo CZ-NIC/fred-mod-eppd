@@ -7,20 +7,11 @@
 	obsahuji clTRID udaj). Tento rozsirujici framework je definovan ve
 	schematu fred-1.0.xsd.
 
-	* Novy prikaz na vyvolani technicke kontroly a definice struktury
-	zpravy o probehle kontrole.
-
-	* Novy element 'reportlevel' byl pridan do schemat nsset-1.1. Element
-	ovlivnuje podrobnost technickych testu vykonavanych na nssetu.
-
 	* Oprava typu registranta u domeny v updatu.
 
 	* Pridani "object-specific protocol extensionu" do schemat objektu.
 	Je to prikaz pro zaslani authInfa klientovi (soucast noveho zpusobu
 	transferu).
-
-	* Pridani "object-specific" zprav do schemat objektu, zatim je to
-	jen zprava o probehlem transferu.
 
 	* Zruseni statusu nastavovanych klientem a tim padem i zruseni
 	mechanismu pro jejich nastaveni.
@@ -34,9 +25,6 @@
 
 	* ExDate u domeny uz neni typ datetime ale pouze date.
 
-	* Povyseni verze u vsech schemat, ktere se zmenily od verze 1.1.1
-	mod_eppd (vsechny krome epp, eppcom, enumval a noveho schematu fred).
-
 	* Z povineni authInfo elementu pri transferech objektu. Nepredstavuje
 	az tak velkou zmenu, do ted bylo authInfo vyzadovano serverem, ted
 	je vyzadovano na urovni schemat.
@@ -48,6 +36,20 @@
 	* Pri infu slo zadat authInfo objektu, jako dodatecnou autorizaci
 	k info prikazu. Vzhledem k tomu ze jsme to nepouzivali, byla vlastnost
 	odebrana.
+
+	* Novy prikaz na vyvolani technicke kontroly a definice struktury
+	zpravy o probehle kontrole.
+
+	* Novy element 'reportlevel' byl pridan do schemat nsset-1.1. Element
+	ovlivnuje podrobnost technickych testu vykonavanych na nssetu a je
+	soucasti create, update a info prikazu nad nssetem.
+
+	* Pridani "object-specific" zprav do schemat objektu. Je to
+	zprava o probehlem transferu (ta byla pridana ke vsem objektum)
+	a zprava o vysledku technickych kontrol u objektu nsset.
+
+	* Povyseni verze u vsech schemat, ktere se zmenily od verze 1.1.1
+	mod_eppd (vsechny krome epp, eppcom, enumval a noveho schematu fred).
 
 2006-09-26 Jan Kryl (version 1.1.1)
 

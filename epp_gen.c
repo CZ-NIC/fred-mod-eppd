@@ -744,6 +744,8 @@ epp_gen_response(void *pool,
 				epps_poll_ack	*poll_ack;
 
 				poll_ack = cdata->data;
+				if (poll_ack->count == 0)
+					break;
 				START_ELEMENT(writer, simple_err, "msgQ");
 				snprintf(strbuf, 25, "%d", poll_ack->count);
 				WRITE_ATTRIBUTE(writer, simple_err, "count",

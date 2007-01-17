@@ -100,4 +100,20 @@ epp_call_cmd(void *pool,
 		int session,
 		epp_command_data *cdata);
 
+/**
+ * This function calls corba function which saves generated XML in database.
+ *
+ * From architectural view THIS IS UGLY HACK! And until
+ * serving of EPP request will become complex operation composed from
+ * several function calls, it will remain so.
+ *
+ * @param service     EPP service.
+ * @param cdata       Used to get svTRID.
+ * @param xml         Output XML.
+ */
+void
+epp_call_save_output_xml(service_EPP service,
+		epp_command_data *cdata,
+		const char *xml);
+
 #endif /* EPP_CLIENT_H */

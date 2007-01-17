@@ -1,5 +1,7 @@
 version 1.2.0
 
+	* ... major rebuild of all source files and code cleanup
+
 	* New memory allocator. Memory is now allocated from pools and freed
 	all at once when request processing is over.
 
@@ -7,6 +9,14 @@ version 1.2.0
 
 	* The mega-structure containing all possible request was parted
 	in smaller peaces, which ease manipulation.
+
+	* New reference manager mod_corba was added, mod_eppd was adapted
+	to changed reference management policy. Now each connection has
+	its own unique CORBA reference.
+
+	* As a side effect of changes in reference management code, the
+	apache can be started without omninames running. The object references
+	are obtained and resolved upon request arrival.
 
 	* The epp-client.c file (CORBA component) was made bullet-proof
 	against possible memory allocation failures.
@@ -19,18 +29,6 @@ version 1.2.0
 	* Extension handling mechanism was changed in order to make adding
 	of new extensions easier (DNSSEC extension was dropped for now).
 
-	* Changes in schema files (see ChangeLog in subdirectory schemas).
-
-	* ... major rebuild of all source files and code cleanup
-
-	* New reference manager mod_corba was added, mod_eppd was adapted
-	to changed reference management policy. Now each connection has
-	its own unique CORBA reference.
-
-	* As a side effect of changes in reference management code, the
-	apache can be started without omninames running. The object references
-	are obtained and resolved upon request arrival.
-
 	* Handling of period in renew and create was changed. The period
 	is now structured as 'value' and 'unit'. No conversion to months
 	is done on behalf of mod_eppd.
@@ -39,9 +37,21 @@ version 1.2.0
 
 	* New EPP command 'sendAuthInfo' was implemented.
 
-	* Script for regular update of CRL.
+	* New EPP command for credit balance retrieval (creditInfo) was added.
 
-	* New command for credit balance retrieval (creditInfo) was added.
+	* New EPP command for trigering of technical check on nsset was added.
+
+	* New attribute of nsset 'reportlevel' was added. This attribute is
+	related to technical checks.
+
+	* XML documents sent in response to EPP commands are from now logged to
+	central register over corba.
+
+	* Script for regular update of CRL is now part of mod_eppd
+	distribution.
+
+	* Changes in schema files (see ChangeLog in subdirectory schemas).
+	The versions on most schema files were bumped up.
 
 version 1.1.1
 

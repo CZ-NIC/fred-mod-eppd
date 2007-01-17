@@ -1283,8 +1283,7 @@ epp_call_info_nsset(void *pool,
 	if (cerrno != 0) goto error;
 	info_nsset->authInfo = unwrap_str(pool, c_nsset->AuthInfoPw, &cerrno);
 	if (cerrno != 0) goto error;
-	/* XXX temporary hack for reportlevel */
-	info_nsset->level = 0;
+	info_nsset->level = c_nsset->level;
 
 	/* initialize status list */
 	for (i = 0; i < c_nsset->stat._length; i++) {
@@ -1536,7 +1535,7 @@ epp_call_poll_ack(void *pool,
 	CLEAR_CERRNO(cerrno);
 
 	poll_ack->count = c_count;
-	poll_ack->newmsgid = unwrap_str_req(pool, c_msgID, &cerrno);
+	poll_ack->newmsgid = unwrap_str(pool, c_msgID, &cerrno);
 	if (cerrno != 0) goto error;
 
 	CORBA_free(c_msgID);
@@ -2039,6 +2038,7 @@ epp_call_create_nsset(void *pool,
 	 *    c_authInfo (*)
 	 *    c_tech (*)
 	 *    c_dnshost (*)
+	 *    level
 	 *    session
 	 *    c_clTRID (*)
 	 *    xml_in (a)
@@ -2154,6 +2154,7 @@ epp_call_create_nsset(void *pool,
 				c_authInfo,
 				c_tech,
 				c_dnshost,
+				create_nsset->level,
 				&c_crDate,
 				session,
 				c_clTRID,
@@ -2840,6 +2841,7 @@ epp_call_update_nsset(void *pool,
 	 *    c_dnshost_rem (*)
 	 *    c_tech_add    (*)
 	 *    c_tech_rem    (*)
+	 *    level
 	 *    session
 	 *    c_clTRID      (*)
 	 *    xml_in        (a)
@@ -2952,6 +2954,7 @@ epp_call_update_nsset(void *pool,
 				c_dnshost_rem,
 				c_tech_add,
 				c_tech_rem,
+				update_nsset->level,
 				session,
 				c_clTRID,
 				cdata->xml_in,
@@ -3435,16 +3438,6 @@ epp_call_test_nsset(void *pool,
 		return CORBA_INT_ERROR;
 	}
 
-	/* XXX temp */
-	CORBA_exception_init(ev);
-	response = ccReg_Response__alloc();
-	response->errCode = 1000;
-	response->errMsg = CORBA_string_dup("Command completed successfully");
-	response->svTRID = CORBA_string_dup("-not implemented-");
-	response->errors._maximum = response->errors._length = 0;
-	response->errors._buffer = NULL;
-	response->errors._release = 0;
-	/*
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
 		CORBA_exception_init(ev);
@@ -3457,12 +3450,11 @@ epp_call_test_nsset(void *pool,
 				cdata->xml_in,
 				ev);
 
-		// if COMM_FAILURE exception is not raised quit retry loop
+		/* if COMM_FAILURE exception is not raised quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
-	*/
 	CORBA_free(c_handle);
 	CORBA_free(c_name);
 	CORBA_free(c_clTRID);
@@ -3618,4 +3610,33 @@ epp_call_cmd(void *pool,
 	}
 
 	return cstat;
+}
+
+void
+epp_call_save_output_xml(service_EPP service, epp_command_data *cdata,
+		const char *xml)
+{
+	CORBA_Environment	 ev[1];
+	int	 retr;
+
+	assert(cdata->svTRID);
+	assert(xml);
+
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev);
+		CORBA_exception_init(ev);
+
+		ccReg_EPP_SaveOutXML((ccReg_EPP) service, cdata->svTRID, xml,ev);
+
+		/* if COMM_FAILURE exception is not raised quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+
+	if (raised_exception(ev)) {
+		CORBA_exception_free(ev);
+		/* ignore error */
+		return;
+	}
 }

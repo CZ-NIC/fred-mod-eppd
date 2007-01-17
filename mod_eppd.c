@@ -852,6 +852,8 @@ static int epp_process_connection(conn_rec *c)
 							"Unknown return code from generator module");
 					break;
 			}
+			/* XXX ugly hack */
+			epp_call_save_output_xml(EPPservice, cdata, response);
 		}
 
 #ifdef EPP_PERF
@@ -1358,8 +1360,8 @@ static const command_rec eppd_cmds[] = {
 			 "This will slow down the server and should be used only for"
 			 " debugging purposes."),
 	AP_INIT_TAKE1("EPPobject", set_epp_object, NULL, RSRC_CONF,
-			 "Name under which is the EPP object known to nameserver. "
-			 "Default is \"EPP\"."),
+			 "Alias under which is the reference to EPP object exported "
+			 "from mod_corba module. Default is \"EPP\"."),
     { NULL }
 };
 
