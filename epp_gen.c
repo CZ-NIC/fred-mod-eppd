@@ -113,7 +113,7 @@ epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting
 	WRITE_ELEMENT(writer, greeting_err, "svID", svid);
 	WRITE_ELEMENT(writer, greeting_err, "svDate", date);
 	START_ELEMENT(writer, greeting_err, "svcMenu");
-	WRITE_ELEMENT(writer, greeting_err, "version" , PACKAGE_VERSION);
+	WRITE_ELEMENT(writer, greeting_err, "version" , "1.0");
 	WRITE_ELEMENT(writer, greeting_err, "lang", "en");
 	WRITE_ELEMENT(writer, greeting_err, "lang", "cs");
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_CONTACT);
