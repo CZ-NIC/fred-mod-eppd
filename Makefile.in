@@ -60,16 +60,17 @@ all: build
 build: $(EXECFILES) doc
 
 install: mod_eppd.so
-	$(INSTALL) --mode 0755 mod_eppd.so $(INSTALLDIR)
-	$(INSTALL) --mode 0755 -d $(AP_CONFDIR)/schemas
+	$(INSTALL) -d $(DESTDIR)/$(INSTALLDIR)
+	$(INSTALL) --mode 0644 mod_eppd.so $(DESTDIR)/$(INSTALLDIR)
+	$(INSTALL) --mode 0755 -d $(DESTDIR)/$(AP_CONFDIR)/schemas
 	@ dir=`dirname $(SCHEMA)`; \
 	for i in `ls $$dir/*.xsd`; do \
-		$(INSTALL) --mode 0644 $$i $(AP_CONFDIR)/schemas; \
+		$(INSTALL) --mode 0644 $$i $(DESTDIR)/$(AP_CONFDIR)/schemas; \
 		echo "Schema $$i installed"; \
 	  done
 
 uninstall:
-	-rm -f $(INSTALLDIR)/mod_eppd.so
+	-rm -f $(DESTDIR)/$(INSTALLDIR)/mod_eppd.so
 
 test: epp_test
 	./epp_test -h curlew -t
