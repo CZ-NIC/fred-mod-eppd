@@ -16,6 +16,7 @@ AC_PROG_AWK
 AC_CHECK_LIB([xml2], [xmlInitGlobals], [], [AC_MSG_ERROR([libxml2 not found])])
 AC_CHECK_LIB([ORBit-2], [CORBA_exception_init], [],
 			 [AC_MSG_ERROR([orbit2 not found])])
+AC_CHECK_LIB([ssl], [X509_digest], [], [AC_MSG_ERROR([openssl not found])])
 
 # Checks for header files.
 dnl AC_HEADER_STDC

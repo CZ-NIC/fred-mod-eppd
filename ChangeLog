@@ -1,3 +1,26 @@
+version 1.3.0
+
+	* The client provided values which caused errors repeated in error
+	message are now taken directly from input document, rather than
+	constructed ad-hoc as it was before. At source code level this implies
+	that parsed document and its context must be attached to command
+	structure and is freed after the whole request is proccessed.
+
+	* New CORBA backend which exploits better possibility of exceptions
+	is in place. The return codes are no more overloaded.
+
+	* Functions for logging were exported in other components of mod_eppd.
+	This results in better error reporting in log file, which was not
+	possible when we identified problem just based on return code.
+
+	* The code of epp-client.c was restructured and is more readable than
+	it was.
+
+version 1.2.1
+
+	* Bugfix - instead of EPP protocol version was in greeting mod_eppd's
+	version.
+
 version 1.2.0
 
 	* ... major rebuild of all source files and code cleanup

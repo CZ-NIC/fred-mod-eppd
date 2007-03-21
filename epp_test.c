@@ -131,7 +131,7 @@ void *epp_calloc(void *pool, unsigned size)
 	return epp_alloc(p, size, 1);
 }
 
-void *epp_strdup(void *pool, const char *str)
+char *epp_strdup(void *pool, const char *str)
 {
 	pool_t	*p = (pool_t *) pool;
 	unsigned	len;
@@ -148,6 +148,48 @@ void *epp_strdup(void *pool, const char *str)
 	memcpy(new_str, str, len);
 	new_str[len] = '\0';
 	return new_str;
+}
+
+char *epp_strcat(void *pool, const char *str1, const char *str2)
+{
+	pool_t	*p = (pool_t *) pool;
+	unsigned	len;
+	char	*new_str;
+
+	if (str1 == NULL || str2 == NULL)
+		return NULL;
+	len = strnlen(str1, MAX_STR_LEN) + strnlen(str2, MAX_STR_LEN);
+	if (len >= MAX_STR_LEN)
+		return NULL;
+	new_str = (char *) epp_alloc(p, len + 1, 0);
+	if (new_str == NULL)
+		return NULL;
+	strcpy(new_str, str1);
+	strcat(new_str, str2);
+	new_str[len] = '\0';
+	return new_str;
+}
+
+char *epp_sprintf(void *pool, const char *fmt, ...)
+{
+	char	buffer[100];
+	va_list	ap;
+
+	va_start(ap, fmt);
+	vsnprintf(buffer, 100, fmt, ap);
+	buffer[99] = '\0';
+	va_end(ap);
+
+	return epp_strdup(pool, buffer);
+}
+
+void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
+{
+	va_list	ap;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
 }
 
 ccReg_EPP
@@ -327,7 +369,7 @@ int main(int argc, char *argv[])
 	ccReg_EPP	service;
 	CORBA_ORB	orb;
 	char	*greeting;
-	int	session;
+	unsigned int	loginid;
 	epp_lang	lang;
 	epp_command_data *cdata;
 	char text[MAX_LENGTH];
@@ -347,6 +389,7 @@ int main(int argc, char *argv[])
 	const char *schemafile = NULL;
 	int	ret;
 	CORBA_Environment ev[1];
+	epp_context	epp_ctx;
 
 	/* parse parameters */
 	for (ar = 1; ar < argc; ar++) {
@@ -403,7 +446,9 @@ int main(int argc, char *argv[])
 		return 2;
 	}
 
-	session = 0;
+	epp_ctx.session = 0;
+	epp_ctx.conn = NULL;
+	loginid = 0;
 	lang = LANG_EN;
 	firsttime = 1;
 	ret = 0;
@@ -416,6 +461,8 @@ int main(int argc, char *argv[])
 			ret = 1;
 			break;
 		}
+
+		epp_ctx.pool = pool;
 
 		if ((service = get_service(orb, host, "EPP")) == NULL) {
 			fputs("Nameservice error\n", stderr);
@@ -475,7 +522,7 @@ int main(int argc, char *argv[])
 		  }
 
 		  /* API: process command */
-		  pstat = epp_parse_command(pool, session, schema , text,
+		  pstat = epp_parse_command(&epp_ctx, (loginid != 0), schema , text,
 				strlen(text), &cdata);
 		}
 
@@ -484,7 +531,8 @@ int main(int argc, char *argv[])
 			char *curdate;
 
 			/* API: greeting */
-			if (epp_call_hello(pool, service, &version, &curdate) != CORBA_OK) {
+			if (epp_call_hello(&epp_ctx, service, &version, &curdate) !=CORBA_OK)
+			{
 				fputs("Corba call failed (greeting)\n", stderr);
 				ret = 3;
 				quit = 1;
@@ -509,18 +557,16 @@ int main(int argc, char *argv[])
 			goto epilog;
 		}
 		else if (pstat == PARSER_CMD_LOGOUT) {
-			int logout; // not used
-
 			/* API: corba call */
-			cstat = epp_call_logout(pool, service, session, cdata, &logout);
+			cstat = epp_call_logout(&epp_ctx, service, &loginid, cdata);
 		}
 		else if (pstat == PARSER_CMD_LOGIN) {
 			/* API: corba call */
-			cstat = epp_call_login(pool, service, &session, &lang, fp, cdata);
+			cstat = epp_call_login(&epp_ctx, service, &loginid, &lang, fp, cdata);
 		}
 		else if (pstat == PARSER_CMD_OTHER || pstat == PARSER_NOT_VALID) {
 			/* API: corba call */
-			cstat = epp_call_cmd(pool, service, session, cdata);
+			cstat = epp_call_cmd(&epp_ctx, service, loginid, cdata);
 		}
 		else {
 			fputs("XML PARSER error\n", stderr);
@@ -535,7 +581,7 @@ int main(int argc, char *argv[])
 			valerr.count = 0;
 
 			/* API: generate response */
-			gstat = epp_gen_response(pool, 1, schema , lang, cdata,
+			gstat = epp_gen_response(&epp_ctx, 1, schema , lang, cdata,
 					&response, &valerr);
 			switch (gstat) {
 				/*

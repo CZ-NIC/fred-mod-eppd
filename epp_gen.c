@@ -181,7 +181,6 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 
 	info_contact = cdata->data;
 
-	START_ELEMENT(writer, simple_err, "resData");
 	START_ELEMENT(writer, simple_err, "contact:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
@@ -292,7 +291,6 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "contact:notifyEmail",
 			info_contact->notify_email);
 	END_ELEMENT(writer, simple_err); /* infdata */
-	END_ELEMENT(writer, simple_err); /* resdata */
 	return 1;
 
 simple_err:
@@ -311,11 +309,9 @@ static char
 gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
 	epps_info_domain	*info_domain;
-	int	print_ext;
 
 	info_domain = cdata->data;
 
-	START_ELEMENT(writer, simple_err, "resData");
 	START_ELEMENT(writer, simple_err, "domain:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_DOMAIN);
@@ -347,30 +343,6 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "domain:authInfo",
 			info_domain->authInfo);
 	END_ELEMENT(writer, simple_err); /* infdata */
-	END_ELEMENT(writer, simple_err); /* resdata */
-	/* optional extensions */
-	print_ext = 0;
-	q_foreach(&info_domain->extensions) {
-		epp_ext_item	*ext_item;
-
-		if (!print_ext) {
-			START_ELEMENT(writer, simple_err, "extension");
-			print_ext = 1;
-		}
-		ext_item = q_content(&info_domain->extensions);
-		if (ext_item->extType == EPP_EXT_ENUMVAL) {
-			START_ELEMENT(writer, simple_err, "enumval:infData");
-			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:enumval",
-					NS_ENUMVAL);
-			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
-					LOC_ENUMVAL);
-			WRITE_ELEMENT(writer, simple_err, "enumval:valExDate",
-					ext_item->ext.ext_enumval);
-			END_ELEMENT(writer, simple_err); /* infdata (enumval) */
-		}
-	}
-	if (print_ext)
-		END_ELEMENT(writer, simple_err); /* extension */
 	return 1;
 
 simple_err:
@@ -393,7 +365,6 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 
 	info_nsset = cdata->data;
 
-	START_ELEMENT(writer, simple_err, "resData");
 	START_ELEMENT(writer, simple_err, "nsset:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_NSSET);
@@ -438,7 +409,6 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 	snprintf(level, 3, "%d", info_nsset->level);
 	WRITE_ELEMENT(writer, simple_err, "nsset:reportlevel", level);
 	END_ELEMENT(writer, simple_err); /* infdata */
-	END_ELEMENT(writer, simple_err); /* resdata */
 	return 1;
 
 simple_err:
@@ -446,179 +416,100 @@ simple_err:
 }
 
 /**
- * Function completes xml tags to both ends of value provided by client
- * which cased error on side of central register. The standard requires
- * to return client provided value INCLUDING bordering xml tags. Because
- * central register is not aware of any xml, it returns just parameter
- * which caused the error and on us is to accompany that parameter value
- * with appropriate xml tags. This should be considered as temporary hack,
- * since we are anyway not able to complete exactly the same tags as the client
- * provided, when it is done this way. But untill we find better solution
- * this is sufficient.
+ * Function gets element (including its content) from input XML document
+ * which caused an error. This must be done according to EPP standard.
  *
  * @param pool   Pool to allocate memory from.
- * @param e      Error specification (the field e->value is changed inside
- *               the function).
+ * @param cdata  Command data containing xpath context and parsed document.
+ * @param e      Error specification.
  */
-static void
-complete_tags(void *pool, epp_error *e)
+static char *
+get_bad_xml(void *pool, epp_command_data *cdata, epp_error *e)
 {
-	char	*newstr;
-	int	len;
-
-	/* this is same for all switch cases, so we will do it here. */
-	if (e->value != NULL)
-		len = strlen(e->value);
-	else
-		len = 0;
+	char	*loc_spec;
 
 	switch (e->spec) {
 		case errspec_poll_msgID:
-			len += strlen("<poll op=\"ack\" msgID=\"");
-			len += strlen("\"/>");
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<poll op=\"ack\" msgID=\"");
-			strcat(newstr, e->value);
-			strcat(newstr, "\"/>");
-			break;
-		case errspec_poll_msgID_missing:
-			newstr = epp_strdup(pool, "<poll op=\"ack\"/>");
-			break;
-		case errspec_contact_identtype_missing:
-			len += strlen("<ident/>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<ident/>");
-			/*
-			strcat(newstr, e->value);
-			strcat(newstr, "</ident>");
-			*/
-			break;
-		case errspec_contact_cc:
-			len += 2 * strlen("<cc>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<cc>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</cc>");
+			loc_spec = epp_strdup(pool, "//epp:poll");
 			break;
 		case errspec_contact_handle:
-		case errspec_nsset_handle:
-			len += 2 * strlen("<id>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<id>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</id>");
+			loc_spec = epp_strdup(pool, "//contact:id");
 			break;
-		case errspec_domain_fqdn:
-			len += 2 * strlen("<name>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<name>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</name>");
+		case errspec_contact_cc:
+			loc_spec = epp_strdup(pool, "//contact:cc");
+			break;
+		case errspec_nsset_handle:
+			loc_spec = epp_strdup(pool, "//nsset:id");
 			break;
 		case errspec_nsset_tech:
-		case errspec_nsset_tech_add:
-		case errspec_nsset_tech_rem:
-			len += 2 * strlen("<tech>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<tech>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</tech>");
+			loc_spec = epp_strdup(pool, "//nsset:tech");
 			break;
 		case errspec_nsset_dns_name:
-		case errspec_nsset_dns_name_add:
-		case errspec_nsset_dns_name_rem:
-			len += 2 * strlen("<name>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<name>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</name>");
+			loc_spec = epp_strdup(pool, "//nsset:name");
 			break;
 		case errspec_nsset_dns_addr:
-			len += 2 * strlen("<addr>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<addr>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</addr>");
+			loc_spec = epp_strdup(pool, "//nsset:addr");
+			break;
+		case errspec_nsset_dns_name_add:
+			loc_spec = epp_strdup(pool, "//nsset:name");
+			break;
+		case errspec_nsset_dns_name_rem:
+			loc_spec = epp_strdup(pool, "//nsset:rem/nsset:name");
+			break;
+		case errspec_nsset_tech_add:
+			loc_spec = epp_strdup(pool, "//nsset:add/nsset:tech");
+			break;
+		case errspec_nsset_tech_rem:
+			loc_spec = epp_strdup(pool, "//nsset:rem/nsset:tech");
+			break;
+		case errspec_domain_fqdn:
+			loc_spec = epp_strdup(pool, "//domain:name");
 			break;
 		case errspec_domain_registrant:
-			len += 2 * strlen("<registrant>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<registrant>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</registrant>");
+			loc_spec = epp_strdup(pool, "//domain:registrant");
 			break;
 		case errspec_domain_nsset:
-			len += 2 * strlen("<nsset>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<nsset>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</nsset>");
+			loc_spec = epp_strdup(pool, "//domain:nsset");
 			break;
 		case errspec_domain_period:
-			len += 2 * strlen("<period>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<period>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</period>");
+			loc_spec = epp_strdup(pool, "//domain:period");
 			break;
 		case errspec_domain_admin:
-		case errspec_domain_admin_add:
-		case errspec_domain_admin_rem:
-			len += 2 * strlen("<admin>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<admin>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</admin>");
+			loc_spec = epp_strdup(pool, "//domain:admin");
 			break;
 		case errspec_domain_ext_valDate:
-			len += 2 * strlen("<valExDate>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<valExDate>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</valExDate>");
+			loc_spec = epp_strdup(pool, "//enumval:valExDate");
+			break;
+		case errspec_domain_ext_valDate_missing:
+			loc_spec = epp_strdup(pool, "/epp:epp");
 			break;
 		case errspec_domain_curExpDate:
-			len += 2 * strlen("<curExpDate>") + 1;
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<curExpDate>");
-			strcat(newstr, e->value);
-			strcat(newstr, "</curExpDate>");
+			loc_spec = epp_strdup(pool, "//domain:curExpDate");
+			break;
+		case errspec_domain_admin_add:
+			loc_spec = epp_strdup(pool, "//domain:add/domain:admin");
+			break;
+		case errspec_domain_admin_rem:
+			loc_spec = epp_strdup(pool, "//domain:rem/domain:admin");
+			break;
+		case errspec_poll_msgID_missing:
+			loc_spec = epp_strdup(pool, "//epp:poll");
+			break;
+		case errspec_contact_identtype_missing:
+			loc_spec = epp_strdup(pool, "//contact:ident");
 			break;
 		case errspec_transfer_op:
-			len += strlen("<transfer op=\"");
-			len += strlen("\"/>");
-			newstr = epp_malloc(pool, len + 1);
-			*newstr = '\0';
-			strcat(newstr, "<transfer op=\"");
-			strcat(newstr, e->value);
-			strcat(newstr, "\">");
+			loc_spec = epp_strdup(pool, "//epp:transfer");
 			break;
 		default:
-			/*
-			 * surrounding tags are already included, don't
-			 * do anything
-			 */
-			return;
+			loc_spec = epp_strdup(pool, "/epp:epp");
+			break;
 	}
-	e->value = newstr;
+	return epp_getSubtree(pool, cdata, loc_spec, e->position);
 }
 
 gen_status
-epp_gen_response(void *pool,
+epp_gen_response(epp_context *epp_ctx,
 		int validate,
 		void *schema,
 		epp_lang lang,
@@ -628,12 +519,11 @@ epp_gen_response(void *pool,
 {
 	xmlTextWriterPtr	writer;
 	xmlBufferPtr	buf;
-	char	strbuf[25]; /* is enough even for 64-bit number and for a date */
 	char	res_code[5];
 	char	error_seen = 1;
 	gen_status	ret;
 
-	assert(pool != NULL);
+	assert(epp_ctx != NULL);
 	assert(schema != NULL);
 	assert(cdata != NULL);
 	assert(valerr->body == NULL);
@@ -673,7 +563,7 @@ epp_gen_response(void *pool,
 	END_ELEMENT(writer, simple_err); /* msg */
 	q_foreach(&cdata->errors) {
 		epp_error	*e;
-		
+
 		e = (epp_error *) q_content(&cdata->errors);
 		START_ELEMENT(writer, simple_err, "extValue");
 		/*
@@ -682,8 +572,8 @@ epp_gen_response(void *pool,
 		 * by &lt;, &gt; respectively.
 		 */
 		START_ELEMENT(writer, simple_err, "value");
-		if (e->spec != errspec_unknown)
-			complete_tags(pool, e);
+		if (e->spec != errspec_not_valid)
+			e->value = get_bad_xml(epp_ctx->pool, cdata, e);
 		if (xmlTextWriterWriteRaw(writer, BAD_CAST e->value) < 0)
 			goto simple_err;
 		END_ELEMENT(writer, simple_err); /* value */
@@ -696,16 +586,57 @@ epp_gen_response(void *pool,
 	}
 	END_ELEMENT(writer, simple_err); /* result */
 
+	/* print message queue data if command was poll_<something> */
+	if (cdata->type == EPP_POLL_REQ) {
+		epps_poll_req	*poll_req;
+		char	strbuf[25]; /* is enough number */
+
+		poll_req = cdata->data;
+		if (poll_req->count > 0) {
+			START_ELEMENT(writer, simple_err, "msgQ");
+			snprintf(strbuf, 25, "%d", poll_req->count);
+			WRITE_ATTRIBUTE(writer, simple_err, "count", strbuf);
+			WRITE_ATTRIBUTE(writer, simple_err, "id",
+					poll_req->msgid);
+			WRITE_ELEMENT(writer, simple_err, "qDate",
+					poll_req->qdate);
+			WRITE_ELEMENT(writer, simple_err, "msg", poll_req->msg);
+			END_ELEMENT(writer, simple_err); /* msgQ */
+		}
+	}
+	else if (cdata->type == EPP_POLL_ACK) {
+		epps_poll_ack	*poll_ack;
+		char	strbuf[25]; /* is enough number */
+
+		poll_ack = cdata->data;
+		if (poll_ack->count > 0) {
+			START_ELEMENT(writer, simple_err, "msgQ");
+			snprintf(strbuf, 25, "%d", poll_ack->count);
+			WRITE_ATTRIBUTE(writer, simple_err, "count", strbuf);
+			WRITE_ATTRIBUTE(writer, simple_err, "id",
+					poll_ack->newmsgid);
+			END_ELEMENT(writer, simple_err); /* msgQ */
+		}
+	}
+
+	/* If there is no resdata section then skip the switch alltogether */
+	if (!cdata->noresdata) {
+		START_ELEMENT(writer, simple_err, "resData");
+	/* beware - the indentation is broken here */
+
 	/*
 	 * Here is handler for each kind of response
-	 * Short reponses are coded directly into swich, long responses are
-	 * coded into separate functions called within the switch
+	 * Short reponses are coded directly into switch, long responses
+	 * are coded into separate functions called within the switch.
 	 */
 	switch (cdata->type) {
-		case EPP_DUMMY:
 		/* commands with no <resData> element */
+		/*
+		case EPP_DUMMY:
 		case EPP_LOGIN:
 		case EPP_LOGOUT:
+		case EPP_POLL_ACK:
+		case EPP_POLL_REQ:
 		case EPP_DELETE_DOMAIN:
 		case EPP_DELETE_CONTACT:
 		case EPP_DELETE_NSSET:
@@ -720,49 +651,13 @@ epp_gen_response(void *pool,
 		case EPP_SENDAUTHINFO_NSSET:
 		case EPP_TEST_NSSET:
 			break;
-		/* commands with <msgQ> element */
-		case EPP_POLL_REQ:
-			if (cdata->rc == 1301) {
-				epps_poll_req	*poll_req;
-				
-				poll_req = cdata->data;
-				START_ELEMENT(writer, simple_err, "msgQ");
-				snprintf(strbuf, 25, "%d", poll_req->count);
-				WRITE_ATTRIBUTE(writer, simple_err, "count",
-						strbuf);
-				WRITE_ATTRIBUTE(writer, simple_err, "id",
-						poll_req->msgid);
-				WRITE_ELEMENT(writer, simple_err, "qDate",
-						poll_req->qdate);
-				WRITE_ELEMENT(writer, simple_err, "msg",
-						poll_req->msg);
-				END_ELEMENT(writer, simple_err); /* msgQ */
-			}
-			break;
-		case EPP_POLL_ACK:
-			if (cdata->rc == 1000) {
-				epps_poll_ack	*poll_ack;
-
-				poll_ack = cdata->data;
-				if (poll_ack->count == 0)
-					break;
-				START_ELEMENT(writer, simple_err, "msgQ");
-				snprintf(strbuf, 25, "%d", poll_ack->count);
-				WRITE_ATTRIBUTE(writer, simple_err, "count",
-						strbuf);
-				WRITE_ATTRIBUTE(writer, simple_err, "id",
-						poll_ack->newmsgid);
-				END_ELEMENT(writer, simple_err); /* msgQ */
-			}
-			break;
+		*/
 		/* query commands with <resData> element */
 		case EPP_CHECK_DOMAIN:
-			if (cdata->rc == 1000)
-			{
+		{
 			epps_check	*check;
 
 			check = cdata->data;
-			START_ELEMENT(writer, simple_err, "resData");
 			START_ELEMENT(writer, simple_err, "domain:chkData");
 			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain",
 					NS_DOMAIN);
@@ -797,16 +692,13 @@ epp_gen_response(void *pool,
 				q_next(&check->avails);
 			}
 			END_ELEMENT(writer, simple_err); /* chkData */
-			END_ELEMENT(writer, simple_err); /* resData */
-			}
 			break;
+		}
 		case EPP_CHECK_CONTACT:
-			if (cdata->rc == 1000)
-			{
+		{
 			epps_check	*check;
 
 			check = cdata->data;
-			START_ELEMENT(writer, simple_err, "resData");
 			START_ELEMENT(writer, simple_err, "contact:chkData");
 			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact",
 					NS_CONTACT);
@@ -832,20 +724,17 @@ epp_gen_response(void *pool,
 					WRITE_ELEMENT(writer, simple_err,
 							"contact:reason",
 							avail->reason);
-				END_ELEMENT(writer, simple_err); /* cd (check data) */
+				END_ELEMENT(writer, simple_err); /* cd */
 				q_next(&check->avails);
 			}
 			END_ELEMENT(writer, simple_err); /* chkData */
-			END_ELEMENT(writer, simple_err); /* resData */
-			}
 			break;
+		}
 		case EPP_CHECK_NSSET:
-			if (cdata->rc == 1000)
-			{
+		{
 			epps_check	*check;
 
 			check = cdata->data;
-			START_ELEMENT(writer, simple_err, "resData");
 			START_ELEMENT(writer, simple_err, "nsset:chkData");
 			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset",
 					NS_NSSET);
@@ -871,214 +760,215 @@ epp_gen_response(void *pool,
 					WRITE_ELEMENT(writer, simple_err,
 							"nsset:reason",
 							avail->reason);
-				END_ELEMENT(writer, simple_err); /* cd (check data) */
+				END_ELEMENT(writer, simple_err); /* cd */
 				q_next(&check->avails);
 			}
 			END_ELEMENT(writer, simple_err); /* chkData */
-			END_ELEMENT(writer, simple_err); /* resData */
-			}
 			break;
+		}
 		case EPP_INFO_DOMAIN:
-			if (cdata->rc != 1000) break;
 			if (!gen_info_domain(writer, cdata)) goto simple_err;
 			break;
 		case EPP_INFO_CONTACT:
-			if (cdata->rc != 1000) break;
 			if (!gen_info_contact(writer, cdata)) goto simple_err;
 			break;
 		case EPP_INFO_NSSET:
-			if (cdata->rc != 1000) break;
 			if (!gen_info_nsset(writer, cdata)) goto simple_err;
 			break;
 		/* transform commands with <resData> element */
 		case EPP_CREATE_DOMAIN:
-			if (cdata->rc == 1000) {
-				epps_create_domain	*create_domain;
+		{
+			epps_create_domain	*create_domain;
 
-				create_domain = cdata->data;
-				START_ELEMENT(writer, simple_err, "resData");
-				START_ELEMENT(writer, simple_err,
-						"domain:creData");
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xmlns:domain", NS_DOMAIN);
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xsi:schemaLocation",
-						LOC_DOMAIN);
-				WRITE_ELEMENT(writer, simple_err, "domain:name",
-						create_domain->name);
-				WRITE_ELEMENT(writer, simple_err,"domain:crDate",
-						create_domain->crDate);
-				WRITE_ELEMENT(writer, simple_err,"domain:exDate",
-						create_domain->exDate);
-				END_ELEMENT(writer, simple_err); /* credata */
-				END_ELEMENT(writer, simple_err); /* resdata */
-			}
+			create_domain = cdata->data;
+			START_ELEMENT(writer, simple_err, "domain:creData");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:domain", NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:name",
+					create_domain->name);
+			WRITE_ELEMENT(writer, simple_err,"domain:crDate",
+					create_domain->crDate);
+			WRITE_ELEMENT(writer, simple_err,"domain:exDate",
+					create_domain->exDate);
+			END_ELEMENT(writer, simple_err); /* credata */
 			break;
+		}
 		case EPP_CREATE_CONTACT:
-			if (cdata->rc == 1000) {
-				epps_create_contact	*create_contact;
+		{
+			epps_create_contact	*create_contact;
 
-				create_contact = cdata->data;
-				START_ELEMENT(writer, simple_err, "resData");
-				START_ELEMENT(writer, simple_err,
-						"contact:creData");
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xmlns:contact", NS_CONTACT);
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xsi:schemaLocation",
-						LOC_CONTACT);
-				WRITE_ELEMENT(writer, simple_err, "contact:id",
-						create_contact->id);
-				WRITE_ELEMENT(writer, simple_err,
-						"contact:crDate",
-						create_contact->crDate);
-				END_ELEMENT(writer, simple_err); /* credata */
-				END_ELEMENT(writer, simple_err); /* resdata */
-			}
+			create_contact = cdata->data;
+			START_ELEMENT(writer, simple_err, "contact:creData");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:contact", NS_CONTACT);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_CONTACT);
+			WRITE_ELEMENT(writer, simple_err, "contact:id",
+					create_contact->id);
+			WRITE_ELEMENT(writer, simple_err,
+					"contact:crDate",create_contact->crDate);
+			END_ELEMENT(writer, simple_err); /* credata */
 			break;
+		}
 		case EPP_CREATE_NSSET:
-			if (cdata->rc == 1000) {
-				epps_create_nsset	*create_nsset;
+		{
+			epps_create_nsset	*create_nsset;
 
-				create_nsset = cdata->data;
-				START_ELEMENT(writer, simple_err, "resData");
-				START_ELEMENT(writer, simple_err,
-						"nsset:creData");
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xmlns:nsset", NS_NSSET);
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xsi:schemaLocation", LOC_NSSET);
-				WRITE_ELEMENT(writer, simple_err, "nsset:id",
-						create_nsset->id);
-				WRITE_ELEMENT(writer, simple_err, "nsset:crDate",
-						create_nsset->crDate);
-				END_ELEMENT(writer, simple_err); /* credata */
-				END_ELEMENT(writer, simple_err); /* resdata */
-			}
+			create_nsset = cdata->data;
+			START_ELEMENT(writer, simple_err, "nsset:creData");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:nsset", NS_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_NSSET);
+			WRITE_ELEMENT(writer, simple_err, "nsset:id",
+					create_nsset->id);
+			WRITE_ELEMENT(writer, simple_err, "nsset:crDate",
+					create_nsset->crDate);
+			END_ELEMENT(writer, simple_err); /* credata */
 			break;
+		}
 		case EPP_RENEW_DOMAIN:
-			if (cdata->rc == 1000) {
-				epps_renew	*renew;
+		{
+			epps_renew	*renew;
 
-				renew = cdata->data;
-				START_ELEMENT(writer, simple_err, "resData");
-				START_ELEMENT(writer, simple_err,
-						"domain:renData");
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xmlns:domain", NS_DOMAIN);
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xsi:schemaLocation",LOC_DOMAIN);
-				WRITE_ELEMENT(writer, simple_err, "domain:name",
-						renew->name);
-				WRITE_ELEMENT(writer, simple_err, "domain:exDate",
-						renew->exDate);
-				END_ELEMENT(writer, simple_err); /* renData */
-				END_ELEMENT(writer, simple_err); /* resData */
-			}
+			renew = cdata->data;
+			START_ELEMENT(writer, simple_err, "domain:renData");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:domain", NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:name",
+					renew->name);
+			WRITE_ELEMENT(writer, simple_err, "domain:exDate",
+					renew->exDate);
+			END_ELEMENT(writer, simple_err); /* renData */
 			break;
+		}
 		case EPP_LIST_CONTACT:
-			if (cdata->rc == 1000) {
-				epps_list	*list;
+		{
+			epps_list	*list;
 
-				list = cdata->data;
-				START_ELEMENT(writer, simple_err, "resData");
-				START_ELEMENT(writer, simple_err,
-						"contact:listData");
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xmlns:contact", NS_CONTACT);
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xsi:schemaLocation",
-						LOC_CONTACT);
-				q_foreach(&list->handles) {
-					WRITE_ELEMENT(writer, simple_err,
-							"contact:id",
-							q_content(&list->handles));
-				}
-				END_ELEMENT(writer, simple_err); /* listData */
-				END_ELEMENT(writer, simple_err); /* resData */
+			list = cdata->data;
+			START_ELEMENT(writer, simple_err, "contact:listData");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:contact", NS_CONTACT);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_CONTACT);
+			q_foreach(&list->handles) {
+				WRITE_ELEMENT(writer, simple_err, "contact:id",
+						q_content(&list->handles));
 			}
+			END_ELEMENT(writer, simple_err); /* listData */
 			break;
+		}
 		case EPP_LIST_DOMAIN:
-			if (cdata->rc == 1000) {
-				epps_list	*list;
+		{
+			epps_list	*list;
 
-				list = cdata->data;
-				START_ELEMENT(writer, simple_err, "resData");
-				START_ELEMENT(writer, simple_err,
-						"domain:listData");
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xmlns:domain", NS_DOMAIN);
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xsi:schemaLocation",LOC_DOMAIN);
-				q_foreach(&list->handles) {
-					WRITE_ELEMENT(writer, simple_err,
-							"domain:name",
-							q_content(&list->handles));
-				}
-				END_ELEMENT(writer, simple_err); /* listData */
-				END_ELEMENT(writer, simple_err); /* resData */
+			list = cdata->data;
+			START_ELEMENT(writer, simple_err, "domain:listData");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:domain", NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation",LOC_DOMAIN);
+			q_foreach(&list->handles) {
+				WRITE_ELEMENT(writer, simple_err, "domain:name",
+						q_content(&list->handles));
 			}
+			END_ELEMENT(writer, simple_err); /* listData */
 			break;
+		}
 		case EPP_LIST_NSSET:
-			if (cdata->rc == 1000) {
-				epps_list	*list;
+		{
+			epps_list	*list;
 
-				list = cdata->data;
-				START_ELEMENT(writer, simple_err, "resData");
-				START_ELEMENT(writer, simple_err,
-						"nsset:listData");
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xmlns:nsset", NS_NSSET);
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xsi:schemaLocation", LOC_NSSET);
-				q_foreach(&list->handles) {
-					WRITE_ELEMENT(writer, simple_err,
-							"nsset:id",
-							q_content(&list->handles));
-				}
-				END_ELEMENT(writer, simple_err); /* listData */
-				END_ELEMENT(writer, simple_err); /* resData */
+			list = cdata->data;
+			START_ELEMENT(writer, simple_err, "nsset:listData");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:nsset", NS_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_NSSET);
+			q_foreach(&list->handles) {
+				WRITE_ELEMENT(writer, simple_err, "nsset:id",
+						q_content(&list->handles));
 			}
+			END_ELEMENT(writer, simple_err); /* listData */
 			break;
+		}
 		case EPP_CREDITINFO:
-			if (cdata->rc == 1000) {
-				epps_creditInfo	*creditInfo;
-				char	credit[50];
+		{
+			epps_creditInfo	*creditInfo;
+			char	credit[50];
 
-				creditInfo = cdata->data;
-				START_ELEMENT(writer, simple_err, "resData");
+			creditInfo = cdata->data;
+			START_ELEMENT(writer, simple_err, "fred:resCreditInfo");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:fred", NS_FRED);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_FRED);
+			q_foreach(&creditInfo->zonecredits) {
+				epp_zonecredit	*zonecredit;
+
 				START_ELEMENT(writer, simple_err,
-						"fred:resCreditInfo");
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xmlns:fred", NS_FRED);
-				WRITE_ATTRIBUTE(writer, simple_err,
-						"xsi:schemaLocation", LOC_FRED);
-				q_foreach(&creditInfo->zonecredits) {
-					epp_zonecredit	*zonecredit;
-
-					START_ELEMENT(writer, simple_err,
-							"fred:zoneCredit");
-					zonecredit = q_content(
-							&creditInfo->zonecredits);
-					snprintf(credit, 49, "%lu.%02lu",
-							zonecredit->credit /100,
-							zonecredit->credit %100);
-					WRITE_ELEMENT(writer, simple_err,
-							"fred:zone",
-							zonecredit->zone);
-					WRITE_ELEMENT(writer, simple_err,
-							"fred:credit", credit);
-					END_ELEMENT(writer, simple_err); /* zoneCredit */
-				}
-				END_ELEMENT(writer, simple_err);/*resCreditInfo*/
-				END_ELEMENT(writer, simple_err); /* resData */
+						"fred:zoneCredit");
+				zonecredit = q_content(&creditInfo->zonecredits);
+				snprintf(credit, 49, "%lu.%02lu",
+						zonecredit->credit / 100,
+						zonecredit->credit % 100);
+				WRITE_ELEMENT(writer, simple_err,
+						"fred:zone", zonecredit->zone);
+				WRITE_ELEMENT(writer, simple_err,
+						"fred:credit", credit);
+				END_ELEMENT(writer, simple_err); /* zoneCredit */
 			}
+			END_ELEMENT(writer, simple_err); /* resCreditInfo */
 			break;
+		}
 		default:
 			assert(1 == 0);
-	}
+	} /* end of switch statement */
 
-	// epp epilog
+	END_ELEMENT(writer, simple_err); /* resData */
+
+	/* optional domain extensions */
+	if (cdata->type == EPP_INFO_DOMAIN) {
+		epps_info_domain	*info_domain;
+		int	 print_ext;
+
+		info_domain = cdata->data;
+		print_ext = 0;
+		q_foreach(&info_domain->extensions) {
+			epp_ext_item	*ext_item;
+
+			if (!print_ext) {
+				START_ELEMENT(writer, simple_err, "extension");
+				print_ext = 1;
+			}
+			ext_item = q_content(&info_domain->extensions);
+			if (ext_item->extType == EPP_EXT_ENUMVAL) {
+				START_ELEMENT(writer, simple_err,
+						"enumval:infData");
+				WRITE_ATTRIBUTE(writer, simple_err,
+						"xmlns:enumval", NS_ENUMVAL);
+				WRITE_ATTRIBUTE(writer, simple_err,
+						"xsi:schemaLocation",
+						LOC_ENUMVAL);
+				WRITE_ELEMENT(writer, simple_err,
+						"enumval:valExDate",
+						ext_item->ext.ext_enumval);
+				/* infdata (enumval) */
+				END_ELEMENT(writer, simple_err);
+			}
+		}
+		if (print_ext)
+			END_ELEMENT(writer, simple_err); /* extension */
+
+	}/* ... broken indentation */
+	} /* if resdata section */
+
+	/* epp epilog */
 	START_ELEMENT(writer, simple_err, "trID");
 	WRITE_ELEMENT(writer, simple_err, "clTRID", cdata->clTRID);
 	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
@@ -1095,7 +985,7 @@ simple_err:
 		return GEN_EBUILD;
 	}
 
-	*response = epp_strdup(pool, (char *) buf->content);
+	*response = epp_strdup(epp_ctx->pool, (char *) buf->content);
 	xmlBufferFree(buf);
 	if (*response == NULL) {
 		return GEN_EBUILD;
@@ -1112,7 +1002,8 @@ simple_err:
 		doc = xmlParseMemory(*response, strlen(*response));
 		if (doc == NULL) return GEN_NOT_XML;
 
-		val_ret = validate_doc(pool, (xmlSchemaPtr) schema, doc, valerr);
+		val_ret = validate_doc(epp_ctx->pool, (xmlSchemaPtr) schema,
+				doc, valerr);
 		switch (val_ret) {
 			case VAL_OK:
 				ret = GEN_OK;

@@ -21,7 +21,10 @@ PKG_NAME    = @PACKAGE_NAME@
 PKG_TARNAME = @PACKAGE_TARNAME@
 PKG_VERSION = @PACKAGE_VERSION@
 
-DISTFILES = configure.ac install-sh Makefile.in mod_eppd.c epp-client.c epp-client.h epp_common.c epp_common.h epp_gen.c epp_gen.h epp_parser.c epp_parser.h epp_xmlcommon.c epp_xmlcommon.h doxy.conf README TODO
+HEADERS   = epp-client.h epp_common.h epp_gen.h epp_parser.h epp_xmlcommon.h unconfig.h
+CFILES    = epp-client.c epp_common.c epp_gen.c epp_parser.c epp_test.c epp_xmlcommon.c mod_eppd.c
+AUXFILES  = config.h.in configure.ac configure doxy.conf install-sh Makefile.in README ChangeLog
+
 EXECFILES = mod_eppd.so epp_test
 IDLOUT    = ${IDLPREFIX}.h ${IDLPREFIX}-common.c ${IDLPREFIX}-stubs.c
 OBJS      = epp_common.o epp_xmlcommon.o epp_parser.o epp_gen.o epp-client.o ${IDLPREFIX}-common.o ${IDLPREFIX}-stubs.o
@@ -52,7 +55,7 @@ AP_LIBS     := $(shell $(APR-CONFIG) --libs)
 
 INSTALLDIR  := $(shell $(APXS) -q LIBEXECDIR)
 
-.PHONY: all build install uninstall clean distclean realclean doc dist test
+.PHONY: all build install uninstall clean realclean doc dist test
 .SUFFIXES:
 
 all: build
@@ -111,13 +114,6 @@ epp_test.o: epp_test.c epp_common.h epp_parser.h epp_gen.h epp-client.h $(IDLPRE
 $(IDLOUT): $(IDL)
 	$(ORBIT-IDL) --noskels $(IDL)
 
-distclean:
-	-rm -f $(ALL_OBJS)
-	-rm -f $(IDLOUT)
-	-rm -rf acconfig.h autom4te.cache configure Makefile config.h config.log config.status
-	-rm -f doxygen.log
-	-rm -f $(TARDIR).tar
-
 clean:
 	-rm -f $(ALL_OBJS)
 	-rm -f $(IDLOUT)
@@ -126,14 +122,8 @@ clean:
 	-rm -fr doc/html
 	-rm -f $(TARDIR).tar
 
-realclean:
-	-rm -f $(ALL_OBJS)
-	-rm -f $(IDLOUT)
+realclean: clean
 	-rm -rf acconfig.h autom4te.cache configure Makefile config.h config.log config.status
-	-rm -f doxygen.log
-	-rm -f $(EXECFILES)
-	-rm -fr doc/html
-	-rm -f $(TARDIR).tar
 
 doc: doxy.conf
 	@ if test x$(DOXYGEN) = x; then \
@@ -145,9 +135,23 @@ doc: doxy.conf
 		 echo "output from doxygen is in doxygen.log file"; \
 	   fi
 
-dist: $(ALL_OBJS) $(DISTFILES) $(EXECFILES)
-	-@ echo "Creating distribution tar archive for package $(PKG_STRING)."
-	mkdir $(TARDIR)
-	cp -r $(EXECFILES) $(DISTFILES) $(IDL) $(IDLOUT) doc $(TARDIR)
-	tar cf $(TARDIR).tar $(TARDIR)
-	rm -rf $(TARDIR)
+dist: $(HEADERS) $(CFILES) $(AUXFILES) doc
+	@ echo "Creating distribution tar archive for package $(PKG_STRING)."
+	@ mkdir -p $(TARDIR)/doc
+	@ echo "Bundling source files and build files."
+	@ cp $(HEADERS) $(CFILES) $(AUXFILES) $(TARDIR)
+	@ echo "Bundling XML schemas."
+	@ mkdir $(TARDIR)/schemas
+	@ DIR=`dirname $(SCHEMA)`; \
+	  for i in `ls $$DIR/*.xsd`; do \
+		cp $$i $(TARDIR)/schemas; \
+	  done
+	@ echo "Bundling documentation."
+	@ cp doc/mainpage.h doc/mod_eppd.png $(TARDIR)/doc
+	@ cp -r doc/html $(TARDIR)/doc/html
+	@ echo "Bundling XML request examples."
+	@ mkdir $(TARDIR)/examples
+	@ cp -r examples/*.xml $(TARDIR)/examples
+	@ echo "Creating tar file."
+	tar cvf $(TARDIR).tar $(TARDIR)
+	@ rm -rf $(TARDIR)

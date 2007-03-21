@@ -48,7 +48,7 @@ epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting
  * There is option that response can be validated, the validation errors
  * are then returned together with generated string in form of a list.
  *
- * @param pool     Memory pool from which to allocate memory.
+ * @param epp_ctx  Epp context (session id, connection and pool).
  * @param validate Tells if response should be validated or not (boolean).
  * @param schema   Schema against which to validate.
  * @param lang     Language selected by the client.
@@ -58,7 +58,7 @@ epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting
  * @return         Generator status.
  */
 gen_status
-epp_gen_response(void *pool,
+epp_gen_response(epp_context *epp_ctx,
 		int validate,
 		void *schema,
 		epp_lang lang,

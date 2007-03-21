@@ -30,24 +30,24 @@ typedef void *service_EPP;
  * corba server, which is used as part of server's name in <greeting>
  * frame.
  *
- * @param pool        Pool for memory allocations.
+ * @param epp_ctx     Epp context (pool, connection and session id).
  * @param service     EPP service.
  * @param version     Output parameter version string.
  * @param curdate     Output parameter current date.
  * @return            If successfull 1 and 0 if corba function call failed.
  */
 int
-epp_call_hello(void *pool,
-		service_EPP  service,
+epp_call_hello(epp_context *epp_ctx,
+		service_EPP service,
 		char **version,
 		char **curdate);
 
 /**
  * Call corba login function, which sets up a session variables.
  *
- * @param pool        Pool for memory allocations.
+ * @param epp_ctx     Epp context (pool, connection and session id).
  * @param service     EPP service.
- * @param session     If successfully logged in, the session identifier assigned
+ * @param loginid     If successfully logged in, the session identifier assigned
  *                    by server will be stored in this parameter.
  * @param lang        If successfully logged in, the selected language will be
  *                    stored in this parameter.
@@ -56,9 +56,9 @@ epp_call_hello(void *pool,
  * @return            Status.
  */
 corba_status
-epp_call_login(void *pool,
+epp_call_login(epp_context *epp_ctx,
 		service_EPP service,
-		int *session,
+		unsigned int *loginid,
 		epp_lang *lang,
 		const char *fingerprint,
 		epp_command_data *cdata);
@@ -66,19 +66,17 @@ epp_call_login(void *pool,
 /**
  * Call corba logout function.
  *
- * @param pool        Pool for memory allocations.
+ * @param epp_ctx     Epp context (pool, connection and session id).
  * @param service     EPP service.
- * @param session     Session identifier.
+ * @param loginid     Session identifier (may change inside).
  * @param cdata       Data from parsed xml command.
- * @param logout      Tells whether the client should be really logged out
  * @return            Status.
  */
 corba_status
-epp_call_logout(void *pool,
+epp_call_logout(epp_context *epp_ctx,
 		service_EPP service,
-		int session,
-		epp_command_data *cdata,
-		int *logout);
+		unsigned int *loginid,
+		epp_command_data *cdata);
 
 /**
  * Call generic command corba handler which decides what to do on the basis
@@ -88,16 +86,16 @@ epp_call_logout(void *pool,
  * They are rather handled by dedicated functions epp_call_login() and
  * epp_call_logout(). For all other commands use this function.
  *
- * @param pool        Pool for memory allocations.
+ * @param epp_ctx     Epp context (pool, connection and session id).
  * @param service     EPP service.
- * @param session     Session identifier
+ * @param loginid     Session identifier
  * @param cdata       Data from parsed xml command.
  * @return            Status.
  */
 corba_status
-epp_call_cmd(void *pool,
+epp_call_cmd(epp_context *epp_ctx,
 		service_EPP service,
-		int session,
+		unsigned int loginid,
 		epp_command_data *cdata);
 
 /**
@@ -107,12 +105,14 @@ epp_call_cmd(void *pool,
  * serving of EPP request will become complex operation composed from
  * several function calls, it will remain so.
  *
+ * @param epp_ctx     Epp context (pool, connection and session id).
  * @param service     EPP service.
  * @param cdata       Used to get svTRID.
  * @param xml         Output XML.
  */
 void
-epp_call_save_output_xml(service_EPP service,
+epp_call_save_output_xml(epp_context *epp_ctx,
+		service_EPP service,
 		epp_command_data *cdata,
 		const char *xml);
 

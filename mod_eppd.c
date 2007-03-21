@@ -106,28 +106,19 @@ module AP_MODULE_DECLARE_DATA eppd_module;
  */
 static APR_OPTIONAL_FN_TYPE(ssl_var_lookup) *epp_ssl_lookup = NULL;
 
-/** Log levels used for logging to eppd log file. */
-typedef enum {
-	EPP_FATAL = 1, /**< Serious error, the module is not in operational state. */
-	EPP_ERROR,     /**< Error caused usually by client, module is operational. */
-	EPP_WARNING,   /**< Errors which are not serious but should be logged. */
-	EPP_INFO,      /**< This is the default log level. */
-	EPP_DEBUG      /**< Contents of requests and responses are logged. */
-}epp_loglevel;
-
 /**
  * Configuration structure of eppd module.
  */
 typedef struct {
-	int	epp_enabled;     /**< Decides whether mod_eppd is enabled for host. */
-	char	*servername; /**< Epp server name used in <greeting> frame. */
-	char	*ns_loc;     /**< Location of CORBA nameservice. */
-	char	*object;     /**< Name under which is object known. */
-	void	*schema;     /**< URL of EPP schema (use just path). */
-	int	valid_resp;      /**< Validate responses before sending them to client.*/
-	char	*epplog;              /**< Epp log filename. */
-	apr_file_t	*epplogfp;        /**< File descriptor of epp log file. */
-	epp_loglevel	loglevel;     /**< Epp log level. */
+	int	epp_enabled;/**< Decides whether mod_eppd is enabled for host.*/
+	char	*servername;/**< Epp server name used in <greeting> frame. */
+	char	*ns_loc;    /**< Location of CORBA nameservice. */
+	char	*object;    /**< Name under which is object known. */
+	void	*schema;    /**< URL of EPP schema (use just path). */
+	int	valid_resp; /**< Validate response before sending it to client.*/
+	char	*epplog;    /**< Epp log filename. */
+	apr_file_t	*epplogfp; /**< File descriptor of epp log file. */
+	epp_loglevel	loglevel;  /**< Epp log level. */
 }eppd_server_conf;
 
 /** Used for access serialization to epp log file. */
@@ -189,11 +180,52 @@ void *epp_calloc(void *pool, unsigned size)
  * @param str  String which is going to be duplicated.
  * @return     Duplicated string.
  */
-void *epp_strdup(void *pool, const char *str)
+char *epp_strdup(void *pool, const char *str)
 {
 	apr_pool_t	*p = (apr_pool_t *) pool;
 
 	return apr_pstrdup(p, str);
+}
+
+/**
+ * Wrapper around apache's apr_pstrcat() which concatenates strings.
+ *
+ * This function is exported in header file to be used
+ * by other modules which are not aware of apache pools.
+ *
+ * @param pool Apache pool pointer.
+ * @param str1 First concatenated string.
+ * @param str2 Second concatenated string.
+ * @return     Duplicated string.
+ */
+char *epp_strcat(void *pool, const char *str1, const char *str2)
+{
+	apr_pool_t	*p = (apr_pool_t *) pool;
+
+	return apr_pstrcat(p, str1, str2, NULL);
+}
+
+/**
+ * Wrapper around apache's apr_pvsprintf() which prints formated string.
+ *
+ * This function is exported in header file to be used
+ * by other modules which are not aware of apache pools.
+ *
+ * @param pool Apache pool pointer.
+ * @param fmt  Format of string.
+ * @return     Formatted string allocated from pool.
+ */
+char *epp_sprintf(void *pool, const char *fmt, ...)
+{
+	va_list	 ap;
+	char	*str;
+	apr_pool_t	*p = (apr_pool_t *) pool;
+
+	va_start(ap, fmt);
+	str = apr_pvsprintf(p, fmt, ap);
+	va_end(ap);
+
+	return str;
 }
 
 /**
@@ -204,55 +236,54 @@ void *epp_strdup(void *pool, const char *str)
  */
 static void current_logtime(char *buf, int nbytes)
 {
-    apr_time_exp_t t;
-    apr_size_t len;
- 
-    apr_time_exp_lt(&t, apr_time_now());
- 
-    apr_strftime(buf, &len, nbytes, "[%d/%b/%Y:%H:%M:%S ", &t);
-    apr_snprintf(buf+len, nbytes-len, "%c%.2d%.2d]",
-                 t.tm_gmtoff < 0 ? '-' : '+',
-                 t.tm_gmtoff / (60*60), t.tm_gmtoff % (60*60));
+	apr_time_exp_t t;
+	apr_size_t len;
+
+	apr_time_exp_lt(&t, apr_time_now());
+
+	apr_strftime(buf, &len, nbytes, "[%d/%b/%Y:%H:%M:%S ", &t);
+	apr_snprintf(buf+len, nbytes-len, "%c%.2d%.2d]",
+			t.tm_gmtoff < 0 ? '-' : '+',
+			t.tm_gmtoff / (60*60), t.tm_gmtoff % (60*60));
 }
 
-/**
- * Write a log message to eppd log file.
- *
- * @param c       Connection record.
- * @param p       A pool from which to allocate strings for internal use.
- * @param session Session ID of the client.
- * @param level   Log level.
- * @param fmt     Printf-style format string.
- */
-static void epplog(conn_rec *c, apr_pool_t *p, int session, epp_loglevel level,
-						const char *fmt, ...)
+void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
 {
-    char	*logline;    /* the actual text written to log file */
-	char	*text;       /* log message as passed from client */
-	char	timestr[80]; /* buffer for timestamp */
-    const char	*rhost;  /* ip address of remote host */
-    apr_size_t	nbytes;  /* length of logline */
-	int	i;
-    apr_status_t	rv;
-    va_list	ap;
-    eppd_server_conf *sc = (eppd_server_conf *)
-		ap_get_module_config(c->base_server->module_config, &eppd_module);
+	char	*logline;     /* the actual text written to log file */
+	char	*text;        /* log message as passed from client */
+	char	 timestr[80]; /* buffer for timestamp */
+	int	 i, session;
+	va_list	 ap;
+	conn_rec	*conn;   /* apache connection struct pointer*/
+	apr_pool_t	*pool;   /* apache pool struct pointer */
+	const char	*rhost;  /* ip address of remote host */
+	apr_size_t	 nbytes; /* length of logline */
+	apr_status_t	 rv;
+	eppd_server_conf *sc;
  
-	/* cancel out messages with lower priority than configured loglevel */
-    if (level > sc->loglevel) return;
+	/* copy items from context struct to individual variables */
+	conn = epp_ctx->conn;
+	pool = epp_ctx->pool;
+	session = epp_ctx->session;
+	/* get module config */
+	sc = (eppd_server_conf *) ap_get_module_config(
+			conn->base_server->module_config, &eppd_module);
 
-    va_start(ap, fmt);
-    text = apr_pvsprintf(p, fmt, ap);
-    va_end(ap);
+	/* cancel out messages with lower priority than configured loglevel */
+	if (level > sc->loglevel) return;
+
+	va_start(ap, fmt);
+	text = apr_pvsprintf(pool, fmt, ap);
+	va_end(ap);
  
 	/* substitute newlines in text */
 	for (i = 0; text[i] != '\0'; i++) {
 		if (text[i] == '\n') text[i] = ' ';
 	}
 
-	/* if epp log file is not configured, log messages to apache's error log */
+	/* if epp log file is not configured, log msg to apache's error log */
 	if (!sc->epplogfp) {
-		int	ap_level; /* apache's log level equivalent to eppd loglevel */
+		int ap_level; /* apache log level equivalent to epp loglevel */
 
 		/* convert between two scales */
 		switch (level) {
@@ -273,188 +304,198 @@ static void epplog(conn_rec *c, apr_pool_t *p, int session, epp_loglevel level,
 				ap_level = APLOG_DEBUG;
 				break;
 		}
-		ap_log_cerror(APLOG_MARK, level, 0, c, text);
+		ap_log_cerror(APLOG_MARK, level, 0, conn, text);
 		return;
 	}
 
 	/* get remote host's ip address - is not critical if it is not known */
-    rhost = ap_get_remote_host(c, NULL, REMOTE_NOLOOKUP, NULL);
+	rhost = ap_get_remote_host(conn, NULL, REMOTE_NOLOOKUP, NULL);
 	/* get timestamp */
 	current_logtime(timestr, 79);
 	/* make up the whole log record */
-    logline = apr_psprintf(p, "%s %s [sessionID %d] %s" APR_EOL_STR,
-						timestr,
-						rhost ? rhost : "UNKNOWN-HOST",
-						session,
-						text);
+	logline = apr_psprintf(pool, "%s %s [sessionID %d] %s" APR_EOL_STR,
+			timestr,
+			rhost ? rhost : "UNKNOWN-HOST",
+			session,
+			text);
 
 	/* serialize access to log file */
-    rv = apr_global_mutex_lock(epp_log_lock);
-    if (rv != APR_SUCCESS) {
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, c,
-                      "apr_global_mutex_lock(epp_log_lock) failed");
-    }
+	rv = apr_global_mutex_lock(epp_log_lock);
+	if (rv != APR_SUCCESS) {
+		ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, conn,
+			"apr_global_mutex_lock(epp_log_lock) failed");
+	}
 
-    nbytes = strlen(logline);
-    apr_file_write(sc->epplogfp, logline, &nbytes);
+	nbytes = strlen(logline);
+	apr_file_write(sc->epplogfp, logline, &nbytes);
 
-    rv = apr_global_mutex_unlock(epp_log_lock);
-    if (rv != APR_SUCCESS) {
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, c,
-                      "apr_global_mutex_unlock(epp_log_lock) failed");
-    }
+	rv = apr_global_mutex_unlock(epp_log_lock);
+	if (rv != APR_SUCCESS) {
+		ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, conn,
+			"apr_global_mutex_unlock(epp_log_lock) failed");
+	}
 
-    return;
+	return;
+}
+
+/**
+ * Cleanup routine, is merely wrapper around epp_parser_request_cleanup().
+ *
+ * @param cdata   Structure containing data to be freed.
+ * @return        Always success.
+ */
+static apr_status_t epp_cleanup_request(void *cdata)
+{
+	epp_parser_request_cleanup(cdata);
+	return APR_SUCCESS;
 }
 
 /**
  * Read epp request.
+ *
  * Epp request consists of header, which contains frame length including
  * the header itself (4 bytes) and the actual request which is xml document.
  *
- * @param p Pool from which to allocate memory.
- * @param c Connection record.
- * @param content The read request without header.
- * @param bytes Length of request (excluding header length).
- * @param session Session ID is used only for logging.
- * @return 1 if successful and 0 when error occured.
+ * @param epp_ctx   EPP context struct.
+ * @param content   The read request without header.
+ * @param bytes     Length of request (excluding header length).
+ * @return          0 if successful, 1 if EOF was red and 2 when error occured.
  */
 static int
-epp_read_request(apr_pool_t *p, conn_rec *c, char **content, unsigned *bytes,
-		int session)
+epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 {
-		char	*buf;	/* buffer for request */
-		uint32_t	hbo_size; /* size of request in host byte order */
-		uint32_t	nbo_size; /* size of request in network byte order */
-		apr_bucket_brigade *bb;
-		apr_status_t	status;
-		apr_size_t	len;
+	char	*buf;	/* buffer for request */
+	uint32_t	 hbo_size; /* size of request in host byte order */
+	uint32_t	 nbo_size; /* size of request in network byte order */
+	apr_status_t	 status;
+	apr_size_t	 len;
+	apr_bucket_brigade *bb;
+	conn_rec	*conn = epp_ctx->conn;
+	apr_pool_t	*pool = epp_ctx->pool;
 
-		bb = apr_brigade_create(p, c->bucket_alloc);
+	bb = apr_brigade_create(pool, conn->bucket_alloc);
 
-		/* blocking read of first 4 bytes (request's length) */
-		status = ap_get_brigade(c->input_filters, bb, AP_MODE_READBYTES,
-									APR_BLOCK_READ, EPP_HEADER_LENGTH);
-		if (status != APR_SUCCESS) {
-			/*
-			 * this used to be logged at EPP_FATAL level, but later was
-			 * changed to lower priority, because condition above catches also
-			 * cases, when client simply aborts the connection without
-			 * logging out first, which happens pretty often and is not
-			 * "fatal" at all.
-			 */
-			if (status == APR_EOF) {
-				epplog(c, p, session, EPP_INFO,
-						"Client disconnected without proper logout.");
-			}
-			else {
-				epplog(c, p, session, EPP_ERROR,
-						"Error when reading epp header (%d)", status);
-			}
-			return 0;
-		}
-
+	/* blocking read of first 4 bytes (request's length) */
+	status = ap_get_brigade(conn->input_filters, bb, AP_MODE_READBYTES,
+			APR_BLOCK_READ, EPP_HEADER_LENGTH);
+	if (status != APR_SUCCESS) {
 		/*
-		 * convert bucket brigade into sequence of bytes
-		 * In most cases there is just one bucket of size 4, which
-		 * could be read directly. But we will not rely on it.
+		 * this used to be logged at EPP_FATAL level, but later was
+		 * changed to lower priority, because condition above catches
+		 * also cases, when client simply aborts the connection without
+		 * logging out first, which happens pretty often and is not
+		 * "fatal" at all.
 		 */
-		len = EPP_HEADER_LENGTH;
-		status = apr_brigade_pflatten(bb, &buf, &len, p);
-		if (status != APR_SUCCESS) {
-			epplog(c, p, session, EPP_FATAL, "Could not flatten apr_brigade!");
-			apr_brigade_destroy(bb);
-			return 0;
+		if (status == APR_EOF) {
+			epplog(epp_ctx, EPP_INFO, "Client disconnected without "
+					"proper logout.");
+			return 1;
 		}
-		if (len != EPP_HEADER_LENGTH) {
-			/* this should not ever happen */
-			epplog(c, p, session, EPP_ERROR,
-					"4 bytes of EPP header were read but after flatting of"
-					" bucket brigade only %u bytes remained?!",
-					(unsigned int) len);
-			apr_brigade_destroy(bb);
-			return 0;
-		}
+		epplog(epp_ctx, EPP_ERROR, "Error when reading epp header (%d)",
+				status);
+		return 2;
+	}
 
-		/* beware of alignment issues - this should be safe */
-		for (len = 0; len < EPP_HEADER_LENGTH; len++)
-			((char *) &nbo_size)[len] = buf[len];
-		hbo_size = ntohl(nbo_size);
-
-		/* exclude header length */
-		hbo_size -= EPP_HEADER_LENGTH;
-
-		/*
-		 * hbo_size needs to be checked, so that we know it's not total
-		 * garbage
-		 */
-		if (hbo_size < 1 || hbo_size > MAX_FRAME_LENGTH) {
-			epplog(c, p, session, EPP_ERROR,
-					"Invalid epp frame length (%u bytes)", hbo_size);
-			apr_brigade_destroy(bb);
-			return 0;
-		}
-
-		/* we will reuse bucket brigade when reading the request */
-		status = apr_brigade_cleanup(bb);
-		if (status != APR_SUCCESS) {
-			epplog(c, p, session, EPP_FATAL, "Could not cleanup brigade!");
-			apr_brigade_destroy(bb);
-			return 0;
-		}
-
-		/* blocking read of request's body */
-		len = hbo_size;
-		status = ap_get_brigade(c->input_filters, bb, AP_MODE_READBYTES,
-									APR_BLOCK_READ, len);
-		if (status != APR_SUCCESS) {
-			epplog(c, p, session, EPP_ERROR,
-					"Error when reading epp request's body (%d)", status);
-			apr_brigade_destroy(bb);
-			return 0;
-		}
-
-		/* convert bucket brigade to string */
-		status = apr_brigade_pflatten(bb, content, &len, p);
-		if (status != APR_SUCCESS) {
-			epplog(c, p, session, EPP_FATAL, "Could not flatten apr_brigade!");
-			apr_brigade_destroy(bb);
-			return 0;
-		}
-		if (len != hbo_size) {
-			epplog(c, p, session, EPP_ERROR,
-				"EPP request's length (%u bytes) is other than the "
-				"claimed one in header (%u bytes)",
-					(unsigned) len, hbo_size);
-			apr_brigade_destroy(bb);
-			return 0;
-		}
-
-		epplog(c, p, session, EPP_DEBUG, "request received (length %u bytes)",
-				hbo_size);
-		epplog(c, p, session, EPP_DEBUG, "request content: %s", *content);
-
+	/*
+	 * convert bucket brigade into sequence of bytes
+	 * In most cases there is just one bucket of size 4, which
+	 * could be read directly. But we will not rely on it.
+	 */
+	len = EPP_HEADER_LENGTH;
+	status = apr_brigade_pflatten(bb, &buf, &len, pool);
+	if (status != APR_SUCCESS) {
+		epplog(epp_ctx, EPP_FATAL, "Could not flatten apr_brigade!");
 		apr_brigade_destroy(bb);
-		*bytes = (unsigned) len;
-		return 1;
+		return 2;
+	}
+	if (len != EPP_HEADER_LENGTH) {
+		/* this should not ever happen */
+		epplog(epp_ctx, EPP_ERROR, "4 bytes of EPP header were read "
+				"but after flatting of bucket brigade only %u "
+				"bytes remained?!", (unsigned int) len);
+		apr_brigade_destroy(bb);
+		return 2;
+	}
+
+	/* beware of alignment issues - this should be safe */
+	for (len = 0; len < EPP_HEADER_LENGTH; len++)
+		((char *) &nbo_size)[len] = buf[len];
+	hbo_size = ntohl(nbo_size);
+
+	/* exclude header length */
+	hbo_size -= EPP_HEADER_LENGTH;
+
+	/*
+	 * hbo_size needs to be checked, so that we know it's not total
+	 * garbage
+	 */
+	if (hbo_size < 1 || hbo_size > MAX_FRAME_LENGTH) {
+		epplog(epp_ctx, EPP_ERROR, "Invalid epp frame length (%u bytes)",
+				hbo_size);
+		apr_brigade_destroy(bb);
+		return 2;
+	}
+
+	/* we will reuse bucket brigade when reading the request */
+	status = apr_brigade_cleanup(bb);
+	if (status != APR_SUCCESS) {
+		epplog(epp_ctx, EPP_FATAL, "Could not cleanup brigade!");
+		apr_brigade_destroy(bb);
+		return 2;
+	}
+
+	/* blocking read of request's body */
+	len = hbo_size;
+	status = ap_get_brigade(conn->input_filters, bb, AP_MODE_READBYTES,
+			APR_BLOCK_READ, len);
+	if (status != APR_SUCCESS) {
+		epplog(epp_ctx, EPP_ERROR, "Error when reading epp request's "
+				"body (%d)", status);
+		apr_brigade_destroy(bb);
+		return 2;
+	}
+
+	/* convert bucket brigade to string */
+	status = apr_brigade_pflatten(bb, content, &len, pool);
+	if (status != APR_SUCCESS) {
+		epplog(epp_ctx, EPP_FATAL, "Could not flatten apr_brigade!");
+		apr_brigade_destroy(bb);
+		return 2;
+	}
+	if (len != hbo_size) {
+		epplog(epp_ctx, EPP_ERROR, "EPP request's length (%u bytes) is "
+				"other than the claimed one in header "
+				"(%u bytes)", (unsigned) len, hbo_size);
+		apr_brigade_destroy(bb);
+		return 2;
+	}
+
+	epplog(epp_ctx, EPP_DEBUG, "request received (length %u bytes)",
+			hbo_size);
+	epplog(epp_ctx, EPP_DEBUG, "request content: %s", *content);
+
+	apr_brigade_destroy(bb);
+	*bytes = (unsigned) len;
+	return 0;
 }
 
 /**
  * Get md5 signature of given PEM encoded certificate.
+ *
  * The only function in module which uses openssl library.
  *
- * @param cert_md5 Allocated buffer for storing the resulting fingerprint
- * (should be at least 50 bytes long).
- * @param pem PEM encoded certificate in its string representation.
- * @return 1 if successful and 0 when error occured.
+ * @param cert_md5   Allocated buffer for storing the resulting fingerprint
+ *                   (should be at least 50 bytes long).
+ * @param pem        PEM encoded certificate in its string representation.
+ * @return           1 if successful and 0 when error occured.
  */
 static int get_md5(char *cert_md5, char *pem)
 {
-	X509	*x;	/* openssl's struture for representing x509 certificate */
-    BIO	*bio;	/* openssl's basic input/output stream */
-	unsigned char	md5[20];	/* fingerprint in binary form */
-	unsigned len;	/* length of fingerprint in binary form */
-    int i;
+	X509	*x;   /* openssl's struture for representing x509 certificate */
+	BIO	*bio; /* openssl's basic input/output stream */
+	int	 i;
+	unsigned int	len;	 /* length of fingerprint in binary form */
+	unsigned char	md5[20]; /* fingerprint in binary form */
 
 	/*
 	 * This function is rather overcomplicated, because the interface
@@ -483,7 +524,7 @@ static int get_md5(char *cert_md5, char *pem)
 		X509_free(x);
 		return 0;
 	}
-	/* convert binary representation to string representation of fingerprint */
+	/* convert binary representation to string repr of fingerprint */
 	for (i = 0; i < len; i++) {
 		sprintf(cert_md5, "%02X%c", md5[i], (i + 1 == len) ? '\0' : ':');
 		cert_md5 += 3;
@@ -491,12 +532,204 @@ static int get_md5(char *cert_md5, char *pem)
 
 	BIO_free_all(bio);
 	X509_free(x);
+	return 1;
+}
 
-    return 1;
+/**
+ * Function calls login over corba and before it computes fingerprint
+ * of client's SSL certificate.
+ *
+ * @param epp_ctx   EPP context.
+ * @param service   CORBA object reference.
+ * @param cdata     EPP data.
+ * @param loginid   Login id assigned by fred_rifd.
+ * @param lang      Language selected by client.
+ * @param cstat     Corba status.
+ * @return          0 in case of internal error, 1 if ok.
+ */
+static int call_login(epp_context *epp_ctx, service_EPP *service,
+		epp_command_data *cdata, unsigned int *loginid,
+		epp_lang *lang, corba_status *cstat)
+{
+	char	 cert_md5[50];/* should be enough for md5 hash of cert */
+	char	*pem;         /* pem encoded client's certificate */
+	conn_rec	*conn;/* apache connection */
+	apr_pool_t	*pool;/* memory pool */
+
+	conn = epp_ctx->conn;
+	pool = epp_ctx->pool;
+	/* we will compute fingerprint of client's certificate */
+	bzero(cert_md5, 50);
+	pem = epp_ssl_lookup(pool, conn->base_server, conn, NULL,
+			"SSL_CLIENT_CERT");
+	if ((pem == NULL) || (*pem == '\0') || !get_md5(cert_md5, pem))
+	{
+		epplog(epp_ctx, EPP_ERROR, "Error when getting client's "
+				"PEM certificate. Did you forget "
+				"\"SSLVerifyClient require\" directive "
+				"in apache conf file?");
+		return 0;
+	}
+
+	epplog(epp_ctx, EPP_DEBUG, "Fingerprint is: %s", cert_md5);
+
+	/*
+	 * corba login function is somewhat special
+	 *   - session might be changed
+	 *   - lang might be changed
+	 *   - there is additional parameter identifing ssl certificate
+	 *     in order to match login name with used certificate on
+	 *     side of central repository. The identifing parameter
+	 *     is md5 digest of client's certificate.
+	 */
+	*cstat = epp_call_login(epp_ctx, service, loginid, lang, cert_md5,cdata);
+	/*
+	 * this event should be logged explicitly if login was
+	 * successfull
+	 */
+	if (*loginid != 0)
+		epplog(epp_ctx, EPP_INFO, "Logged in successfully, login id "
+				"is %d", *loginid);
+	return 1;
+}
+
+/**
+ * Function calls command from corba backend.
+ *
+ * @param epp_ctx   EPP context.
+ * @param service   CORBA object reference.
+ * @param cdata     EPP data.
+ * @param pstat     Parser return status.
+ * @param loginid   Login id assigned by fred_rifd.
+ * @param lang      Language selected by client.
+ * @return          0 in case of internal error, 1 if ok.
+ */
+static int call_corba(epp_context *epp_ctx, service_EPP *service,
+		epp_command_data *cdata, parser_status pstat,
+		unsigned int *loginid, epp_lang *lang)
+{
+	corba_status	cstat; /* ret code of corba component */
+
+	if (pstat == PARSER_CMD_LOGIN) {
+		if (!call_login(epp_ctx, service, cdata, loginid, lang, &cstat))
+			return 0;
+	}
+	else if (pstat == PARSER_CMD_LOGOUT) {
+		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
+	}
+	else {
+		/* go ahead to generic corba function call */
+		cstat = epp_call_cmd(epp_ctx, service, *loginid, cdata);
+	}
+
+	/* catch corba failures */
+	if (cstat != CORBA_OK) {
+		switch (cstat) {
+			case CORBA_ERROR:
+				epplog(epp_ctx, EPP_ERROR, "Corba call failed "
+					"- terminating session");
+				break;
+			case CORBA_REMOTE_ERROR:
+				epplog(epp_ctx, EPP_ERROR, "Unqualified answer "
+					"from server - terminating session");
+				break;
+			case CORBA_INT_ERROR:
+				epplog(epp_ctx, EPP_FATAL,
+					"Malloc in corba wrapper failed");
+				break;
+			default:
+				epplog(epp_ctx, EPP_ERROR,
+					"Unknown return code from corba module");
+				break;
+		}
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * Function generates XML response.
+ *
+ * @param epp_ctx   EPP context.
+ * @param service   CORBA object reference.
+ * @param cdata     Command data.
+ * @param validate  Validate responses.
+ * @param schema    Parsed XML schema.
+ * @param lang      Language of session.
+ * @param response  On return holds response if ret code is 1.
+ * @return          0 in case of internal error, 1 if ok.
+ */
+static int gen_response(epp_context *epp_ctx, service_EPP *service,
+		epp_command_data *cdata, int validate, void *schema,
+		epp_lang lang, char **response)
+{
+	qhead	 valerr; /* encountered errors when validating response */
+	gen_status	gstat; /* generator's return code */
+
+	valerr.body = NULL;
+	valerr.count = 0;
+
+	/* generate xml response */
+	gstat = epp_gen_response(epp_ctx, validate, schema, lang, cdata,
+			response, &valerr);
+
+	switch (gstat) {
+		case GEN_OK:
+			break;
+		/*
+		 * following errors are serious and response cannot be sent
+		 * to client when any of them appears
+		 */
+		case GEN_EBUFFER:
+		case GEN_EWRITER:
+		case GEN_EBUILD:
+			epplog(epp_ctx, EPP_FATAL, "XML generator failed - "
+					"terminating session");
+			return 0;
+		/*
+		 * following errors are only informative though serious.
+		 * The connection persists and response is sent back to
+		 * client.
+		 */
+		case GEN_NOT_XML:
+			epplog(epp_ctx, EPP_ERROR,
+					"Generated response is not XML");
+			break;
+		case GEN_EINTERNAL:
+			epplog(epp_ctx, EPP_ERROR, "Malloc failure when "
+					"validating response");
+			break;
+		case GEN_ESCHEMA:
+			epplog(epp_ctx, EPP_ERROR, "Error when parsing XML "
+					"schema during response validation");
+			break;
+		case GEN_NOT_VALID:
+			epplog(epp_ctx, EPP_ERROR,
+					"Generated response does not validate");
+			/* print more information about validation errors */
+			q_foreach(&valerr) {
+				epp_error *e = q_content(&valerr);
+
+				epplog(epp_ctx, EPP_ERROR, "Element: %s",
+						e->value);
+				epplog(epp_ctx, EPP_ERROR, "Reason: %s",
+						e->reason);
+			}
+			break;
+		default:
+			epplog(epp_ctx, EPP_ERROR, "Unknown return code from "
+					"generator module");
+			break;
+	}
+	/* XXX ugly hack */
+	epp_call_save_output_xml(epp_ctx, service, cdata, *response);
+	return 1;
 }
 
 /**
  * EPP Connection handler.
+ *
  * When EPP engine is turn on for connection, this handler takes care
  * of it for whole connection's lifetime duration. The connection is
  * taken out of reach of other handlers, this is important, since
@@ -504,21 +737,21 @@ static int get_md5(char *cert_md5, char *pem)
  * make EPP request as much as possible similar to HTTP request,
  * unexpectable influences from other modules occur.
  *
- * @param c Incoming connection.
- * @return Return code
+ * @param c   Incoming connection.
+ * @return    Return code
  */
 static int epp_process_connection(conn_rec *c)
 {
-	int	session;	/* session = 0 when not authenticated yet */
-	unsigned	lang;	/* session's language */
-	int	logout;	/* if true, terminate request loop */
-	int	firsttime;	/* if true, generate greeting in request loop */
+	int	firsttime; /* if true, generate greeting in request loop */
 	int	i;
-	apr_bucket_brigade	*bb;
-	apr_status_t	status;	/* used to store return code from apr functions */
-	service_EPP	EPPservice;
-	apr_hash_t	*references;
+	unsigned int	 loginid;    /* session id assigned by fred_rif */
+	epp_lang	 lang;       /* session's language */
+	epp_context	 epp_ctx;    /* context (session , connection, pool) */
+	apr_status_t	 status;     /* used to store rc from apr functions */
+	service_EPP	 EPPservice; /* CORBA object reference */
+	apr_hash_t	*references; /* directory of CORBA object references */
 	module	*corba_module;
+	apr_bucket_brigade *bb;
 	server_rec	*s = c->base_server;
 	eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(s->module_config, &eppd_module);
@@ -527,29 +760,37 @@ static int epp_process_connection(conn_rec *c)
 	if (!sc->epp_enabled)
 		return DECLINED;
 
+	/* Initialize epp context structure (used mainly for logging) */
+	epp_ctx.conn = c;
+	epp_ctx.pool = c->pool;
+	/*
+	 * combination of timestamp and connection id should
+	 * provide mostly unique identifier
+	 */
+	epp_ctx.session = (apr_time_now() * (c->id + 1)) % 524288;
+
 	/*
 	 * get module structure for mod_corba, in order to retrieve service
 	 * stored by that module in connection config.
 	 */
 	corba_module = NULL;
-	for (i = 0; ap_loaded_modules[i] != NULL; i++)
+	for (i = 0; ap_loaded_modules[i] != NULL; i++) {
 		if (!strcmp(ap_loaded_modules[i]->name, "mod_corba.c")) {
 			corba_module = ap_loaded_modules[i];
 			break;
-		}   
-
+		}
+	}
 	if (corba_module == NULL) {
-		ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-				"mod_corba module was not loaded - unable to handle an EPP "
-				"request");
+		epplog(&epp_ctx, EPP_FATAL, "mod_corba module was not loaded - "
+				"unable to handle an EPP request");
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 	references = (apr_hash_t *)
 		ap_get_module_config(c->conn_config, corba_module);
 	if (references == NULL) {
-		ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-				"mod_corba is not enabled for this server though it "
-				"should be! Cannot handle EPP request.");
+		epplog(&epp_ctx, EPP_FATAL, "mod_corba is not enabled for this "
+				"server though it should be! Cannot handle EPP "
+				"request.");
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
@@ -557,8 +798,8 @@ static int epp_process_connection(conn_rec *c)
 	EPPservice = (service_EPP) apr_hash_get(references, sc->object,
 			strlen(sc->object));
 	if (EPPservice == NULL) {
-		epplog(c, c->pool, 0, EPP_ERROR, "Could not obtain object reference for "
-				"alias '%s'.", sc->object);
+		epplog(&epp_ctx, EPP_ERROR, "Could not obtain object reference "
+				"for alias '%s'.", sc->object);
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
@@ -572,21 +813,20 @@ static int epp_process_connection(conn_rec *c)
 	bb = apr_brigade_create(c->pool, c->bucket_alloc);
 
 	/* initialize variables used inside the loop */
-	session = 0;
+	loginid = 0;    /* this means that client is not logged in */
 	lang = LANG_EN;	/* default language is english */
 	firsttime = 1;	/* this will cause automatic generation of greeting */
 
 	/*
-	 * Loop in which are processed requests until client logs out or error
-	 * appears.
+	 * The loop in which are processed requests until client logs out or
+	 * error appears.
 	 */
-	logout = 0;
-	while (!logout) {
-		apr_pool_t	*rpool;	/* memory pool used for duration of a request */
-		epp_command_data	*cdata;	/* self-descriptive data structure */
-		char	*response;	/* generated XML answer to client */
-		qhead	valerr; /* encountered errors when validating response */
-		parser_status	pstat;	/* parser's return code */
+	while (1) {
+		/* memory pool used for duration of one request */
+		apr_pool_t	*rpool;
+		parser_status	 pstat;  /* parser's return code */
+		epp_command_data *cdata; /* self-descriptive data structure */
+		char	*response;       /* generated XML answer to client */
 #ifdef EPP_PERF
 		/*
 		 * array of timestamps for perf measurement:
@@ -596,323 +836,209 @@ static int epp_process_connection(conn_rec *c)
 		 *     time[3] - after response generation
 		 */
 		apr_time_t	times[4];
-
 		bzero(times, 4 * sizeof(times[0]));
 #endif
-		/* possible previous content is gone with request pool */
-		valerr.body = NULL;
-		valerr.count = 0;
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, c->pool);
 		apr_pool_tag(rpool, "EPP_request");
+		epp_ctx.pool = rpool;
+		/* possible previous content is gone with request pool */
+		cdata = NULL;
 
 		if (firsttime) {
 			firsttime = 0;
 			/*
-			 * bogus branch in order to generate greeting when firsttime
-			 * in request loop. We don't have much to do, we will
-			 * just simulate <hello> frame arrival by setting pstat.
+			 * bogus branch in order to generate greeting when
+			 * firsttime in request loop. We don't have much to do,
+			 * we will just simulate <hello> frame arrival by
+			 * setting pstat.
 			 */
 			pstat = PARSER_HELLO;
-			epplog(c, rpool, session, EPP_DEBUG, "Client connected");
+			epplog(&epp_ctx, EPP_DEBUG, "Client connected");
 		}
 		else {
-			char *request;	/* raw request read from socket */
-			unsigned	bytes;	/* length of request */
+			int	retval;     /* return code of read_request */
+			char	*request;   /* raw request read from socket */
+			unsigned int bytes; /* length of request */
 
 			/* read request */
-			if (!epp_read_request(rpool, c, &request, &bytes, session)) {
+			retval = epp_read_request(&epp_ctx, &request, &bytes);
+			if (retval == 1) {
 				/*
-				 * we used to return HTTP_INTERNAL_SERVER_ERROR here, but
-				 * since epp_read_request is unsuccessfull each time client
-				 * disconnects without first logging out, which happens quite
-				 * often, we return OK.
+				 * epp_read_request red EOF, this results in
+				 * OK status being returned from connection
+				 * handler, since it's not counted as an error.
 				 */
 				break;
 			}
-
-#ifdef EPP_PERF
-			times[0] = apr_time_now();
-#endif
-			/*
-			 * deliver request to XML parser, the task of parser is to fill
-			 * cdata structure with data
-			 */
-			pstat = epp_parse_command((void *) rpool, session, sc->schema,
-					request, bytes, &cdata);
-#ifdef EPP_PERF
-			times[1] = apr_time_now();
-#endif
-		}
-
-		/* log request to CORBA logger */
-		//remote_log_request((void *) rpool, session, cdata);
-
-		switch (pstat) {
-			case PARSER_NOT_XML:
-				epplog(c, rpool, session, EPP_WARNING,
-						"Request is not XML");
-				return HTTP_BAD_REQUEST;
-			case PARSER_NOT_COMMAND:
-				epplog(c, rpool, session, EPP_WARNING,
-						"Request is neither a command nor hello");
-				return HTTP_BAD_REQUEST;
-			case PARSER_ESCHEMA:
-				epplog(c, rpool, session, EPP_WARNING,
-						"Schema's parser error - check correctness of schema");
-				return HTTP_INTERNAL_SERVER_ERROR;
-			case PARSER_EINTERNAL:
-				epplog(c, rpool, session, EPP_FATAL,
-						"Internal parser error occured when processing request");
-				return HTTP_INTERNAL_SERVER_ERROR;
-			case PARSER_HELLO:
-			case PARSER_NOT_VALID:
-			case PARSER_CMD_LOGIN:
-			case PARSER_CMD_LOGOUT:
-			case PARSER_CMD_OTHER:
-				/* theese return codes are ok - we can continue in processing */
-				break;
-			default:
-				epplog(c, rpool, session, EPP_FATAL,
-						"Unknown error occured during parsing stage");
-				return HTTP_BAD_REQUEST;
-		}
-
-		/* is it <hello> frame? */
-		if (pstat == PARSER_HELLO) {
-			int	rc;
-			char	*version;
-			char	*curdate;
-			gen_status	gstat;	/* generator's return code */
-
-			/* get info from CR used in <greeting> frame */
-			rc = epp_call_hello(rpool, EPPservice, &version, &curdate);
-
-			if (rc != CORBA_OK) {
-				epplog(c, rpool, session, EPP_ERROR,
-						"Could not obtain version string from CR");
+			else if (retval == 2) {
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
+#ifdef EPP_PERF
+			times[0] = apr_time_now(); /* before parsing */
+#endif
+			/*
+			 * Deliver request to XML parser, the task of parser is
+			 * to fill cdata structure with data.
+			 */
+			pstat = epp_parse_command(&epp_ctx, (loginid != 0),
+					sc->schema, request, bytes, &cdata);
+#ifdef EPP_PERF
+			times[1] = apr_time_now(); /* after parsing */
+#endif
+			/*
+			 * Register cleanup for cdata structure. The most of the
+			 * items in this structure are allocated from pool, but
+			 * parsed document tree and xpath context must be
+			 * explicitly released.
+			 */
+			apr_pool_cleanup_register(rpool, (void *) cdata,
+					epp_cleanup_request,
+					apr_pool_cleanup_null);
+		}
 
+		/* test if the failure is serious enough to close connection */
+		if (pstat > PARSER_HELLO) {
+			switch (pstat) {
+				case PARSER_NOT_XML:
+					epplog(&epp_ctx, EPP_WARNING,
+						"Request is not XML");
+					return HTTP_BAD_REQUEST;
+				case PARSER_NOT_COMMAND:
+					epplog(&epp_ctx, EPP_WARNING,"Request is"
+						" neither a command nor hello");
+					return HTTP_BAD_REQUEST;
+				case PARSER_ESCHEMA:
+					epplog(&epp_ctx, EPP_WARNING,
+						"Schema's parser error - check "
+						"correctness of schema");
+					return HTTP_INTERNAL_SERVER_ERROR;
+				case PARSER_EINTERNAL:
+					epplog(&epp_ctx, EPP_FATAL,
+						"Internal parser error occured "
+						"when processing request");
+					return HTTP_INTERNAL_SERVER_ERROR;
+				default:
+					epplog(&epp_ctx, EPP_FATAL,
+						"Unknown error occured "
+						"during parsing stage");
+					return HTTP_BAD_REQUEST;
+			}
+		}
+
+		/* hello and other frames are processed in different way */
+		if (pstat == PARSER_HELLO) {
+			int	 rc;      /* corba ret code */
+			char	*version; /* version of fred_rifd */
+			char	*curdate; /* cur. date returned from fred_rifd */
+			gen_status gstat; /* generator's return code */
+
+			/* get info from CR needed for <greeting> frame */
+			rc = epp_call_hello(&epp_ctx, EPPservice, &version,
+					&curdate);
+			if (rc != CORBA_OK) {
+				epplog(&epp_ctx, EPP_ERROR, "Could not get "
+						"greeting data from fred_rifd");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
 #ifdef EPP_PERF
 			times[2] = apr_time_now();
 #endif
 			/*
-			 * generate greeting (server name is concatenation of string
-			 * given in apache's configuration file and string retrieved
+			 * generate greeting (server name is concatenation of
+			 * string from apache conf file and string retrieved
 			 * from corba server through version() function)
 			 */
-			gstat = epp_gen_greeting(rpool,
-					apr_pstrcat(rpool,sc->servername, " (", version, ")", NULL),
+			gstat = epp_gen_greeting(epp_ctx.pool,
+					apr_pstrcat(rpool, sc->servername, " (",
+						version, ")", NULL),
 					curdate, &response);
 			if (gstat != GEN_OK) {
-				epplog(c, rpool, session, EPP_FATAL,
-						"Error when creating epp greeting");
+				epplog(&epp_ctx, EPP_FATAL, "Error when creating"
+						" epp greeting");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 		}
 		/* it is a command */
 		else {
-			corba_status	cstat;	/* return code of corba component */
-			gen_status	gstat;	/* generator's return code */
-
-			/*
-			 * we generate response for valid commands and requests which
-			 * doesn't validate. Note that this is the only case in which
-			 * cdata structure is filled and therefore needs to be freed.
-			 */
-
-			/* we will drop a line for requests which don't validate in log */
+			/* log request which doesn't validate */
 			if (pstat == PARSER_NOT_VALID) {
-				epplog(c, rpool, session, EPP_WARNING,
+				epplog(&epp_ctx, EPP_WARNING,
 						"Request doest not validate");
 			}
-
-			if (pstat == PARSER_CMD_LOGIN) {
-				char	cert_md5[50]; /* should be enough for md5 hash of cert */
-				char	*pem;	/* pem encoded client's certificate */
-
-				/* we will compute fingerprint of client's certificate */
-				bzero(cert_md5, 50);
-				pem = epp_ssl_lookup(rpool, c->base_server, c, NULL,
-						"SSL_CLIENT_CERT");
-				if ((pem == NULL) || (*pem == '\0') || !get_md5(cert_md5, pem)) {
-					epplog(c, rpool, session, EPP_ERROR,
-							"Error when getting client's PEM certificate. "
-							"Did you forget \"SSLVerifyClient require\" "
-							"directive in apache's conf?");
-					return HTTP_INTERNAL_SERVER_ERROR;
-				}
-
-				epplog(c, rpool, session, EPP_DEBUG,
-						"Fingerprint is: %s", cert_md5);
-
-				/*
-				 * corba login function is somewhat special
-				 *   - session might be changed
-				 *   - lang might be changed
-				 *   - there is additional parameter identifing ssl certificate
-				 *     in order to match login name with used certificate on
-				 *     side of central repository. The identifing parameter
-				 *     is md5 digest of client's certificate.
-				 */
-				cstat = epp_call_login(rpool, EPPservice, &session, &lang,
-						cert_md5, cdata);
-				/*
-				 * this event should be logged explicitly if login was
-				 * successfull
-				 */
-				if (session != 0)
-					epplog(c, rpool, session, EPP_INFO,"Logged in successfully");
-			}
-			else if (pstat == PARSER_CMD_LOGOUT) {
-				cstat = epp_call_logout(rpool, EPPservice, session,
-						cdata, &logout);
-			}
-			else {
-				/* go ahead to generic corba function call */
-				cstat = epp_call_cmd(rpool, EPPservice, session, cdata);
-			}
-
-			/* catch corba failures */
-			if (cstat != CORBA_OK) {
-				switch (cstat) {
-					case CORBA_ERROR:
-						epplog(c, rpool, session, EPP_ERROR,
-								"Corba call failed - terminating session");
-						break;
-					case CORBA_REMOTE_ERROR:
-						epplog(c, rpool, session, EPP_ERROR,
-								"Unqualified answer from server - "
-								"terminating session");
-						break;
-					case CORBA_INT_ERROR:
-						epplog(c, rpool, session, EPP_FATAL,
-								"Malloc in corba wrapper failed");
-						break;
-					default:
-						epplog(c, rpool, session, EPP_ERROR,
-								"Unknown return code from corba module");
-						break;
-				}
+			/* call function from corba backend */
+			if (!call_corba(&epp_ctx, EPPservice, cdata, pstat,
+						&loginid, &lang))
 				return HTTP_INTERNAL_SERVER_ERROR;
-			}
-
 #ifdef EPP_PERF
 			times[2] = apr_time_now();
 #endif
-			/* generate xml response */
-			gstat = epp_gen_response(rpool, sc->valid_resp, sc->schema,
-					lang, cdata, &response, &valerr);
-
-			switch (gstat) {
-				case GEN_OK:
-					break;
-				/*
-				 * following errors are serious and response cannot be sent
-				 * to client when any of them appears
-				 */
-				case GEN_EBUFFER:
-				case GEN_EWRITER:
-				case GEN_EBUILD:
-					epplog(c, rpool, session, EPP_FATAL,
-							"XML generator failed - terminating session");
-					return HTTP_INTERNAL_SERVER_ERROR;
-				/*
-				 * following errors are only informative though serious.
-				 * The connection persists and response is sent back to
-				 * client.
-				 */
-				case GEN_NOT_XML:
-					epplog(c, rpool, session, EPP_ERROR,
-							"Generated response is not XML");
-					break;
-				case GEN_EINTERNAL:
-					epplog(c, rpool, session, EPP_ERROR,
-							"Malloc failure when validating response");
-					break;
-				case GEN_ESCHEMA:
-					epplog(c, rpool, session, EPP_ERROR,
-						"Error when parsing schema for validation of response");
-					break;
-				case GEN_NOT_VALID:
-					epplog(c, rpool, session, EPP_ERROR,
-							"Generated response does not validate");
-					/* print more detailed information about validation errors */
-					q_foreach(&valerr) {
-						epp_error	*e = q_content(&valerr);
-						epplog(c, rpool, session, EPP_ERROR,
-								"Element: %s", e->value);
-						epplog(c, rpool, session, EPP_ERROR,
-								"Reason: %s", e->reason);
-					}
-					break;
-				default:
-					epplog(c, rpool, session, EPP_ERROR,
-							"Unknown return code from generator module");
-					break;
-			}
-			/* XXX ugly hack */
-			epp_call_save_output_xml(EPPservice, cdata, response);
+			/* generate response */
+			if (!gen_response(&epp_ctx, EPPservice, cdata,
+						sc->valid_resp, sc->schema,
+						lang, &response))
+				return HTTP_INTERNAL_SERVER_ERROR;
 		}
-
 #ifdef EPP_PERF
 		times[3] = apr_time_now();
 #endif
 		/* send response back to client */
 		apr_brigade_puts(bb, NULL, NULL, response);
-		epplog(c, rpool, session, EPP_DEBUG, "Response content: %s", response);
+		epplog(&epp_ctx, EPP_DEBUG, "Response content: %s", response);
 #ifdef EPP_PERF
 		/*
 		 * record perf data
-		 * apache 2.0 has problem with processing %llu formating, therefore
-		 * we overtype the results to a more common numeric values
+		 * Apache 2.0 has problem with processing %llu formating,
+		 * therefore we overtype the results to a more common numeric
+		 * values.
 		 */
-		epplog(c, rpool, session, EPP_DEBUG, "Perf data: p(%u), c(%u), "
+		epplog(&epp_ctx, EPP_DEBUG, "Perf data: p(%u), c(%u), "
 				"g(%u), s(%u)",
 				(unsigned) (times[1] - times[0]), /* parser */
 				(unsigned) (times[2] - times[1]), /* CORBA */
 				(unsigned) (times[3] - times[2]), /* generator */
-				(unsigned) (apr_time_now() - times[3]));/* send */
+				(unsigned) (apr_time_now() - times[3]));/*send*/
 #endif
 		status = ap_fflush(c->output_filters, bb);
 		if (status != APR_SUCCESS) {
-			epplog(c, rpool, session, EPP_FATAL,
+			epplog(&epp_ctx, EPP_FATAL,
 					"Error when sending response to client");
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
+		/* check if successful logout appeared */
+		if (pstat == PARSER_CMD_LOGOUT && loginid == 0)
+			break;
+
 		/* prepare bucket brigade for reuse in next request */
 		status = apr_brigade_cleanup(bb);
 		if (status != APR_SUCCESS) {
-			epplog(c, rpool, session, EPP_FATAL,
-					"Could not cleanup bucket brigade used for response");
+			epplog(&epp_ctx, EPP_FATAL, "Could not cleanup bucket "
+					"brigade used for response");
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
-		/* log response to CORBA logger */
-		//remote_log_response((void *) rpool, session, cdata);
-
 		/*XXX
-		 * if server is going down non-gracefully we will try to say good-bye
-		 * before we will be killed.
+		 * if server is going down non-gracefully we will try to say
+		 * good-bye before we will be killed.
 		if (ap_graceful_stop_signalled()
 		 */
 
 		apr_pool_destroy(rpool);
 	}
+	epp_ctx.pool = c->pool;
 
 	/* client logged out or disconnected from server */
-	epplog(c, c->pool, session, EPP_INFO, "Session ended");
+	epplog(&epp_ctx, EPP_INFO, "Session ended");
 	return HTTP_OK;
 }
 
 /**
  * EPP output filter, which prefixes each response with length of the response.
  *
- * @param f Apache filter structure.
- * @param bb Bucket brigade containing a response.
- * @return Return code of next filter in chain.
+ * @param f    Apache filter structure.
+ * @param bb   Bucket brigade containing a response.
+ * @return     Return code of next filter in chain.
  */
 static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
 {
@@ -931,8 +1057,9 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
 
 		/* catch weird situation which will probably never happen */
 		if (b->length == -1)
-			ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, f->c,
-			"mod_eppd: in filter - Bucket with unknown length ... weird");
+			ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, f->c, "mod_eppd:"
+					" in filter - Bucket with unknown length"
+					" ... weird");
 		else
 			len += b->length;
 	}
@@ -953,30 +1080,30 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
  * Init child hook is run everytime a new thread (or process) is started.
  * Task of the hook is to initialize a lock which protects epp log file.
  *
- * @param p Memory pool.
- * @param s Server record.
+ * @param p    Memory pool.
+ * @param s    Server record.
  */
 static void epp_init_child_hook(apr_pool_t *p, server_rec *s)
 {
 	apr_status_t	rv;
 
 	rv = apr_global_mutex_child_init(&epp_log_lock, NULL, p);
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                     "mod_eppd: could not init epp log lock in child");
-    }
+	if (rv != APR_SUCCESS) {
+		ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s, "mod_eppd: could "
+				"not init epp log lock in child");
+	}
 }
 
 /**
  * Cleanup routine, is merely wrapper around epp_parser_init_cleanup().
  *
- * @param data XML schema.
- * @return Always 0.
+ * @param data   XML schema.
+ * @return       Always success.
  */
-static int epp_cleanup_xml(void *data)
+static apr_status_t epp_cleanup_xml(void *data)
 {
 	epp_parser_init_cleanup(data);
-	return 0;
+	return APR_SUCCESS;
 }
 
 /**
@@ -993,8 +1120,8 @@ static int epp_cleanup_xml(void *data)
 static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 		apr_pool_t *ptemp, server_rec *s)
 {
-	eppd_server_conf *sc;
-	apr_status_t	rv = 0;
+	apr_status_t	 rv = 0;
+	eppd_server_conf	*sc;
 
 	/*
 	 * during authentication of epp client we need to get value of a
@@ -1002,28 +1129,29 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 	 */
 	epp_ssl_lookup = APR_RETRIEVE_OPTIONAL_FN(ssl_var_lookup);
 	if (epp_ssl_lookup == NULL) {
-        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                     "mod_eppd: could not retrieve ssl_var_lookup function. "
-					 "Is mod_ssl loaded?");
-        return HTTP_INTERNAL_SERVER_ERROR;
+		ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+				"mod_eppd: could not retrieve ssl_var_lookup "
+				"function. Is mod_ssl loaded?");
+		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-    /* create the rewriting lockfiles in the parent */
-    if ((rv = apr_global_mutex_create(&epp_log_lock, NULL,
-                                      APR_LOCK_DEFAULT, p)) != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                     "mod_eppd: could not create epp_log_lock");
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
+	/* create the rewriting lockfiles in the parent */
+	if ((rv = apr_global_mutex_create(&epp_log_lock, NULL,
+			APR_LOCK_DEFAULT, p)) != APR_SUCCESS)
+	{
+		ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+				"mod_eppd: could not create epp_log_lock");
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
  
 //#ifdef AP_NEED_SET_MUTEX_PERMS  
-    rv = unixd_set_global_mutex_perms(epp_log_lock);
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                     "mod_eppd: Could not set permissions on "
-                     "epp_log_lock; check User and Group directives");
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
+	rv = unixd_set_global_mutex_perms(epp_log_lock);
+	if (rv != APR_SUCCESS) {
+		ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+				"mod_eppd: Could not set permissions on "
+				"epp_log_lock; check User and Group directives");
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
 //#endif /* perms */
 
 	/*
@@ -1059,26 +1187,29 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 			if (sc->epplog && !sc->epplogfp) {
 				fname = ap_server_root_relative(p, sc->epplog);
 				if (!fname) {
-					ap_log_error(APLOG_MARK, APLOG_ERR, APR_EBADPATH, s,
-							 "mod_eppd: Invalid EPPlog path %s", sc->epplog);
+					ap_log_error(APLOG_MARK, APLOG_ERR,
+						APR_EBADPATH, s,
+						"mod_eppd: Invalid "
+						"EPPlog path %s", sc->epplog);
 					return HTTP_INTERNAL_SERVER_ERROR; 
 				}
 				if ((rv = apr_file_open(&sc->epplogfp, fname,
-							(APR_WRITE | APR_APPEND | APR_CREATE),
-							( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD ),
-							p))
-						!= APR_SUCCESS) {
-					ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
-							 "mod_eppd: could not open EPPlog file %s", fname);
+					(APR_WRITE | APR_APPEND | APR_CREATE),
+					( APR_UREAD | APR_UWRITE | APR_GREAD |
+					  APR_WREAD ), p)) != APR_SUCCESS)
+				{
+					ap_log_error(APLOG_MARK, APLOG_ERR, rv,
+						s, "mod_eppd: could not open "
+						"EPPlog file %s", fname);
 					return HTTP_INTERNAL_SERVER_ERROR;
 				}
 			}
 		}
 		s = s->next;
 	}
-	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
-		"mod_eppd started (mod_eppd version %s, SVN revision %s, BUILT %s %s)",
-				PACKAGE_VERSION, SVN_REV, __DATE__, __TIME__);
+	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s, "mod_eppd started (mod_eppd "
+			"version %s, SVN revision %s, BUILT %s %s)",
+			PACKAGE_VERSION, SVN_REV, __DATE__, __TIME__);
 
 	return OK;
 }
@@ -1086,35 +1217,33 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 /**
  * Handler for apache's configuration directive "EPPprotocol".
  *
- * @param cmd Command structure.
- * @param dummy Not used parameter.
- * @param flag 1 means EPPprotocol is turned on, 0 means turned off.
- * @return Error string in case of failure otherwise NULL.
+ * @param cmd      Command structure.
+ * @param dummy    Not used parameter.
+ * @param flag     1 means EPPprotocol is turned on, 0 means turned off.
+ * @return         Error string in case of failure otherwise NULL.
  */
 static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
 {
-    server_rec *s = cmd->server;
-    eppd_server_conf *sc = (eppd_server_conf *)
-		ap_get_module_config(s->module_config, &eppd_module);
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
+			ap_get_module_config(s->module_config, &eppd_module);
 
 	const char *err = ap_check_cmd_context(cmd,
 			NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
-    if (err) {
-        return err;
-    }
+	if (err) return err;
 
-    sc->epp_enabled = flag;
-    return NULL;
+	sc->epp_enabled = flag;
+	return NULL;
 }
 
 /**
  * Handler for apache's configuration directive "EPPObject".
  * Sets the name under which is EPP object known to nameservice.
  *
- * @param cmd Command structure.
- * @param dummy Not used parameter.
- * @param obj_name A name of object.
- * @return Error string in case of failure otherwise NULL.
+ * @param cmd       Command structure.
+ * @param dummy     Not used parameter.
+ * @param obj_name  A name of object.
+ * @return          Error string in case of failure otherwise NULL.
  */
 static const char *set_epp_object(cmd_parms *cmd, void *dummy,
 		const char *obj_name)
@@ -1125,7 +1254,7 @@ static const char *set_epp_object(cmd_parms *cmd, void *dummy,
 		ap_get_module_config(s->module_config, &eppd_module);
 
 	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
-    if (err) return err;
+	if (err) return err;
 
 	/*
 	 * catch double definition of object's name
@@ -1133,14 +1262,14 @@ static const char *set_epp_object(cmd_parms *cmd, void *dummy,
 	 */
 	if (sc->object != NULL) {
 		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-			"mod_eppd: more than one definition of object's name. All but \
-			the first one will be ignored");
+				"mod_eppd: more than one definition of object's "
+				"name. All but the first one will be ignored");
 		return NULL;
 	}
 
 	sc->object = apr_pstrdup(cmd->pool, obj_name);
 
-    return NULL;
+	return NULL;
 }
 
 /**
@@ -1163,7 +1292,7 @@ static const char *set_schema(cmd_parms *cmd, void *dummy,
 		ap_get_module_config(s->module_config, &eppd_module);
 
 	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
-    if (err) return err;
+	if (err) return err;
 
 	/*
 	 * catch double definition of iorfile
@@ -1171,8 +1300,8 @@ static const char *set_schema(cmd_parms *cmd, void *dummy,
 	 */
 	if (sc->schema != NULL) {
 		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-			"mod_eppd: more than one definition of schema URL. All but\
-			the first one will be ignored");
+			"mod_eppd: more than one definition of schema URL. All "
+			"but the first one will be ignored");
 		return NULL;
 	}
 
@@ -1183,8 +1312,8 @@ static const char *set_schema(cmd_parms *cmd, void *dummy,
 	if (sc->schema == NULL) {
 		return apr_psprintf(cmd->temp_pool,
 				"mod_eppd: error in xml parser initialization. "
-				"It is likely that xml schema '%s' is corupted, check it with "
-				"xmllint or other similar tool.",
+				"It is likely that xml schema '%s' is corupted, "
+				"check it with xmllint or other similar tool.",
 				schemaurl);
 	}
 	/*
@@ -1193,16 +1322,16 @@ static const char *set_schema(cmd_parms *cmd, void *dummy,
 	apr_pool_cleanup_register(cmd->pool, sc->schema, epp_cleanup_xml,
 			apr_pool_cleanup_null);
 
-    return NULL;
+	return NULL;
 }
 
 /**
  * Handler for apache's configuration directive "EPPlog".
  *
- * @param cmd Command structure.
- * @param dummy Not used parameter.
- * @param a1 The file where log messages from mod_eppd should be logged.
- * @return Error string in case of failure otherwise NULL.
+ * @param cmd     Command structure.
+ * @param dummy   Not used parameter.
+ * @param a1      The file where log messages from mod_eppd should be logged.
+ * @return        Error string in case of failure otherwise NULL.
  */
 static const char *set_epplog(cmd_parms *cmd, void *dummy,
 		const char *a1)
@@ -1213,7 +1342,7 @@ static const char *set_epplog(cmd_parms *cmd, void *dummy,
 		ap_get_module_config(s->module_config, &eppd_module);
 
 	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
-    if (err) return err;
+	if (err) return err;
 
 	/*
 	 * catch double definition of iorfile
@@ -1221,23 +1350,23 @@ static const char *set_epplog(cmd_parms *cmd, void *dummy,
 	 */
 	if (sc->epplog != NULL) {
 		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-			"mod_eppd: more than one definition of epplog file. All but\
-			the first one will be ignored");
+				"mod_eppd: more than one definition of epplog "
+				"file. All but the first one will be ignored");
 		return NULL;
 	}
 
 	sc->epplog = apr_pstrdup(cmd->pool, a1);
 
-    return NULL;
+	return NULL;
 }
 
 /**
  * Handler for apache's configuration directive "EPPloglevel".
  *
- * @param cmd Command structure.
- * @param dummy Not used parameter.
- * @param a1 Loglevel is one of fatal, error, warning, info, debug.
- * @return Error string in case of failure otherwise NULL.
+ * @param cmd     Command structure.
+ * @param dummy   Not used parameter.
+ * @param a1      Loglevel is one of fatal, error, warning, info, debug.
+ * @return        Error string in case of failure otherwise NULL.
  */
 static const char *set_loglevel(cmd_parms *cmd, void *dummy,
 		const char *a1)
@@ -1248,7 +1377,7 @@ static const char *set_loglevel(cmd_parms *cmd, void *dummy,
 		ap_get_module_config(s->module_config, &eppd_module);
 
 	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
-    if (err) return err;
+	if (err) return err;
 
 	/*
 	 * catch double definition of loglevel
@@ -1256,8 +1385,8 @@ static const char *set_loglevel(cmd_parms *cmd, void *dummy,
 	 */
 	if (sc->loglevel != 0) {
 		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-			"mod_eppd: loglevel defined more than once. All but\
-			the first definition will be ignored");
+				"mod_eppd: loglevel defined more than once. All "
+				"but the first definition will be ignored");
 		return NULL;
 	}
 
@@ -1273,20 +1402,20 @@ static const char *set_loglevel(cmd_parms *cmd, void *dummy,
 	else if (!apr_strnatcmp("debug", a1))
 		sc->loglevel = EPP_DEBUG;
 	else {
-		return "mod_eppd: log level must be one of "
-				"fatal, error, warning, info, debug";
+		return "mod_eppd: log level must be one of fatal, error, "
+			"warning, info, debug";
 	}
 
-    return NULL;
+	return NULL;
 }
 
 /**
  * Handler for apache's configuration directive "EPPservername".
  *
- * @param cmd Command structure.
- * @param dummy Not used parameter.
- * @param a1 Server name of length less than 30 characters.
- * @return Error string in case of failure otherwise NULL.
+ * @param cmd    Command structure.
+ * @param dummy  Not used parameter.
+ * @param a1     Server name of length less than 30 characters.
+ * @return       Error string in case of failure otherwise NULL.
  */
 static const char *set_servername(cmd_parms *cmd, void *dummy,
 		const char *a1)
@@ -1297,7 +1426,7 @@ static const char *set_servername(cmd_parms *cmd, void *dummy,
 		ap_get_module_config(s->module_config, &eppd_module);
 
 	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
-    if (err) return err;
+	if (err) return err;
 
 	/*
 	 * catch double definition of servername
@@ -1305,39 +1434,37 @@ static const char *set_servername(cmd_parms *cmd, void *dummy,
 	 */
 	if (sc->servername != NULL) {
 		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-			"mod_eppd: more than one definition of servername. All but\
-			the first one will be ignored");
+				"mod_eppd: more than one definition of server"
+				"name. All but the first one will be ignored");
 		return NULL;
 	}
 
 	/* because of xml schema, the server name's length is limited */
 	sc->servername = apr_pstrndup(cmd->pool, a1, 29);
 
-    return NULL;
+	return NULL;
 }
 
 /**
  * Handler for apache's configuration directive "EPPvalidResponse".
  *
- * @param cmd Command structure.
- * @param dummy Not used parameter.
- * @param flag 1 if mod_eppd's responses should be validated, otherwise 0.
- * @return Error string in case of failure otherwise NULL.
+ * @param cmd     Command structure.
+ * @param dummy   Not used parameter.
+ * @param flag    1 if mod_eppd's responses should be validated, otherwise 0.
+ * @return        Error string in case of failure otherwise NULL.
  */
 static const char *set_valid_resp(cmd_parms *cmd, void *dummy, int flag)
 {
-    server_rec *s = cmd->server;
-    eppd_server_conf *sc = (eppd_server_conf *)
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(s->module_config, &eppd_module);
 
 	const char *err = ap_check_cmd_context(cmd,
 			NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
-    if (err) {
-        return err;
-    }
+	if (err) return err;
 
-    sc->valid_resp = flag;
-    return NULL;
+	sc->valid_resp = flag;
+	return NULL;
 }
 
 /**
@@ -1345,24 +1472,25 @@ static const char *set_valid_resp(cmd_parms *cmd, void *dummy, int flag)
  * handler references.
  */
 static const command_rec eppd_cmds[] = {
-    AP_INIT_FLAG("EPPprotocol", set_epp_protocol, NULL, RSRC_CONF,
-			 "Whether this server is serving the epp protocol"),
+	AP_INIT_FLAG("EPPprotocol", set_epp_protocol, NULL, RSRC_CONF,
+			"Whether this server is serving the epp protocol"),
 	AP_INIT_TAKE1("EPPschema", set_schema, NULL, RSRC_CONF,
-			 "URL of XML schema of EPP protocol"),
+			"URL of XML schema of EPP protocol"),
 	AP_INIT_TAKE1("EPPservername", set_servername, NULL, RSRC_CONF,
-			 "Name of server sent in EPP greeting"),
+			"Name of server sent in EPP greeting"),
 	AP_INIT_TAKE1("EPPlog", set_epplog, NULL, RSRC_CONF,
-			 "The file where come all log messages from mod_eppd"),
+			"The file where come all log messages from mod_eppd"),
 	AP_INIT_TAKE1("EPPloglevel", set_loglevel, NULL, RSRC_CONF,
-		 "Log level setting for epp log (fatal, error, warning, info, debug)"),
-    AP_INIT_FLAG("EPPvalidResponse", set_valid_resp, NULL, RSRC_CONF,
-			 "Set to on, to validate every outcomming response."
-			 "This will slow down the server and should be used only for"
-			 " debugging purposes."),
+			"Log level setting for epp log (fatal, error, warning, "
+			"info, debug)"),
+	AP_INIT_FLAG("EPPvalidResponse", set_valid_resp, NULL, RSRC_CONF,
+			"Set to on, to validate every outcomming response."
+			"This will slow down the server and should be used "
+			"only for debugging purposes."),
 	AP_INIT_TAKE1("EPPobject", set_epp_object, NULL, RSRC_CONF,
-			 "Alias under which is the reference to EPP object exported "
-			 "from mod_corba module. Default is \"EPP\"."),
-    { NULL }
+			"Alias under which is the reference to EPP object "
+			"exported from mod_corba module. Default is \"EPP\"."),
+	{ NULL }
 };
 
 /**
@@ -1370,9 +1498,7 @@ static const command_rec eppd_cmds[] = {
  */
 static void *create_eppd_config(apr_pool_t *p, server_rec *s)
 {
-	eppd_server_conf *sc =
-	    (eppd_server_conf *) apr_pcalloc(p, sizeof(*sc));
-
+	eppd_server_conf *sc = (eppd_server_conf *) apr_pcalloc(p, sizeof(*sc));
 	return sc;
 }
 
@@ -1390,20 +1516,20 @@ static void register_hooks(apr_pool_t *p)
 
 	/* register epp filters */
 	ap_register_output_filter("EPP_OUTPUT_FILTER", epp_output_filter, NULL,
-				                              AP_FTYPE_CONNECTION);
+			AP_FTYPE_CONNECTION);
 }
 
 /**
  * eppd_module definition.
  */
 module AP_MODULE_DECLARE_DATA eppd_module = {
-    STANDARD20_MODULE_STUFF,
-    NULL,                       /* create per-directory config structure */
-    NULL,                       /* merge per-directory config structures */
-    create_eppd_config,         /* create per-server config structure */
-    NULL,                       /* merge per-server config structures */
-    eppd_cmds,                  /* command apr_table_t */
-    register_hooks              /* register hooks */
+	STANDARD20_MODULE_STUFF,
+	NULL,                       /* create per-directory config structure */
+	NULL,                       /* merge per-directory config structures */
+	create_eppd_config,         /* create per-server config structure */
+	NULL,                       /* merge per-server config structures */
+	eppd_cmds,                  /* command apr_table_t */
+	register_hooks              /* register hooks */
 };
 
-/* vi:set ts=4 sw=4: */
+/* vi:set ts=8 sw=8: */

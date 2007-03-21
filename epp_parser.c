@@ -532,6 +532,19 @@ void epp_parser_init_cleanup(void *schema)
 	xmlCleanupParser();
 }
 
+void
+epp_parser_request_cleanup(void *cdata_arg)
+{
+	epp_command_data	*cdata = (epp_command_data *) cdata_arg;
+
+	/* be carefull when freeing - any of pointers might be NULL */
+	if (cdata == NULL) return;
+	if (cdata->xpath_ctx != NULL)
+		xmlXPathFreeContext((xmlXPathContextPtr) cdata->xpath_ctx);
+	if (cdata->parsed_doc != NULL)
+		xmlFreeDoc((xmlDocPtr) cdata->parsed_doc);
+}
+
 /**
  * Create and enqueue new error item of specified type.
  *
@@ -2152,9 +2165,21 @@ error:
 	cdata->type = EPP_DUMMY;
 }
 
+/**
+ * Generic parser of EPP command section.
+ *
+ * From this function are further called dedicated parser handlers for
+ * individual commands.
+ *
+ * @param pool       Memory pool.
+ * @param loggedin   True if user is logged in.
+ * @param cdata      Command data.
+ * @param xpathctx   XPath context.
+ * @return           Status.
+ */
 static parser_status
 parse_command(void *pool,
-		int session,
+		int loggedin,
 		epp_command_data *cdata,
 		xmlXPathContextPtr xpathCtx)
 {
@@ -2188,8 +2213,8 @@ parse_command(void *pool,
 	 * 	- the user is not logged in and attempts to issue a command
 	 * 	- the user is already logged in and issues another login
 	 */
-	if ((cmd != EPP_RED_LOGIN && session == 0) ||
-		(cmd == EPP_RED_LOGIN && session != 0))
+	if ((cmd != EPP_RED_LOGIN && !loggedin) ||
+		(cmd == EPP_RED_LOGIN && loggedin))
 	{
 		cdata->type = EPP_DUMMY;
 		cdata->rc = 2002;
@@ -2205,7 +2230,7 @@ parse_command(void *pool,
 			 * logout is so simple that we don't use dedicated
 			 * parsing function
 			 */
-			if (session == 0) {
+			if (!loggedin) {
 				cdata->rc = 2002;
 				cdata->type = EPP_DUMMY;
 			}
@@ -2316,6 +2341,17 @@ parse_command(void *pool,
 	return PARSER_CMD_OTHER;
 }
 
+/**
+ * Generic parser of EPP extension section.
+ *
+ * From this function are further called dedicated parser handlers for
+ * individual extensions.
+ *
+ * @param pool       Memory pool.
+ * @param cdata      Command data.
+ * @param xpathctx   XPath context.
+ * @return           Status.
+ */
 static parser_status
 parse_extension(void *pool,
 		epp_command_data *cdata,
@@ -2398,8 +2434,8 @@ parse_extension(void *pool,
 }
 
 parser_status
-epp_parse_command(void *pool,
-		int session,
+epp_parse_command(epp_context *epp_ctx,
+		int loggedin,
 		void *schema,
 		const char *request,
 		unsigned bytes,
@@ -2408,52 +2444,49 @@ epp_parse_command(void *pool,
 	xmlXPathContextPtr	 xpathCtx;
 	xmlXPathObjectPtr	 xpathObj;
 	epp_command_data	*cdata;
-	xmlDocPtr	 doc;
 	valid_status	 val_ret;
 	parser_status	 ret;
 	const char	*elemname;
 
 	/* check input parameters */
-	assert(pool != NULL);
+	assert(epp_ctx != NULL);
 	assert(request != NULL);
 	assert(bytes != 0);
 
-	/* parse xml request */
-	doc = xmlParseMemory(request, bytes);
-	if (doc == NULL) {
-		return PARSER_NOT_XML;
-	}
-
 	/* allocate cdata structure */
-	*cdata_arg = (epp_command_data *) epp_calloc(pool, sizeof *cdata);
-	if (*cdata_arg == NULL) {
-		xmlFreeDoc(doc);
+	*cdata_arg = (epp_command_data *) epp_calloc(epp_ctx->pool,
+			sizeof *cdata);
+	if (*cdata_arg == NULL)
 		return PARSER_EINTERNAL;
-	}
 	cdata = *cdata_arg;
+	/* ... from now the management of cdata structure and all its items
+	 * is done at higher level -> we don't have to care about release
+	 * of resources which are part of cdata. */
+
+	/* parse xml request */
+	cdata->parsed_doc = xmlParseMemory(request, bytes);
+	if (cdata->parsed_doc == NULL)
+		return PARSER_NOT_XML;
 
 	/*
 	 * Save input xml document (we cannot use strdup since it is not sure the
 	 * request is NULL terminated).
 	 */
-	cdata->xml_in = epp_malloc(pool, bytes + 1);
-	if (cdata->xml_in == NULL) {
-		xmlFreeDoc(doc);
+	cdata->xml_in = epp_malloc(epp_ctx->pool, bytes + 1);
+	if (cdata->xml_in == NULL)
 		return PARSER_EINTERNAL;
-	}
 	memcpy(cdata->xml_in, request, bytes);
 	cdata->xml_in[bytes] = '\0';
 
 	/* validate the doc */
-	val_ret = validate_doc(pool, (xmlSchemaPtr) schema, doc, &cdata->errors);
+	val_ret = validate_doc(epp_ctx->pool, (xmlSchemaPtr) schema,
+			(xmlDocPtr) cdata->parsed_doc, &cdata->errors);
 
 	if (val_ret == VAL_ESCHEMA || val_ret == VAL_EINTERNAL) {
-		xmlFreeDoc(doc);
 		return (val_ret == VAL_ESCHEMA) ?
 			PARSER_ESCHEMA : PARSER_EINTERNAL;
 	}
 	else if (val_ret == VAL_NOT_VALID) {
-		xmlFreeDoc(doc);
 		/*
 		 * validation error consequence: response identifing a problem
 		 * (libxml message) is sent back to client, the connection
@@ -2466,11 +2499,10 @@ epp_parse_command(void *pool,
 	/* ... VAL_OK */
 
 	/* create XPath context */
-	xpathCtx = xmlXPathNewContext(doc);
-	if (xpathCtx == NULL) {
-		xmlFreeDoc(doc);
+	cdata->xpath_ctx = xpathCtx =
+		xmlXPathNewContext((xmlDocPtr) cdata->parsed_doc);
+	if (cdata->xpath_ctx == NULL)
 		return PARSER_EINTERNAL;
-	}
 
 	/*
 	 * register namespaces and their prefixes in XPath context
@@ -2493,17 +2525,13 @@ epp_parse_command(void *pool,
 		xmlXPathRegisterNs(xpathCtx, BAD_CAST "enumval",
 			BAD_CAST NS_ENUMVAL))
 	{
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
 		return PARSER_EINTERNAL;
 	}
 
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:*", xpathCtx);
-	if (xpathObj == NULL) {
-		xmlXPathFreeContext(xpathCtx);
-		xmlFreeDoc(doc);
+	if (xpathObj == NULL)
 		return PARSER_EINTERNAL;
-	}
+
 	assert(xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1);
 	xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
 	xmlXPathFreeObject(xpathObj);
@@ -2525,22 +2553,22 @@ epp_parse_command(void *pool,
 		case 'c':
 			/* It is a <command> element. */
 			if (!strcmp(elemname, "command")) {
-				ret = parse_command(pool, session, cdata,
-						xpathCtx);
+				ret = parse_command(epp_ctx->pool, loggedin,
+						cdata, xpathCtx);
 				break;
 			}
 			/* fall through if not matched */
 		case 'e':
 			/* It is an <extension> element. */
 			if (!strcmp(elemname, "extension")) {
-				if (session == 0) {
+				if (!loggedin) {
 					cdata->type = EPP_DUMMY;
 					cdata->rc = 2002;
 					ret = PARSER_CMD_OTHER;
 				}
 				else {
-					ret = parse_extension(pool, cdata,
-							xpathCtx);
+					ret = parse_extension(epp_ctx->pool,
+							cdata, xpathCtx);
 				}
 				break;
 			}
@@ -2557,8 +2585,6 @@ epp_parse_command(void *pool,
 			break;
 	}
 
-	xmlXPathFreeContext(xpathCtx);
-	xmlFreeDoc(doc);
 	return ret;
 }
 

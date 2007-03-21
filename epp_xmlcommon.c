@@ -13,6 +13,8 @@
 #include <libxml/tree.h>
 #include <libxml/xmlerror.h>
 #include <libxml/xmlschemas.h>
+#include <libxml/xpath.h>
+#include <libxml/xpathInternals.h>
 
 #include "epp_common.h"
 #include "epp_xmlcommon.h"
@@ -94,13 +96,15 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 	buf = xmlBufferCreate();
 	if (buf == NULL)
 		return;
-	if (xmlNodeDump(buf, doc, (xmlNodePtr) error->node, 0, 0) < 0)
+	if (xmlNodeDump(buf, doc, (xmlNodePtr) error->node, 0, 0) < 0) {
+		xmlBufferFree(buf);
 		return;
+	}
 	valerr->value = epp_strdup(pool, (char *) buf->content);
 	xmlBufferFree(buf);
 	if (valerr->value == NULL)
 		return;
-	valerr->spec = errspec_unknown;	/* surrounding tags are included */
+	valerr->spec = errspec_not_valid; /* surrounding tags are included */
 
 	/* enqueue new error item */
 	q_add(pool, error_list, valerr);
@@ -135,6 +139,50 @@ validate_doc(void *pool, xmlSchemaPtr schema, xmlDocPtr doc, qhead *err_list)
 	xmlSchemaFreeValidCtxt(svctx);
 
 	return VAL_OK;
+}
+
+char *
+epp_getSubtree(void *pool,
+		epp_command_data *cdata,
+		const char *xpath_expr,
+		int position)
+{
+	char	*subtree;
+	xmlBufferPtr	 buf;
+	xmlDocPtr	 doc;
+	xmlXPathObjectPtr	 xpath_obj;
+	xmlXPathContextPtr	 xpath_ctx;
+
+	doc = (xmlDocPtr) cdata->parsed_doc;
+	xpath_ctx = (xmlXPathContextPtr) cdata->xpath_ctx;
+
+	xpath_obj = xmlXPathEvalExpression(BAD_CAST xpath_expr, xpath_ctx);
+	if (xpath_obj == NULL)
+		return NULL;
+	/* correct position for non-list elements */
+	if (position == 0) position++;
+	if (xmlXPathNodeSetGetLength(xpath_obj->nodesetval) < position) {
+		xmlXPathFreeObject(xpath_obj);
+		/* return empty string if the node is not there */
+		return epp_strdup(pool, "");
+	}
+
+	/* get content of problematic tag */
+	buf = xmlBufferCreate();
+	if (buf == NULL)
+		return NULL;
+	if (xmlNodeDump(buf, doc, xmlXPathNodeSetItem(xpath_obj->nodesetval,
+					position - 1),
+				0, 0) < 0)
+	{
+		xmlXPathFreeObject(xpath_obj);
+		xmlBufferFree(buf);
+		return NULL;
+	}
+	subtree = epp_strdup(pool, (char *) buf->content);
+	xmlXPathFreeObject(xpath_obj);
+	xmlBufferFree(buf);
+	return subtree;
 }
 
 /* vim: set ts=8 sw=8: */

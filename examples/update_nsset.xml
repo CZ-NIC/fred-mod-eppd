@@ -9,7 +9,7 @@
        xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.1"
        xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.1
        nsset-1.1.xsd">
-        <nsset:id>NSSID:exampleNsset</nsset:id>
+        <nsset:id>NSSID:LEVEL</nsset:id>
 	<nsset:add>
 		<nsset:ns>
 			<nsset:name>ns99.bazmek.net</nsset:name>

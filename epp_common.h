@@ -10,6 +10,26 @@
 #ifndef EPP_COMMON_H
 #define EPP_COMMON_H
 
+/** Log levels used for logging to eppd log file. */
+typedef enum {
+	EPP_FATAL = 1, /**< Error, the module is not in operational state. */
+	EPP_ERROR,     /**< Error caused usually by client, module is operational. */
+	EPP_WARNING,   /**< Errors which are not serious but should be logged. */
+	EPP_INFO,      /**< This is the default log level. */
+	EPP_DEBUG      /**< Contents of requests and responses are logged. */
+}epp_loglevel;
+
+/** EPP context is a group of variables used often together.
+ *
+ * The two items inside the struct are void pointers because we don't want
+ * to export apache datatypes in all other modules sharing this header file.
+ */
+typedef struct {
+	void *pool;
+	void *conn;
+	int session;
+}epp_context;
+
 /**
  * Enumeration of codes of all EPP commands this module is able to handle.
  * The object specific commands are written as EPP_{command}_{object}.
@@ -88,16 +108,12 @@ typedef enum {
  * there has to be way how to propagate this information back to client.
  * The standard requires that client provided value has to be surrounded
  * with xml tags, of which the central repository is not aware. Therefore
- * mod_eppd has to complete the tags and this error specification specifies
- * which tags.
+ * exact specification of errors is needed.
  */
 typedef enum {
-	errspec_unknown = 0, 
-	errspec_poll_msgID,
-	errspec_poll_msgID_missing,
+	errspec_poll_msgID = 0,
 	errspec_contact_handle,
 	errspec_contact_cc,
-	errspec_contact_identtype_missing,
 	errspec_nsset_handle,
 	errspec_nsset_tech,
 	errspec_nsset_dns_name,
@@ -112,9 +128,14 @@ typedef enum {
 	errspec_domain_period,
 	errspec_domain_admin,
 	errspec_domain_ext_valDate,
+	errspec_domain_ext_valDate_missing,
 	errspec_domain_curExpDate,
 	errspec_domain_admin_add,
 	errspec_domain_admin_rem,
+	/* input errors */
+	errspec_not_valid,
+	errspec_poll_msgID_missing,
+	errspec_contact_identtype_missing,
 	errspec_transfer_op
 }epp_errorspec;
 
@@ -126,23 +147,25 @@ typedef enum {
  * according to #epp_errorspec value).
  */
 typedef struct {
-	char	*value; /**< Client provided input which caused the error. */
+	/** Client provided input which caused the error. */
+	char	*value;
 	/**
 	 * Specification of surrounding XML tags.
 	 *
-	 * For validation errors this is set to errspec_unknown.
+	 * For validation errors this is set to errspec_not_valid.
 	 */
 	epp_errorspec spec;
 	/**
 	 * Human readable reason of error.
 	 *
 	 * For schema validity errors it is filled by mod_eppd (by message from
-	 * libxml), which is send to server which transforms libxml message and
-	 * returns the result of transformation (by transformation is ment
-	 * prefixing by localized text). In all other cases it is left empty
-	 * and filled wholly by CR.
+	 * libxml) which is prefixed by localized message retrieved from
+	 * central register. In all other cases it is left empty and filled
+	 * by CR.
 	 */
 	char	*reason;
+	/** Position of faulty element if it is part of list. */
+	int	 position;
 }epp_error;
 
 /**
@@ -545,12 +568,16 @@ typedef struct {
  * it holds information about which command it holds.
  */
 typedef struct {
-	/* theese items are same for all possible epp commands */
 	char	*clTRID;/**< client's TRID */
 	char	*svTRID;/**< server's TRID */
-	int	rc;     /**< EPP return code defined in standard. */
+	int	 rc;    /**< EPP return code defined in standard. */
 	char	*msg;   /**< Text message coresponding to return code. */
 	char	*xml_in;/**< XML as it is received from client. */
+	/* parsed_doc and xpath_ctx are needed for error reporting. */
+	void	*parsed_doc; /**< Parsed XML document tree. */
+	void	*xpath_ctx;  /**< XPath context. */
+	/** True if there should be no resdata section or msgQ section. */
+	short	 noresdata;
 	/** List of validation errors or errors from central repository. */
 	qhead	 errors;
 
@@ -569,6 +596,14 @@ typedef struct {
 
 /* ********************************************************************* */
 
+/**
+ * Write a log message to eppd log file.
+ *
+ * @param epp_ctx EPP context structure (connection, pool and session id).
+ * @param level   Log level.
+ * @param fmt     Printf-style format string.
+ */
+void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...);
 
 /**
  * @defgroup allocgroup Functions for memory allocation.
@@ -605,27 +640,33 @@ void *epp_calloc(void *pool, unsigned size);
  * @param str    String which is going to be duplicated.
  * @return       Pointer duplicated string.
  */
-void *epp_strdup(void *pool, const char *str);
+char *epp_strdup(void *pool, const char *str);
 
 /**
- * Duplicate string from argument, the memory will be allocated from
+ * Concatenate two strings in arguments, the memory will be allocated from
  * memory pool.
  *
+ * In case of memory allocation failure or if one of arguments is NULL
+ * the function returns NULL.
+ *
  * @param pool   Memory pool.
- * @param str    String which is going to be duplicated.
- * @return       Pointer duplicated string.
+ * @param str1   String which will be the first one.
+ * @param str2   String which will be appended.
+ * @return       Pointer to new string.
  */
-void *epp_strdup(void *pool, const char *str);
+char *epp_strcat(void *pool, const char *str1, const char *str2);
+
+/**
+ * Print formatted string.
+ *
+ * @param pool   Memory pool.
+ * @param fmt    Format of string.
+ * @return       Formatted string allocated from pool.
+ */
+char *epp_sprintf(void *pool, const char *fmt, ...);
 
 /**
  * @}
  */
-
-/**
- * Log message formated in printf manner.
- *
- * @param fmt    Format of string.
- */
-void *epp_log(const char *fmt, ...);
 
 #endif /* EPP_COMMON_H */

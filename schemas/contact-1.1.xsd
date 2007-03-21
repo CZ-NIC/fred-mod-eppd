@@ -80,7 +80,7 @@
          minOccurs="0"/>
         <element name="fax" type="contact:e164StringType"
          minOccurs="0"/>
-        <element name="email" type="eppcom:minTokenType"/>
+        <element name="email" type="contact:emailType"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
         <element name="disclose" type="contact:discloseType"
@@ -94,7 +94,7 @@
 	  -->
         <element name="ssn" type="contact:identT"
 	minOccurs="0"/>
-        <element name="notifyEmail" type="eppcom:minTokenType"
+        <element name="notifyEmail" type="contact:emailType"
 	minOccurs="0"/>
       </sequence>
     </complexType>
@@ -224,7 +224,7 @@
          minOccurs="0"/>
         <element name="fax" type="contact:e164StringType"
          minOccurs="0"/>
-        <element name="email" type="eppcom:minTokenType"
+        <element name="email" type="contact:emailType"
          minOccurs="0"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
@@ -239,7 +239,7 @@
 	  -->
         <element name="ssn" type="contact:identUpdT"
 	 minOccurs="0"/>
-        <element name="notifyEmail" type="eppcom:minTokenType"
+        <element name="notifyEmail" type="contact:emailUpdType"
          minOccurs="0"/>
       </sequence>
     </complexType>
@@ -319,7 +319,7 @@
          minOccurs="0"/>
         <element name="fax" type="contact:e164StringType"
          minOccurs="0"/>
-        <element name="email" type="eppcom:minTokenType"/>
+        <element name="email" type="contact:emailType"/>
         <element name="clID" type="eppcom:clIDType"/>
         <element name="crID" type="eppcom:clIDType"/>
         <element name="crDate" type="dateTime"/>
@@ -337,10 +337,26 @@
 	minOccurs="0"/>
         <element name="ident" type="contact:identT"
 	minOccurs="0"/>
-        <element name="notifyEmail" type="eppcom:minTokenType"
+        <element name="notifyEmail" type="contact:emailType"
 	minOccurs="0"/>
       </sequence>
     </complexType>
+
+    <!-- Type for email addresses -->
+    <simpleType name="emailType">
+      <restriction base="token">
+        <pattern value="[^@]{1,64}@[^@]+"/>
+        <maxLength value="320"/>
+      </restriction>
+    </simpleType>
+
+    <simpleType name="emailUpdType">
+      <restriction base="token">
+        <pattern value="([^@]{1,64}@[^@]+)?"/>
+        <maxLength value="320"/>
+        <minLength value="0"/>
+      </restriction>
+    </simpleType>
 
   <!--
   Status is a combination of attributes and an optional human-readable

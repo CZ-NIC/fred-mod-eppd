@@ -40,7 +40,7 @@ typedef enum {
 	VAL_OK,        /**< Document is valid. */
 	VAL_NOT_VALID, /**< Document does not validate. */
 	VAL_ESCHEMA,   /**< Error when loading or parsing schema. */
-	VAL_EINTERNAL, /**< Internal error (malloc failed). */
+	VAL_EINTERNAL  /**< Internal error (malloc failed). */
 }valid_status;
 
 /**
@@ -56,5 +56,24 @@ valid_status validate_doc(void *pool,
 		xmlSchemaPtr schema,
 		xmlDocPtr doc,
 		qhead *err_list);
+
+/**
+ * Get subtree of XML document based on xpath expression.
+ *
+ * If there is no node matching xpath expression at appropriate position,
+ * empty string is returned.
+ * In case of internal error NULL is returned.
+ *
+ * @param pool       Pool for memory allocations.
+ * @param cdata      Structure containing xpath context and parsed document.
+ * @param xpath_expr XPath expression which identifies element.
+ * @param position   Poradi elementu v mnozine pasujicich elementu.
+ * @return           String with resulting subtree allocated from pool.
+ */
+char *
+epp_getSubtree(void *pool,
+		epp_command_data *cdata,
+		const char *xpath_expr,
+		int position);
 
 #endif /* EPP_XMLCOMMON_H */
