@@ -342,6 +342,10 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "domain:trDate", info_domain->trDate);
 	WRITE_ELEMENT(writer, simple_err, "domain:authInfo",
 			info_domain->authInfo);
+	q_foreach(&info_domain->tmpcontact) {
+		WRITE_ELEMENT(writer, simple_err, "domain:tempcontact",
+				q_content(&info_domain->tmpcontact));
+	}
 	END_ELEMENT(writer, simple_err); /* infdata */
 	return 1;
 
@@ -476,6 +480,9 @@ get_bad_xml(void *pool, epp_command_data *cdata, epp_error *e)
 			break;
 		case errspec_domain_admin:
 			loc_spec = epp_strdup(pool, "//domain:admin");
+			break;
+		case errspec_domain_tmpcontact:
+			loc_spec = epp_strdup(pool, "//domain:tempcontact");
 			break;
 		case errspec_domain_ext_valDate:
 			loc_spec = epp_strdup(pool, "//enumval:valExDate");

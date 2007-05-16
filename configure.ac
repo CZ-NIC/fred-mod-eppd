@@ -3,7 +3,7 @@
 # vim: set ts=4 sw=4:
 
 AC_PREREQ(2.59)
-AC_INIT([mod_eppd], 1.2, [], [mod_eppd])
+AC_INIT([mod_eppd], 1.3, [], [mod_eppd])
 AC_CONFIG_SRCDIR([mod_eppd.c])
 
 # Checks for programs.
@@ -17,6 +17,7 @@ AC_CHECK_LIB([xml2], [xmlInitGlobals], [], [AC_MSG_ERROR([libxml2 not found])])
 AC_CHECK_LIB([ORBit-2], [CORBA_exception_init], [],
 			 [AC_MSG_ERROR([orbit2 not found])])
 AC_CHECK_LIB([ssl], [X509_digest], [], [AC_MSG_ERROR([openssl not found])])
+#AC_CHECK_HEADER([openssl/ssl.h], ...
 
 # Checks for header files.
 dnl AC_HEADER_STDC
@@ -113,9 +114,9 @@ AC_SUBST([IDLPREFIX], [$idlprefix])
 # check schema file
 #
 AC_ARG_WITH([schema], [AS_HELP_STRING([--with-schema],
-			[xml schema defining EPP protocol [schemas/all-1.1.xsd]])],
+			[xml schema defining EPP protocol [schemas/all-1.2.xsd]])],
 			[AC_SUBST([SCHEMA], [$with_schema])],
-			[AC_SUBST([SCHEMA], [schemas/all-1.1.xsd])])
+			[AC_SUBST([SCHEMA], [schemas/all-1.2.xsd])])
 AC_CHECK_FILE([$SCHEMA], [], [AC_MSG_ERROR(
 			   [xml schema "$SCHEMA" does not exist (use --with-schema)])])
 

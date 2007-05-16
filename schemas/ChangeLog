@@ -1,10 +1,32 @@
-2006-01-02 Jan Kryl (version ?.?.?)
+2006-01-02 Jan Kryl (version 1.3.1)
 
 	* New email pattern was defined. Now every email address has to
 	fulfill quite basic criteria.
 
 	* NotifyEmail could not be deleted, because it was not allowed to
 	enter empty NotifyEmail tag in update. This is fixed now.
+
+	* Inteface for technical checks has changed. The name element
+	may be specified multipletimes and is optional. Nsset's report
+	level can be overriden by level element. Poll message, which
+	is the answer to technical check, contains additional element
+	testid which is clTRID of technical check request and name of
+	the test in result structure was renamed to testname.
+
+	* In order to ease migration from old to new register, new contact
+	type 'tempcontact' was introduce. This contact can be only deleted
+	and queried by info-domain command.
+
+	* Element oldID was substituted by element clID in transfer poll
+	message. clID is ID of new registrar owning the object.
+
+	* Definition of poll messages' structure informing client about
+	impending expiration, expiration, dns zone outage of domain object;
+	validation expiration and impending validation expiration of ENUM
+	domain object; deletion of not used contact and deletion of not used
+	nsset.
+
+	* Version was bumped up on domain, contact, nsset and "all" schemas.
 
 2006-01-02 Jan Kryl (version 1.2.0)
 

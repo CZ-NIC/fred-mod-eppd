@@ -127,6 +127,7 @@ typedef enum {
 	errspec_domain_nsset,
 	errspec_domain_period,
 	errspec_domain_admin,
+	errspec_domain_tmpcontact,
 	errspec_domain_ext_valDate,
 	errspec_domain_ext_valDate_missing,
 	errspec_domain_curExpDate,
@@ -393,6 +394,7 @@ typedef struct {
 	char	*roid;    /**< ROID of object. */
 	qhead	 status;  /**< Domain's status. */
 	char	*registrant; /**< Registrant of domain. */
+	qhead	 tmpcontact; /**< Temporary contact used for migration. */
 	qhead	 admin;   /**< Admin contact for domain. */
 	char	*nsset;   /**< Nsset of domain. */
 	char	*clID;    /**< Owner's ID. */
@@ -426,7 +428,7 @@ typedef struct {
 
 /** Poll request parameters. */
 typedef struct {
-	int	count;   /**< Count of waiting messages. */
+	int	 count;  /**< Count of waiting messages. */
 	char	*msgid;  /**< ID of next message in a queue. */
 	char	*msg;    /**< Text of message. */
 	char	*qdate;  /**< Date of message submission. */
@@ -515,6 +517,7 @@ typedef struct {
 	char	*registrant;   /**< Registrant of domain. */
 	qhead	 add_admin;    /**< Admin contacts to be added. */
 	qhead	 rem_admin;    /**< Admin contacts to be removed. */
+	qhead	 rem_tmpcontact; /**< Temporary contact used for migration. */
 	char	*nsset;        /**< Nsset of domain. */
 	char	*authInfo;     /**< Authorization information. */
 	qhead	 extensions;   /**< List of domain extensions. */
@@ -554,8 +557,9 @@ typedef struct {
 
 /** Test parameters. */
 typedef struct {
-	char	*id;   /**< ID of tested nsset. */
-	char	*name; /**< Name of domain to be tested with nsset. */
+	char	*id;    /**< ID of tested nsset. */
+	qhead	 names; /**< Fqdns of domains to be tested with nsset. */
+	int	 level; /**< Level of tests (-1 if not overriden). */
 }epps_test;
 
 /**

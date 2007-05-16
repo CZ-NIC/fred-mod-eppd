@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/nsset-1.1"
-          xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.1"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/nsset-1.2"
+          xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.2"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
           xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
           xmlns="http://www.w3.org/2001/XMLSchema"
@@ -65,7 +65,7 @@
     <complexType name="addType">
       <sequence>
         <element name="ns" type="nsset:nsT"
-		minOccurs="0" maxOccurs="10"/>
+         minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
@@ -74,7 +74,7 @@
     <complexType name="remType">
       <sequence>
         <element name="name" type="eppcom:labelType"
-		minOccurs="0" maxOccurs="10"/>
+         minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
@@ -96,7 +96,7 @@
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
         <element name="ns" type="nsset:nsT"
-	 maxOccurs="10"/>
+         maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          maxOccurs="unbounded"/>
         <element name="authInfo" type="fredcom:authInfoType"
@@ -253,21 +253,30 @@
   nsset specific messages
   -->
     <element name="trnData" type="nsset:handleDateT"/>
+    <element name="idleDelData" type="nsset:idleDelDataT"/>
+    <element name="testData" type="nsset:testDataT"/>
 
     <complexType name="handleDateT">
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
         <element name="trDate" type="dateTime"/>
-        <element name="oldID" type="fredcom:objIDType"/>
+        <element name="clID" type="eppcom:clIDType"/>
       </sequence>
     </complexType>
 
-    <element name="testData" type="nsset:testDataT"/>
+    <complexType name="idleDelDataT">
+      <sequence>
+        <element name="id" type="fredcom:objIDType"/>
+      </sequence>
+    </complexType>
 
     <complexType name="testDataT">
       <sequence>
+        <element name="cltestid" type="nsset:trIDStringType"
+         minOccurs="0"/>
         <element name="id" type="fredcom:objIDType"/>
-        <element name="name" type="eppcom:labelType"/>
+        <element name="name" type="eppcom:labelType"
+         minOccurs="0" maxOccurs="unbounded"/>
         <element name="result" type="nsset:resultType"
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
@@ -275,13 +284,19 @@
 
     <complexType name="resultType">
       <sequence>
-        <element name="name" type="eppcom:labelType"/>
+        <element name="testname" type="eppcom:labelType"/>
         <element name="status" type="boolean"/>
         <element name="note" type="string"
-	 minOccurs="0"/>
+         minOccurs="0"/>
       </sequence>
     </complexType>
 
+    <simpleType name="trIDStringType">
+      <restriction base="token">
+        <minLength value="3"/>
+        <maxLength value="64"/>
+      </restriction>
+    </simpleType>
   <!--
   nsset specific protocol extensions
   -->
@@ -295,7 +310,10 @@
     <complexType name="testType">
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
-        <element name="name" type="eppcom:labelType"/>
+        <element name="level" type="nsset:reportlevelType"
+         minOccurs="0"/>
+        <element name="name" type="eppcom:labelType"
+         minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
     </complexType>
 

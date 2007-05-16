@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<schema targetNamespace="http://www.nic.cz/xml/epp/enumval-1.0"
-        xmlns:enumval="http://www.nic.cz/xml/epp/enumval-1.0"
+<schema targetNamespace="http://www.nic.cz/xml/epp/enumval-1.1"
+        xmlns:enumval="http://www.nic.cz/xml/epp/enumval-1.1"
+        xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
         xmlns="http://www.w3.org/2001/XMLSchema"
         elementFormDefault="qualified">
+
+  <!--
+  Import common element types.
+  -->
+  <import namespace="urn:ietf:params:xml:ns:eppcom-1.0"
+            schemaLocation="eppcom-1.0.xsd"/>
 
   <annotation>
     <documentation>
@@ -41,6 +48,29 @@ Child elements of the <update> command.
 Child response elements.
 -->
   <element name="infData" type="enumval:exValType"/>
+
+  <!--
+  domain specific messages
+  -->
+    <element name="impendingValExpData" type="enumval:impendingValExpDataT"/>
+    <element name="valExpData" type="enumval:valExpDataT"/>
+
+  <!--
+  blizi se datum validace
+  -->
+    <complexType name="impendingValExpDataT">
+      <sequence>
+        <element name="name" type="eppcom:labelType"/>
+        <element name="valExDate" type="date"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="valExpDataT">
+      <sequence>
+        <element name="name" type="eppcom:labelType"/>
+        <element name="valExDate" type="date"/>
+      </sequence>
+    </complexType>
 
 <!--
 End of schema.

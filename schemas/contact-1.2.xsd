@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/contact-1.1"
-          xmlns:contact="http://www.nic.cz/xml/epp/contact-1.1"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/contact-1.2"
+          xmlns:contact="http://www.nic.cz/xml/epp/contact-1.2"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
           xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
           xmlns="http://www.w3.org/2001/XMLSchema"
@@ -394,12 +394,19 @@
   contact specific messages
   -->
     <element name="trnData" type="contact:handleDateT"/>
+    <element name="idleDelData" type="contact:idleDelDataT"/>
 
     <complexType name="handleDateT">
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
         <element name="trDate" type="dateTime"/>
-        <element name="oldID" type="fredcom:objIDType"/>
+        <element name="clID" type="eppcom:clIDType"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="idleDelDataT">
+      <sequence>
+        <element name="id" type="fredcom:objIDType"/>
       </sequence>
     </complexType>
 

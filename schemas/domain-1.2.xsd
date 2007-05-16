@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/domain-1.1"
-          xmlns:domain="http://www.nic.cz/xml/epp/domain-1.1"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/domain-1.2"
+          xmlns:domain="http://www.nic.cz/xml/epp/domain-1.2"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
           xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
           xmlns="http://www.w3.org/2001/XMLSchema"
@@ -125,9 +125,9 @@
     <complexType name="updateType">
       <sequence>
         <element name="name" type="eppcom:labelType"/>
-        <element name="add" type="domain:addRemType"
+        <element name="add" type="domain:addType"
          minOccurs="0"/>
-        <element name="rem" type="domain:addRemType"
+        <element name="rem" type="domain:remType"
          minOccurs="0"/>
         <element name="chg" type="domain:chgType"
          minOccurs="0"/>
@@ -137,9 +137,21 @@
   <!--
   Data elements that can be added or removed.
   -->
-    <complexType name="addRemType">
+    <complexType name="addType">
       <sequence>
         <element name="admin" type="fredcom:objIDType"
+         minOccurs="0" maxOccurs="unbounded"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  Data elements that can be added or removed.
+  -->
+    <complexType name="remType">
+      <sequence>
+        <element name="admin" type="fredcom:objIDType"
+         minOccurs="0" maxOccurs="unbounded"/>
+        <element name="tempcontact" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
     </complexType>
@@ -253,6 +265,8 @@
          minOccurs="0"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
+        <element name="tempcontact" type="fredcom:objIDType"
+         minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
     </complexType>
 
@@ -304,12 +318,45 @@
   domain specific messages
   -->
     <element name="trnData" type="domain:handleDateT"/>
+    <element name="impendingExpData" type="domain:impendingExpDataT"/>
+    <element name="expData" type="domain:expDataT"/>
+    <element name="dnsOutageData" type="domain:dnsOutageDataT"/>
 
     <complexType name="handleDateT">
       <sequence>
         <element name="name" type="eppcom:labelType"/>
         <element name="trDate" type="dateTime"/>
-        <element name="oldID" type="fredcom:objIDType"/>
+        <element name="clID" type="eppcom:clIDType"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  impending domain expiration announcement
+  -->
+    <complexType name="impendingExpDataT">
+      <sequence>
+        <element name="name" type="eppcom:labelType"/>
+        <element name="exDate" type="date"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  domain expired announcement
+  -->
+    <complexType name="expDataT">
+      <sequence>
+        <element name="name" type="eppcom:labelType"/>
+        <element name="exDate" type="date"/>
+      </sequence>
+    </complexType>
+
+  <!--
+  domain outage from zone
+  -->
+    <complexType name="dnsOutageDataT">
+      <sequence>
+        <element name="name" type="eppcom:labelType"/>
+        <element name="exDate" type="date"/>
       </sequence>
     </complexType>
 

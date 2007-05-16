@@ -1433,6 +1433,9 @@ parse_update_domain(void *pool,
 		xpath_getn(pool, &update_domain->rem_admin, xpathCtx,
 				"domain:admin", &xerr);
 		CHK_XERR(xerr, error);
+		xpath_getn(pool, &update_domain->rem_tmpcontact, xpathCtx,
+				"domain:tempcontact", &xerr);
+		CHK_XERR(xerr, error);
 		xpathCtx->node = xpathCtx->node->parent;
 	}
 	else if (xerr == XERR_LIBXML)
@@ -2006,7 +2009,8 @@ parse_test(void *pool,
 		epp_command_data *cdata)
 {
 	epps_test	*test;
-	int	xerr;
+	char	*level;
+	int	 xerr;
 
 	cdata->data = epp_calloc(pool, sizeof *test);
 	if (cdata->data == NULL) {
@@ -2028,12 +2032,16 @@ parse_test(void *pool,
 		return;
 	}
 
-	test->id = xpath_get1(pool, xpathCtx,
-			"nsset:id", 1, &xerr);
+	test->id = xpath_get1(pool, xpathCtx, "nsset:id", 1, &xerr);
 	CHK_XERR(xerr, error);
-	test->name = xpath_get1(pool, xpathCtx,
-			"nsset:name", 1, &xerr);
+	xpath_getn(pool, &test->names, xpathCtx, "nsset:name", &xerr);
 	CHK_XERR(xerr, error);
+	level = xpath_get1(pool, xpathCtx, "nsset:level", 0, &xerr);
+	CHK_XERR(xerr, error);
+	if (level != NULL)
+		test->level = atoi(level);
+	else
+		test->level = -1;
 	cdata->type = EPP_TEST_NSSET;
 	return;
 
