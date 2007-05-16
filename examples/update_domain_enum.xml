@@ -6,17 +6,17 @@
   <command>
     <update>
       <domain:update
-       xmlns:domain="http://www.nic.cz/xml/epp/domain-1.1"
-       xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.1
-       domain-1.1.xsd">
+       xmlns:domain="http://www.nic.cz/xml/epp/domain-1.2"
+       xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.2
+       domain-1.2.xsd">
         <domain:name>1.1.1.1.1.1.1.1.1.0.2.4.e164.arpa</domain:name>
       </domain:update>
     </update>
     <extension>
       <enumval:update
-       xmlns:enumval="http://www.nic.cz/xml/epp/enumval-1.0"
-       xsi:schemaLocation="http://www.nic.cz/xml/epp/enumval-1.0
-       enumval-1.0.xsd">
+       xmlns:enumval="http://www.nic.cz/xml/epp/enumval-1.1"
+       xsi:schemaLocation="http://www.nic.cz/xml/epp/enumval-1.1
+       enumval-1.1.xsd">
        <enumval:chg>
          <enumval:valExDate>2009-12-03</enumval:valExDate>
        </enumval:chg>

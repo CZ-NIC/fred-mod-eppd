@@ -6,9 +6,9 @@
   <command>
     <update>
       <domain:update
-       xmlns:domain="http://www.nic.cz/xml/epp/domain-1.1"
-       xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.1
-       domain-1.1.xsd">
+       xmlns:domain="http://www.nic.cz/xml/epp/domain-1.2"
+       xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.2
+       domain-1.2.xsd">
         <domain:name>example.cz</domain:name>
       </domain:update>
     </update>
