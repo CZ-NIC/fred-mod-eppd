@@ -19,22 +19,22 @@
  * \image html mod_eppd.png
  *
  * Apache connection handler is used to process EPP connection and
- * subsequent EPP requests. Incomming and outcomming requests are filtered
+ * subsequent EPP requests. Incomming and outgoing requests are filtered
  * through mod_ssl, which handles SSL encryption of communication channel.
  * mod_eppd.c is interfacing with apache and the central component of
  * the whole module. A request goes through following stages:
  * 
  *     - At first it is read.
  *     - It is processed by XML parser.
- *     - Data are send and answer is received to/from central register.
- *     - Answer in form of XML is generated.
+ *     - Data are sent to central register and answer is received from central register.
+ *     - Answer is generated in form of XML.
  *     - Answer is sent off.
  *     .
  *
- * Parsing resp. CORBA communication resp. generating of response is not done
- * by mod_eppd.c itself, but rather by epp_parser.c resp. epp-client.c resp.
+ * Parsing, CORBA communication and generating of response is not done
+ * by mod_eppd.c itself, but rather by epp_parser.c, epp-client.c and
  * epp_gen.c. These are components which help to mod_eppd.c to get work done.
- * epp_parser.c uses libxml2 library to process XML, epp_gen.c as well.
+ * epp_parser.c and epp_gen.c use libxml2 library to process and generate XML.
  * epp-client.c uses ORBit2 library, implementation of CORBA protocol, in
  * order to communicate with central register.
  *
@@ -108,47 +108,8 @@
  *         proceeds as normaly. This is very handy for verifing good operation
  *         of the server. On the other hand it will notably slow down server.
  *   .
- * 
- * Example configuration suited for production might look like this:
  *
- @verbatim
- #
- # mod_eppd virtual host
- #
- Listen 700      # EPP port, assigned by IANA
- LoadModule eppd_module modules/mod_eppd.so
- <VirtualHost 192.168.2.1:700>
-   EPPprotocol       On
-   EPPobject         "EPP"
-   EPPschema         "/etc/apache2/schemas/all-1.1.xsd"
-   EPPservername     "EPP production server"
-   EPPlog            "/var/log/apache2/epp.log"
-   EPPloglevel       error
-   EPPvalidResponse  Off
- 
-   SSLEngine on
-   SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP
-   SSLCertificateFile    /etc/apache2/server.crt
-   SSLCertificateKeyFile /etc/apache2/server.key
-   SSLVerifyClient       require
-   SSLCACertificateFile  /etc/apache2/certs/server.crt
- </VirtualHost>
- @endverbatim
- *
- * The SSL configuration in virtual host is mandatory, since EPP works only
- * over SSL. The configuration of mod_corba module must be part of virtual
- * host's configuration. See documentation of mod_corba module.
- *
- * @section memory Memory management
- *
- * Apache introduces memory pools, which should minimize danger of memory
- * leaks. Of course libraries which we use (libxml and ORBit) are not
- * aware of these pools and they allocate memory by traditional malloc.
- * But everywhere where it is possible, we try to use apache pools for
- * allocations. Apache header files are not included directly in theese
- * files but rather mod_eppd.c exports wrappers for memory allocations
- * to be used in other files. For each request is created dedicated pool,
- * which is destroyed when the request is answered.
+ * File httpd-epp.conf is example of mod_eppd's configuration.
  *
  * @section make Building and installing the module
  *
@@ -163,29 +124,50 @@
  *     - --with-schema          Location of epp xmlschema.
  *     .
  * Following options doesn't have to be ussualy specified since tools'
- * location is automatically found by configure:
+ * location is automatically found by configure in most cases:
  *
  *     - --with-apr-config      Location of apr-config tool.
- *     - --with-apu-config      Location of apu-config tool.
  *     - --with-apxs            Location of apxs tool.
  *     - --with-orbit-idl       Location of ORBit IDL compiler.
  *     - --with-pkg-config      Location of pkg-config tool.
- *     - --with-pkg-config      Location of pkg-config tool.
- *     - --with-pkg-config      Location of doxygen tool.
+ *     - --with-doc             Location of doxygen if you want to generate documentation.
  *     .
  *
- * The module is built by the traditional way: ./configure && make && make
- * install. The module is installed in directory where reside other apache
- * modules. Together with module are installed xmlschema files in subdirectory
+ * The installation directories are not taken into account. The installation
+ * directories are given by apxs tool.
+ *
+ * The module is installed by the traditional way: ./configure && make && make
+ * install. The module is installed in directory where other apache modules
+ * reside. Together with module are installed xmlschema files in subdirectory
  * "schemas" in apache configuration directory.
  *
  * @section trouble Troubleshooting
  *
- * The best friend is mod_eppd's log (the one configured in apache's config).
+ * The best friend is mod_eppd's log file.
  * In case of serious error the message is written to stderr instead of the
  * log, so you will find it in apache's error log. If you can't still localize
- * the problem, module comes with test program "test". This binary is easy
+ * the problem, module comes with test program "epp_test". This binary is easy
  * to debug in gdb and in 99% of cases are the bugs from mod_eppd reproducible
- * by this binary.
+ * by this simplified binary. If you decided to use gdb, don't forget to
+ * configure mod_eppd with CFLAGS='-g -O0'.
+ *
+ * It is possible to run epp_test in two modes: interactive and batch mode.
+ * In batch mode you specify XML files to be processed on command line. They
+ * will be processed in the same order as they are written on command line.
+ * Interactive mode will give you a prompt, where you specify a command
+ * and then another prompt to specify name of file when command was 'file'
+ * and XML document when command was 'custom'. If you want to exit from
+ * program, use command 'exit'.
+ *
+ * @section memory Memory management
+ *
+ * Apache introduces memory pools, which should minimize danger of memory
+ * leaks. Of course libraries which we use (libxml and ORBit) are not
+ * aware of these pools and they allocate memory by traditional malloc.
+ * But everywhere where it is possible, we try to use apache pools for
+ * allocations. Apache header files are not included directly in theese
+ * files but rather mod_eppd.c exports wrappers for memory allocations
+ * to be used in other files. For each request is created dedicated pool,
+ * which is destroyed when the request is processed.
  *
  */

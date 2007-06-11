@@ -6,9 +6,9 @@
   <command>
     <transfer op="request">
       <contact:transfer
-       xmlns:contact="http://www.nic.cz/xml/epp/contact-1.2"
-       xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.2
-       contact-1.2.xsd">
+       xmlns:contact="http://www.nic.cz/xml/epp/contact-1.3"
+       xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.3
+       contact-1.3.xsd">
         <contact:id>example.cz</contact:id>
 	<contact:authInfo>hloupeAuthinfo</contact:authInfo>
       </contact:transfer>

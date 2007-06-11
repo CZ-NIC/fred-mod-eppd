@@ -607,7 +607,11 @@ epp_gen_response(epp_context *epp_ctx,
 					poll_req->msgid);
 			WRITE_ELEMENT(writer, simple_err, "qDate",
 					poll_req->qdate);
-			WRITE_ELEMENT(writer, simple_err, "msg", poll_req->msg);
+			START_ELEMENT(writer, simple_err, "msg");
+			if (xmlTextWriterWriteRaw(writer,
+						BAD_CAST (poll_req->msg)) < 0)
+				goto simple_err;
+			END_ELEMENT(writer, simple_err); /* msg */
 			END_ELEMENT(writer, simple_err); /* msgQ */
 		}
 	}
@@ -931,6 +935,45 @@ epp_gen_response(epp_context *epp_ctx,
 				END_ELEMENT(writer, simple_err); /* zoneCredit */
 			}
 			END_ELEMENT(writer, simple_err); /* resCreditInfo */
+			break;
+		}
+		case EPP_INFO_LIST_CONTACTS:
+		case EPP_INFO_LIST_DOMAINS:
+		case EPP_INFO_LIST_NSSETS:
+		case EPP_INFO_DOMAINS_BY_NSSET:
+		case EPP_INFO_DOMAINS_BY_CONTACT:
+		case EPP_INFO_NSSETS_BY_CONTACT:
+		case EPP_INFO_NSSETS_BY_NS:
+		{
+			epps_info	*info;
+			char	 infocount[20];
+
+			info = cdata->data;
+			START_ELEMENT(writer, simple_err, "fred:infoResponse");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:fred", NS_FRED);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_FRED);
+			snprintf(infocount, 19, "%u", info->count);
+			WRITE_ELEMENT(writer, simple_err, "fred:count", infocount);
+			END_ELEMENT(writer, simple_err); /* infoResponse */
+			break;
+		}
+		case EPP_INFO_GET_RESULTS:
+		{
+			epps_list	*list;
+
+			list = cdata->data;
+			START_ELEMENT(writer, simple_err, "fred:resultsList");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:fred", NS_FRED);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_FRED);
+			q_foreach(&list->handles) {
+				WRITE_ELEMENT(writer, simple_err, "fred:item",
+						q_content(&list->handles));
+			}
+			END_ELEMENT(writer, simple_err); /* resultsList */
 			break;
 		}
 		default:

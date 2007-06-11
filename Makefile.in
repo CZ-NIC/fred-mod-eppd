@@ -5,21 +5,24 @@ DEFS        = @DEFS@
 LDFLAGS     = @LDFLAGS@
 LIBS        = @LIBS@
 
-APR-CONFIG  = @APR_CONFIG@
-APU-CONFIG  = @APU_CONFIG@
-APXS        = @APXS@
 ORBIT-IDL   = @ORBIT_IDL@
-PKG-CONFIG  = @PKG_CONFIG@
 DOXYGEN     = @DOXYGEN@
 IDL         = @IDL@
 IDLPREFIX   = @IDLPREFIX@
 SCHEMA      = @SCHEMA@
 INSTALL     = @INSTALL@
-SHELL       = @SHELL@
 PKG_STRING  = @PACKAGE_STRING@
-PKG_NAME    = @PACKAGE_NAME@
 PKG_TARNAME = @PACKAGE_TARNAME@
 PKG_VERSION = @PACKAGE_VERSION@
+XML_CFLAGS  = @XML_CFLAGS@
+XML_LDFLAGS = @XML_LDFLAGS@
+ORB_CFLAGS  = @ORB_CFLAGS@
+ORB_LDFLAGS = @ORB_LDFLAGS@
+AP_CPPFLAGS = @AP_CPPFLAGS@
+AP_CFLAGS   = @AP_CFLAGS@
+AP_LDFLAGS  = @AP_LDFLAGS@
+AP_CONFDIR  = @AP_CONFDIR@
+INSTALLDIR  = @INSTALLDIR@
 
 HEADERS   = epp-client.h epp_common.h epp_gen.h epp_parser.h epp_xmlcommon.h unconfig.h
 CFILES    = epp-client.c epp_common.c epp_gen.c epp_parser.c epp_test.c epp_xmlcommon.c mod_eppd.c
@@ -31,29 +34,6 @@ OBJS      = epp_common.o epp_xmlcommon.o epp_parser.o epp_gen.o epp-client.o ${I
 MOD_OBJS  = mod_eppd.o $(OBJS)
 ALL_OBJS  = epp_test.o $(MOD_OBJS)
 TARDIR    = $(PKG_TARNAME)-$(PKG_VERSION)
-
-ORB_LDFLAGS := $(shell $(PKG-CONFIG) --libs ORBit-2.0)
-ORB_CFLAGS  := $(shell $(PKG-CONFIG) --cflags ORBit-2.0)
-COS_LDFLAGS:= $(shell $(PKG-CONFIG) --libs ORBit-CosNaming-2.0)
-COS_CFLAGS := $(shell $(PKG-CONFIG) --cflags ORBit-CosNaming-2.0)
-ORB_LDFLAGS:= $(ORB_LDFLAGS) $(COS_LDFLAGS)
-ORB_CFLAGS := $(ORB_CFLAGS) $(COS_CFLAGS)
-
-XML_CFLAGS  := $(shell $(PKG-CONFIG) --cflags libxml-2.0)
-XML_LIBS    := $(shell $(PKG-CONFIG) --libs libxml-2.0)
-
-AP_CPPFLAGS := $(shell $(APR-CONFIG) --cppflags)
-AP_CFLAGS   := $(shell $(APR-CONFIG) --cflags)
-APXS_INCLUDE:= $(shell $(APXS) -q INCLUDEDIR)
-APR_INCLUDE := $(shell $(APR-CONFIG) --includes)
-APU_INCLUDE := $(shell $(APU-CONFIG) --includes)
-AP_INCLUDE  := -I$(APXS_INCLUDE) $(APU_INCLUDE) $(APR_INCLUDE)
-AP_CONFDIR  := $(shell $(APXS) -q SYSCONFDIR)
-
-AP_LDFLAGS  := $(shell $(APR-CONFIG) --ldflags)
-AP_LIBS     := $(shell $(APR-CONFIG) --libs)
-
-INSTALLDIR  := $(shell $(APXS) -q LIBEXECDIR)
 
 .PHONY: all build install uninstall clean realclean doc dist test
 .SUFFIXES:
@@ -79,10 +59,10 @@ test: epp_test
 	./epp_test -h curlew -t
 
 mod_eppd.so: $(MOD_OBJS)
-	$(CC) -Wl,-rpath $(AP_INSTALLDIR) -Bshareable -shared -o mod_eppd.so $(LDFLAGS) $(LIBS) $(AP_LDFLAGS) $(ORB_LDFLAGS) $(AP_LIBS) $(XML_LIBS) $(MOD_OBJS)
+	$(CC) -Bshareable -shared -o mod_eppd.so $(LDFLAGS) $(LIBS) $(AP_LDFLAGS) $(ORB_LDFLAGS) $(XML_LDFLAGS) $(MOD_OBJS)
 
 mod_eppd.o:	mod_eppd.c epp_parser.h epp_gen.h epp-client.h epp_common.h config.h
-	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(AP_CPPFLAGS) $(AP_CFLAGS) $(AP_INCLUDE) $(DEFS) -c mod_eppd.c
+	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(AP_CPPFLAGS) $(AP_CFLAGS) $(DEFS) -c mod_eppd.c
 
 epp_xmlcommon.o: epp_xmlcommon.c epp_xmlcommon.h epp_common.h config.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(XML_CFLAGS) $(DEFS) -c epp_xmlcommon.c
@@ -106,7 +86,7 @@ ${IDLPREFIX}-stubs.o: ${IDLPREFIX}-stubs.c ${IDLPREFIX}.h
 	$(CC) -fPIC $(CPPFLAGS) $(CFLAGS) $(ORB_CFLAGS) $(DEFS) -c ${IDLPREFIX}-stubs.c
 
 epp_test: epp_test.o $(OBJS)
-	$(CC) $(LDFLAGS) $(LIBS) $(ORB_LDFLAGS) $(XML_LIBS) -o epp_test epp_test.o $(OBJS)
+	$(CC) $(LDFLAGS) $(LIBS) $(ORB_LDFLAGS) $(XML_LDFLAGS) -o epp_test epp_test.o $(OBJS)
 
 epp_test.o: epp_test.c epp_common.h epp_parser.h epp_gen.h epp-client.h $(IDLPREFIX).h config.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEFS) $(ORB_CFLAGS) -c epp_test.c

@@ -11,15 +11,10 @@
 /** Possible return values of functions from corba module. */
 typedef enum {
 	CORBA_OK,   /**< No errors. */
-	/**
-	 * Corba function call failed (e.g. server is not available).
-	 */
+	/** Corba function call failed (e.g. server is not available).  */
 	CORBA_ERROR,
 	CORBA_INT_ERROR, /**< This should occur unusualy (e.g. malloc failed) */
-	/**
-	 * Epp server is responding but cannot send qualified response
-	 * because of an error on its side.
-	 */
+	/** Epp server is responding but the response is not valid.  */
 	CORBA_REMOTE_ERROR
 }corba_status;
 

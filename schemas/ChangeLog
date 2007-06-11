@@ -1,4 +1,16 @@
-2006-01-02 Jan Kryl (version 1.3.1)
+2006-05-16 Jan Kryl (version 1.4.0)
+
+	* It's possible to control disclosure of vat, ident and notifyEmail
+	attributes of contact in addition to previously supported attributes.
+
+	* New ident type 'birthday' (date of birth) was added.
+
+	* New domain specific poll message informing client about removal
+	of domain from register.
+
+	* There are more usefull comments in schemas.
+
+2006-05-16 Jan Kryl (version 1.3.1)
 
 	* New email pattern was defined. Now every email address has to
 	fulfill quite basic criteria.

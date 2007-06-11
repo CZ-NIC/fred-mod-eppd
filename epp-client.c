@@ -39,9 +39,6 @@
 /** True if exception is COMM_FAILURE, which is used in retry loop. */
 #define IS_NOT_COMM_FAILURE_EXCEPTION(_ev)                             \
 	(strcmp((_ev)->_id, "IDL:omg.org/CORBA/COMM_FAILURE:1.0"))
-/** True if exception is INT_ERROR (internal error on server's side). */
-#define IS_INTSERV_ERROR(_ev)                             \
-	(!strcmp((_ev)->_id, "IDL:ccReg/EPP/ServerIntError:1.0"))
 /** True if exception is EPP_ERROR. */
 #define IS_EPP_ERROR(_ev)                             \
 	(!strcmp((_ev)->_id, "IDL:ccReg/EPP/EppError:1.0"))
@@ -202,7 +199,8 @@ unwrap_str(void *pool, const char *str, int *cerrno)
  *
  * @param epp_ctx Epp context used for logging and memory allocation.
  * @param str	  Input string.
- * @param cerrno  Set to 1 if malloc failed and to 2 if string is empty.
+ * @param cerrno  Set to 2 if malloc failed and to 1 if requited string is
+ *                missing.
  * @param id	  Identifier of string used in error message.
  * @return        Output string.
  */
@@ -215,14 +213,14 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
 	assert(str != NULL);
 
 	if (*str == '\0') {
-		epplog(epp_ctx, EPP_ERROR, "Output parameter \"%s\" is empty",
-				id);
-		*cerrno = 2;
+		epplog(epp_ctx, EPP_ERROR,
+				"Output parameter \"%s\" is empty", id);
+		*cerrno = 1;
 		return NULL;
 	}
 	res = epp_strdup(epp_ctx->pool, str);
 	if (res == NULL)
-		*cerrno = 1;
+		*cerrno = 2;
 
 	return res;
 }
@@ -250,20 +248,9 @@ epp_call_hello(epp_context *epp_ctx, service_EPP service, char **version,
 	}
 
 	if (raised_exception(ev)) {
-		int	ret;
-
-		if (IS_INTSERV_ERROR(ev)) {
-			epplog(epp_ctx, EPP_ERROR, "Internal server's error: %s",
-				((ccReg_EPP_ServerIntError *) ev->_any._value)->reason);
-			ret  = CORBA_REMOTE_ERROR;
-		}
-		else {
-			epplog(epp_ctx, EPP_ERROR, "CORBA exception: %s",
-					ev->_id);
-			ret  = CORBA_ERROR;
-		}
+		epplog(epp_ctx, EPP_ERROR, "CORBA exception: %s", ev->_id);
 		CORBA_exception_free(ev);
-		return ret;
+		return CORBA_ERROR;
 	}
 
 	CLEAR_CERRNO(cerrno);
@@ -274,15 +261,48 @@ epp_call_hello(epp_context *epp_ctx, service_EPP service, char **version,
 		CORBA_free(c_curdate);
 		return CORBA_INT_ERROR;
 	}
+	CORBA_free(c_version);
 	*curdate = unwrap_str(epp_ctx->pool, c_curdate, &cerrno);
 	if (cerrno != 0) {
-		CORBA_free(c_version);
 		CORBA_free(c_curdate);
 		return CORBA_INT_ERROR;
 	}
-	CORBA_free(c_version);
 	CORBA_free(c_curdate);
 	return CORBA_OK;
+}
+
+/**
+ * This function creates answer eventhough it has not enough data for that
+ * from CORBA server.
+ *
+ * This behaviour is in conflict with EPP standard, but it was enforced
+ * by users and administrators.
+ *
+ * @param epp_ctx   Epp context.
+ * @param cdata     Epp data.
+ * @return          Corba status.
+ */
+static corba_status
+create_dummy_answer(epp_context *epp_ctx, epp_command_data *cdata)
+{
+	cdata->svTRID = epp_strdup(epp_ctx->pool, "DUMMY-SVTRID");
+	if (cdata->svTRID == NULL)
+		return CORBA_INT_ERROR;
+
+	cdata->msg = epp_strdup(epp_ctx->pool, "Command failed");
+	if (cdata->msg == NULL)
+		return CORBA_INT_ERROR;
+
+	/* this flag is needed for XML generator */
+	cdata->noresdata = 1;
+
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+	/* reset errors */
+	cdata->errors.count = 0;
+	cdata->errors.body = NULL;
+	cdata->errors.cur  = NULL;
+	return CORBA_ERROR;
 }
 
 /**
@@ -294,9 +314,9 @@ epp_call_hello(epp_context *epp_ctx, service_EPP service, char **version,
  * @param epp_ctx  Epp context.
  * @param cdata    Command input and output data.
  * @param response Response returned from CORBA call.
- * @return         0 in case of success, 1 otherwise.
+ * @return         CORBA status.
  */
-static int
+static corba_status
 epilog_success(epp_context *epp_ctx, epp_command_data *cdata,
 		ccReg_Response *response)
 {
@@ -304,19 +324,18 @@ epilog_success(epp_context *epp_ctx, epp_command_data *cdata,
 
 	CLEAR_CERRNO(cerrno);
 
+	cdata->rc = response->code;
+	cdata->msg = unwrap_str_req(epp_ctx, response->msg, &cerrno, "msg");
 	cdata->svTRID = unwrap_str_req(epp_ctx, response->svTRID, &cerrno,
 			"svTRID");
-	if (cerrno != 0) {
-		CORBA_free(response);
-		return 1;
-	}
-	cdata->msg = unwrap_str_req(epp_ctx, response->msg, &cerrno, "msg");
-	if (cerrno != 0) {
-		CORBA_free(response);
-		return 1;
-	}
-	cdata->rc = response->code;
-	return 0;
+	CORBA_free(response);
+
+	if (cerrno == 0)
+		return CORBA_OK;
+	else if (cerrno == 1)
+		return create_dummy_answer(epp_ctx, cdata);
+
+	return CORBA_INT_ERROR;
 }
 
 /**
@@ -326,7 +345,8 @@ epilog_success(epp_context *epp_ctx, epp_command_data *cdata,
  * @param epp_ctx   Epp context.
  * @param cdata     EPP data.
  * @param exc       Data of thrown exception.
- * @return          0 if successful, 1 otherwise.
+ * @return          0 if successful, 1 if required parameter is missing, 2 if
+ *                  malloc failed.
  */
 static int
 epilog_failure(epp_context *epp_ctx, epp_command_data *cdata,
@@ -337,9 +357,9 @@ epilog_failure(epp_context *epp_ctx, epp_command_data *cdata,
 
 	CLEAR_CERRNO(cerrno);
 	cdata->svTRID = unwrap_str_req(epp_ctx, exc->svTRID, &cerrno, "svTRID");
-	if (cerrno != 0) return 1;
+	if (cerrno != 0) return cerrno;
 	cdata->msg = unwrap_str_req(epp_ctx, exc->errMsg, &cerrno, "msg");
-	if (cerrno != 0) return 1;
+	if (cerrno != 0) return cerrno;
 	cdata->rc = exc->errCode;
 
 	/* process all errors one by one */
@@ -352,14 +372,14 @@ epilog_failure(epp_context *epp_ctx, epp_command_data *cdata,
 		if (err_item == NULL) return 1;
 		err_item->reason = unwrap_str_req(epp_ctx, c_error->reason,
 				&cerrno, "reason");
-		if (cerrno != 0) return 1;
+		if (cerrno != 0) return cerrno;
 		/* copy position spec */
 		err_item->position = c_error->position;
 		/* convert error code */
 		err_item->spec = err_idl2epp(c_error->code);
 
 		if (q_add(epp_ctx->pool, &cdata->errors, err_item))
-			return 1;
+			return 2;
 	}
 	/* this flag is needed for XML generator */
 	cdata->noresdata = 1;
@@ -381,17 +401,17 @@ handle_exception(epp_context *epp_ctx, epp_command_data *cdata,
 {
 	int	ret;
 
-	if (IS_INTSERV_ERROR(ev)) {
-		ret  = CORBA_REMOTE_ERROR;
-	}
-	else if (IS_EPP_ERROR(ev)) {
+	if (IS_EPP_ERROR(ev)) {
 		ccReg_EPP_EppError	*err_data;
 
 		err_data = (ccReg_EPP_EppError *) ev->_any._value;
-		if (epilog_failure(epp_ctx, cdata, err_data))
-			ret = CORBA_INT_ERROR;
+		ret = epilog_failure(epp_ctx, cdata, err_data);
+		if (ret == 0)
+			ret = CORBA_OK;
+		else if (ret == 1)
+			ret = create_dummy_answer(epp_ctx, cdata);
 		else
-			ret  = CORBA_OK;
+			ret = CORBA_INT_ERROR;
 	}
 	else if (IS_NO_MESSAGES(ev)) {
 		ccReg_EPP_NoMessages	*exc;
@@ -405,13 +425,17 @@ handle_exception(epp_context *epp_ctx, epp_command_data *cdata,
 		cdata->svTRID = unwrap_str_req(epp_ctx, exc->svTRID, &cerrno,
 				"svTRID");
 		/* this checks both previous allocations */
-		if (cerrno != 0)
-			ret = CORBA_INT_ERROR;
+		if (cerrno == 0)
+			ret = CORBA_OK;
+		else if (cerrno == 1)
+			ret = create_dummy_answer(epp_ctx, cdata);
 		else
-			ret  = CORBA_OK;
+			ret = CORBA_INT_ERROR;
 	}
 	else {
-		ret  = CORBA_ERROR;
+		epplog(epp_ctx, EPP_ERROR, "CORBA exception: %s", ev->_id);
+		/* we'll return 'something' in case of communication failure */
+		ret = create_dummy_answer(epp_ctx, cdata);
 	}
 
 	CORBA_exception_free(ev);
@@ -507,10 +531,10 @@ epp_call_dummy(epp_context *epp_ctx,
 		return handle_exception(epp_ctx, cdata, ev);
 
 	if (c_errStrings->_length != len) {
-		epplog(epp_ctx,EPP_ERROR, "Bad length of translated error list");
+		epplog(epp_ctx,EPP_ERROR,"Bad length of translated error list");
 		CORBA_free(c_errStrings);
 		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return create_dummy_answer(epp_ctx, cdata);
 	}
 	CLEAR_CERRNO(cerrno);
 	/* now try to pair reported errors with translated strings */
@@ -519,17 +543,21 @@ epp_call_dummy(epp_context *epp_ctx,
 		epp_error	*err_item;
 
 		err_item = q_content(&cdata->errors);
-		/* prefix validation errors by translated prefix */
-		if (err_item->spec == errspec_not_valid) {
+		if (*c_errStrings->_buffer[i] == '\0') {
+			epplog(epp_ctx, EPP_ERROR, "Reuired parameter "
+					"'translated error' is missing");
+			CORBA_free(c_errStrings);
+			CORBA_free(response);
+			return create_dummy_answer(epp_ctx, cdata);
+		}
+		/* prefix validation errors by a translated prefix */
+		if (err_item->spec == errspec_not_valid)
 			err_item->reason = epp_strcat(epp_ctx->pool,
 					c_errStrings->_buffer[i++],
 					err_item->reason);
-		}
-		else {
-			err_item->reason = unwrap_str_req(epp_ctx->pool,
-					c_errStrings->_buffer[i++], &cerrno,
-					"error reason");
-		}
+		else
+			err_item->reason = unwrap_str(epp_ctx->pool,
+					c_errStrings->_buffer[i++], &cerrno);
 		if (err_item->reason == NULL) {
 			CORBA_free(c_errStrings);
 			CORBA_free(response);
@@ -538,13 +566,10 @@ epp_call_dummy(epp_context *epp_ctx,
 	}
 	CORBA_free(c_errStrings);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
 	/* This is always true for this request, but we must set it here */
 	cdata->noresdata = 1;
 
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 corba_status
@@ -631,14 +656,11 @@ epp_call_login(epp_context *epp_ctx,
 	if (raised_exception(ev))
 		return handle_exception(epp_ctx, cdata, ev);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	/* update session data */
+	/* update session data ( XXX premature update of session data) */
 	*loginid = c_session;
 	*lang = login->lang;
 
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 corba_status
@@ -686,13 +708,10 @@ epp_call_logout(epp_context *epp_ctx,
 	if (raised_exception(ev))
 		return handle_exception(epp_ctx, cdata, ev);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
 	/* propagate information about logout upwards */
 	*loginid = 0;
 
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -812,7 +831,7 @@ epp_call_check(epp_context *epp_ctx,
 		epplog(epp_ctx, EPP_ERROR, "Bad length of check list");
 		CORBA_free(c_avails);
 		CORBA_free(response);
-		return CORBA_REMOTE_ERROR;
+		return create_dummy_answer(epp_ctx, cdata);
 	}
 
 	for (i = 0; i < c_avails->_length; i++) {
@@ -835,7 +854,7 @@ epp_call_check(epp_context *epp_ctx,
 					"is not available");
 			CORBA_free(c_avails);
 			CORBA_free(response);
-			return CORBA_REMOTE_ERROR;
+			return create_dummy_answer(epp_ctx, cdata);
 		}
 		if (q_add(epp_ctx->pool, &check->avails, avail)) break;
 	}
@@ -847,10 +866,7 @@ epp_call_check(epp_context *epp_ctx,
 	}
 	CORBA_free(c_avails);
 
-	if (epilog_success(epp_ctx->pool, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -1009,11 +1025,11 @@ epp_call_info_contact(epp_context *epp_ctx,
 	if (cerrno != 0) goto error;
 	/* convert identtype from idl's enum to our enum */
 	switch (c_contact->identtype) {
-		case ccReg_RC:
-			info_contact->identtype = ident_RC;
-			break;
 		case ccReg_OP:
 			info_contact->identtype = ident_OP;
+			break;
+		case ccReg_RC:
+			info_contact->identtype = ident_RC;
 			break;
 		case ccReg_PASS:
 			info_contact->identtype = ident_PASSPORT;
@@ -1023,6 +1039,9 @@ epp_call_info_contact(epp_context *epp_ctx,
 			break;
 		case ccReg_ICO:
 			info_contact->identtype = ident_ICO;
+			break;
+		case ccReg_BIRTHDAY:
+			info_contact->identtype = ident_BIRTHDAY;
 			break;
 		default:
 			info_contact->identtype = ident_UNKNOWN;
@@ -1049,13 +1068,16 @@ epp_call_info_contact(epp_context *epp_ctx,
 			(c_contact->DiscloseFax == CORBA_TRUE) ? 1 : 0;
 		info_contact->discl.email =
 			(c_contact->DiscloseEmail == CORBA_TRUE) ? 1 : 0;
+		info_contact->discl.vat =
+			(c_contact->DiscloseVAT == CORBA_TRUE) ? 1 : 0;
+		info_contact->discl.ident =
+			(c_contact->DiscloseIdent == CORBA_TRUE) ? 1 : 0;
+		info_contact->discl.notifyEmail =
+			(c_contact->DiscloseNotifyEmail == CORBA_TRUE) ? 1 : 0;
 	}
 
 	CORBA_free(c_contact);
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 
 error:
 	CORBA_free(c_contact);
@@ -1229,10 +1251,7 @@ epp_call_info_domain(epp_context *epp_ctx,
 	}
 
 	CORBA_free(c_domain);
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 
 error:
 	CORBA_free(c_domain);
@@ -1388,10 +1407,7 @@ epp_call_info_nsset(epp_context *epp_ctx,
 	}
 
 	CORBA_free(c_nsset);
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 
 error:
 	CORBA_free(c_nsset);
@@ -1477,10 +1493,7 @@ epp_call_poll_req(epp_context *epp_ctx,
 	CORBA_free(c_msgID);
 	CORBA_free(c_msg);
 	CORBA_free(c_qdate);
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 
 error:
 	CORBA_free(c_msgID);
@@ -1562,10 +1575,7 @@ epp_call_poll_ack(epp_context *epp_ctx,
 	if (cerrno != 0) goto error;
 
 	CORBA_free(c_msgID);
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 
 error:
 	CORBA_free(c_msgID);
@@ -1738,10 +1748,7 @@ error_input:
 
 	CORBA_free(c_crDate);
 	CORBA_free(c_exDate);
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 
 error:
 	CORBA_free(c_crDate);
@@ -1760,11 +1767,12 @@ static ccReg_identtyp
 convIdentType(epp_identType our_ident)
 {
 	switch (our_ident) {
-		case ident_ICO: return ccReg_ICO; break;
 		case ident_OP: return ccReg_OP; break;
 		case ident_RC: return ccReg_RC; break;
 		case ident_PASSPORT: return ccReg_PASS; break;
 		case ident_MPSV: return ccReg_MPSV; break;
+		case ident_ICO: return ccReg_ICO; break;
+		case ident_BIRTHDAY: return ccReg_BIRTHDAY; break;
 		default: return ccReg_EMPTY; break;
 	}
 }
@@ -1892,6 +1900,12 @@ epp_call_create_contact(epp_context *epp_ctx,
 			(create_contact->discl.fax ? CORBA_TRUE : CORBA_FALSE);
 		c_contact->DiscloseEmail =
 			(create_contact->discl.email ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseVAT =
+			(create_contact->discl.vat ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseIdent =
+			(create_contact->discl.ident ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseNotifyEmail =
+			(create_contact->discl.notifyEmail ? CORBA_TRUE : CORBA_FALSE);
 	}
 	/* postal info */
 	c_contact->Name = wrap_str(create_contact->pi.name);
@@ -1987,10 +2001,7 @@ epp_call_create_contact(epp_context *epp_ctx,
 	}
 
 	CORBA_free(c_crDate);
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -2170,10 +2181,7 @@ epp_call_create_nsset(epp_context *epp_ctx,
 	}
 
 	CORBA_free(c_crDate);
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -2253,10 +2261,7 @@ epp_call_delete(epp_context *epp_ctx,
 	if (raised_exception(ev))
 		return handle_exception(epp_ctx, cdata, ev);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -2390,11 +2395,7 @@ error_input:
 	}
 	CORBA_free(c_exDateOUT);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
-
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -2578,11 +2579,7 @@ error_input:
 	if (raised_exception(ev))
 		return handle_exception(epp_ctx, cdata, ev);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	CORBA_free(response);
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -2704,6 +2701,12 @@ epp_call_update_contact(epp_context *epp_ctx,
 			(update_contact->discl.fax ? CORBA_TRUE : CORBA_FALSE);
 		c_contact->DiscloseEmail =
 			(update_contact->discl.email ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseVAT =
+			(update_contact->discl.vat ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseIdent =
+			(update_contact->discl.ident ? CORBA_TRUE : CORBA_FALSE);
+		c_contact->DiscloseNotifyEmail =
+			(update_contact->discl.notifyEmail ? CORBA_TRUE : CORBA_FALSE);
 	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
@@ -2736,10 +2739,7 @@ error_input:
 	if (raised_exception(ev))
 		return handle_exception(epp_ctx, cdata, ev);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -2923,10 +2923,7 @@ error_input:
 	if (raised_exception(ev))
 		return handle_exception(epp_ctx, cdata, ev);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -3020,10 +3017,7 @@ epp_call_transfer(epp_context *epp_ctx,
 	if (raised_exception(ev))
 		return handle_exception(epp_ctx, cdata, ev);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -3125,10 +3119,7 @@ epp_call_list(epp_context *epp_ctx,
 	}
 
 	CORBA_free(c_handles);
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -3219,10 +3210,7 @@ epp_call_sendauthinfo(epp_context *epp_ctx,
 	if (raised_exception(ev))
 		return handle_exception(epp_ctx, cdata, ev);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -3308,10 +3296,7 @@ epp_call_creditinfo(epp_context *epp_ctx,
 	}
 	CORBA_free(c_zoneCredit);
 
-	if (epilog_success(epp_ctx, cdata, response))
-		return CORBA_INT_ERROR;
-
-	return CORBA_OK;
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -3410,10 +3395,169 @@ error_input:
 	if (raised_exception(ev))
 		return handle_exception(epp_ctx, cdata, ev);
 
-	if (epilog_success(epp_ctx, cdata, response))
+	return epilog_success(epp_ctx, cdata, response);
+}
+
+/**
+ * Info functions handler.
+ *
+ * @param epp_ctx  Epp context.
+ * @param service  EPP service.
+ * @param loginid  Session identifier.
+ * @param cdata    Data from xml request.
+ * @param infotype Type of info query.
+ * @return         Status.
+ */
+static corba_status
+epp_call_info(epp_context *epp_ctx,
+		service_EPP service,
+		unsigned int loginid,
+		epp_command_data *cdata,
+		ccReg_InfoType c_infotype)
+{
+	CORBA_Environment	 ev[1];
+	CORBA_char	*c_clTRID, *c_handle;
+	CORBA_long	 c_count;
+	ccReg_Response	*response;
+	epps_info	*info;
+	int	 retr, i, input_ok;
+
+	info = cdata->data;
+	input_ok = 0;
+	c_clTRID = NULL;
+	c_handle = NULL;
+	/*
+	 * Input parameters:
+	 *    loginid
+	 *    c_clTRID (*)
+	 *    c_infotype
+	 *    c_handle (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_count
+	 */
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		goto error_input;
+
+	c_handle = wrap_str(info->handle);
+	if (c_handle == NULL)
+		goto error_input;
+
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev);
+		CORBA_exception_init(ev);
+
+		response = ccReg_EPP_info((ccReg_EPP) service,
+				c_infotype,
+				c_handle,
+				&c_count,
+				loginid,
+				c_clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+	input_ok = 1;
+
+error_input:
+	CORBA_free(c_handle);
+	CORBA_free(c_clTRID);
+	if (!input_ok)
 		return CORBA_INT_ERROR;
 
-	return CORBA_OK;
+	/* if it is exception then return */
+	if (raised_exception(ev))
+		return handle_exception(epp_ctx, cdata, ev);
+
+	info->count = (unsigned int) c_count;
+
+	return epilog_success(epp_ctx, cdata, response);
+}
+
+/**
+ * Get results of info search.
+ *
+ * @param epp_ctx Epp context.
+ * @param service EPP service.
+ * @param loginid Session identifier.
+ * @param cdata   Data from xml request.
+ * @return        Status.
+ */
+static corba_status
+epp_call_getInfoResults(epp_context *epp_ctx,
+		service_EPP service,
+		unsigned int loginid,
+		epp_command_data *cdata)
+{
+	CORBA_Environment	 ev[1];
+	CORBA_char	*c_clTRID;
+	ccReg_Response	*response;
+	ccReg_Lists	*c_handles;
+	int	 i, retr;
+	epps_list	*list;
+
+	list = cdata->data;
+	/*
+	 * Input parameters:
+	 *    loginid
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_handles (*)
+	 */
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev);
+		CORBA_exception_init(ev);
+
+		response = ccReg_EPP_getInfoResults((ccReg_EPP) service,
+				&c_handles,
+				loginid,
+				c_clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+	CORBA_free(c_clTRID);
+
+	/* if it is exception then return */
+	if (raised_exception(ev))
+		return handle_exception(epp_ctx, cdata, ev);
+
+	for (i = 0; i < c_handles->_length; i++) {
+		char	*handle;
+		int	cerrno;
+
+		CLEAR_CERRNO(cerrno);
+
+		handle = unwrap_str(epp_ctx->pool, c_handles->_buffer[i],
+				&cerrno);
+		if (cerrno != 0) {
+			CORBA_free(response);
+			return CORBA_INT_ERROR;
+		}
+		if (q_add(epp_ctx->pool, &list->handles, handle)) {
+			CORBA_free(response);
+			return CORBA_INT_ERROR;
+		}
+	}
+
+	CORBA_free(c_handles);
+	return epilog_success(epp_ctx, cdata, response);
 }
 
 corba_status
@@ -3559,6 +3703,38 @@ epp_call_cmd(epp_context *epp_ctx,
 			cdata->noresdata = 1;
 			cstat = epp_call_test_nsset(epp_ctx, service, loginid,
 					cdata);
+			break;
+		case EPP_INFO_LIST_CONTACTS:
+			cstat = epp_call_info(epp_ctx, service, loginid,
+					cdata, ccReg_IT_LIST_CONTACTS);
+			break;
+		case EPP_INFO_LIST_DOMAINS:
+			cstat = epp_call_info(epp_ctx, service, loginid,
+					cdata, ccReg_IT_LIST_DOMAINS);
+			break;
+		case EPP_INFO_LIST_NSSETS:
+			cstat = epp_call_info(epp_ctx, service, loginid,
+					cdata, ccReg_IT_LIST_NSSETS);
+			break;
+		case EPP_INFO_DOMAINS_BY_NSSET:
+			cstat = epp_call_info(epp_ctx, service, loginid,
+					cdata, ccReg_IT_DOMAINS_BY_NSSET);
+			break;
+		case EPP_INFO_DOMAINS_BY_CONTACT:
+			cstat = epp_call_info(epp_ctx, service, loginid,
+					cdata, ccReg_IT_DOMAINS_BY_CONTACT);
+			break;
+		case EPP_INFO_NSSETS_BY_CONTACT:
+			cstat = epp_call_info(epp_ctx, service, loginid,
+					cdata, ccReg_IT_NSSETS_BY_CONTACT);
+			break;
+		case EPP_INFO_NSSETS_BY_NS:
+			cstat = epp_call_info(epp_ctx, service, loginid,
+					cdata, ccReg_IT_NSSETS_BY_NS);
+			break;
+		case EPP_INFO_GET_RESULTS:
+			cstat = epp_call_getInfoResults(epp_ctx, service,
+					loginid, cdata);
 			break;
 		default:
 			cstat = CORBA_INT_ERROR;

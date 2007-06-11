@@ -1,3 +1,22 @@
+version 1.4.0
+
+	* Configuration utilities (apr-config, apxs, pkg-config) are run
+	as part of configure rather than in makefile. Makefile gets real
+	parameters and not just paths of these utilities. I belive it's
+	more correct solution.
+
+	* Missing tests for header files as well as errors in 'with' parameters
+	in configure.ac were corrected.
+
+	* mod_eppd creates "dummy answer" if it cannot get response from
+	some reason from CORBA server. Dummy answer looks like normal error
+	response, but the svtrid is faked. If the error occures during
+	the first greeting, the mod_eppd closes the connection without
+	responding with error message, which is the same behaviour as before.
+
+	* Again changes in XML schemas, see schemas' changelog for more
+	information. Schemas versions were bumped up.
+
 version 1.3.1
 
 	* New 'tempcontact' element in domain, new technical check interface

@@ -623,26 +623,22 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service,
 	}
 
 	/* catch corba failures */
-	if (cstat != CORBA_OK) {
-		switch (cstat) {
-			case CORBA_ERROR:
-				epplog(epp_ctx, EPP_ERROR, "Corba call failed "
-					"- terminating session");
-				break;
-			case CORBA_REMOTE_ERROR:
-				epplog(epp_ctx, EPP_ERROR, "Unqualified answer "
-					"from server - terminating session");
-				break;
-			case CORBA_INT_ERROR:
-				epplog(epp_ctx, EPP_FATAL,
-					"Malloc in corba wrapper failed");
-				break;
-			default:
-				epplog(epp_ctx, EPP_ERROR,
-					"Unknown return code from corba module");
-				break;
-		}
+	if (cstat == CORBA_INT_ERROR) {
+		epplog(epp_ctx, EPP_FATAL, "Malloc in corba wrapper failed");
 		return 0;
+	}
+
+	switch (cstat) {
+		case CORBA_ERROR:
+			epplog(epp_ctx, EPP_ERROR, "Corba call failed");
+			break;
+		case CORBA_REMOTE_ERROR:
+			epplog(epp_ctx, EPP_ERROR, "Unqualified answer "
+				"from CORBA server!");
+			break;
+		case CORBA_OK:
+		default:
+			break;
 	}
 
 	return 1;
@@ -727,6 +723,216 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 	return 1;
 }
 
+static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
+		service_EPP *EPPservice, eppd_server_conf *sc)
+{
+	unsigned int	 loginid;/* session id assigned by fred_rif */
+	epp_lang	 lang;   /* session's language */
+	apr_pool_t	*rpool;  /* conntection memory pool */
+	parser_status	 pstat;  /* parser's return code */
+	apr_status_t	 status; /* used to store rc of apr functions */
+	epp_command_data *cdata; /* command data structure */
+	unsigned int	 bytes;  /* length of request */
+	char	*request;        /* raw request read from socket */
+	char	*response;       /* generated XML answer to client */
+	int	 retval;         /* return code of read_request */
+#ifdef EPP_PERF
+	/*
+	 * array of timestamps for perf measurement:
+	 *     time[0] - before parsing
+	 *     time[1] - after parsing and before corba call
+	 *     time[2] - after corba call and before response generation
+	 *     time[3] - after response generation
+	 */
+	apr_time_t	times[4];
+#endif
+
+	/* initialize variables used inside the loop */
+	loginid = 0;    /* this means that client is not logged in */
+	lang = LANG_EN;	/* default language is english */
+
+	/*
+	 * The loop in which are processed requests until client logs out or
+	 * error appears.
+	 */
+	while (1) {
+#ifdef EPP_PERF
+		bzero(times, 4 * sizeof(times[0]));
+#endif
+		/* allocate new pool for request */
+		apr_pool_create(&rpool, ((conn_rec *) epp_ctx->conn)->pool);
+		apr_pool_tag(rpool, "EPP_request");
+		epp_ctx->pool = rpool;
+		/* possible previous content is gone with request pool */
+		cdata = NULL;
+
+		/* read request */
+		retval = epp_read_request(epp_ctx, &request, &bytes);
+		if (retval == 1)
+			/*
+			 * epp_read_request red EOF, this results in OK status
+			 * being returned from connection handler, since it's
+			 * not counted as an error, if client ends connection
+			 * without proper logout.
+			 */
+			break;
+		else if (retval == 2)
+			return HTTP_INTERNAL_SERVER_ERROR;
+#ifdef EPP_PERF
+		times[0] = apr_time_now(); /* before parsing */
+#endif
+		/*
+		 * Deliver request to XML parser, the task of parser is
+		 * to fill cdata structure with data.
+		 */
+		pstat = epp_parse_command(epp_ctx, (loginid != 0), sc->schema,
+				request, bytes, &cdata);
+#ifdef EPP_PERF
+		times[1] = apr_time_now(); /* after parsing */
+#endif
+		/*
+		 * Register cleanup for cdata structure. The most of the
+		 * items in this structure are allocated from pool, but
+		 * parsed document tree and xpath context must be
+		 * explicitly released.
+		 */
+		apr_pool_cleanup_register(rpool, (void *) cdata,
+				epp_cleanup_request, apr_pool_cleanup_null);
+
+		/* test if the failure is serious enough to close connection */
+		if (pstat > PARSER_HELLO) {
+			switch (pstat) {
+				case PARSER_NOT_XML:
+					epplog(epp_ctx, EPP_WARNING,
+						"Request is not XML");
+					return HTTP_BAD_REQUEST;
+				case PARSER_NOT_COMMAND:
+					epplog(epp_ctx, EPP_WARNING,
+						"Request is neither a command "
+						"nor hello");
+					return HTTP_BAD_REQUEST;
+				case PARSER_ESCHEMA:
+					epplog(epp_ctx, EPP_WARNING,
+						"Schema's parser error - check "
+						"correctness of schema");
+					return HTTP_INTERNAL_SERVER_ERROR;
+				case PARSER_EINTERNAL:
+					epplog(epp_ctx, EPP_FATAL,
+						"Internal parser error occured "
+						"when processing request");
+					return HTTP_INTERNAL_SERVER_ERROR;
+				default:
+					epplog(epp_ctx, EPP_FATAL,
+						"Unknown error occured "
+						"during parsing stage");
+					return HTTP_BAD_REQUEST;
+			}
+		}
+
+		/* hello and other frames are processed in different way */
+		if (pstat == PARSER_HELLO) {
+			int	 rc;      /* corba ret code */
+			char	*version; /* version of fred_rifd */
+			char	*curdate; /* cur. date returned from fred_rifd */
+			gen_status gstat; /* generator's return code */
+
+			/* get info from CR needed for <greeting> frame */
+			rc = epp_call_hello(epp_ctx, EPPservice, &version,
+					&curdate);
+			if (rc != CORBA_OK) {
+				epplog(epp_ctx, EPP_ERROR, "Could not get "
+						"greeting data from fred_rifd");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+#ifdef EPP_PERF
+			times[2] = apr_time_now();
+#endif
+			/*
+			 * generate greeting (server name is concatenation of
+			 * string from apache conf file and string retrieved
+			 * from corba server through version() function)
+			 */
+			gstat = epp_gen_greeting(epp_ctx->pool,
+					apr_pstrcat(rpool, sc->servername, " (",
+						version, ")", NULL),
+					curdate, &response);
+			if (gstat != GEN_OK) {
+				epplog(epp_ctx, EPP_FATAL, "Error when "
+						"creating epp greeting");
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+		}
+		/* it is a command */
+		else {
+			/* log request which doesn't validate */
+			if (pstat == PARSER_NOT_VALID) {
+				epplog(epp_ctx, EPP_WARNING,
+						"Request doest not validate");
+			}
+			/* call function from corba backend */
+			if (!call_corba(epp_ctx, EPPservice, cdata, pstat,
+						&loginid, &lang))
+				return HTTP_INTERNAL_SERVER_ERROR;
+#ifdef EPP_PERF
+			times[2] = apr_time_now();
+#endif
+			/* generate response */
+			if (!gen_response(epp_ctx, EPPservice, cdata,
+						sc->valid_resp, sc->schema,
+						lang, &response))
+				return HTTP_INTERNAL_SERVER_ERROR;
+		}
+#ifdef EPP_PERF
+		times[3] = apr_time_now();
+#endif
+		/* send response back to client */
+		apr_brigade_puts(bb, NULL, NULL, response);
+		epplog(epp_ctx, EPP_DEBUG, "Response content: %s", response);
+#ifdef EPP_PERF
+		/*
+		 * record perf data
+		 * Apache 2.0 has problem with processing %llu formating,
+		 * therefore we overtype the results to a more common numeric
+		 * values.
+		 */
+		epplog(epp_ctx, EPP_DEBUG, "Perf data: p(%u), c(%u), "
+				"g(%u), s(%u)",
+				(unsigned) (times[1] - times[0]),/* parser */
+				(unsigned) (times[2] - times[1]),/* CORBA */
+				(unsigned) (times[3] - times[2]),/* generator */
+				(unsigned) (apr_time_now() - times[3]));/*send*/
+#endif
+		status = ap_fflush(((conn_rec *) epp_ctx->conn)->output_filters,
+			       bb);
+		if (status != APR_SUCCESS) {
+			epplog(epp_ctx, EPP_FATAL,
+					"Error when sending response to client");
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+
+		/* check if successful logout appeared */
+		if (pstat == PARSER_CMD_LOGOUT && loginid == 0)
+			break;
+
+		/* prepare bucket brigade for reuse in next request */
+		status = apr_brigade_cleanup(bb);
+		if (status != APR_SUCCESS) {
+			epplog(epp_ctx, EPP_FATAL, "Could not cleanup bucket "
+					"brigade used for response");
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+
+		/*XXX
+		 * if server is going down non-gracefully we will try to say
+		 * good-bye before we will be killed.
+		if (ap_graceful_stop_signalled()
+		 */
+
+		apr_pool_destroy(rpool);
+	}
+	return HTTP_OK;
+}
+
 /**
  * EPP Connection handler.
  *
@@ -742,12 +948,15 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
  */
 static int epp_process_connection(conn_rec *c)
 {
-	int	firsttime; /* if true, generate greeting in request loop */
-	int	i;
-	unsigned int	 loginid;    /* session id assigned by fred_rif */
-	epp_lang	 lang;       /* session's language */
+	int	 i;
+	int	 rc;      /* corba ret code */
+	int	 ret;     /* command loop return code */
+	char	*version; /* version of fred_rifd */
+	char	*curdate; /* cur. date returned from fred_rifd */
+	char	*response;/* greeting response */
+	apr_status_t	 status;/* used to store rc of apr functions */
+	gen_status	 gstat; /* generator's return code */
 	epp_context	 epp_ctx;    /* context (session , connection, pool) */
-	apr_status_t	 status;     /* used to store rc from apr functions */
 	service_EPP	 EPPservice; /* CORBA object reference */
 	apr_hash_t	*references; /* directory of CORBA object references */
 	module	*corba_module;
@@ -812,225 +1021,54 @@ static int epp_process_connection(conn_rec *c)
 	/* create bucket brigade for transmition of responses */
 	bb = apr_brigade_create(c->pool, c->bucket_alloc);
 
-	/* initialize variables used inside the loop */
-	loginid = 0;    /* this means that client is not logged in */
-	lang = LANG_EN;	/* default language is english */
-	firsttime = 1;	/* this will cause automatic generation of greeting */
+	epplog(&epp_ctx, EPP_DEBUG, "Client connected");
 
-	/*
-	 * The loop in which are processed requests until client logs out or
-	 * error appears.
-	 */
-	while (1) {
-		/* memory pool used for duration of one request */
-		apr_pool_t	*rpool;
-		parser_status	 pstat;  /* parser's return code */
-		epp_command_data *cdata; /* self-descriptive data structure */
-		char	*response;       /* generated XML answer to client */
-#ifdef EPP_PERF
-		/*
-		 * array of timestamps for perf measurement:
-		 *     time[0] - before parsing
-		 *     time[1] - after parsing and before corba call
-		 *     time[2] - after corba call and before response generation
-		 *     time[3] - after response generation
-		 */
-		apr_time_t	times[4];
-		bzero(times, 4 * sizeof(times[0]));
-#endif
-		/* allocate new pool for request */
-		apr_pool_create(&rpool, c->pool);
-		apr_pool_tag(rpool, "EPP_request");
-		epp_ctx.pool = rpool;
-		/* possible previous content is gone with request pool */
-		cdata = NULL;
+	/* Send greeting - this is the first message of session automatically
+	 * sent by server. */
 
-		if (firsttime) {
-			firsttime = 0;
-			/*
-			 * bogus branch in order to generate greeting when
-			 * firsttime in request loop. We don't have much to do,
-			 * we will just simulate <hello> frame arrival by
-			 * setting pstat.
-			 */
-			pstat = PARSER_HELLO;
-			epplog(&epp_ctx, EPP_DEBUG, "Client connected");
-		}
-		else {
-			int	retval;     /* return code of read_request */
-			char	*request;   /* raw request read from socket */
-			unsigned int bytes; /* length of request */
-
-			/* read request */
-			retval = epp_read_request(&epp_ctx, &request, &bytes);
-			if (retval == 1) {
-				/*
-				 * epp_read_request red EOF, this results in
-				 * OK status being returned from connection
-				 * handler, since it's not counted as an error.
-				 */
-				break;
-			}
-			else if (retval == 2) {
-				return HTTP_INTERNAL_SERVER_ERROR;
-			}
-#ifdef EPP_PERF
-			times[0] = apr_time_now(); /* before parsing */
-#endif
-			/*
-			 * Deliver request to XML parser, the task of parser is
-			 * to fill cdata structure with data.
-			 */
-			pstat = epp_parse_command(&epp_ctx, (loginid != 0),
-					sc->schema, request, bytes, &cdata);
-#ifdef EPP_PERF
-			times[1] = apr_time_now(); /* after parsing */
-#endif
-			/*
-			 * Register cleanup for cdata structure. The most of the
-			 * items in this structure are allocated from pool, but
-			 * parsed document tree and xpath context must be
-			 * explicitly released.
-			 */
-			apr_pool_cleanup_register(rpool, (void *) cdata,
-					epp_cleanup_request,
-					apr_pool_cleanup_null);
-		}
-
-		/* test if the failure is serious enough to close connection */
-		if (pstat > PARSER_HELLO) {
-			switch (pstat) {
-				case PARSER_NOT_XML:
-					epplog(&epp_ctx, EPP_WARNING,
-						"Request is not XML");
-					return HTTP_BAD_REQUEST;
-				case PARSER_NOT_COMMAND:
-					epplog(&epp_ctx, EPP_WARNING,"Request is"
-						" neither a command nor hello");
-					return HTTP_BAD_REQUEST;
-				case PARSER_ESCHEMA:
-					epplog(&epp_ctx, EPP_WARNING,
-						"Schema's parser error - check "
-						"correctness of schema");
-					return HTTP_INTERNAL_SERVER_ERROR;
-				case PARSER_EINTERNAL:
-					epplog(&epp_ctx, EPP_FATAL,
-						"Internal parser error occured "
-						"when processing request");
-					return HTTP_INTERNAL_SERVER_ERROR;
-				default:
-					epplog(&epp_ctx, EPP_FATAL,
-						"Unknown error occured "
-						"during parsing stage");
-					return HTTP_BAD_REQUEST;
-			}
-		}
-
-		/* hello and other frames are processed in different way */
-		if (pstat == PARSER_HELLO) {
-			int	 rc;      /* corba ret code */
-			char	*version; /* version of fred_rifd */
-			char	*curdate; /* cur. date returned from fred_rifd */
-			gen_status gstat; /* generator's return code */
-
-			/* get info from CR needed for <greeting> frame */
-			rc = epp_call_hello(&epp_ctx, EPPservice, &version,
-					&curdate);
-			if (rc != CORBA_OK) {
-				epplog(&epp_ctx, EPP_ERROR, "Could not get "
-						"greeting data from fred_rifd");
-				return HTTP_INTERNAL_SERVER_ERROR;
-			}
-#ifdef EPP_PERF
-			times[2] = apr_time_now();
-#endif
-			/*
-			 * generate greeting (server name is concatenation of
-			 * string from apache conf file and string retrieved
-			 * from corba server through version() function)
-			 */
-			gstat = epp_gen_greeting(epp_ctx.pool,
-					apr_pstrcat(rpool, sc->servername, " (",
-						version, ")", NULL),
-					curdate, &response);
-			if (gstat != GEN_OK) {
-				epplog(&epp_ctx, EPP_FATAL, "Error when creating"
-						" epp greeting");
-				return HTTP_INTERNAL_SERVER_ERROR;
-			}
-		}
-		/* it is a command */
-		else {
-			/* log request which doesn't validate */
-			if (pstat == PARSER_NOT_VALID) {
-				epplog(&epp_ctx, EPP_WARNING,
-						"Request doest not validate");
-			}
-			/* call function from corba backend */
-			if (!call_corba(&epp_ctx, EPPservice, cdata, pstat,
-						&loginid, &lang))
-				return HTTP_INTERNAL_SERVER_ERROR;
-#ifdef EPP_PERF
-			times[2] = apr_time_now();
-#endif
-			/* generate response */
-			if (!gen_response(&epp_ctx, EPPservice, cdata,
-						sc->valid_resp, sc->schema,
-						lang, &response))
-				return HTTP_INTERNAL_SERVER_ERROR;
-		}
-#ifdef EPP_PERF
-		times[3] = apr_time_now();
-#endif
-		/* send response back to client */
-		apr_brigade_puts(bb, NULL, NULL, response);
-		epplog(&epp_ctx, EPP_DEBUG, "Response content: %s", response);
-#ifdef EPP_PERF
-		/*
-		 * record perf data
-		 * Apache 2.0 has problem with processing %llu formating,
-		 * therefore we overtype the results to a more common numeric
-		 * values.
-		 */
-		epplog(&epp_ctx, EPP_DEBUG, "Perf data: p(%u), c(%u), "
-				"g(%u), s(%u)",
-				(unsigned) (times[1] - times[0]), /* parser */
-				(unsigned) (times[2] - times[1]), /* CORBA */
-				(unsigned) (times[3] - times[2]), /* generator */
-				(unsigned) (apr_time_now() - times[3]));/*send*/
-#endif
-		status = ap_fflush(c->output_filters, bb);
-		if (status != APR_SUCCESS) {
-			epplog(&epp_ctx, EPP_FATAL,
-					"Error when sending response to client");
-			return HTTP_INTERNAL_SERVER_ERROR;
-		}
-
-		/* check if successful logout appeared */
-		if (pstat == PARSER_CMD_LOGOUT && loginid == 0)
-			break;
-
-		/* prepare bucket brigade for reuse in next request */
-		status = apr_brigade_cleanup(bb);
-		if (status != APR_SUCCESS) {
-			epplog(&epp_ctx, EPP_FATAL, "Could not cleanup bucket "
-					"brigade used for response");
-			return HTTP_INTERNAL_SERVER_ERROR;
-		}
-
-		/*XXX
-		 * if server is going down non-gracefully we will try to say
-		 * good-bye before we will be killed.
-		if (ap_graceful_stop_signalled()
-		 */
-
-		apr_pool_destroy(rpool);
+	/* get info from CR needed for <greeting> frame */
+	rc = epp_call_hello(&epp_ctx, EPPservice, &version, &curdate);
+	if (rc != CORBA_OK) {
+		epplog(&epp_ctx, EPP_ERROR, "Could not get greeting data "
+				"from fred_rifd");
+		return HTTP_INTERNAL_SERVER_ERROR;
 	}
+	/*
+	 * generate greeting (server name is concatenation of string from
+	 * apache conf file and string retrieved from corba server through
+	 * version() function)
+	 */
+	gstat = epp_gen_greeting(epp_ctx.pool,
+			apr_pstrcat(epp_ctx.pool, sc->servername,
+				" (", version, ")", NULL),
+			curdate, &response);
+	if (gstat != GEN_OK) {
+		epplog(&epp_ctx, EPP_FATAL, "Error when creating epp greeting");
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	apr_brigade_puts(bb, NULL, NULL, response);
+	status = ap_fflush(c->output_filters, bb);
+	if (status != APR_SUCCESS) {
+		epplog(&epp_ctx, EPP_FATAL,
+				"Error when sending response to client");
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	/* prepare bucket brigade for reuse in next request */
+	status = apr_brigade_cleanup(bb);
+	if (status != APR_SUCCESS) {
+		epplog(&epp_ctx, EPP_FATAL, "Could not cleanup bucket "
+				"brigade used for response");
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	ret = epp_request_loop(&epp_ctx, bb, EPPservice, sc);
 	epp_ctx.pool = c->pool;
 
 	/* client logged out or disconnected from server */
 	epplog(&epp_ctx, EPP_INFO, "Session ended");
-	return HTTP_OK;
+	return ret;
 }
 
 /**

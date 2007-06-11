@@ -957,9 +957,10 @@ string2identtype(const char *str)
 {
 	if (strcmp("op", str) == 0) return ident_OP;
 	else if (strcmp("rc", str) == 0) return ident_RC;
-	else if (strcmp("ico", str) == 0) return ident_ICO;
-	else if (strcmp("mpsv", str) == 0) return ident_MPSV;
 	else if (strcmp("passport", str) == 0) return ident_PASSPORT;
+	else if (strcmp("mpsv", str) == 0) return ident_MPSV;
+	else if (strcmp("ico", str) == 0) return ident_ICO;
+	else if (strcmp("birthday", str) == 0) return ident_BIRTHDAY;
 
 	return ident_UNKNOWN;
 }
@@ -1021,26 +1022,6 @@ parse_create_contact(void *pool,
 		 */
 		assert(create_contact->identtype != ident_UNKNOWN);
 	}
-	/* XXX Hack for obsolete "ssn" tag - to be removed in future */
-	if (create_contact->ident == NULL) {
-		create_contact->ident = xpath_get1(pool, xpathCtx,
-				"contact:ssn", 0, &xerr);
-		CHK_XERR(xerr, error);
-		create_contact->identtype = ident_UNKNOWN;
-		if (create_contact->ident != NULL) {
-			char	*str;
-
-			str = xpath_get_attr(pool, xpathCtx,
-					"contact:ssn", "type", 1, &xerr);
-			CHK_XERR(xerr, error);
-			create_contact->identtype = string2identtype(str);
-			/*
-			 * schema and source code is out of sync if following
-			 * assert does not hold
-			 */
-			assert(create_contact->identtype != ident_UNKNOWN);
-		}
-	}
 	/*
 	 * disclose flags - we don't interpret anyhow disclose flags, we just
 	 * send the values to CR and CR decides in conjuction with default
@@ -1078,6 +1059,15 @@ parse_create_contact(void *pool,
 		CHK_XERR(xerr, error);
 		create_contact->discl.email = xpath_count(xpathCtx,
 				"contact:email", &xerr);
+		CHK_XERR(xerr, error);
+		create_contact->discl.vat = xpath_count(xpathCtx,
+				"contact:vat", &xerr);
+		CHK_XERR(xerr, error);
+		create_contact->discl.ident = xpath_count(xpathCtx,
+				"contact:ident", &xerr);
+		CHK_XERR(xerr, error);
+		create_contact->discl.notifyEmail = xpath_count(xpathCtx,
+				"contact:notifyEmail", &xerr);
 		CHK_XERR(xerr, error);
 		xpathCtx->node = xpathCtx->node->parent;
 	}
@@ -1519,40 +1509,6 @@ parse_update_contact(void *pool,
 		 */
 		assert(update_contact->identtype != ident_UNKNOWN);
 	}
-	/* XXX Hack for obsolete "ssn" tag - to be removed in future */
-	if (update_contact->ident == NULL) {
-		update_contact->ident = xpath_get1(pool, xpathCtx,
-				"contact:ssn", 0, &xerr);
-		CHK_XERR(xerr, error);
-		update_contact->identtype = ident_UNKNOWN;
-		if (update_contact->ident != NULL) {
-			char	*str;
-
-			str = xpath_get_attr(pool, xpathCtx,
-					"contact:ssn", "type", 1, &xerr);
-			CHK_XERR(xerr, error);
-			/*
-			 * attribute type might not be present, we have to explicitly
-			 * check it
-			 */
-			if (str == NULL) {
-				if (new_error_item(pool, &cdata->errors,
-						errspec_contact_identtype_missing))
-					goto error;
-
-				cdata->rc = 2003;
-				cdata->type = EPP_DUMMY;
-				return;
-			}
-
-			update_contact->identtype = string2identtype(str);
-			/*
-			 * schema and source code is out of sync if following
-			 * assert does not hold
-			 */
-			assert(update_contact->identtype != ident_UNKNOWN);
-		}
-	}
 	update_contact->authInfo = xpath_get1(pool, xpathCtx,
 			"contact:authInfo", 0, &xerr);
 	CHK_XERR(xerr, error);
@@ -1605,6 +1561,15 @@ parse_update_contact(void *pool,
 		CHK_XERR(xerr, error);
 		update_contact->discl.email = xpath_count(xpathCtx,
 				"contact:email", &xerr);
+		CHK_XERR(xerr, error);
+		update_contact->discl.vat = xpath_count(xpathCtx,
+				"contact:vat", &xerr);
+		CHK_XERR(xerr, error);
+		update_contact->discl.ident = xpath_count(xpathCtx,
+				"contact:ident", &xerr);
+		CHK_XERR(xerr, error);
+		update_contact->discl.notifyEmail = xpath_count(xpathCtx,
+				"contact:notifyEmail", &xerr);
 		CHK_XERR(xerr, error);
 		xpathCtx->node = xpathCtx->node->parent;
 	}
@@ -1997,6 +1962,43 @@ error:
 }
 
 /**
+ * Parametrized parser of commands domainsByNsset, domainsByContact,
+ * nssetsByContact and nssetsByNs.
+ *
+ * @param pool     Pool to allocate memory from.
+ * @param xpathCtx Xpath context.
+ * @param cdata    Parsed data.
+ * @param key      Key used for search (for domain and ns it is name, otherwise
+ *                 it is id).
+ */
+static void
+parse_infoKey(void *pool,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata,
+		const char *key)
+{
+	epps_info	*info;
+	int	xerr;
+
+	cdata->data = epp_calloc(pool, sizeof (epps_info));
+	if (cdata->data == NULL) {
+		cdata->rc = 2400;
+		cdata->type = EPP_DUMMY;
+		return;
+	}
+	info = cdata->data;
+
+	RESET_XERR(xerr); /* clear value of errno */
+	info->handle = xpath_get1(pool, xpathCtx, key, 1, &xerr);
+	CHK_XERR(xerr, error);
+	return;
+
+error:
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
+/**
  * Parser of command test.
  *
  * @param pool Pool to allocate memory from.
@@ -2366,7 +2368,7 @@ parse_extension(void *pool,
 		xmlXPathContextPtr xpathCtx)
 {
 	xmlNodePtr	 node;
-	int	 xerr;
+	int	 xerr, matched;
 	const char	*elemname;
 
 	RESET_XERR(xerr); /* clear value of errno */
@@ -2394,25 +2396,27 @@ parse_extension(void *pool,
 	assert(xerr == XERR_OK);
 
 	elemname = (char *) xpathCtx->node->name;
+	matched = 0;
 
 	switch (elemname[0]) {
 		case 's':
 			/* It is sendAuthInfo */
 			if (!strcmp(elemname, "sendAuthInfo")) {
+				matched = 1;
 				parse_sendAuthInfo(pool, xpathCtx, cdata);
-				break;
 			}
-			/* fall-through if not matched */
+			break;
 		case 't':
 			/* It is test */
 			if (!strcmp(elemname, "test")) {
+				matched = 1;
 				parse_test(pool, xpathCtx, cdata);
-				break;
 			}
-			/* fall-through if not matched */
+			break;
 		case 'c':
 			/* It is cashInfo */
 			if (!strcmp(elemname, "creditInfo")) {
+				matched = 1;
 				cdata->data = epp_calloc(pool,
 						sizeof (epps_creditInfo));
 				if (cdata->data == NULL) {
@@ -2421,13 +2425,83 @@ parse_extension(void *pool,
 					return PARSER_CMD_OTHER;
 				}
 				cdata->type = EPP_CREDITINFO;
-				break;
 			}
-			/* fall-through if not matched */
-		default:
-			cdata->rc = 2000; /* "Unknown command" */
-			cdata->type = EPP_DUMMY;
 			break;
+		case 'l':
+		{
+
+			/* It is listDomains,listContacts,listNssets */
+			if (!strcmp(elemname, "listDomains")) {
+				cdata->type = EPP_INFO_LIST_DOMAINS;
+				matched = 1;
+			}
+			else if (!strcmp(elemname, "listContacts")) {
+				cdata->type = EPP_INFO_LIST_CONTACTS;
+				matched = 1;
+			}
+			else if (!strcmp(elemname, "listNssets")) {
+				cdata->type = EPP_INFO_LIST_NSSETS;
+				matched = 1;
+			}
+			/* allocate I/O structure if matched */
+			if (matched) {
+				cdata->data = epp_calloc(pool,sizeof(epps_info));
+				if (cdata->data == NULL) {
+					cdata->rc = 2400;
+					cdata->type = EPP_DUMMY;
+					return PARSER_CMD_OTHER;
+				}
+			}
+			break;
+		}
+		case 'd':
+		{
+			if (!strcmp(elemname, "domainsByNsset")) {
+				matched = 1;
+				cdata->type = EPP_INFO_DOMAINS_BY_NSSET;
+				parse_infoKey(pool, xpathCtx, cdata, "fred:id");
+			}
+			if (!strcmp(elemname, "domainsByContact")) {
+				matched = 1;
+				cdata->type = EPP_INFO_DOMAINS_BY_CONTACT;
+				parse_infoKey(pool, xpathCtx, cdata, "fred:id");
+			}
+			break;
+		}
+		case 'n':
+		{
+			if (!strcmp(elemname, "nssetsByContact")) {
+				matched = 1;
+				cdata->type = EPP_INFO_NSSETS_BY_CONTACT;
+				parse_infoKey(pool, xpathCtx, cdata, "fred:id");
+			}
+			if (!strcmp(elemname, "nssetsByNs")) {
+				matched = 1;
+				cdata->type = EPP_INFO_NSSETS_BY_NS;
+				parse_infoKey(pool, xpathCtx, cdata,"fred:name");
+			}
+			break;
+		}
+		case 'g':
+		{
+			if (!strcmp(elemname, "getResults")) {
+				matched = 1;
+				cdata->type = EPP_INFO_GET_RESULTS;
+				cdata->data = epp_calloc(pool,sizeof(epps_list));
+				if (cdata->data == NULL) {
+					cdata->rc = 2400;
+					cdata->type = EPP_DUMMY;
+					return PARSER_CMD_OTHER;
+				}
+			}
+			break;
+		}
+		default:
+			break;
+	}
+	if (!matched) {
+		cdata->rc = 2000; /* "Unknown command" */
+		cdata->type = EPP_DUMMY;
 	}
 
 	/* restore relative root */

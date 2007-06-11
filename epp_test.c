@@ -431,7 +431,7 @@ int main(int argc, char *argv[])
 	if (host == NULL)
 		host = "localhost";
 	if (schemafile == NULL)
-		schemafile = "schemas/all-1.1.xsd";
+		schemafile = "schemas/all-1.3.xsd";
 
 	if (!test)
 		/* API: init parser */
@@ -573,7 +573,7 @@ int main(int argc, char *argv[])
 			goto epilog;
 		}
 
-		if (cstat == CORBA_OK) {
+		if (cstat != CORBA_INT_ERROR) {
 			char	*response;
 			qhead	valerr;
 
@@ -625,7 +625,7 @@ int main(int argc, char *argv[])
 					break;
 			}
 		}
-		else fputs("Corba call failed\n", stderr);
+		else fputs("Internal error in Corba part\n", stderr);
 
 epilog:
 		CORBA_Object_release(service, ev);

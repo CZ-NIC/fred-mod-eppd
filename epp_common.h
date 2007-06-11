@@ -12,11 +12,11 @@
 
 /** Log levels used for logging to eppd log file. */
 typedef enum {
-	EPP_FATAL = 1, /**< Error, the module is not in operational state. */
-	EPP_ERROR,     /**< Error caused usually by client, module is operational. */
-	EPP_WARNING,   /**< Errors which are not serious but should be logged. */
-	EPP_INFO,      /**< This is the default log level. */
-	EPP_DEBUG      /**< Contents of requests and responses are logged. */
+	EPP_FATAL = 1,/**< Error, the module is not in operational state. */
+	EPP_ERROR,    /**< Error caused usually by client, module is operational. */
+	EPP_WARNING,  /**< Errors which are not serious but should be logged. */
+	EPP_INFO,     /**< This is the default log level. */
+	EPP_DEBUG     /**< Contents of requests and responses are logged. */
 }epp_loglevel;
 
 /** EPP context is a group of variables used often together.
@@ -75,7 +75,16 @@ typedef enum {
 	EPP_SENDAUTHINFO_DOMAIN,
 	EPP_SENDAUTHINFO_NSSET,
 	EPP_TEST_NSSET,
-	EPP_CREDITINFO
+	EPP_CREDITINFO,
+	/* info functions */
+	EPP_INFO_LIST_CONTACTS,
+	EPP_INFO_LIST_DOMAINS,
+	EPP_INFO_LIST_NSSETS,
+	EPP_INFO_DOMAINS_BY_NSSET,
+	EPP_INFO_DOMAINS_BY_CONTACT,
+	EPP_INFO_NSSETS_BY_CONTACT,
+	EPP_INFO_NSSETS_BY_NS,
+	EPP_INFO_GET_RESULTS
 }epp_command_type;
 
 /**
@@ -269,9 +278,13 @@ typedef struct {
 	unsigned char	name; /**< Contact's name is exceptional. */
 	unsigned char	org;  /**< Contact's organization is exceptional. */
 	unsigned char	addr; /**< Contact's address is exceptional. */
-	unsigned char	voice;/**< Contact's voice (tel. number) is exceptional. */
+	unsigned char	voice;/**< Contact's voice (tel. num.) is exceptional. */
 	unsigned char	fax;  /**< Contact's fax number is exceptional. */
 	unsigned char	email;/**< Contact's email address is exceptional. */
+	unsigned char	vat;  /**< Contact's VAT is exceptional. */
+	unsigned char	ident;/**< Contact's ident is exceptional. */
+	/** Contact's notification emai is exceptional. */
+	unsigned char	notifyEmail;
 }epp_discl;
 
 /**
@@ -307,7 +320,8 @@ typedef enum {
 	ident_RC,      /**< Born number (rodne cislo). */
 	ident_PASSPORT,/**< Number of passport. */
 	ident_MPSV,    /**< Number assigned by "ministry of work and ...". */
-	ident_ICO      /**< ICO. */
+	ident_ICO,     /**< ICO. */
+	ident_BIRTHDAY /**< Date of birth. */
 }epp_identType;
 
 typedef enum {
@@ -540,11 +554,6 @@ typedef struct {
 	char	*authInfo;     /**< Authorization information. */
 }epps_transfer;
 
-/** Parameters of command list. */
-typedef struct {
-	qhead	 handles;     /**< List of handles. */
-}epps_list;
-
 /** SendAuthInfo parameters. */
 typedef struct {
 	char	*id;          /**< Handle of object. */
@@ -561,6 +570,21 @@ typedef struct {
 	qhead	 names; /**< Fqdns of domains to be tested with nsset. */
 	int	 level; /**< Level of tests (-1 if not overriden). */
 }epps_test;
+
+/** Parameters of obsolete command 'list' and getResults command. */
+typedef struct {
+	qhead	 handles;     /**< List of handles. */
+}epps_list;
+
+/**
+ * All Info functions, which accept single key on input and count on
+ * output (domainsByNsset, domainsByContact, nssetsByContact, nssetsByNs).
+ * This structure is used also by new list functions, handle is NULL for them.
+ */
+typedef struct {
+	char	*handle;      /**< Search key. */
+	unsigned int count;   /**< Count of results. */
+}epps_info;
 
 /**
  * This structure is central to the concept of the whole module. The

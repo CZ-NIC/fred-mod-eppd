@@ -6,14 +6,9 @@
     <fred:extcommand xmlns:fred="http://www.nic.cz/xml/epp/fred-1.1"
 		  xsi:schemaLocation="http://www.nic.cz/xml/epp/fred-1.1
 		  fred-1.1.xsd">
-      <fred:test>
-        <nsset:test xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.2"
-		    xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.2
-		    nsset-1.2.xsd">
-	  <nsset:id>NSSID:example</nsset:id>
-	  <nsset:name>domain.cz</nsset:name>
-	</nsset:test>
-      </fred:test>
+      <fred:domainsByContact>
+        <fred:id>CID:TECH</fred:id>
+      </fred:domainsByContact>
       <fred:clTRID>ABC-12346</fred:clTRID>
     </fred:extcommand>
   </extension>

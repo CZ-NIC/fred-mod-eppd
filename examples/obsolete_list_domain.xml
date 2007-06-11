@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0
-     epp-1.0.xsd">
+     xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
   <command>
     <info>
-      <contact:list xmlns:contact="http://www.nic.cz/xml/epp/contact-1.2"
-	    xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.2
-	    contact-1.2.xsd"/>
+      <domain:list xmlns:domain="http://www.nic.cz/xml/epp/domain-1.3"
+	    xsi:schemaLocation="http://www.nic.cz/xml/epp/domain-1.3
+	    domain-1.3.xsd"/>
     </info>
     <clTRID>ABC-12346</clTRID>
   </command>
 </epp>
+
+
 

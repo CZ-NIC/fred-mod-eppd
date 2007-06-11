@@ -8,13 +8,13 @@
     <annotation>
       <documentation>
         Extension to Extensible Provisioning Protocol v1.0
-        shared structures schema.
+        shared types schema.
       </documentation>
     </annotation>
 
-  <!--
-  Abstract object identifier type.
-  -->
+    <!--
+    Object identifier type.
+    -->
     <simpleType name="objIDType">
       <restriction base="token">
         <minLength value="3"/>
@@ -29,9 +29,9 @@
       </restriction>
     </simpleType>
 
-  <!--
-  Generic msg type of unbounded length (now used only in check-reason)
-  -->
+    <!--
+    Message of unbounded length (now used only in check-reason)
+    -->
     <complexType name="msgType">
       <simpleContent>
         <extension base="normalizedString">
@@ -41,9 +41,9 @@
       </simpleContent>
     </complexType>
 
-  <!--
-  Object authorization information type.
-  -->
+    <!--
+    Authorization information of object.
+    -->
     <simpleType name="authInfoType">
       <restriction base="normalizedString">
         <minLength value="0"/>
@@ -51,8 +51,4 @@
       </restriction>
     </simpleType>
 
-  <!--
-  End of schema.
-  -->
   </schema>
-
