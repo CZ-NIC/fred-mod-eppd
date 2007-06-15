@@ -427,7 +427,7 @@ int main(int argc, char *argv[])
 	}
 	interactive = (ar >= argc);
 	if (fp == NULL)
-		fp = "AE:B3:5F:FA:38:80:DB:37:53:6A:3E:D4:55:E2:91:97";
+		fp = "60:7E:DF:39:62:C3:9D:3C:EB:5A:87:80:C1:73:4F:99";
 	if (host == NULL)
 		host = "localhost";
 	if (schemafile == NULL)
