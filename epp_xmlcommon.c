@@ -150,6 +150,8 @@ epp_getSubtree(void *pool,
 	char	*subtree;
 	xmlBufferPtr	 buf;
 	xmlDocPtr	 doc;
+	xmlNsPtr	 namespaces;
+	xmlNodePtr	 node;
 	xmlXPathObjectPtr	 xpath_obj;
 	xmlXPathContextPtr	 xpath_ctx;
 
@@ -167,13 +169,18 @@ epp_getSubtree(void *pool,
 		return epp_strdup(pool, "");
 	}
 
-	/* get content of problematic tag */
+	/*
+	 * Get content of problematic tag. It's not so easy task. We have
+	 * to declare namespaces defined higher in the tree which are relevant
+	 * to the part of document being dumped. Fortunatelly there is a
+	 * function from libxml library doing exactly that (xmlreconsiliatens).
+	 */
 	buf = xmlBufferCreate();
 	if (buf == NULL)
 		return NULL;
-	if (xmlNodeDump(buf, doc, xmlXPathNodeSetItem(xpath_obj->nodesetval,
-					position - 1),
-				0, 0) < 0)
+	node = xmlXPathNodeSetItem(xpath_obj->nodesetval, position - 1);
+	if (xmlReconciliateNs(doc, node) < 0 ||
+			xmlNodeDump(buf, doc, node, 0, 0) < 0)
 	{
 		xmlXPathFreeObject(xpath_obj);
 		xmlBufferFree(buf);
