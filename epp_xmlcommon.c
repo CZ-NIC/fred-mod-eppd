@@ -150,7 +150,6 @@ epp_getSubtree(void *pool,
 	char	*subtree;
 	xmlBufferPtr	 buf;
 	xmlDocPtr	 doc;
-	xmlNsPtr	 namespaces;
 	xmlNodePtr	 node;
 	xmlXPathObjectPtr	 xpath_obj;
 	xmlXPathContextPtr	 xpath_ctx;
@@ -179,8 +178,14 @@ epp_getSubtree(void *pool,
 	if (buf == NULL)
 		return NULL;
 	node = xmlXPathNodeSetItem(xpath_obj->nodesetval, position - 1);
-	if (xmlReconciliateNs(doc, node) < 0 ||
-			xmlNodeDump(buf, doc, node, 0, 0) < 0)
+	if (node->ns != NULL) {
+		xmlNsPtr	 nsdef;
+
+		nsdef = xmlSearchNs(doc, node, node->ns->prefix);
+		if (nsdef != NULL)
+			xmlNewNs(node, nsdef->href, nsdef->prefix);
+	}
+	if (xmlNodeDump(buf, doc, node, 0, 0) < 0)
 	{
 		xmlXPathFreeObject(xpath_obj);
 		xmlBufferFree(buf);
