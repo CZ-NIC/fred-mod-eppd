@@ -10,6 +10,12 @@
 
 	* There are more usefull comments in schemas.
 
+	* New info functions (listDomains, listContacts, listNssets,
+	domainsByNsset, domainsByContact, nssetsByContact, nssetsByNs,
+	getResults) in schema fred-1.0 were implemented. Old list functions,
+	which were in object specific schemas, are deprecated and will be
+	removed soon.
+
 2006-05-16 Jan Kryl (version 1.3.1)
 
 	* New email pattern was defined. Now every email address has to

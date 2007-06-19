@@ -1,3 +1,9 @@
+version 1.4.1
+
+	* Viewport of client's document identifing an error was cut out
+	without proper modifications, which resulted in usage of namespaces
+	which were not defined. This is fixed now.
+
 version 1.4.0
 
 	* Configuration utilities (apr-config, apxs, pkg-config) are run
