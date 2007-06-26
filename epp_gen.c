@@ -252,6 +252,18 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 			START_ELEMENT(writer, simple_err, "contact:email");
 			END_ELEMENT(writer, simple_err);
 		}
+		if (info_contact->discl.vat) {
+			START_ELEMENT(writer, simple_err, "contact:vat");
+			END_ELEMENT(writer, simple_err);
+		}
+		if (info_contact->discl.ident) {
+			START_ELEMENT(writer, simple_err, "contact:ident");
+			END_ELEMENT(writer, simple_err);
+		}
+		if (info_contact->discl.notifyEmail) {
+			START_ELEMENT(writer,simple_err, "contact:notifyEmail");
+			END_ELEMENT(writer, simple_err);
+		}
 		END_ELEMENT(writer, simple_err); /* disclose */
 	}
 	WRITE_ELEMENT(writer, simple_err, "contact:vat", info_contact->vat);
@@ -273,6 +285,9 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 				break;
 			case ident_ICO:
 				snprintf(type, 15, "%s", "ico");
+				break;
+			case ident_BIRTHDAY:
+				snprintf(type, 15, "%s", "birthday");
 				break;
 			default:
 				/*
