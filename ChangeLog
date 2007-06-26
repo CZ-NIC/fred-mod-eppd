@@ -9,6 +9,10 @@
 	could result in db insert failure, if the input was encoded in other
 	than UTF-8 encoding.
 
+	* The policy when required parameter is not returned from central
+	register was changed. Mod_eppd generates invalid XML and logs the
+	error.
+
 	* Changes in XML schemas - see schemas' changelog for more detailed
 	information.
 

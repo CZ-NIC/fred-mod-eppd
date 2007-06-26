@@ -195,12 +195,11 @@ unwrap_str(void *pool, const char *str, int *cerrno)
 
 /**
  * Does the same thing as unwrap_str() but in addition input string is
- * required not to be empty.
+ * required not to be empty. If it is empty, an error message is logged.
  *
  * @param epp_ctx Epp context used for logging and memory allocation.
  * @param str	  Input string.
- * @param cerrno  Set to 2 if malloc failed and to 1 if requited string is
- *                missing.
+ * @param cerrno  Set to 1 if malloc failed.
  * @param id	  Identifier of string used in error message.
  * @return        Output string.
  */
@@ -212,15 +211,13 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
 
 	assert(str != NULL);
 
-	if (*str == '\0') {
-		epplog(epp_ctx, EPP_ERROR,
-				"Output parameter \"%s\" is empty", id);
-		*cerrno = 1;
-		return NULL;
-	}
+	if (*str == '\0')
+		epplog(epp_ctx, EPP_ERROR, "Output parameter \"%s\" is empty "
+				"and it shouldn't!", id);
+
 	res = epp_strdup(epp_ctx->pool, str);
 	if (res == NULL)
-		*cerrno = 2;
+		*cerrno = 1;
 
 	return res;
 }
@@ -330,12 +327,10 @@ epilog_success(epp_context *epp_ctx, epp_command_data *cdata,
 			"svTRID");
 	CORBA_free(response);
 
-	if (cerrno == 0)
-		return CORBA_OK;
-	else if (cerrno == 1)
-		return create_dummy_answer(epp_ctx, cdata);
+	if (cerrno != 0)
+		return CORBA_INT_ERROR;
 
-	return CORBA_INT_ERROR;
+	return CORBA_OK;
 }
 
 /**
@@ -425,12 +420,10 @@ handle_exception(epp_context *epp_ctx, epp_command_data *cdata,
 		cdata->svTRID = unwrap_str_req(epp_ctx, exc->svTRID, &cerrno,
 				"svTRID");
 		/* this checks both previous allocations */
-		if (cerrno == 0)
-			ret = CORBA_OK;
-		else if (cerrno == 1)
-			ret = create_dummy_answer(epp_ctx, cdata);
-		else
+		if (cerrno != 0)
 			ret = CORBA_INT_ERROR;
+		else
+			ret = CORBA_OK;
 	}
 	else {
 		epplog(epp_ctx, EPP_ERROR, "CORBA exception: %s", ev->_id);
@@ -940,8 +933,8 @@ epp_call_info_contact(epp_context *epp_ctx,
 	info_contact->handle = unwrap_str_req(epp_ctx, c_contact->handle,
 			&cerrno, "handle");
 	if (cerrno != 0) goto error;
-	info_contact->authInfo = unwrap_str(epp_ctx->pool, c_contact->AuthInfoPw,
-			&cerrno);
+	info_contact->authInfo = unwrap_str(epp_ctx->pool,
+			c_contact->AuthInfoPw, &cerrno);
 	if (cerrno != 0) goto error;
 	info_contact->clID = unwrap_str_req(epp_ctx, c_contact->ClID, &cerrno,
 			"clID");
@@ -949,7 +942,8 @@ epp_call_info_contact(epp_context *epp_ctx,
 	info_contact->crID = unwrap_str_req(epp_ctx, c_contact->CrID, &cerrno,
 			"crID");
 	if (cerrno != 0) goto error;
-	info_contact->upID = unwrap_str(epp_ctx->pool, c_contact->UpID, &cerrno);
+	info_contact->upID = unwrap_str(epp_ctx->pool, c_contact->UpID,
+			&cerrno);
 	if (cerrno != 0) goto error;
 	info_contact->crDate = unwrap_str_req(epp_ctx, c_contact->CrDate,
 			&cerrno, "crDate");
@@ -979,11 +973,11 @@ epp_call_info_contact(epp_context *epp_ctx,
 			goto error;
 	}
 	/* postal info */
-	info_contact->pi.name = unwrap_str_req(epp_ctx, c_contact->Name, &cerrno,
-			"name");
+	info_contact->pi.name = unwrap_str_req(epp_ctx, c_contact->Name,
+			&cerrno, "name");
 	if (cerrno != 0) goto error;
-	info_contact->pi.org = unwrap_str(epp_ctx->pool, c_contact->Organization,
-			&cerrno);
+	info_contact->pi.org = unwrap_str(epp_ctx->pool,
+			c_contact->Organization, &cerrno);
 	if (cerrno != 0) goto error;
 	for (i = 0; i < c_contact->Streets._length; i++) {
 		char	*street;
@@ -994,8 +988,8 @@ epp_call_info_contact(epp_context *epp_ctx,
 		if (q_add(epp_ctx->pool, &info_contact->pi.streets, street))
 			goto error;
 	}
-	info_contact->pi.city = unwrap_str_req(epp_ctx, c_contact->City, &cerrno,
-			"city");
+	info_contact->pi.city = unwrap_str_req(epp_ctx, c_contact->City,
+			&cerrno, "city");
 	if (cerrno != 0) goto error;
 	info_contact->pi.sp = unwrap_str(epp_ctx->pool,
 			c_contact->StateOrProvince, &cerrno);
@@ -1162,10 +1156,11 @@ epp_call_info_domain(epp_context *epp_ctx,
 	info_domain->crID   = unwrap_str_req(epp_ctx, c_domain->CrID, &cerrno,
 			"crID");
 	if (cerrno != 0) goto error;
-	info_domain->upID   = unwrap_str(epp_ctx->pool, c_domain->UpID, &cerrno);
+	info_domain->upID   = unwrap_str(epp_ctx->pool, c_domain->UpID,
+			&cerrno);
 	if (cerrno != 0) goto error;
-	info_domain->crDate = unwrap_str_req(epp_ctx, c_domain->CrDate, &cerrno,
-			"crDate");
+	info_domain->crDate = unwrap_str_req(epp_ctx, c_domain->CrDate,
+			&cerrno, "crDate");
 	if (cerrno != 0) goto error;
 	info_domain->upDate = unwrap_str(epp_ctx->pool, c_domain->UpDate,
 			&cerrno);
@@ -1176,8 +1171,8 @@ epp_call_info_domain(epp_context *epp_ctx,
 	info_domain->exDate = unwrap_str(epp_ctx->pool, c_domain->ExDate,
 			&cerrno);
 	if (cerrno != 0) goto error;
-	info_domain->registrant = unwrap_str(epp_ctx->pool, c_domain->Registrant,
-			&cerrno);
+	info_domain->registrant = unwrap_str(epp_ctx->pool,
+			c_domain->Registrant, &cerrno);
 	if (cerrno != 0) goto error;
 	info_domain->nsset  = unwrap_str(epp_ctx->pool, c_domain->nsset,
 			&cerrno);
