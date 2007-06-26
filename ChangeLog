@@ -13,6 +13,12 @@
 	register was changed. Mod_eppd generates invalid XML and logs the
 	error.
 
+	* The ident type birthday was not tranformed in output XML. This was
+	fixed.
+
+	* Disclose on vat, ident and notifyEmail was not displayed in output
+	XML. This was fixed.
+
 	* Changes in XML schemas - see schemas' changelog for more detailed
 	information.
 
