@@ -29,8 +29,8 @@
  * 	- generating of xml response
  * 	.
  *
- * 	General information concerning configuration and installation of mod_eppd
- * 	module can be found in README file.
+ * 	General information concerning configuration and installation of
+ * 	mod_eppd module can be found in README file.
  */
 
 #include "httpd.h"

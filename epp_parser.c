@@ -2525,6 +2525,8 @@ epp_parse_command(epp_context *epp_ctx,
 {
 	xmlXPathContextPtr	 xpathCtx;
 	xmlXPathObjectPtr	 xpathObj;
+	xmlChar	*dumpedXML;
+	int	 dumpLength;
 	epp_command_data	*cdata;
 	valid_status	 val_ret;
 	parser_status	 ret;
@@ -2551,14 +2553,17 @@ epp_parse_command(epp_context *epp_ctx,
 		return PARSER_NOT_XML;
 
 	/*
-	 * Save input xml document (we cannot use strdup since it is not sure the
-	 * request is NULL terminated).
+	 * Save input xml document (we cannot use strdup since it is not sure
+	 * the request is NULL terminated).
 	 */
-	cdata->xml_in = epp_malloc(epp_ctx->pool, bytes + 1);
+	xmlDocDumpMemoryEnc(cdata->parsed_doc, &dumpedXML, &dumpLength,"UTF-8");
+	if (dumpedXML == NULL || dumpLength <= 0)
+		return PARSER_EINTERNAL;
+	cdata->xml_in = epp_malloc(epp_ctx->pool, dumpLength + 1);
 	if (cdata->xml_in == NULL)
 		return PARSER_EINTERNAL;
-	memcpy(cdata->xml_in, request, bytes);
-	cdata->xml_in[bytes] = '\0';
+	memcpy(cdata->xml_in, dumpedXML, dumpLength);
+	cdata->xml_in[dumpLength] = '\0';
 
 	/* validate the doc */
 	val_ret = validate_doc(epp_ctx->pool, (xmlSchemaPtr) schema,

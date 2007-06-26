@@ -249,7 +249,7 @@
         <element name="name" type="eppcom:labelType"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="domain:statusType"
-         minOccurs="0" maxOccurs="4"/>
+         minOccurs="0" maxOccurs="9"/>
         <!--
         Optional registrant is a hack used to hide indentity of ENUM domain
         holder.
@@ -298,11 +298,16 @@
     <simpleType name="statusValueType">
       <restriction base="token">
         <enumeration value="ok"/>
-        <enumeration value="serverHold"/>
         <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverRenewProhibited"/>
         <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
+        <enumeration value="serverBlocked"/>
+        <enumeration value="serverOutzoneManual"/>
+        <enumeration value="serverInzoneManual"/>
+        <enumeration value="expired"/>
+        <enumeration value="outzone"/>
+        <enumeration value="notValidated"/>
       </restriction>
     </simpleType>
 
@@ -328,7 +333,7 @@
     Definition of domain specific poll messages:
       completed transfer
       warning about impending expiration of a domain
-      domain have just expired
+      domain has just expired
       domain was outaged from DNS zone
       domain was deleted from register
     -->

@@ -4,6 +4,14 @@
 	without proper modifications, which resulted in usage of namespaces
 	which were not defined. This is fixed now.
 
+	* The input XML documents sent to central register for archivation
+	are encoded in UTF-8. The old behaviour of sending the raw text
+	could result in db insert failure, if the input was encoded in other
+	than UTF-8 encoding.
+
+	* Changes in XML schemas - see schemas' changelog for more detailed
+	information.
+
 version 1.4.0
 
 	* Configuration utilities (apr-config, apxs, pkg-config) are run

@@ -168,7 +168,6 @@
     <simpleType name="identTypeT">
       <restriction base="token">
         <enumeration value="op"/>
-        <enumeration value="rc"/>
         <enumeration value="passport"/>
         <enumeration value="mpsv"/>
         <enumeration value="ico"/>
@@ -332,8 +331,7 @@
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="contact:statusType"
          minOccurs="0" maxOccurs="4"/>
-        <element name="postalInfo" type="contact:postalInfoType"
-         maxOccurs="2"/>
+        <element name="postalInfo" type="contact:postalInfoType"/>
         <element name="voice" type="contact:e164StringType"
          minOccurs="0"/>
         <element name="fax" type="contact:e164StringType"
