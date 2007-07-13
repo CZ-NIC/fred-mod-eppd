@@ -45,6 +45,7 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 {
 	/* used to get content of problematic xml tag */
 	xmlBufferPtr	buf;
+	xmlNodePtr	node;
 	int	len;
 	/* used for new list item creation */
 	epp_error	*valerr;
@@ -96,7 +97,15 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 	buf = xmlBufferCreate();
 	if (buf == NULL)
 		return;
-	if (xmlNodeDump(buf, doc, (xmlNodePtr) error->node, 0, 0) < 0) {
+	node = (xmlNodePtr) error->node;
+	if (node->ns != NULL) {
+		xmlNsPtr	 nsdef;
+
+		nsdef = xmlSearchNs(doc, node, node->ns->prefix);
+		if (nsdef != NULL)
+			xmlNewNs(node, nsdef->href, nsdef->prefix);
+	}
+	if (xmlNodeDump(buf, doc, (xmlNodePtr) node, 0, 0) < 0) {
 		xmlBufferFree(buf);
 		return;
 	}

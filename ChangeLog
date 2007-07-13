@@ -1,5 +1,8 @@
 2007-07-13 Jan Kryl (version 1.4.2)
 
+	* Error messages triggered by XML validator were using namespaces
+	which were not declared.
+
 	* Bug in update of ident attribute was fixed. It was not possible
 	to nullify ident attribute.
 
