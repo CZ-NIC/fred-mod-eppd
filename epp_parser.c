@@ -194,7 +194,7 @@ xpath_get1(void *pool,
 
 	obj = xmlXPathEvalExpression(BAD_CAST expr, ctx);
 	if (obj == NULL) {
-		*xerr = XERR_CONSTR;
+		*xerr = XERR_LIBXML;
 		return NULL;
 	}
 
@@ -1488,11 +1488,8 @@ parse_update_contact(void *pool,
 		str = xpath_get_attr(pool, xpathCtx,
 				"contact:ident", "type", 1, &xerr);
 		CHK_XERR(xerr, error);
-		/*
-		 * attribute type might not be present, we have to explicitly
-		 * check it
-		 */
-		if (str == NULL) {
+		/* if ident is non-empty, type attribute must be present */
+		if (*update_contact->ident != '\0' && str == NULL) {
 			if (new_error_item(pool, &cdata->errors,
 					errspec_contact_identtype_missing))
 				goto error;
@@ -1501,13 +1498,14 @@ parse_update_contact(void *pool,
 			cdata->type = EPP_DUMMY;
 			return;
 		}
-
-		update_contact->identtype = string2identtype(str);
-		/*
-		 * schema and source code is out of sync if following
-		 * assert does not hold
-		 */
-		assert(update_contact->identtype != ident_UNKNOWN);
+		else if (str != NULL) {
+			update_contact->identtype = string2identtype(str);
+			/*
+			 * schema and source code is out of sync if following
+			 * assert does not hold
+			 */
+			assert(update_contact->identtype != ident_UNKNOWN);
+		}
 	}
 	update_contact->authInfo = xpath_get1(pool, xpathCtx,
 			"contact:authInfo", 0, &xerr);
