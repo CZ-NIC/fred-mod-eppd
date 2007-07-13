@@ -9,7 +9,7 @@
        xmlns:contact="http://www.nic.cz/xml/epp/contact-1.3"
        xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.3
        contact-1.3.xsd">
-		<contact:id>jouda</contact:id>
+		<contact:id>CID:FEELA</contact:id>
 		<contact:chg>
 		  <contact:postalInfo>
 			<contact:name>John Doe</contact:name>
@@ -33,7 +33,7 @@
 			  <contact:email />
 		  </contact:disclose>
 		  <contact:vat>7035555556</contact:vat>
-		  <contact:ident type="rc">8888888856</contact:ident>
+		  <contact:ident type="birthday">24.11.1981</contact:ident>
 		  <contact:notifyEmail>novyjouda@example.com</contact:notifyEmail>
 		</contact:chg>
 	  </contact:update>
