@@ -1,3 +1,7 @@
+2007-07-26 Jaromir Talir (version 1.4.3)
+	
+	* Simple schema change
+
 2007-07-13 Jan Kryl (version 1.4.2)
 
 	* Error messages triggered by XML validator were using namespaces
