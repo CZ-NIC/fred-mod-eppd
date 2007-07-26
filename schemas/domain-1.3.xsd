@@ -302,6 +302,7 @@
         <enumeration value="serverRenewProhibited"/>
         <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
+        <enumeration value="serverRegistrantChangeProhibited"/>
         <enumeration value="serverBlocked"/>
         <enumeration value="serverOutzoneManual"/>
         <enumeration value="serverInzoneManual"/>

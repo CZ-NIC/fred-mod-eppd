@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/fred-1.1"
-          xmlns:fred="http://www.nic.cz/xml/epp/fred-1.1"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/fred-1.2"
+          xmlns:fred="http://www.nic.cz/xml/epp/fred-1.2"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
           xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
           xmlns="http://www.w3.org/2001/XMLSchema"
@@ -129,5 +129,21 @@
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
     </complexType>
+
+    <!--
+    Definition of non-object specific poll messages:
+      warning about low credit
+    -->
+
+    <element name="lowCreditData" type="fred:lowCreditDataT"/>
+
+    <complexType name="lowCreditDataT">
+      <sequence>
+        <element name="zone" type="eppcom:labelType"/>
+        <element name="limit" type="fred:creditType"/>
+        <element name="credit" type="fred:creditType"/>
+      </sequence>
+    </complexType>
+
 
   </schema>
