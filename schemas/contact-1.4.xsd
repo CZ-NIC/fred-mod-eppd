@@ -143,9 +143,9 @@
 
     <complexType name="discloseType">
       <sequence>
-        <element name="name" minOccurs="0"/>
-        <element name="org" minOccurs="0"/>
-        <element name="addr" minOccurs="0"/>
+<!--        <element name="name" minOccurs="0"/> -->
+<!--        <element name="org" minOccurs="0"/> -->
+<!--        <element name="addr" minOccurs="0"/>  -->
         <element name="voice" minOccurs="0"/>
         <element name="fax" minOccurs="0"/>
         <element name="email" minOccurs="0"/>
