@@ -1,17 +1,17 @@
 
 2006-07-31 Jaromir Talir (version 1.4.2)
 
-	* Removing of disclose options for (name,org,address). 
-	
+	* Removing of disclose options for (name,org,address).
+
 	* New status flag serverRegistrantChangeProhibited for domain 
-	was added
+	was added.
 
-	* Street and PC(postal code) were made *required* in Contact
+	* Street and PC(postal code) were made *required* in Contact.
 
-	* New poll message about low credit was added to fred
+	* New poll message about low credit was added to fred.
 
  	* Version was bumped up on contact, fred and "all" schemas.
-	
+
 2006-06-26 Jan Kryl (version 1.4.1)
 
 	* New status flags for domain object were added (serverBlocked,

@@ -994,8 +994,8 @@ epp_call_info_contact(epp_context *epp_ctx,
 	info_contact->pi.sp = unwrap_str(epp_ctx->pool,
 			c_contact->StateOrProvince, &cerrno);
 	if (cerrno != 0) goto error;
-	info_contact->pi.pc = unwrap_str(epp_ctx->pool, c_contact->PostalCode,
-			&cerrno);
+	info_contact->pi.pc = unwrap_str_req(epp_ctx, c_contact->PostalCode,
+			&cerrno, "pc");
 	if (cerrno != 0) goto error;
 	info_contact->pi.cc = unwrap_str_req(epp_ctx, c_contact->CountryCode,
 			&cerrno, "cc");

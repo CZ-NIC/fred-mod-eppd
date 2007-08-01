@@ -1098,7 +1098,7 @@ parse_create_contact(void *pool,
 			"contact:sp", 0, &xerr);
 	CHK_XERR(xerr, error);
 	create_contact->pi.pc = xpath_get1(pool, xpathCtx,
-			"contact:pc", 0, &xerr);
+			"contact:pc", 1, &xerr);
 	CHK_XERR(xerr, error);
 	create_contact->pi.cc = xpath_get1(pool, xpathCtx,
 			"contact:cc", 1, &xerr);
