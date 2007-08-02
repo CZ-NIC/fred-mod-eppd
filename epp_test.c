@@ -431,7 +431,7 @@ int main(int argc, char *argv[])
 	if (host == NULL)
 		host = "localhost";
 	if (schemafile == NULL)
-		schemafile = "schemas/all-1.3.xsd";
+		schemafile = "schemas/all-1.4.xsd";
 
 	if (!test)
 		/* API: init parser */
