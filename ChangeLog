@@ -1,3 +1,10 @@
+2007-08-15 Jan Kryl (version 1.5.0)
+
+	* New mechanism of creating poll message's content. The XML of message
+	is created in mod_eppd and not in central register. Maintenance
+	of XML generators scattered all over the central register was a
+	nightmare.
+
 2007-07-26 Jaromir Talir (version 1.4.3)
 	
 	* Simple schema change.
@@ -32,7 +39,7 @@
 	XML. This was fixed.
 
 	* Changes in XML schemas - see schemas' changelog for more detailed
-	information.
+	information. Schemas versions were bumped up.
 
 version 1.4.0
 
