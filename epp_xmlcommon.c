@@ -116,7 +116,9 @@ validerr_callback(void *ctx, xmlErrorPtr error)
 	valerr->spec = errspec_not_valid; /* surrounding tags are included */
 
 	/* enqueue new error item */
-	q_add(pool, error_list, valerr);
+	if (q_add(pool, error_list, valerr))
+		/* we have nothing to do here in case of error */
+		return;
 }
 
 valid_status

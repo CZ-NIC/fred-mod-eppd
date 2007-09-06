@@ -42,6 +42,7 @@
 #undef CORE_PRIVATE
 
 #define APR_WANT_BYTEFUNC
+#define APR_WANT_STRFUNC
 #include "apr_want.h"	/* ntohl/htonl-like functions */
 #include "apr_buckets.h"
 #include "apr_file_io.h"
@@ -456,7 +457,14 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 	}
 
 	/* convert bucket brigade to string */
-	status = apr_brigade_pflatten(bb, content, &len, pool);
+	*content = apr_palloc(pool, len + 1);
+	if (*content == NULL) {
+		epplog(epp_ctx, EPP_FATAL, "Could not allocate space for "
+				"request.");
+		apr_brigade_destroy(bb);
+		return 2;
+	}
+	status = apr_brigade_flatten(bb, *content, &len);
 	if (status != APR_SUCCESS) {
 		epplog(epp_ctx, EPP_FATAL, "Could not flatten apr_brigade!");
 		apr_brigade_destroy(bb);
@@ -469,6 +477,11 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 		apr_brigade_destroy(bb);
 		return 2;
 	}
+	/*
+	 * NULL terminate request. The apr_brigade_flatten doesn't do this
+	 * for sure.
+	 */
+	content[len] = '\0';
 
 	epplog(epp_ctx, EPP_DEBUG, "request received (length %u bytes)",
 			hbo_size);
@@ -719,7 +732,8 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 			break;
 	}
 	/* XXX ugly hack */
-	epp_call_save_output_xml(epp_ctx, service, cdata, *response);
+	if (strcmp(cdata->svTRID, "DUMMY-SVTRID"))
+		epp_call_save_output_xml(epp_ctx, service, cdata, *response);
 	return 1;
 }
 

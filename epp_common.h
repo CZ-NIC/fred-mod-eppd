@@ -317,7 +317,6 @@ typedef struct {
 typedef enum {
 	ident_UNKNOWN, /**< Unknown value can also mean undefined. */
 	ident_OP,      /**< Number of ID card. */
-	ident_RC,      /**< Born number (rodne cislo). */
 	ident_PASSPORT,/**< Number of passport. */
 	ident_MPSV,    /**< Number assigned by "ministry of work and ...". */
 	ident_ICO,     /**< ICO. */
@@ -357,6 +356,29 @@ typedef struct {
 	}ext; /**< Extension. */
 }epp_ext_item;
 
+/** Type of poll message. */
+typedef enum {
+	pt_transfer_contact, /**< Contact was transferred. */
+	pt_delete_contact,   /**< Contact was deleted because not used. */
+	pt_transfer_nsset,   /**< Nsset was transferred. */
+	pt_delete_nsset,     /**< Contact was deleted because not used. */
+	pt_techcheck,        /**< Technical check results. */
+	pt_transfer_domain,  /**< Domain was transferred. */
+	pt_impexpiration,    /**< Domain will expire in near future. */
+	pt_expiration,       /**< Domain expired. */
+	pt_impvalidation,    /**< Domain validation will expire soon. */
+	pt_validation,       /**< Domain validation expired. */
+	pt_outzone,          /**< Domain was outaged from zone. */
+	pt_delete_domain,    /**< Domain was deleted. */
+	pt_lowcredit,        /**< Credit of registrator is low. */
+}epp_pollType;
+
+/** Structure containing result of one technical test. */
+typedef struct {
+	char	*testname;
+	int	 status;
+	char	*note;
+}epp_testResult;
 
 /* ********************************************************************* */
 
@@ -442,10 +464,33 @@ typedef struct {
 
 /** Poll request parameters. */
 typedef struct {
-	int	 count;  /**< Count of waiting messages. */
-	char	*msgid;  /**< ID of next message in a queue. */
-	char	*msg;    /**< Text of message. */
-	char	*qdate;  /**< Date of message submission. */
+	int	 count;    /**< Count of waiting messages. */
+	char	*msgid;    /**< ID of next message in a queue. */
+	char	*qdate;    /**< Date of message submission. */
+	epp_pollType type; /**< Type of poll message. */
+	/** Message data. */
+	union {
+		char	*handle;
+		struct {
+			char	*handle;
+			char	*date;
+			char	*clID;
+		}hdt; /**< Handle, date, registrator structure. */
+		struct {
+			char	*handle;
+			char	*date;
+		}hd; /**< Handle, date structure. */
+		struct {
+			char	*handle;
+			qhead	 fqdns;
+			qhead	 tests;
+		}tc; /**< Structure with results of technical tests. */
+		struct {
+			char	*zone;
+			unsigned long limit;
+			unsigned long credit;
+		}lc; /**< Low credit structure. */
+	}msg;
 }epps_poll_req;
 
 /** Poll acknoledge parameters. */

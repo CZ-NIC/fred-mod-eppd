@@ -106,7 +106,7 @@
     <complexType name="creditType">
       <sequence>
         <element name="zone" type="eppcom:labelType"/>
-    <element name="credit" type="fred:amountType"/>
+        <element name="credit" type="fred:amountType"/>
       </sequence>
     </complexType>
 

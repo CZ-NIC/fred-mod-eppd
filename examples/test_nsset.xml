@@ -3,9 +3,9 @@
      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
   <extension>
-    <fred:extcommand xmlns:fred="http://www.nic.cz/xml/epp/fred-1.1"
-		  xsi:schemaLocation="http://www.nic.cz/xml/epp/fred-1.1
-		  fred-1.1.xsd">
+    <fred:extcommand xmlns:fred="http://www.nic.cz/xml/epp/fred-1.2"
+		  xsi:schemaLocation="http://www.nic.cz/xml/epp/fred-1.2
+		  fred-1.2.xsd">
       <fred:test>
         <nsset:test xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.2"
 		    xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.2

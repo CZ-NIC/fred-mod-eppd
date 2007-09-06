@@ -274,9 +274,6 @@ gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 			case ident_OP:
 				snprintf(type, 15, "%s", "op");
 				break;
-			case ident_RC:
-				snprintf(type, 15, "%s", "rc");
-				break;
 			case ident_PASSPORT:
 				snprintf(type, 15, "%s", "passport");
 				break;
@@ -372,9 +369,9 @@ simple_err:
  * This is assistant function for generating info nsset <resData>
  * xml subtree.
  *
- * @param writer XML writer.
- * @param cdata Data needed to generate XML.
- * @return 1 if OK, 0 in case of failure.
+ * @param writer   XML writer.
+ * @param cdata    Data needed to generate XML.
+ * @return         1 if OK, 0 in case of failure.
  */
 static char
 gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
@@ -428,6 +425,226 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 	snprintf(level, 3, "%d", info_nsset->level);
 	WRITE_ELEMENT(writer, simple_err, "nsset:reportlevel", level);
 	END_ELEMENT(writer, simple_err); /* infdata */
+	return 1;
+
+simple_err:
+	return 0;
+}
+
+/**
+ * This is assistant function for generating poll message.
+ *
+ * @param writer    XML writer.
+ * @param msgdata   Message data plus its type.
+ * @return          1 if OK, 0 in case of failure.
+ */
+static char
+gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
+{
+	switch (msgdata->type) {
+		case pt_transfer_contact:
+			START_ELEMENT(writer, simple_err, "contact:trnData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact",
+					NS_CONTACT);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_CONTACT);
+			WRITE_ELEMENT(writer, simple_err, "contact:id",
+					msgdata->msg.hdt.handle);
+			WRITE_ELEMENT(writer, simple_err, "contact:trDate",
+					msgdata->msg.hdt.date);
+			WRITE_ELEMENT(writer, simple_err, "contact:clID",
+					msgdata->msg.hdt.clID);
+			END_ELEMENT(writer, simple_err); /* trnData */
+			break;
+		case pt_transfer_nsset:
+			START_ELEMENT(writer, simple_err, "nsset:trnData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset",
+					NS_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_NSSET);
+			WRITE_ELEMENT(writer, simple_err, "nsset:id",
+					msgdata->msg.hdt.handle);
+			WRITE_ELEMENT(writer, simple_err, "nsset:trDate",
+					msgdata->msg.hdt.date);
+			WRITE_ELEMENT(writer, simple_err, "nsset:clID",
+					msgdata->msg.hdt.clID);
+			END_ELEMENT(writer, simple_err); /* trnData */
+			break;
+		case pt_transfer_domain:
+			START_ELEMENT(writer, simple_err, "domain:trnData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain",
+					NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:name",
+					msgdata->msg.hdt.handle);
+			WRITE_ELEMENT(writer, simple_err, "domain:trDate",
+					msgdata->msg.hdt.date);
+			WRITE_ELEMENT(writer, simple_err, "domain:clID",
+					msgdata->msg.hdt.clID);
+			END_ELEMENT(writer, simple_err); /* trnData */
+			break;
+		case pt_delete_contact:
+			START_ELEMENT(writer, simple_err,"contact:idleDelData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact",
+					NS_CONTACT);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_CONTACT);
+			WRITE_ELEMENT(writer, simple_err, "contact:id",
+					msgdata->msg.handle);
+			END_ELEMENT(writer, simple_err); /* idleDelData */
+			break;
+		case pt_delete_nsset:
+			START_ELEMENT(writer, simple_err,"nsset:idleDelData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset",
+					NS_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_NSSET);
+			WRITE_ELEMENT(writer, simple_err, "nsset:id",
+					msgdata->msg.handle);
+			END_ELEMENT(writer, simple_err); /* idleDelData */
+			break;
+		case pt_delete_domain:
+			START_ELEMENT(writer, simple_err, "domain:delData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain",
+					NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:name",
+					msgdata->msg.hd.handle);
+			WRITE_ELEMENT(writer, simple_err, "domain:exDate",
+					msgdata->msg.hd.date);
+			END_ELEMENT(writer, simple_err); /* delData */
+			break;
+		case pt_impexpiration:
+			START_ELEMENT(writer, simple_err,
+					"domain:impendingExpData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain",
+					NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:name",
+					msgdata->msg.hd.handle);
+			WRITE_ELEMENT(writer, simple_err, "domain:exDate",
+					msgdata->msg.hd.date);
+			END_ELEMENT(writer, simple_err); /* impendingExpData */
+			break;
+		case pt_expiration:
+			START_ELEMENT(writer, simple_err, "domain:expData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain",
+					NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:name",
+					msgdata->msg.hd.handle);
+			WRITE_ELEMENT(writer, simple_err, "domain:exDate",
+					msgdata->msg.hd.date);
+			END_ELEMENT(writer, simple_err); /* expData */
+			break;
+		case pt_impvalidation:
+			START_ELEMENT(writer, simple_err,
+					"enumval:impendingValExpData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:enumval",
+					NS_ENUMVAL);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_ENUMVAL);
+			WRITE_ELEMENT(writer, simple_err, "enumval:name",
+					msgdata->msg.hd.handle);
+			WRITE_ELEMENT(writer, simple_err, "enumval:valExDate",
+					msgdata->msg.hd.date);
+			END_ELEMENT(writer, simple_err); /*impendingValExpData*/
+			break;
+		case pt_validation:
+			START_ELEMENT(writer, simple_err, "enumval:valExpData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:enumval",
+					NS_ENUMVAL);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_ENUMVAL);
+			WRITE_ELEMENT(writer, simple_err, "enumval:name",
+					msgdata->msg.hd.handle);
+			WRITE_ELEMENT(writer, simple_err, "enumval:valExDate",
+					msgdata->msg.hd.date);
+			END_ELEMENT(writer, simple_err); /* valExpData */
+			break;
+		case pt_outzone:
+			START_ELEMENT(writer, simple_err,
+					"domain:dnsOutageData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain",
+					NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:name",
+					msgdata->msg.hd.handle);
+			WRITE_ELEMENT(writer, simple_err, "domain:exDate",
+					msgdata->msg.hd.date);
+			END_ELEMENT(writer, simple_err); /* dnsOutageData */
+			break;
+		case pt_techcheck:
+			START_ELEMENT(writer, simple_err, "nsset:testData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset",
+					NS_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_NSSET);
+			WRITE_ELEMENT(writer, simple_err, "nsset:id",
+					msgdata->msg.tc.handle);
+			q_foreach(&msgdata->msg.tc.fqdns) {
+				WRITE_ELEMENT(writer, simple_err, "nsset:name",
+					q_content(&msgdata->msg.tc.fqdns));
+			}
+			q_foreach(&msgdata->msg.tc.tests) {
+				epp_testResult *tr =
+					q_content(&msgdata->msg.tc.tests);
+				START_ELEMENT(writer,simple_err,"nsset:result");
+				WRITE_ELEMENT(writer, simple_err,
+						"nsset:testname", tr->testname);
+				WRITE_ELEMENT(writer, simple_err,
+						"nsset:status",
+						(tr->status ? "true":"false"));
+				WRITE_ELEMENT(writer, simple_err,
+						"nsset:note", tr->note);
+				END_ELEMENT(writer, simple_err); /* result */
+			}
+			END_ELEMENT(writer, simple_err); /* testData */
+			break;
+		case pt_lowcredit:
+			{
+			char	price[50];
+
+			START_ELEMENT(writer, simple_err, "fred:lowCreditData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:fred",
+					NS_FRED);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_FRED);
+			WRITE_ELEMENT(writer, simple_err, "fred:zone",
+					msgdata->msg.lc.zone);
+			/* 
+			 * XXX
+			 * this stupid code will be simplified after the
+			 * schemas will be corrected.
+			 */
+			START_ELEMENT(writer, simple_err, "fred:limit");
+			WRITE_ELEMENT(writer, simple_err, "fred:zone",
+					msgdata->msg.lc.zone);
+			snprintf(price, 49, "%lu.%02lu",
+					msgdata->msg.lc.limit / 100,
+					msgdata->msg.lc.limit % 100);
+			WRITE_ELEMENT(writer, simple_err, "fred:credit", price);
+			END_ELEMENT(writer, simple_err); /* limit */
+			START_ELEMENT(writer, simple_err, "fred:credit");
+			WRITE_ELEMENT(writer, simple_err, "fred:zone",
+					msgdata->msg.lc.zone);
+			snprintf(price, 49, "%lu.%02lu",
+					msgdata->msg.lc.credit / 100,
+					msgdata->msg.lc.credit % 100);
+			WRITE_ELEMENT(writer, simple_err, "fred:credit", price);
+			END_ELEMENT(writer, simple_err); /* credit */
+			END_ELEMENT(writer, simple_err); /* lowCreditData */
+			break;
+			}
+		default:
+			START_ELEMENT(writer, simple_err, "fred:lowCreditData");
+			break;
+	}
 	return 1;
 
 simple_err:
@@ -623,8 +840,7 @@ epp_gen_response(epp_context *epp_ctx,
 			WRITE_ELEMENT(writer, simple_err, "qDate",
 					poll_req->qdate);
 			START_ELEMENT(writer, simple_err, "msg");
-			if (xmlTextWriterWriteRaw(writer,
-						BAD_CAST (poll_req->msg)) < 0)
+			if (!gen_poll_message(writer, poll_req))
 				goto simple_err;
 			END_ELEMENT(writer, simple_err); /* msg */
 			END_ELEMENT(writer, simple_err); /* msgQ */

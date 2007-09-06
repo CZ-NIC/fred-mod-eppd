@@ -956,7 +956,6 @@ static epp_identType
 string2identtype(const char *str)
 {
 	if (strcmp("op", str) == 0) return ident_OP;
-	else if (strcmp("rc", str) == 0) return ident_RC;
 	else if (strcmp("passport", str) == 0) return ident_PASSPORT;
 	else if (strcmp("mpsv", str) == 0) return ident_MPSV;
 	else if (strcmp("ico", str) == 0) return ident_ICO;
@@ -2238,13 +2237,7 @@ parse_command(void *pool,
 			 * logout is so simple that we don't use dedicated
 			 * parsing function
 			 */
-			if (!loggedin) {
-				cdata->rc = 2002;
-				cdata->type = EPP_DUMMY;
-			}
-			else {
-				cdata->type = EPP_LOGOUT;
-			}
+			cdata->type = EPP_LOGOUT;
 			break;
 		case EPP_RED_CHECK:
 			parse_check(pool, xpathCtx, cdata);

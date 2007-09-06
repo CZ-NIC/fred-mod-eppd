@@ -1022,9 +1022,6 @@ epp_call_info_contact(epp_context *epp_ctx,
 		case ccReg_OP:
 			info_contact->identtype = ident_OP;
 			break;
-		case ccReg_RC:
-			info_contact->identtype = ident_RC;
-			break;
 		case ccReg_PASS:
 			info_contact->identtype = ident_PASSPORT;
 			break;
@@ -1426,11 +1423,13 @@ epp_call_poll_req(epp_context *epp_ctx,
 		epp_command_data *cdata)
 {
 	ccReg_Response	*response;
+	ccReg_PollType	 c_polltype;
+	CORBA_any	*c_mesg;
 	CORBA_Environment	ev[1];
-	CORBA_short	c_count;
-	CORBA_char	*c_qdate, *c_msg, *c_clTRID, *c_msgID;
-	int	retr, cerrno;
+	CORBA_short	 c_count;
+	CORBA_char	*c_qdate, *c_clTRID, *c_msgID;
 	epps_poll_req	*poll_req;
+	int	retr, cerrno;
 
 	poll_req = cdata->data;
 	/*
@@ -1442,7 +1441,8 @@ epp_call_poll_req(epp_context *epp_ctx,
 	 *    c_msgID (*)
 	 *    c_count
 	 *    c_qdate (*)
-	 *    c_msg (*)
+	 *    c_polltype
+	 *    c_mesg (*)
 	 */
 	assert(cdata->xml_in);
 	c_clTRID = wrap_str(cdata->clTRID);
@@ -1458,7 +1458,8 @@ epp_call_poll_req(epp_context *epp_ctx,
 				&c_msgID,
 				&c_count,
 				&c_qdate,
-				&c_msg,
+				&c_polltype,
+				&c_mesg,
 				loginid,
 				c_clTRID,
 				cdata->xml_in,
@@ -1482,18 +1483,207 @@ epp_call_poll_req(epp_context *epp_ctx,
 	if (cerrno != 0) goto error;
 	poll_req->qdate = unwrap_str(epp_ctx->pool, c_qdate, &cerrno);
 	if (cerrno != 0) goto error;
-	poll_req->msg = unwrap_str(epp_ctx->pool, c_msg, &cerrno);
-	if (cerrno != 0) goto error;
+	/* copy message data */
+	switch (c_polltype) {
+		case ccReg_polltype_transfer_domain:
+			{
+			ccReg_PollMsg_HandleDateReg *hdr =
+				(ccReg_PollMsg_HandleDateReg *) c_mesg->_value;
+			poll_req->type = pt_transfer_domain;
+			poll_req->msg.hdt.handle = unwrap_str(epp_ctx->pool,
+					hdr->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hdt.date = unwrap_str(epp_ctx->pool,
+					hdr->date, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hdt.clID = unwrap_str(epp_ctx->pool,
+					hdr->clID, &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+			}
+		case ccReg_polltype_transfer_contact:
+			{
+			ccReg_PollMsg_HandleDateReg *hdr =
+				(ccReg_PollMsg_HandleDateReg *) c_mesg->_value;
+			poll_req->type = pt_transfer_contact;
+			poll_req->msg.hdt.handle = unwrap_str(epp_ctx->pool,
+					hdr->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hdt.date = unwrap_str(epp_ctx->pool,
+					hdr->date, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hdt.clID = unwrap_str(epp_ctx->pool,
+					hdr->clID, &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+			}
+		case ccReg_polltype_transfer_nsset:
+			{
+			ccReg_PollMsg_HandleDateReg *hdr =
+				(ccReg_PollMsg_HandleDateReg *) c_mesg->_value;
+			poll_req->type = pt_transfer_nsset;
+			poll_req->msg.hdt.handle = unwrap_str(epp_ctx->pool,
+					hdr->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hdt.date = unwrap_str(epp_ctx->pool,
+					hdr->date, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hdt.clID = unwrap_str(epp_ctx->pool,
+					hdr->clID, &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+			}
+		case ccReg_polltype_delete_contact:
+			poll_req->type = pt_delete_contact;
+			poll_req->msg.handle = unwrap_str(epp_ctx->pool,
+					*((char **) c_mesg->_value), &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+		case ccReg_polltype_delete_nsset:
+			poll_req->type = pt_delete_nsset;
+			poll_req->msg.handle = unwrap_str(epp_ctx->pool,
+					*((char **) c_mesg->_value), &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+		case ccReg_polltype_delete_domain:
+			{
+			ccReg_PollMsg_HandleDate *hd =
+				(ccReg_PollMsg_HandleDate *) c_mesg->_value;
+			poll_req->type = pt_delete_domain;
+			poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool,
+					hd->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hd.date = unwrap_str(epp_ctx->pool,
+					hd->date, &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+			}
+		case ccReg_polltype_impexpiration:
+			{
+			ccReg_PollMsg_HandleDate *hd =
+				(ccReg_PollMsg_HandleDate *) c_mesg->_value;
+			poll_req->type = pt_impexpiration;
+			poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool,
+					hd->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hd.date = unwrap_str(epp_ctx->pool,
+					hd->date, &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+			}
+		case ccReg_polltype_expiration:
+			{
+			ccReg_PollMsg_HandleDate *hd =
+				(ccReg_PollMsg_HandleDate *) c_mesg->_value;
+			poll_req->type = pt_expiration;
+			poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool,
+					hd->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hd.date = unwrap_str(epp_ctx->pool,
+					hd->date, &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+			}
+		case ccReg_polltype_impvalidation:
+			{
+			ccReg_PollMsg_HandleDate *hd =
+				(ccReg_PollMsg_HandleDate *) c_mesg->_value;
+			poll_req->type = pt_impvalidation;
+			poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool,
+					hd->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hd.date = unwrap_str(epp_ctx->pool,
+					hd->date, &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+			}
+		case ccReg_polltype_validation:
+			{
+			ccReg_PollMsg_HandleDate *hd =
+				(ccReg_PollMsg_HandleDate *) c_mesg->_value;
+			poll_req->type = pt_validation;
+			poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool,
+					hd->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hd.date = unwrap_str(epp_ctx->pool,
+					hd->date, &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+			}
+		case ccReg_polltype_outzone:
+			{
+			ccReg_PollMsg_HandleDate *hd =
+				(ccReg_PollMsg_HandleDate *) c_mesg->_value;
+			poll_req->type = pt_outzone;
+			poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool,
+					hd->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hd.date = unwrap_str(epp_ctx->pool,
+					hd->date, &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+			}
+		case ccReg_polltype_techcheck:
+			{
+			ccReg_PollMsg_Techcheck *tc =
+				(ccReg_PollMsg_Techcheck *) c_mesg->_value;
+			int	i;
+
+			poll_req->type = pt_techcheck;
+			poll_req->msg.tc.handle = unwrap_str(epp_ctx->pool,
+					tc->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			/* copy list of extra fqdns */
+			for (i = 0; i < tc->fqdns._length; i++) {
+				char *fqdn = unwrap_str(epp_ctx->pool,
+						tc->fqdns._buffer[i], &cerrno);
+				if (cerrno != 0) goto error;
+				q_add(epp_ctx->pool, &poll_req->msg.tc.fqdns,
+						fqdn);
+			}
+			for (i = 0; i < tc->tests._length; i++) {
+				ccReg_TechcheckItem *tci= &tc->tests._buffer[i];
+				epp_testResult	*tr = epp_malloc(epp_ctx->pool,
+						sizeof *tr);
+				tr->status = (tci->status ? 1 : 0);
+				tr->testname = unwrap_str(epp_ctx->pool,
+						tci->testname, &cerrno);
+				if (cerrno != 0) goto error;
+				tr->note = unwrap_str(epp_ctx->pool,
+						tci->note, &cerrno);
+				if (cerrno != 0) goto error;
+				q_add(epp_ctx->pool, &poll_req->msg.tc.tests,
+						tr);
+			}
+			break;
+			}
+		case ccReg_polltype_lowcredit:
+			{
+			ccReg_PollMsg_LowCredit *lc =
+				(ccReg_PollMsg_LowCredit *) c_mesg->_value;
+			poll_req->type = pt_lowcredit;
+			poll_req->msg.lc.zone = unwrap_str(epp_ctx->pool,
+					lc->zone, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.lc.limit = lc->limit;
+			poll_req->msg.lc.credit = lc->credit;
+			break;
+			}
+		default:
+			epplog(epp_ctx, EPP_ERROR, "Unexpected type of poll "
+					"message.");
+			goto error;
+	}
 
 	CORBA_free(c_msgID);
-	CORBA_free(c_msg);
+	CORBA_free(c_mesg);
 	CORBA_free(c_qdate);
 	return epilog_success(epp_ctx, cdata, response);
 
 error:
 	CORBA_free(c_msgID);
 	CORBA_free(c_qdate);
-	CORBA_free(c_msg);
+	CORBA_free(c_mesg);
 	CORBA_free(response);
 	return CORBA_INT_ERROR;
 }
@@ -1763,7 +1953,6 @@ convIdentType(epp_identType our_ident)
 {
 	switch (our_ident) {
 		case ident_OP: return ccReg_OP; break;
-		case ident_RC: return ccReg_RC; break;
 		case ident_PASSPORT: return ccReg_PASS; break;
 		case ident_MPSV: return ccReg_MPSV; break;
 		case ident_ICO: return ccReg_ICO; break;
@@ -3415,7 +3604,7 @@ epp_call_info(epp_context *epp_ctx,
 	CORBA_long	 c_count;
 	ccReg_Response	*response;
 	epps_info	*info;
-	int	 retr, i, input_ok;
+	int	 retr, input_ok;
 
 	info = cdata->data;
 	input_ok = 0;
