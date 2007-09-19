@@ -110,7 +110,7 @@ doc: doxy.conf
 		 echo "Doxygen executable not configured."; \
 		 echo "Use --with-doc parameter to configure."; \
 	   else \
-		 $(DOXYGEN) doxy.conf 2>&1 1>&doxygen.log; \
+		 $(DOXYGEN) doxy.conf 2>&1 1>doxygen.log; \
 		 echo "index.html is in doc/html directory"; \
 		 echo "output from doxygen is in doxygen.log file"; \
 	   fi
