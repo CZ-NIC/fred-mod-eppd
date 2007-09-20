@@ -457,14 +457,8 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 	}
 
 	/* convert bucket brigade to string */
-	*content = apr_palloc(pool, len + 1);
-	if (*content == NULL) {
-		epplog(epp_ctx, EPP_FATAL, "Could not allocate space for "
-				"request.");
-		apr_brigade_destroy(bb);
-		return 2;
-	}
-	status = apr_brigade_flatten(bb, *content, &len);
+	/* Don't use apr_brigade_flatten otherwise mysterious segfault occurs */
+	status = apr_brigade_pflatten(bb, content, &len, pool);
 	if (status != APR_SUCCESS) {
 		epplog(epp_ctx, EPP_FATAL, "Could not flatten apr_brigade!");
 		apr_brigade_destroy(bb);
@@ -477,11 +471,21 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 		apr_brigade_destroy(bb);
 		return 2;
 	}
-	/*
-	 * NULL terminate request. The apr_brigade_flatten doesn't do this
-	 * for sure.
-	 */
-	content[len] = '\0';
+	/* NULL terminate the request - needed for request logging */
+	{
+		char	*newcontent;
+
+		newcontent = apr_palloc(pool, len + 1);
+		if (newcontent == NULL) {
+			epplog(epp_ctx, EPP_FATAL, "Could not allocate space "
+					"for request.");
+			apr_brigade_destroy(bb);
+			return 2;
+		}
+		memcpy(newcontent, *content, len);
+		newcontent[len] = '\0';
+		*content = newcontent;
+	}
 
 	epplog(epp_ctx, EPP_DEBUG, "request received (length %u bytes)",
 			hbo_size);

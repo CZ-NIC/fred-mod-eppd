@@ -5,6 +5,10 @@
 	of XML generators scattered all over the central register was a
 	nightmare.
 
+2007-09-19 Jan Kryl (version 1.4.4)
+
+	* Remove bashism from Makefile (output redirection).
+
 2007-07-26 Jaromir Talir (version 1.4.3)
 	
 	* Simple schema change.
