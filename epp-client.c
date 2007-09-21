@@ -3544,7 +3544,7 @@ epp_call_test_nsset(epp_context *epp_ctx,
 		char *name = q_content(&test->names);
 
 		c_names->_buffer[i] = CORBA_string_dup(name);
-		if (c_names->_buffer[i] == NULL)
+		if (c_names->_buffer[i++] == NULL)
 			goto error_input;
 	}
 
