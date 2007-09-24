@@ -111,4 +111,15 @@ epp_call_save_output_xml(epp_context *epp_ctx,
 		epp_command_data *cdata,
 		const char *xml);
 
+/**
+ * Let the CR know that client has closed tcp session.
+ *
+ * @param epp_ctx     Epp context (pool, connection and session id).
+ * @param service     EPP service.
+ * @param loginid     Login ID of client.
+ */
+void
+epp_call_end_session(epp_context *epp_ctx, service_EPP service,
+		unsigned int loginid);
+
 #endif /* EPP_CLIENT_H */

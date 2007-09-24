@@ -3958,3 +3958,32 @@ epp_call_save_output_xml(epp_context *epp_ctx, service_EPP service,
 		return;
 	}
 }
+
+void
+epp_call_end_session(epp_context *epp_ctx, service_EPP service,
+		unsigned int loginid)
+{
+	CORBA_Environment	 ev[1];
+	int	 retr;
+
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev);
+		CORBA_exception_init(ev);
+
+		ccReg_EPP_sessionClosed((ccReg_EPP) service, loginid, ev);
+
+		/* if COMM_FAILURE exception is not raised quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+
+	if (raised_exception(ev)) {
+		epplog(epp_ctx, EPP_ERROR, "CORBA exception in sessionClosed: "
+				"%s", ev->_id);
+		CORBA_exception_free(ev);
+		/* ignore error */
+		return;
+	}
+}
+

@@ -600,13 +600,6 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
 	 *     is md5 digest of client's certificate.
 	 */
 	*cstat = epp_call_login(epp_ctx, service, loginid, lang, cert_md5,cdata);
-	/*
-	 * this event should be logged explicitly if login was
-	 * successfull
-	 */
-	if (*loginid != 0)
-		epplog(epp_ctx, EPP_INFO, "Logged in successfully, login id "
-				"is %d", *loginid);
 	return 1;
 }
 
@@ -742,9 +735,9 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 }
 
 static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
-		service_EPP *EPPservice, eppd_server_conf *sc)
+		service_EPP *EPPservice, eppd_server_conf *sc,
+		unsigned int *loginid_save)
 {
-	unsigned int	 loginid;/* session id assigned by fred_rif */
 	epp_lang	 lang;   /* session's language */
 	apr_pool_t	*rpool;  /* conntection memory pool */
 	parser_status	 pstat;  /* parser's return code */
@@ -754,6 +747,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	char	*request;        /* raw request read from socket */
 	char	*response;       /* generated XML answer to client */
 	int	 retval;         /* return code of read_request */
+	unsigned int	 loginid;        /* login id of client's session */
 #ifdef EPP_PERF
 	/*
 	 * array of timestamps for perf measurement:
@@ -766,7 +760,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 #endif
 
 	/* initialize variables used inside the loop */
-	loginid = 0;    /* this means that client is not logged in */
+	*loginid_save = loginid = 0;    /* this means that client is not logged in */
 	lang = LANG_EN;	/* default language is english */
 
 	/*
@@ -891,6 +885,16 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			if (!call_corba(epp_ctx, EPPservice, cdata, pstat,
 						&loginid, &lang))
 				return HTTP_INTERNAL_SERVER_ERROR;
+			/* did successfull login occured? */
+			if (*loginid_save == 0 && loginid != 0) {
+				*loginid_save = loginid;
+				/*
+				 * this event should be logged explicitly if
+				 * login was successfull
+				 */
+				epplog(epp_ctx, EPP_INFO, "Logged in "
+					"successfully, login id is %d",loginid);
+			}
 #ifdef EPP_PERF
 			times[2] = apr_time_now();
 #endif
@@ -967,6 +971,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 static int epp_process_connection(conn_rec *c)
 {
 	int	 i;
+	unsigned int	 loginid; /* login id of client */
 	int	 rc;      /* corba ret code */
 	int	 ret;     /* command loop return code */
 	char	*version; /* version of fred_rifd */
@@ -1081,7 +1086,10 @@ static int epp_process_connection(conn_rec *c)
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	ret = epp_request_loop(&epp_ctx, bb, EPPservice, sc);
+	ret = epp_request_loop(&epp_ctx, bb, EPPservice, sc, &loginid);
+	/* send notification about session end to CR */
+	if (loginid > 0)
+		epp_call_end_session(&epp_ctx, EPPservice, loginid);
 	epp_ctx.pool = c->pool;
 
 	/* client logged out or disconnected from server */
