@@ -760,7 +760,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 #endif
 
 	/* initialize variables used inside the loop */
-	*loginid_save = loginid = 0;    /* this means that client is not logged in */
+	*loginid_save = loginid = 0; /* zero means that client isn't logged in*/
 	lang = LANG_EN;	/* default language is english */
 
 	/*
@@ -1090,6 +1090,7 @@ static int epp_process_connection(conn_rec *c)
 	/* send notification about session end to CR */
 	if (loginid > 0)
 		epp_call_end_session(&epp_ctx, EPPservice, loginid);
+
 	epp_ctx.pool = c->pool;
 
 	/* client logged out or disconnected from server */

@@ -1,9 +1,21 @@
-2007-08-15 Jan Kryl (version 1.5.0)
+2007-09-26 Jan Kryl (version 1.5.0)
 
 	* New mechanism of creating poll message's content. The XML of message
 	is created in mod_eppd and not in central register. Maintenance
 	of XML generators scattered all over the central register was a
 	nightmare.
+
+	* Upon tcp connection close is called new CORBA function which signals
+	this event to Central Register. Central register in response deletes
+	a session entry from its table, so that it doesn't get overfilled by
+	stale connections.
+
+	* Bugfix in test_nsset function, which didn't properly incremented
+	index in a list and led to segmentation fault.
+
+	* XML response is send for archivation to central-register only if
+	it has real svTRID assigned by Central register (otherwise the CR
+	is not able to pair the response with request).
 
 2007-09-19 Jan Kryl (version 1.4.4)
 

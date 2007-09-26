@@ -7,6 +7,9 @@
 /**
  * @mainpage package mod_eppd
  *
+ * WARNING! This documentation is slightly obsolete and needs to be updated.
+ * However it is still usefull source of information.
+ *
  * @section overview Overview
  *
  * Purpose of this package is to translate incomming requests in form of
