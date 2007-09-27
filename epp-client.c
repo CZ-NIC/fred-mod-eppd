@@ -1638,8 +1638,9 @@ epp_call_poll_req(epp_context *epp_ctx,
 				char *fqdn = unwrap_str(epp_ctx->pool,
 						tc->fqdns._buffer[i], &cerrno);
 				if (cerrno != 0) goto error;
-				q_add(epp_ctx->pool, &poll_req->msg.tc.fqdns,
-						fqdn);
+				if (q_add(epp_ctx->pool,
+						&poll_req->msg.tc.fqdns, fqdn))
+					goto error;
 			}
 			for (i = 0; i < tc->tests._length; i++) {
 				ccReg_TechcheckItem *tci= &tc->tests._buffer[i];
@@ -1652,8 +1653,9 @@ epp_call_poll_req(epp_context *epp_ctx,
 				tr->note = unwrap_str(epp_ctx->pool,
 						tci->note, &cerrno);
 				if (cerrno != 0) goto error;
-				q_add(epp_ctx->pool, &poll_req->msg.tc.tests,
-						tr);
+				if (q_add(epp_ctx->pool,
+						&poll_req->msg.tc.tests, tr))
+					goto error;
 			}
 			break;
 			}

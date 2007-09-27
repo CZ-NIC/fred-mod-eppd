@@ -724,36 +724,24 @@ parse_info(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 	exists = xpath_count(xpathCtx, "contact:list", &xerr);
 	CHK_XERR(xerr, error);
 	if (exists) {
-		epps_list	*list;
-
-		if ((cdata->data = epp_calloc(pool, sizeof *list)) == NULL)
+		if ((cdata->data = epp_calloc(pool, sizeof(epps_list))) == NULL)
 			goto error;
-		list = cdata->data;
-
 		cdata->type = EPP_LIST_CONTACT;
 		return;
 	}
 	exists = xpath_count(xpathCtx, "domain:list", &xerr);
 	CHK_XERR(xerr, error);
 	if (exists) {
-		epps_list	*list;
-
-		if ((cdata->data = epp_calloc(pool, sizeof *list)) == NULL)
+		if ((cdata->data = epp_calloc(pool, sizeof(epps_list))) == NULL)
 			goto error;
-		list = cdata->data;
-
 		cdata->type = EPP_LIST_DOMAIN;
 		return;
 	}
 	exists = xpath_count(xpathCtx, "nsset:list", &xerr);
 	CHK_XERR(xerr, error);
 	if (exists) {
-		epps_list	*list;
-
-		if ((cdata->data = epp_calloc(pool, sizeof *list)) == NULL)
+		if ((cdata->data = epp_calloc(pool, sizeof(epps_list))) == NULL)
 			goto error;
-		list = cdata->data;
-
 		cdata->type = EPP_LIST_NSSET;
 		return;
 	}

@@ -305,7 +305,7 @@ void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
 				ap_level = APLOG_DEBUG;
 				break;
 		}
-		ap_log_cerror(APLOG_MARK, level, 0, conn, text);
+		ap_log_cerror(APLOG_MARK, ap_level, 0, conn, text);
 		return;
 	}
 
@@ -543,7 +543,7 @@ static int get_md5(char *cert_md5, char *pem)
 	}
 	/* convert binary representation to string repr of fingerprint */
 	for (i = 0; i < len; i++) {
-		sprintf(cert_md5, "%02X%c", md5[i], (i + 1 == len) ? '\0' : ':');
+		snprintf(cert_md5, 4, "%02X%c", md5[i], (i + 1 == len) ? '\0' : ':');
 		cert_md5 += 3;
 	}
 
@@ -568,7 +568,7 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
 		epp_command_data *cdata, unsigned int *loginid,
 		epp_lang *lang, corba_status *cstat)
 {
-	char	 cert_md5[50];/* should be enough for md5 hash of cert */
+	char	 cert_md5[80];/* should be enough for md5 hash of cert */
 	char	*pem;         /* pem encoded client's certificate */
 	conn_rec	*conn;/* apache connection */
 	apr_pool_t	*pool;/* memory pool */
@@ -576,7 +576,7 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
 	conn = epp_ctx->conn;
 	pool = epp_ctx->pool;
 	/* we will compute fingerprint of client's certificate */
-	bzero(cert_md5, 50);
+	bzero(cert_md5, 80);
 	pem = epp_ssl_lookup(pool, conn->base_server, conn, NULL,
 			"SSL_CLIENT_CERT");
 	if ((pem == NULL) || (*pem == '\0') || !get_md5(cert_md5, pem))
@@ -599,7 +599,8 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
 	 *     side of central repository. The identifing parameter
 	 *     is md5 digest of client's certificate.
 	 */
-	*cstat = epp_call_login(epp_ctx, service, loginid, lang, cert_md5,cdata);
+	*cstat = epp_call_login(epp_ctx, service, loginid, lang, cert_md5,
+			cdata);
 	return 1;
 }
 
