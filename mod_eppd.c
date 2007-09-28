@@ -928,7 +928,9 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		status = ap_fflush(((conn_rec *) epp_ctx->conn)->output_filters,
 			       bb);
 		if (status != APR_SUCCESS) {
-			epplog(epp_ctx, EPP_FATAL,
+			/* happens on every greeting when client just tests
+			 * the port. Not severe. */
+			epplog(epp_ctx, EPP_INFO,
 					"Error when sending response to client");
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
@@ -943,6 +945,18 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			epplog(epp_ctx, EPP_FATAL, "Could not cleanup bucket "
 					"brigade used for response");
 			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+
+		/*
+		 * XXX TEMPORARY HACK -disconnect on certain EPP return codes.
+		 */
+		switch (cdata->rc) {
+			case 2500:
+			case 2501:
+			case 2502:
+				return HTTP_OK;
+			default:
+				break;
 		}
 
 		/*XXX
