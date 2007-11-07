@@ -2531,13 +2531,14 @@ epp_parse_command(epp_context *epp_ctx,
 	if (cdata->parsed_doc == NULL)
 		return PARSER_NOT_XML;
 
-	/*
-	 * Save input xml document (we cannot use strdup since it is not sure
-	 * the request is NULL terminated).
-	 */
+	/* Save input xml document */
 	xmlDocDumpMemoryEnc(cdata->parsed_doc, &dumpedXML, &dumpLength,"UTF-8");
 	if (dumpedXML == NULL || dumpLength <= 0)
 		return PARSER_EINTERNAL;
+	/*
+	 * we cannot use strdup since it is not sure the request is NULL
+	 * terminated
+	 */
 	cdata->xml_in = epp_malloc(epp_ctx->pool, dumpLength + 1);
 	if (cdata->xml_in == NULL)
 		return PARSER_EINTERNAL;

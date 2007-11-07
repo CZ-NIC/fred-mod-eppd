@@ -21,7 +21,7 @@
 
 #define INITIAL_CHUNK 1024
 #define MAX_STR_LEN	100000
-#define DEBUG_ALLOC 1
+/* #define DEBUG_ALLOC 1 */
 
 #define raised_exception(ev)	((ev)->_major != CORBA_NO_EXCEPTION)
 
@@ -354,6 +354,7 @@ void usage(void)
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "      -f fingerprint\n");
 	fprintf(stderr, "      -h host\n");
+	fprintf(stderr, "      -p\n");
 	fprintf(stderr, "      -s schema\n");
 	fprintf(stderr, "      -t           (run in test mode)\n");
 	fprintf(stderr, "\n");
@@ -384,6 +385,7 @@ int main(int argc, char *argv[])
 	int	ar;
 	int interactive;
 	int	test = 0;
+	int	pflag = 0;
 	const char *host = NULL;
 	const char *fp = NULL;
 	const char *schemafile = NULL;
@@ -408,6 +410,9 @@ int main(int argc, char *argv[])
 					usage();
 					return 1;
 				}
+				break;
+			case 'p':
+				pflag = 1;
 				break;
 			case 't':
 				test = 1;
@@ -470,6 +475,9 @@ int main(int argc, char *argv[])
 			ret = 2;
 			break;
 		}
+
+		if (pflag) /* just ping the nameservice */
+			break;
 
 		if (firsttime) {
 			firsttime = 0;

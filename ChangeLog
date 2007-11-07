@@ -1,10 +1,13 @@
-2007-09-28 Jan Kryl (version 1.5.1)
+2007-11-07 Jan Kryl (version 1.5.1)
 
 	* Minor issues pointed by a coverity test were fixed.
 
 	* Hack to accomodate connection closing on certain return codes
 	was incorporated. In future the logic should be incorporated in
 	CORBA interface.
+
+	* New option -p of epp_test can be used to test corba nameservice
+	functionality.
 
 2007-09-26 Jan Kryl (version 1.5.0)
 
