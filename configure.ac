@@ -36,9 +36,18 @@ CPPFLAGS=$XML_CFLAGS
 LDFLAGS=$XML_LDFLAGS
 AC_CHECK_LIB([xml2], [xmlInitGlobals], [], [AC_MSG_ERROR([libxml2 not found])])
 AC_CHECK_HEADER([libxml/parser.h], [],
-				[AC_MSG_ERROR([missing libxml header files])], [])
+				[AC_MSG_ERROR([missing libxml header files])])
 AC_SUBST([XML_CFLAGS])
 AC_SUBST([XML_LDFLAGS])
+
+# Checks for devel libraries.
+AC_CHECK_HEADER([libxml2/libxml/xmlmodule.h], [], 
+    [AC_MSG_ERROR([Missing xmlmodule.h header file. Type: sudo apt-get install libxml2-dev])])
+AC_CHECK_HEADER([apr-0/apr.h], [], 
+    [AC_MSG_ERROR([Missing apr.h header file. Type: sudo apt-get install libapr0-dev])])
+AC_CHECK_HEADER([apache-1.3/httpd.h], [], 
+    [AC_MSG_WARN([Probably missing httpd.h header file. Type: sudo apt-get install apache-dev])])
+
 
 # Check for ORBit2 library and header files
 ORB_CFLAGS=[`$PKG_CONFIG --cflags ORBit-2.0 ORBit-CosNaming-2.0`]
@@ -48,16 +57,16 @@ LDFLAGS=$ORB_LDFLAGS
 AC_CHECK_LIB([ORBit-2], [CORBA_exception_init], [],
 			 [AC_MSG_ERROR([orbit2 not found])])
 AC_CHECK_HEADER([orbit/orbit.h], [],
-				[AC_MSG_ERROR([missing orbit2 header files])], [])
+				[AC_MSG_ERROR([missing orbit2 header files])])
 AC_CHECK_HEADER([ORBitservices/CosNaming.h], [],
-				[AC_MSG_ERROR([missing orbit2 cosnaming header files])], [])
+				[AC_MSG_ERROR([missing orbit2 cosnaming header files])])
 AC_SUBST([ORB_CFLAGS])
 AC_SUBST([ORB_LDFLAGS])
 
 # Check for openssl library and header files
 AC_CHECK_LIB([ssl], [X509_digest], [], [AC_MSG_ERROR([openssl not found])])
 AC_CHECK_HEADER([openssl/ssl.h], [],
-				[AC_MSG_ERROR([missing openssl header files])], [])
+				[AC_MSG_ERROR([missing openssl header files])])
 
 #
 # check apr-config
@@ -72,12 +81,12 @@ AC_CHECK_FILE([$APR_CONFIG], [], [AC_MSG_ERROR(
 			   [apr-config executable "$APR_CONFIG" does not exist (use --with-apr-config)])])
 
 #
-# check apxs tool
+# check apxs tool, prefer apxs2
 #
-AC_ARG_WITH([apxs], [AS_HELP_STRING([--with-apxs],
+AC_ARG_WITH([apxs2], [AS_HELP_STRING([--with-apxs],
 			[location of apxs executable])], [APXS=$withval])
 if test x"$APXS" = x; then
-	AC_PATH_PROGS([APXS], [apxs apxs2])
+	AC_PATH_PROGS([APXS], [apxs2 apxs])
 fi
 AC_CHECK_FILE([$APXS], [], [AC_MSG_ERROR(
 			   [apxs executable "$APXS" was not found (use --with-apxs)])])
@@ -126,9 +135,9 @@ AC_SUBST([IDLPREFIX], [$idlprefix])
 # check schema file
 #
 AC_ARG_WITH([schema], [AS_HELP_STRING([--with-schema],
-			[xml schema defining EPP protocol [schemas/all-1.3.xsd]])],
+			[xml schema defining EPP protocol [schemas/all-1.4.xsd]])],
 			[AC_SUBST([SCHEMA], [$withval])],
-			[AC_SUBST([SCHEMA], [schemas/all-1.3.xsd])])
+			[AC_SUBST([SCHEMA], [schemas/all-1.4.xsd])])
 AC_CHECK_FILE([$SCHEMA], [], [AC_MSG_ERROR(
 			   [xml schema "$SCHEMA" does not exist (use --with-schema)])])
 
