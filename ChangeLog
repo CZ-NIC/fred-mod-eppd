@@ -1,3 +1,10 @@
+2008-01-10 Jiri Sadek
+
+	* Automake support and autoconf somewhat rewritten
+
+	* Log message after successfuly initialization uniformalized with
+	other modules
+
 2007-11-07 Jan Kryl (version 1.5.1)
 
 	* Minor issues pointed by a coverity test were fixed.
