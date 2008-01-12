@@ -1,8 +1,7 @@
 Name:           @PACKAGE@
 Version:        @VERSION@
 Release:        1%{?dist}
-Summary:        Free Registry for Enum and Domain
-
+Summary:        FRED - server for EPP over TCP/SSL as apache module
 Group:          Applications/Utils
 License:        GPL
 URL:            http://fred.nic.cz
@@ -12,7 +11,11 @@ BuildRequires:  apr-devel, httpd-devel, libxml2-devel, openssl-devel, fred-idl
 Requires: httpd, libxml2, openssl, fred-mod-corba
 
 %description
-Fred registry system
+FRED (Free Registry for Enum and Domain) is free registry system for 
+managing domain registrations. This package contains apache module that
+implements server for EPP communication over TCP/SSL. For real work this
+module communicate with fred-server via CORBA technology as provided by
+mod_corba apache module
 
 %prep
 %setup
