@@ -3,13 +3,13 @@
 # vim: set ts=4 sw=4:
 
 AC_PREREQ(2.59)
-AC_INIT([mod_eppd], 2.0, [], [mod_eppd])
+AC_INIT([fred-mod-eppd], 1.5, [], [fred-mod-eppd])
 AC_CONFIG_SRCDIR([mod_eppd.c])
 
 AH_TOP([#include "unconfig.h" /* why this? See comment in unconfig.h */])
 
 # init automake
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([-Wall -Werror])
 
 # Checks for programs.
 AC_PROG_CC
@@ -19,6 +19,8 @@ AC_PROG_AWK
 AC_PROG_INSTALL
 AM_PROG_LIBTOOL
 
+# Required byt automake per-targate flags
+AM_PROG_CC_C_O
 
 # Check for libxml2 library and header files
 AM_PATH_XML2([2.0.0],[],[AC_MSG_ERROR([missing libxml header files])])
@@ -56,11 +58,16 @@ APACHE_CPPFLAGS="`${apr_config} --cppflags`"
 AC_SUBST(APACHE_CFLAGS)
 AC_SUBST(APACHE_CPPFLAGS)
 
+#set apache module path
+APACHE_LIBEXECDIR=`${APXS} -q LIBEXECDIR`
+APACHE_LIBEXECDIR=${libdir}${APACHE_LIBEXECDIR#/usr/lib};
+AC_SUBST(APACHE_LIBEXECDIR)
+
 # check IDL dir
 AC_ARG_WITH([idldir], [AS_HELP_STRING([--with-idldir],
-                        [Directory with idl [$CWD/idl]])],
+                        [Directory with idl [/usr/share/idl/fred/]])],
                         [AC_SUBST([IDLDIR], [$withval])],
-                        [AC_SUBST([IDLDIR], [`pwd`/idl])])
+                        [AC_SUBST([IDLDIR], [/usr/share/idl/fred])])
 
 # check IDL file
 AC_ARG_WITH([idl], [AS_HELP_STRING([--with-idl],
@@ -78,7 +85,7 @@ AC_SUBST([IDLPREFIX], [$idlprefix])
 AC_ARG_WITH([schema], [AS_HELP_STRING([--with-schema],
 			[xml schema defining EPP protocol [schemas/all-1.4.xsd]])],
 			[AC_SUBST([SCHEMA], [$withval])],
-			[AC_SUBST([SCHEMA], [schemas/all-1.4.xsd])])
+			[AC_SUBST([SCHEMA], [$srcdir/schemas/all-1.4.xsd])])
 AC_CHECK_FILE([$SCHEMA], [], [AC_MSG_ERROR(
 			   [xml schema "$SCHEMA" does not exist (use --with-schema)])])
 
@@ -117,5 +124,6 @@ fi
 
 # finalization
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile
+		 fred-mod-eppd.spec])
 AC_OUTPUT

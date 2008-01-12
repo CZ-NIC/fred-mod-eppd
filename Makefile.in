@@ -36,10 +36,13 @@ build_triplet = @build@
 host_triplet = @host@
 noinst_PROGRAMS = epp_test$(EXEEXT)
 subdir = .
-DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
-	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
+DIST_COMMON = README $(am__configure_deps) $(dist_fredschemas_DATA) \
+	$(dist_fredssl_DATA) $(dist_pkgdata_DATA) \
+	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
+	$(srcdir)/config.h.in $(srcdir)/fred-mod-eppd.spec.in \
 	$(top_srcdir)/configure AUTHORS COPYING ChangeLog INSTALL NEWS \
-	config.guess config.sub depcomp install-sh ltmain.sh missing
+	compile config.guess config.sub depcomp install-sh ltmain.sh \
+	missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_orbit_cosnaming.m4 \
 	$(top_srcdir)/m4/ax_with_apxs.m4 $(top_srcdir)/configure.ac
@@ -49,7 +52,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES =
+CONFIG_CLEAN_FILES = fred-mod-eppd.spec
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libmodeppd_la_DEPENDENCIES = liborbeppd.la libxmleppd.la
 am_libmodeppd_la_OBJECTS = libmodeppd_la-epp_common.lo \
@@ -74,9 +77,13 @@ libxmleppd_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libxmleppd_la_CFLAGS) \
 	$(CFLAGS) $(libxmleppd_la_LDFLAGS) $(LDFLAGS) -o $@
 PROGRAMS = $(noinst_PROGRAMS)
-am_epp_test_OBJECTS = epp_test.$(OBJEXT)
+am_epp_test_OBJECTS = epp_test-epp_test.$(OBJEXT)
 epp_test_OBJECTS = $(am_epp_test_OBJECTS)
-epp_test_DEPENDENCIES = libmodeppd.la
+am__DEPENDENCIES_1 =
+epp_test_DEPENDENCIES = libmodeppd.la $(am__DEPENDENCIES_1)
+epp_test_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
+	--mode=link $(CCLD) $(epp_test_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -93,7 +100,19 @@ SOURCES = $(libmodeppd_la_SOURCES) $(liborbeppd_la_SOURCES) \
 	$(libxmleppd_la_SOURCES) $(epp_test_SOURCES)
 DIST_SOURCES = $(libmodeppd_la_SOURCES) $(liborbeppd_la_SOURCES) \
 	$(libxmleppd_la_SOURCES) $(epp_test_SOURCES)
-DATA = $(noinst_DATA)
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
+am__installdirs = "$(DESTDIR)$(fredschemasdir)" \
+	"$(DESTDIR)$(fredssldir)" "$(DESTDIR)$(pkgdatadir)"
+dist_fredschemasDATA_INSTALL = $(INSTALL_DATA)
+dist_fredsslDATA_INSTALL = $(INSTALL_DATA)
+dist_pkgdataDATA_INSTALL = $(INSTALL_DATA)
+DATA = $(dist_fredschemas_DATA) $(dist_fredssl_DATA) \
+	$(dist_pkgdata_DATA) $(noinst_DATA)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -111,6 +130,7 @@ ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 APACHE_CFLAGS = @APACHE_CFLAGS@
 APACHE_CPPFLAGS = @APACHE_CPPFLAGS@
+APACHE_LIBEXECDIR = @APACHE_LIBEXECDIR@
 APXS = @APXS@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
@@ -234,11 +254,20 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-ACLOCAL_AMFLAGS = -I ${top_srcdir}/m4/
-CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~
+ACLOCAL_AMFLAGS = -I m4
+CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la
+fredschemasdir = ${pkgdatadir}/schemas
+fredssldir = ${pkgdatadir}/ssl
 noinst_LTLIBRARIES = liborbeppd.la libxmleppd.la libmodeppd.la
 noinst_DATA = mod_eppd.la
-INCLUDES = ${APACHE_CFLAGS} ${APACHE_CPPFLAGS} ${ORBIT_CFLAGS} ${CPPFLAGS} 
+dist_pkgdata_DATA = conf/02-fred-mod-eppd-apache.conf
+dist_fredschemas_DATA = ${srcdir}/schemas/*.xsd ${srcdir}/schemas/README \
+			${srcdir}/schemas/ChangeLog
+
+dist_fredssl_DATA = ${srcdir}/ssl/README ${srcdir}/ssl/*.pem
+EXTRA_DIST = unconfig.h fred-mod-eppd.spec 
+BUILT_SOURCES = EPP.h EPP-common.c EPP-stubs.c
+INCL = ${APACHE_CFLAGS} ${APACHE_CPPFLAGS} ${ORBIT_CFLAGS} ${CPPFLAGS} 
 AM_LDFLAGS = ${ORBIT_LIBS} ${LIBS} ${LDFLAGS}
 IDL_H = @IDLPREFIX@.h
 IDL_S = @IDLPREFIX@-common.c @IDLPREFIX@-stubs.c
@@ -246,15 +275,20 @@ IDL_ALL = ${IDL_S} ${IDL_H}
 liborbeppd_la_SOURCES = ${IDL_S} 
 liborbeppd_la_CFLAGS = ${ORBIT_CFLAGS} 
 liborbeppd_la_LDFLAGS = ${ORBIT_LIBS}
-libxmleppd_la_SOURCES = epp_gen.c epp_parser.c epp_xmlcommon.c
+libxmleppd_la_SOURCES = epp_gen.c epp_gen.h epp_parser.c epp_parser.h \
+                        epp_xmlcommon.c epp_xmlcommon.h 
+
 libxmleppd_la_CFLAGS = ${XML_CPPFLAGS}
 libxmleppd_la_LDFLAGS = ${XML_LIBS}
-libmodeppd_la_SOURCES = epp_common.c epp-client.c mod_eppd.c 
-libmodeppd_la_CFLAGS = ${INCLUDES} -include ${IDL_H}
+libmodeppd_la_SOURCES = epp_common.c epp_common.h epp-client.c epp-client.h \
+                        mod_eppd.c 
+
+libmodeppd_la_CFLAGS = ${INCL} -include ${IDL_H}
 libmodeppd_la_LIBADD = liborbeppd.la libxmleppd.la
 epp_test_SOURCES = epp_test.c
-epp_test_LDADD = libmodeppd.la 
-all: config.h
+epp_test_CFLAGS = ${ORBIT_CFLAGS} 
+epp_test_LDADD = libmodeppd.la ${ORBIT_LIBS}
+all: $(BUILT_SOURCES) config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
 .SUFFIXES:
@@ -309,6 +343,8 @@ $(srcdir)/config.h.in:  $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f config.h stamp-h1
+fred-mod-eppd.spec: $(top_builddir)/config.status $(srcdir)/fred-mod-eppd.spec.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
 
 clean-noinstLTLIBRARIES:
 	-test -z "$(noinst_LTLIBRARIES)" || rm -f $(noinst_LTLIBRARIES)
@@ -333,7 +369,7 @@ clean-noinstPROGRAMS:
 	done
 epp_test$(EXEEXT): $(epp_test_OBJECTS) $(epp_test_DEPENDENCIES) 
 	@rm -f epp_test$(EXEEXT)
-	$(LINK) $(epp_test_OBJECTS) $(epp_test_LDADD) $(LIBS)
+	$(epp_test_LINK) $(epp_test_OBJECTS) $(epp_test_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -341,7 +377,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/epp_test.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/epp_test-epp_test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmodeppd_la-epp-client.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmodeppd_la-epp_common.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmodeppd_la-mod_eppd.Plo@am__quote@
@@ -428,6 +464,20 @@ libxmleppd_la-epp_xmlcommon.lo: epp_xmlcommon.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libxmleppd_la_CFLAGS) $(CFLAGS) -c -o libxmleppd_la-epp_xmlcommon.lo `test -f 'epp_xmlcommon.c' || echo '$(srcdir)/'`epp_xmlcommon.c
 
+epp_test-epp_test.o: epp_test.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(epp_test_CFLAGS) $(CFLAGS) -MT epp_test-epp_test.o -MD -MP -MF $(DEPDIR)/epp_test-epp_test.Tpo -c -o epp_test-epp_test.o `test -f 'epp_test.c' || echo '$(srcdir)/'`epp_test.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/epp_test-epp_test.Tpo $(DEPDIR)/epp_test-epp_test.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='epp_test.c' object='epp_test-epp_test.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(epp_test_CFLAGS) $(CFLAGS) -c -o epp_test-epp_test.o `test -f 'epp_test.c' || echo '$(srcdir)/'`epp_test.c
+
+epp_test-epp_test.obj: epp_test.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(epp_test_CFLAGS) $(CFLAGS) -MT epp_test-epp_test.obj -MD -MP -MF $(DEPDIR)/epp_test-epp_test.Tpo -c -o epp_test-epp_test.obj `if test -f 'epp_test.c'; then $(CYGPATH_W) 'epp_test.c'; else $(CYGPATH_W) '$(srcdir)/epp_test.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/epp_test-epp_test.Tpo $(DEPDIR)/epp_test-epp_test.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='epp_test.c' object='epp_test-epp_test.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(epp_test_CFLAGS) $(CFLAGS) -c -o epp_test-epp_test.obj `if test -f 'epp_test.c'; then $(CYGPATH_W) 'epp_test.c'; else $(CYGPATH_W) '$(srcdir)/epp_test.c'; fi`
+
 mostlyclean-libtool:
 	-rm -f *.lo
 
@@ -436,6 +486,57 @@ clean-libtool:
 
 distclean-libtool:
 	-rm -f libtool
+install-dist_fredschemasDATA: $(dist_fredschemas_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(fredschemasdir)" || $(MKDIR_P) "$(DESTDIR)$(fredschemasdir)"
+	@list='$(dist_fredschemas_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f=$(am__strip_dir) \
+	  echo " $(dist_fredschemasDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(fredschemasdir)/$$f'"; \
+	  $(dist_fredschemasDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(fredschemasdir)/$$f"; \
+	done
+
+uninstall-dist_fredschemasDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(dist_fredschemas_DATA)'; for p in $$list; do \
+	  f=$(am__strip_dir) \
+	  echo " rm -f '$(DESTDIR)$(fredschemasdir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(fredschemasdir)/$$f"; \
+	done
+install-dist_fredsslDATA: $(dist_fredssl_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(fredssldir)" || $(MKDIR_P) "$(DESTDIR)$(fredssldir)"
+	@list='$(dist_fredssl_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f=$(am__strip_dir) \
+	  echo " $(dist_fredsslDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(fredssldir)/$$f'"; \
+	  $(dist_fredsslDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(fredssldir)/$$f"; \
+	done
+
+uninstall-dist_fredsslDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(dist_fredssl_DATA)'; for p in $$list; do \
+	  f=$(am__strip_dir) \
+	  echo " rm -f '$(DESTDIR)$(fredssldir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(fredssldir)/$$f"; \
+	done
+install-dist_pkgdataDATA: $(dist_pkgdata_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(pkgdatadir)" || $(MKDIR_P) "$(DESTDIR)$(pkgdatadir)"
+	@list='$(dist_pkgdata_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f=$(am__strip_dir) \
+	  echo " $(dist_pkgdataDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(pkgdatadir)/$$f'"; \
+	  $(dist_pkgdataDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(pkgdatadir)/$$f"; \
+	done
+
+uninstall-dist_pkgdataDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(dist_pkgdata_DATA)'; for p in $$list; do \
+	  f=$(am__strip_dir) \
+	  echo " rm -f '$(DESTDIR)$(pkgdatadir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(pkgdatadir)/$$f"; \
+	done
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
@@ -611,10 +712,15 @@ distcleancheck: distclean
 	       $(distcleancheck_listfiles) ; \
 	       exit 1; } >&2
 check-am: all-am
-check: check-am
+check: $(BUILT_SOURCES)
+	$(MAKE) $(AM_MAKEFLAGS) check-am
 all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(DATA) config.h
 installdirs:
-install: install-am
+	for dir in "$(DESTDIR)$(fredschemasdir)" "$(DESTDIR)$(fredssldir)" "$(DESTDIR)$(pkgdatadir)"; do \
+	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
+	done
+install: $(BUILT_SOURCES)
+	$(MAKE) $(AM_MAKEFLAGS) install-am
 install-exec: install-exec-am
 install-data: install-data-am
 uninstall: uninstall-am
@@ -639,6 +745,7 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
+	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 clean: clean-am
 
 clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
@@ -661,7 +768,8 @@ info: info-am
 
 info-am:
 
-install-data-am:
+install-data-am: install-dist_fredschemasDATA install-dist_fredsslDATA \
+	install-dist_pkgdataDATA
 
 install-dvi: install-dvi-am
 
@@ -699,7 +807,9 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am:
+uninstall-am: uninstall-dist_fredschemasDATA \
+	uninstall-dist_fredsslDATA uninstall-dist_pkgdataDATA \
+	uninstall-local
 
 .MAKE: install-am install-strip
 
@@ -710,19 +820,26 @@ uninstall-am:
 	distclean-compile distclean-generic distclean-hdr \
 	distclean-libtool distclean-tags distcleancheck distdir \
 	distuninstallcheck dvi dvi-am html html-am info info-am \
-	install install-am install-data install-data-am install-dvi \
-	install-dvi-am install-exec install-exec-am install-exec-local \
-	install-html install-html-am install-info install-info-am \
-	install-man install-pdf install-pdf-am install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-compile mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags uninstall \
-	uninstall-am
+	install install-am install-data install-data-am \
+	install-dist_fredschemasDATA install-dist_fredsslDATA \
+	install-dist_pkgdataDATA install-dvi install-dvi-am \
+	install-exec install-exec-am install-exec-local install-html \
+	install-html-am install-info install-info-am install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am tags uninstall uninstall-am \
+	uninstall-dist_fredschemasDATA uninstall-dist_fredsslDATA \
+	uninstall-dist_pkgdataDATA uninstall-local
 
 
 install-exec-local:
-	${APXS} -i -n 'mod_eppd' mod_eppd.la
+	mkdir -p ${DESTDIR}${APACHE_LIBEXECDIR}; \
+	${APXS} -S LIBEXECDIR=${DESTDIR}${APACHE_LIBEXECDIR} -i -n 'mod_eppd' mod_eppd.la
+
+uninstall-local:
+	rm -rf ${DESTDIR}${APACHE_LIBEXECDIR}/mod_eppd.so
 
 mod_eppd.la: libmodeppd.la
 	${APXS} -c -o $@ $< ${APACHE_CFLAGS} ${ORBIT_CFLAGS} ${AM_LDFLAGS}

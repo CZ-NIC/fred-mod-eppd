@@ -1,0 +1,51 @@
+Name:           @PACKAGE@
+Version:        @VERSION@
+Release:        1%{?dist}
+Summary:        Free Registry for Enum and Domain
+
+Group:          Applications/Utils
+License:        GPL
+URL:            http://fred.nic.cz
+Source:         %{name}-%{version}.tar.gz
+BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+BuildRequires:  apr-devel, httpd-devel, libxml2-devel, openssl-devel, fred-idl
+Requires: httpd, libxml2, openssl, fred-mod-corba
+
+%description
+Fred registry system
+
+%prep
+%setup
+
+%build
+%configure --prefix=/usr --with-apxs=/usr/sbin/apxs
+make
+
+%install
+rm -rf ${RPM_BUILD_ROOT}
+make DESTDIR=${RPM_BUILD_ROOT} install
+
+%post
+test -f /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf || ln -s /usr/share/fred-mod-eppd/02-fred-mod-eppd-apache.conf /etc/httpd/conf.d/
+
+%preun
+test ! -f /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf || rm /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf
+
+%clean
+rm -rf ${RPM_BUILD_ROOT}
+
+%files
+%defattr(-,root,root,-)
+/usr/lib/httpd/modules/mod_eppd.so
+/usr/share/fred-mod-eppd/02-fred-mod-eppd-apache.conf
+/usr/share/fred-mod-eppd/schemas/*.xsd
+/usr/share/fred-mod-eppd/schemas/README
+/usr/share/fred-mod-eppd/schemas/ChangeLog
+/usr/share/fred-mod-eppd/ssl/README
+/usr/share/fred-mod-eppd/ssl/test-cert.pem
+/usr/share/fred-mod-eppd/ssl/test-key.pem
+
+%changelog
+* Sat Jan 12 2008 Jaromir Talir <jaromir.talir@nic.cz>
+- initial spec file
+

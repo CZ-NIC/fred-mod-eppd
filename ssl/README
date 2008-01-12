@@ -1,0 +1,24 @@
+This directory contains certificate and it's associated private key for
+purpose of test EPP communication with FRED registry. There are three types
+of certificates involved in EPP communication.
+
+1. Certificate od certification autorithy (CA). All two remaining certificate
+need to be signed by this CA certificate
+
+2. SSL server certificate. Standard SSL communitation requires server to
+authenticate itself by this certificate. Clients can validate informations
+from this certificate with connection
+
+3. SSL client certificates. Every client (registrar) must have client
+certificate to initiate SSL connection. Server validate this certificate
+through CA certificate and compare it's MD5 with data stored in database
+along with registrar login informations
+
+Server side EPP configuration needs first and second of this certificates. 
+For testing purpose we use same certificate in these two roles. This
+certificate can even play a role of client certificate.
+
+This certificate was created by two calls to openssl:
+
+openssl req -new -nodes -keyout test-key.pem -subj /C=CZ/L=Prague/O=CZ.NIC/OU=Registry/CN=localhost/ | openssl x509 -req -days 3650 -signkey test-key.pem -out test-cert.pem
+
