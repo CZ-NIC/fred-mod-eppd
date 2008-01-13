@@ -53,7 +53,7 @@ if test "$?" != "0"; then
 fi
 
 # set apache flags
-APACHE_CFLAGS="-I`${APXS} -q INCLUDEDIR` -I`${apr_config} --includedir`"
+APACHE_CFLAGS="`${APXS} -q CFLAGS` -I`${APXS} -q INCLUDEDIR` -I`${apr_config} --includedir`"
 APACHE_CPPFLAGS="`${apr_config} --cppflags`"
 AC_SUBST(APACHE_CFLAGS)
 AC_SUBST(APACHE_CPPFLAGS)

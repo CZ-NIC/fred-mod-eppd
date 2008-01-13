@@ -20888,7 +20888,7 @@ echo "$as_me: error: $apr_config is not valid apr-config executable" >&2;}
 fi
 
 # set apache flags
-APACHE_CFLAGS="-I`${APXS} -q INCLUDEDIR` -I`${apr_config} --includedir`"
+APACHE_CFLAGS="`${APXS} -q CFLAGS` -I`${APXS} -q INCLUDEDIR` -I`${apr_config} --includedir`"
 APACHE_CPPFLAGS="`${apr_config} --cppflags`"
 
 
