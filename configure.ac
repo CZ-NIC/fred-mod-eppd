@@ -8,6 +8,17 @@ AC_CONFIG_SRCDIR([mod_eppd.c])
 
 AH_TOP([#include "unconfig.h" /* why this? See comment in unconfig.h */])
 
+# doxygen
+DX_HTML_FEATURE(ON)
+DX_CHM_FEATURE(OFF)
+DX_CHI_FEATURE(OFF)
+DX_MAN_FEATURE(OFF)
+DX_RTF_FEATURE(OFF)
+DX_XML_FEATURE(OFF)
+DX_PDF_FEATURE(OFF)
+DX_PS_FEATURE(OFF)
+DX_INIT_DOXYGEN(fred-mod-eppd, doxy.conf, [doc])
+
 # init automake
 AM_INIT_AUTOMAKE([-Wall -Werror])
 
@@ -88,16 +99,6 @@ AC_ARG_WITH([schema], [AS_HELP_STRING([--with-schema],
 			[AC_SUBST([SCHEMA], [$srcdir/schemas/all-1.4.xsd])])
 AC_CHECK_FILE([$SCHEMA], [], [AC_MSG_ERROR(
 			   [xml schema "$SCHEMA" does not exist (use --with-schema)])])
-
-# check doc (implying doxygen)
-AC_ARG_WITH([doc], [AS_HELP_STRING([--with-doc],
-			[location of doxygen executable used for html documentation])],
-			[AC_SUBST([DOXYGEN], [$withval])])
-if test x"$DOXYGEN" = x; then
-	AC_PATH_PROG([DOXYGEN], [doxygen])
-fi
-AC_CHECK_FILE([$DOXYGEN], [], [AC_MSG_NOTICE(
-			   [doxygen executable "$DOXYGEN" not found, you will not be able to generate html documentation])])
 
 # check svn revision (if available)
 AC_SUBST([SVNREV], [unknown])

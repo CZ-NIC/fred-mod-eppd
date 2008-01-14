@@ -1,5 +1,7 @@
 ACLOCAL_AMFLAGS = -I m4
-CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la
+include $(top_srcdir)/am_doxygen.am
+
+CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la ${DX_CLEANFILES}
 
 fredschemasdir = ${pkgdatadir}/schemas
 fredssldir = ${pkgdatadir}/ssl
