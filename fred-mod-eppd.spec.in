@@ -21,7 +21,7 @@ mod_corba apache module
 %setup
 
 %build
-%configure --prefix=/usr --with-apxs=/usr/sbin/apxs
+%configure
 make
 
 %install
