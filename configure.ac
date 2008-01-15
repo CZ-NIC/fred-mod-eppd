@@ -70,8 +70,9 @@ AC_SUBST(APACHE_CFLAGS)
 AC_SUBST(APACHE_CPPFLAGS)
 
 #set apache module path
-APACHE_LIBEXECDIR=`${APXS} -q LIBEXECDIR`
-APACHE_LIBEXECDIR=${libdir}${APACHE_LIBEXECDIR#/usr/lib};
+#hack: replacing lib-part of dir with ${libdir} to support prefix install
+APACHE_LEDIR=`${APXS} -q LIBEXECDIR`
+APACHE_LIBEXECDIR=${libdir}${APACHE_LEDIR##${APACHE_LEDIR%/*/*}};
 AC_SUBST(APACHE_LIBEXECDIR)
 
 # check IDL dir

@@ -39,7 +39,7 @@ rm -rf ${RPM_BUILD_ROOT}
 
 %files
 %defattr(-,root,root,-)
-/usr/lib/httpd/modules/mod_eppd.so
+%{_libdir}/httpd/modules/mod_eppd.so
 /usr/share/fred-mod-eppd/02-fred-mod-eppd-apache.conf
 /usr/share/fred-mod-eppd/schemas/*.xsd
 /usr/share/fred-mod-eppd/schemas/README
