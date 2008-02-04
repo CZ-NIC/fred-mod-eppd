@@ -396,7 +396,7 @@ int main(int argc, char *argv[])
 	parser_status	pstat;
 	corba_status	cstat;
 	gen_status	gstat;
-	void	*schema;
+	void	*schema = NULL;
 	void	*pool;
 	int	firsttime;
 	int	ar;

@@ -1806,7 +1806,7 @@ epp_call_create_domain(epp_context *epp_ctx,
 	CORBA_Environment ev[1];
 	CORBA_char	*c_crDate, *c_exDate;
 	CORBA_char	*c_registrant, *c_nsset, *c_authInfo, *c_clTRID;
-	ccReg_Response	*response;
+	ccReg_Response	*response = NULL;
 	ccReg_AdminContact	*c_admin;
 	ccReg_ExtensionList	*c_ext_list;
 	ccReg_Period_str	*c_period;
@@ -2622,7 +2622,7 @@ epp_call_update_domain(epp_context *epp_ctx,
 	ccReg_ExtensionList	*c_ext_list;
 	epps_update_domain	*update_domain;
 	CORBA_char	*c_clTRID, *c_registrant, *c_authInfo, *c_nsset;
-	ccReg_Response	*response;
+	ccReg_Response	*response = NULL;
 	int	i, len, retr, input_ok;
 
 	input_ok = 0;

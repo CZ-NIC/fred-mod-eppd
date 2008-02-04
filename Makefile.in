@@ -75,6 +75,7 @@ noinst_PROGRAMS = epp_test$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_orbit_cosnaming.m4 \
+	$(top_srcdir)/m4/ax_prog_doxygen.m4 \
 	$(top_srcdir)/m4/ax_with_apxs.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -318,6 +319,7 @@ ACLOCAL_AMFLAGS = -I m4
 @DX_COND_doc_TRUE@@DX_COND_ps_TRUE@DX_PS_GOAL = doxygen-ps
 @DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@DX_CLEAN_PDF = @DX_DOCDIR@/@PACKAGE@.pdf
 @DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@DX_PDF_GOAL = doxygen-pdf
+@DX_COND_doc_TRUE@@DX_COND_latex_TRUE@DX_CLEAN_LATEX = @DX_DOCDIR@/latex
 @DX_COND_doc_TRUE@DX_CLEANFILES = \
 @DX_COND_doc_TRUE@    @DX_DOCDIR@/@PACKAGE@.tag \
 @DX_COND_doc_TRUE@    -r \
@@ -331,7 +333,6 @@ ACLOCAL_AMFLAGS = -I m4
 @DX_COND_doc_TRUE@    $(DX_CLEAN_PDF) \
 @DX_COND_doc_TRUE@    $(DX_CLEAN_LATEX)
 
-@DX_COND_doc_TRUE@@DX_COND_latex_TRUE@DX_CLEAN_LATEX = @DX_DOCDIR@/latex
 CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la ${DX_CLEANFILES}
 fredschemasdir = ${pkgdatadir}/schemas
 fredssldir = ${pkgdatadir}/ssl
