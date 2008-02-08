@@ -644,6 +644,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service,
 	}
 	else if (pstat == PARSER_CMD_LOGOUT) {
 		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
+		epplog(epp_ctx, EPP_DEBUG, "login id after logout command is %d", *loginid);
 	}
 	else {
 		/* go ahead to generic corba function call */
@@ -904,6 +905,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 						&loginid, &lang))
 				return HTTP_INTERNAL_SERVER_ERROR;
 			/* did successfull login occured? */
+			epplog(epp_ctx, EPP_DEBUG, "after corba call command "
+				"saved login id is %d, login id is %d", *loginid_save, loginid);
 			if (*loginid_save == 0 && loginid != 0) {
 				*loginid_save = loginid;
 				/*
@@ -953,8 +956,10 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		}
 
 		/* check if successful logout appeared */
-		if (pstat == PARSER_CMD_LOGOUT && loginid == 0)
+		if (pstat == PARSER_CMD_LOGOUT && loginid == 0) {
+			*loginid_save = 0;
 			break;
+		}
 
 		/* prepare bucket brigade for reuse in next request */
 		status = apr_brigade_cleanup(bb);
