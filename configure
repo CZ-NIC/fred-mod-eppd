@@ -22992,29 +22992,6 @@ echo "$as_me: error: failed to find apxs. Try using --with-apxs" >&2;}
    { (exit 1); exit 1; }; }
 fi
 
-  # check Apache version
-  { echo "$as_me:$LINENO: checking Apache version" >&5
-echo $ECHO_N "checking Apache version... $ECHO_C" >&6; }
-  HTTPD="`${APXS} -q SBINDIR`/`${APXS} -q TARGET`"
-  if test ! -x "$HTTPD"; then
-    { { echo "$as_me:$LINENO: error: $APXS says that your apache binary lives at $HTTPD but that file isn't executable.  Specify the correct apxs location with --with-apxs" >&5
-echo "$as_me: error: $APXS says that your apache binary lives at $HTTPD but that file isn't executable.  Specify the correct apxs location with --with-apxs" >&2;}
-   { (exit 1); exit 1; }; }
-  fi
-  ver=`$HTTPD -v | /usr/bin/awk '/version/ {print }' | /usr/bin/awk -F/ '{print }'`
-  { echo "$as_me:$LINENO: result: $ver" >&5
-echo "${ECHO_T}$ver" >&6; }
-
-  # make sure version begins with 2
-  if test -z "`$HTTPD -v | egrep 'Server version: Apache/2'`"; then
-    { { echo "$as_me:$LINENO: error: mod_auth_openid only works with Apache 2. The one you have seems to be $ver." >&5
-echo "$as_me: error: mod_auth_openid only works with Apache 2. The one you have seems to be $ver." >&2;}
-   { (exit 1); exit 1; }; }
-  fi
-
-
-
-
 # check apr-config
 
 # Check whether --with-apr-config was given.
