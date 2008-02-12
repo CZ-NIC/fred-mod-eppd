@@ -46,7 +46,17 @@ AC_CHECK_HEADER([openssl/ssl.h], [],
 				[AC_MSG_ERROR([missing openssl header files])])
 
 # check apxs tool
-AX_WITH_APXS()
+AX_WITH_APXS([no],[${PATH}:/usr/local/bin:/usr/local/sbin:/usr/sbin:/sbin])
+if test "$APXS" = "no"; then
+    AC_MSG_ERROR([apxs executable does not exist (use --with-apxs)])
+fi
+# check for ap_release.h
+# if present we have a apache 2.0.x and greater (in lower it's not included)
+# syntax of \#define AP_SERVER_MAJORVERSION differ in minor versions
+APXS_INCDIR="`${APXS} -q INCLUDEDIR`"
+AC_CHECK_FILE([$APXS_INCDIR/ap_release.h],
+              [AC_MSG_NOTICE([apache version >=2.0.x found])],
+              [AC_MSG_ERROR([apache version >=2.0.x not found.])])
 
 # check apr-config
 AC_ARG_WITH([apr-config], [AC_HELP_STRING([[--with-apr-config]],

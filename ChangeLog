@@ -1,3 +1,10 @@
+2008-02-08 Jiri Sadek (version 1.6.0)
+
+	* Release 1.6.0
+
+	* Fixed double logout call to Central Register when user issue proper
+	connection close.
+
 2008-01-12 Jaromir Talir
 
 	* Adding test ssl certificate and updating test configuration
