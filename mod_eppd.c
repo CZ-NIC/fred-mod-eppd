@@ -103,6 +103,11 @@
 #include "config.h"
 #endif
 
+
+/** Min and max time values (in msec) for deferring error responses  */
+#define DEFER_MIN 		0
+#define DEFER_MAX		10000
+
 /** Length of EPP header containing message size. */
 #define EPP_HEADER_LENGTH	4
 
@@ -137,6 +142,7 @@ typedef struct {
 	char	*epplog;    /**< Epp log filename. */
 	apr_file_t	*epplogfp; /**< File descriptor of epp log file. */
 	epp_loglevel	loglevel;  /**< Epp log level. */
+	int	defer_err;  /**< Time value for deferring error response. */
 }eppd_server_conf;
 
 /** Used for access serialization to epp log file. */
@@ -919,6 +925,13 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 #ifdef EPP_PERF
 			times[2] = apr_time_now();
 #endif
+			/* error response will be deferred */
+			if (cdata->rc >= 2000) {
+				epplog(epp_ctx, EPP_DEBUG, "response code %d: sleeping for %d ms", 
+					cdata->rc, sc->defer_err);
+				/* sleep time conversion to microsec */
+				apr_sleep(sc->defer_err * 1000);
+			}
 			/* generate response */
 			if (!gen_response(epp_ctx, EPPservice, cdata,
 						sc->valid_resp, sc->schema,
@@ -1222,7 +1235,7 @@ static apr_status_t epp_cleanup_xml(void *data)
 static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 		apr_pool_t *ptemp, server_rec *s)
 {
-	apr_status_t	 rv = 0;
+	apr_status_t	 	rv = 0;
 	eppd_server_conf	*sc;
 
 	/*
@@ -1282,6 +1295,9 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 				sc->object = apr_pstrdup(p, "EPP");
 			/* set default loglevel */
 			if (sc->loglevel == 0) sc->loglevel = EPP_INFO;
+
+			if (sc->defer_err < DEFER_MIN || sc->defer_err > DEFER_MAX)
+				sc->defer_err = 0;
 
 			/*
 			 * open epp log file (if configured to do so)
@@ -1570,6 +1586,38 @@ static const char *set_valid_resp(cmd_parms *cmd, void *dummy, int flag)
 }
 
 /**
+ * Handler for apache's configuration directive "EPPvalidResponse".
+ *
+ * @param cmd     Command structure.
+ * @param dummy   Not used parameter.
+ * @param a1      Integer value representing time for
+ *                deferring error responses from CR
+ * @return        Error string in case of failure otherwise NULL.
+ */
+static const char *set_defer_errors(cmd_parms *cmd, void *dummy, 
+		const char *a1)
+{
+	const char 	*err;
+	int 		val;
+
+	val = atoi(a1);
+	/* don't allow negative and to high values */
+	if (val < DEFER_MIN || val > DEFER_MAX)
+		return "Defer time for error responses out of range";
+	
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(s->module_config, &eppd_module);
+
+	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
+	if (err) return err;
+
+	sc->defer_err = val; 
+
+	return NULL;
+}
+
+/**
  * Structure containing mod_eppd's configuration directives and their
  * handler references.
  */
@@ -1592,6 +1640,11 @@ static const command_rec eppd_cmds[] = {
 	AP_INIT_TAKE1("EPPobject", set_epp_object, NULL, RSRC_CONF,
 			"Alias under which is the reference to EPP object "
 			"exported from mod_corba module. Default is \"EPP\"."),
+	AP_INIT_TAKE1("EPPdeferErrors", set_defer_errors, NULL, RSRC_CONF,
+			"Integer value representing time value (in miliseconds)"
+			"for deferring error response from Central Registry."
+			"Default is 0 (zero)."),
+
 	{ NULL }
 };
 

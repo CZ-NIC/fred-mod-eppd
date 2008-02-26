@@ -3,7 +3,7 @@
 # vim: set ts=4 sw=4:
 
 AC_PREREQ(2.59)
-AC_INIT([fred-mod-eppd], 1.5, [], [fred-mod-eppd])
+AC_INIT([fred-mod-eppd], [HEAD], [], [fred-mod-eppd])
 AC_CONFIG_SRCDIR([mod_eppd.c])
 
 AH_TOP([#include "unconfig.h" /* why this? See comment in unconfig.h */])
