@@ -927,8 +927,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 #endif
 			/* error response will be deferred */
 			if (cdata->rc >= 2000) {
-				epplog(epp_ctx, EPP_DEBUG, "response code %d: sleeping for %d ms", 
-					cdata->rc, sc->defer_err);
+				epplog(epp_ctx, EPP_DEBUG, "(epp-cmd %d) response code %d: sleeping for %d ms", 
+					cdata->type, cdata->rc, sc->defer_err);
 				/* sleep time conversion to microsec */
 				apr_sleep(sc->defer_err * 1000);
 			}
@@ -1586,7 +1586,7 @@ static const char *set_valid_resp(cmd_parms *cmd, void *dummy, int flag)
 }
 
 /**
- * Handler for apache's configuration directive "EPPvalidResponse".
+ * Handler for apache's configuration directive "EPPdeferErrors".
  *
  * @param cmd     Command structure.
  * @param dummy   Not used parameter.

@@ -112,6 +112,15 @@
  *         of the server. On the other hand it will notably slow down server.
  *   .
  *
+ *   name: EPPdeferErrors
+ *   - value:        positive integer (<=10000)
+ *   - default:      0
+ *   - context:      global config, virtual host
+ *   - description:
+ *         Value represents time in msec that will be used to defer all error
+ *         responses from Central Registry (all response codes > 2000).
+ *   .
+ *
  * File httpd-epp.conf is example of mod_eppd's configuration.
  *
  * @section make Building and installing the module
