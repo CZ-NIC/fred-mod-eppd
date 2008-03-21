@@ -6,6 +6,23 @@ AC_PREREQ(2.59)
 AC_INIT([fred-mod-eppd], [HEAD], [], [fred-mod-eppd])
 AC_CONFIG_SRCDIR([mod_eppd.c])
 
+AC_DEFUN([AC_CREATE_INSTALL_DIR],
+[
+ installdir="/usr/local/share/$PACKAGE"
+ if test -d ${datadir}; then
+     installdir="${datadir}/${PACKAGE}"
+ else
+     if test -d ${datarootdir}; then
+         installdir="${datarootdir}/${PACKAGE}"
+     else
+         if test -d ${prefix}; then
+             installdir="${prefix}/share/${PACKAGE}"
+         fi
+     fi
+ fi
+ AC_SUBST([INSTALLDIR], [$installdir])
+])
+
 AH_TOP([#include "unconfig.h" /* why this? See comment in unconfig.h */])
 
 # doxygen
@@ -87,9 +104,9 @@ AC_SUBST(APACHE_LIBEXECDIR)
 
 # check IDL dir
 AC_ARG_WITH([idldir], [AS_HELP_STRING([--with-idldir],
-                        [Directory with idl [/usr/share/idl/fred/]])],
+                        [Directory with idl [/usr/local/share/idl/fred/]])],
                         [AC_SUBST([IDLDIR], [$withval])],
-                        [AC_SUBST([IDLDIR], [/usr/share/idl/fred])])
+                        [AC_SUBST([IDLDIR], [/usr/local/share/idl/fred])])
 
 # check IDL file
 AC_ARG_WITH([idl], [AS_HELP_STRING([--with-idl],
@@ -110,6 +127,26 @@ AC_ARG_WITH([schema], [AS_HELP_STRING([--with-schema],
 			[AC_SUBST([SCHEMA], [$srcdir/schemas/all-1.4.xsd])])
 AC_CHECK_FILE([$SCHEMA], [], [AC_MSG_ERROR(
 			   [xml schema "$SCHEMA" does not exist (use --with-schema)])])
+
+# mod_eppd port
+AC_ARG_WITH([port], [AS_HELP_STRING([--with-port],
+            [Port where mod_eppd listen [700]])],
+            [AC_SUBST([PORT], [$withval])],
+            [AC_SUBST([PORT], [700])])
+
+#nameservice host
+AC_ARG_WITH([nshost], [AS_HELP_STRING([--with-nshost],
+            [Location of CORBA nameservice host (host[:port]) [localhost]])],
+            [AC_SUBST([NSHOST], [$withval])],
+            [AC_SUBST([NSHOST], [localhost])])
+
+#object name
+AC_ARG_WITH([objectname], [AS_HELP_STRING([--with-objectname],
+            [Name of object [EPP]])],
+            [AC_SUBST([OBJECTNAME], [$withval])],
+            [AC_SUBST([OBJECTNAME], [EPP])])
+
+AC_CREATE_INSTALL_DIR()
 
 # check svn revision (if available)
 AC_SUBST([SVNREV], [unknown])
@@ -137,5 +174,5 @@ fi
 # finalization
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile
-		 fred-mod-eppd.spec])
+		 fred-mod-eppd.spec conf/fred-mod-eppd-apache.conf])
 AC_OUTPUT

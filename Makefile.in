@@ -14,36 +14,6 @@
 
 @SET_MAKE@
 
-# Copyright (C) 2004 Oren Ben-Kiki
-# This file is distributed under the same terms as the Automake macro files.
-
-# Generate automatic documentation using Doxygen. Goals and variables values
-# are controlled by the various DX_COND_??? conditionals set by autoconf.
-#
-# The provided goals are:
-# doxygen-doc: Generate all doxygen documentation.
-# doxygen-run: Run doxygen, which will generate some of the documentation
-#              (HTML, CHM, CHI, MAN, RTF, XML) but will not do the post
-#              processing required for the rest of it (PS, PDF, and some MAN).
-# doxygen-man: Rename some doxygen generated man pages.
-# doxygen-ps: Generate doxygen PostScript documentation.
-# doxygen-pdf: Generate doxygen PDF documentation.
-#
-# Note that by default these are not integrated into the automake goals. If
-# doxygen is used to generate man pages, you can achieve this integration by
-# setting man3_MANS to the list of man pages generated and then adding the
-# dependency:
-#
-#   $(man3_MANS): doxygen-doc
-#
-# This will cause make to run doxygen and generate all the documentation.
-#
-# The following variable is intended for use in Makefile.am:
-#
-# DX_CLEANFILES = everything to clean.
-#
-# This is usually added to MOSTLYCLEANFILES.
-
 
 
 VPATH = @srcdir@
@@ -64,15 +34,16 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+noinst_PROGRAMS = epp_test$(EXEEXT)
+subdir = .
 DIST_COMMON = README $(am__configure_deps) $(dist_fredschemas_DATA) \
 	$(dist_fredssl_DATA) $(dist_pkgdata_DATA) \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/config.h.in $(srcdir)/fred-mod-eppd.spec.in \
-	$(top_srcdir)/am_doxygen.am $(top_srcdir)/configure AUTHORS \
-	COPYING ChangeLog INSTALL NEWS compile config.guess config.sub \
-	depcomp install-sh ltmain.sh missing
-noinst_PROGRAMS = epp_test$(EXEEXT)
-subdir = .
+	$(top_srcdir)/conf/fred-mod-eppd-apache.conf.in \
+	$(top_srcdir)/configure AUTHORS COPYING ChangeLog INSTALL NEWS \
+	compile config.guess config.sub depcomp install-sh ltmain.sh \
+	missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_orbit_cosnaming.m4 \
 	$(top_srcdir)/m4/ax_prog_doxygen.m4 \
@@ -83,7 +54,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES = fred-mod-eppd.spec
+CONFIG_CLEAN_FILES = fred-mod-eppd.spec conf/fred-mod-eppd-apache.conf
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libmodeppd_la_DEPENDENCIES = liborbeppd.la libxmleppd.la
 am_libmodeppd_la_OBJECTS = libmodeppd_la-epp_common.lo \
@@ -218,6 +189,7 @@ IDL = @IDL@
 IDLDIR = @IDLDIR@
 IDLPREFIX = @IDLPREFIX@
 INSTALL = @INSTALL@
+INSTALLDIR = @INSTALLDIR@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -231,6 +203,8 @@ LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 NMEDIT = @NMEDIT@
+NSHOST = @NSHOST@
+OBJECTNAME = @OBJECTNAME@
 OBJEXT = @OBJEXT@
 ORBIT_CFLAGS = @ORBIT_CFLAGS@
 ORBIT_CONFIG = @ORBIT_CONFIG@
@@ -246,6 +220,7 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
+PORT = @PORT@
 RANLIB = @RANLIB@
 SCHEMA = @SCHEMA@
 SED = @SED@
@@ -311,36 +286,13 @@ target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4
-@DX_COND_doc_TRUE@@DX_COND_html_TRUE@DX_CLEAN_HTML = @DX_DOCDIR@/html
-@DX_COND_chm_TRUE@@DX_COND_doc_TRUE@DX_CLEAN_CHM = @DX_DOCDIR@/chm
-@DX_COND_chi_TRUE@@DX_COND_chm_TRUE@@DX_COND_doc_TRUE@DX_CLEAN_CHI = @DX_DOCDIR@/@PACKAGE@.chi
-@DX_COND_doc_TRUE@@DX_COND_man_TRUE@DX_CLEAN_MAN = @DX_DOCDIR@/man
-@DX_COND_doc_TRUE@@DX_COND_rtf_TRUE@DX_CLEAN_RTF = @DX_DOCDIR@/rtf
-@DX_COND_doc_TRUE@@DX_COND_xml_TRUE@DX_CLEAN_XML = @DX_DOCDIR@/xml
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@DX_CLEAN_PS = @DX_DOCDIR@/@PACKAGE@.ps
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@DX_PS_GOAL = doxygen-ps
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@DX_CLEAN_PDF = @DX_DOCDIR@/@PACKAGE@.pdf
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@DX_PDF_GOAL = doxygen-pdf
-@DX_COND_doc_TRUE@@DX_COND_latex_TRUE@DX_CLEAN_LATEX = @DX_DOCDIR@/latex
-@DX_COND_doc_TRUE@DX_CLEANFILES = \
-@DX_COND_doc_TRUE@    @DX_DOCDIR@/@PACKAGE@.tag \
-@DX_COND_doc_TRUE@    -r \
-@DX_COND_doc_TRUE@    $(DX_CLEAN_HTML) \
-@DX_COND_doc_TRUE@    $(DX_CLEAN_CHM) \
-@DX_COND_doc_TRUE@    $(DX_CLEAN_CHI) \
-@DX_COND_doc_TRUE@    $(DX_CLEAN_MAN) \
-@DX_COND_doc_TRUE@    $(DX_CLEAN_RTF) \
-@DX_COND_doc_TRUE@    $(DX_CLEAN_XML) \
-@DX_COND_doc_TRUE@    $(DX_CLEAN_PS) \
-@DX_COND_doc_TRUE@    $(DX_CLEAN_PDF) \
-@DX_COND_doc_TRUE@    $(DX_CLEAN_LATEX)
-
-CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la ${DX_CLEANFILES}
+### include $(top_srcdir)/am_doxygen.am
+CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la ${DX_CLEANFILES} conf/fred-mod-eppd-apache.conf
 fredschemasdir = ${pkgdatadir}/schemas
 fredssldir = ${pkgdatadir}/ssl
 noinst_LTLIBRARIES = liborbeppd.la libxmleppd.la libmodeppd.la
 noinst_DATA = mod_eppd.la
-dist_pkgdata_DATA = conf/02-fred-mod-eppd-apache.conf
+dist_pkgdata_DATA = conf/fred-mod-eppd-apache.conf
 dist_fredschemas_DATA = ${srcdir}/schemas/*.xsd ${srcdir}/schemas/README \
 			${srcdir}/schemas/ChangeLog
 
@@ -375,7 +327,7 @@ all: $(BUILT_SOURCES) config.h
 .SUFFIXES: .c .lo .o .obj
 am--refresh:
 	@:
-$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(top_srcdir)/am_doxygen.am $(am__configure_deps)
+$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -424,6 +376,8 @@ $(srcdir)/config.h.in:  $(am__configure_deps)
 distclean-hdr:
 	-rm -f config.h stamp-h1
 fred-mod-eppd.spec: $(top_builddir)/config.status $(srcdir)/fred-mod-eppd.spec.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+conf/fred-mod-eppd-apache.conf: $(top_builddir)/config.status $(top_srcdir)/conf/fred-mod-eppd-apache.conf.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 
 clean-noinstLTLIBRARIES:
@@ -918,54 +872,6 @@ uninstall-am: uninstall-dist_fredschemasDATA \
 	uninstall-dist_fredschemasDATA uninstall-dist_fredsslDATA \
 	uninstall-dist_pkgdataDATA uninstall-local
 
-
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@doxygen-ps: @DX_DOCDIR@/@PACKAGE@.ps
-
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@@DX_DOCDIR@/@PACKAGE@.ps: @DX_DOCDIR@/@PACKAGE@.tag
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	cd @DX_DOCDIR@/latex; \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	rm -f *.aux *.toc *.idx *.ind *.ilg *.log *.out; \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	$(DX_LATEX) refman.tex; \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	$(MAKEINDEX_PATH) refman.idx; \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	$(DX_LATEX) refman.tex; \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	countdown=5; \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	while $(DX_EGREP) 'Rerun (LaTeX|to get cross-references right)' \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	                  refman.log > /dev/null 2>&1 \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	   && test $$countdown -gt 0; do \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	    $(DX_LATEX) refman.tex; \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	    countdown=`expr $$countdown - 1`; \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	done; \
-@DX_COND_doc_TRUE@@DX_COND_ps_TRUE@	$(DX_DVIPS) -o ../@PACKAGE@.ps refman.dvi
-
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@doxygen-pdf: @DX_DOCDIR@/@PACKAGE@.pdf
-
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@@DX_DOCDIR@/@PACKAGE@.pdf: @DX_DOCDIR@/@PACKAGE@.tag
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	cd @DX_DOCDIR@/latex; \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	rm -f *.aux *.toc *.idx *.ind *.ilg *.log *.out; \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	$(DX_PDFLATEX) refman.tex; \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	$(DX_MAKEINDEX) refman.idx; \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	$(DX_PDFLATEX) refman.tex; \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	countdown=5; \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	while $(DX_EGREP) 'Rerun (LaTeX|to get cross-references right)' \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	                  refman.log > /dev/null 2>&1 \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	   && test $$countdown -gt 0; do \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	    $(DX_PDFLATEX) refman.tex; \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	    countdown=`expr $$countdown - 1`; \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	done; \
-@DX_COND_doc_TRUE@@DX_COND_pdf_TRUE@	mv refman.pdf ../@PACKAGE@.pdf
-
-@DX_COND_doc_TRUE@.PHONY: doc doxygen-run doxygen-doc $(DX_PS_GOAL) $(DX_PDF_GOAL)
-
-@DX_COND_doc_TRUE@.INTERMEDIATE: doxygen-run $(DX_PS_GOAL) $(DX_PDF_GOAL)
-
-@DX_COND_doc_TRUE@doc: doxygen-doc
-
-@DX_COND_doc_TRUE@doxygen-run: @DX_DOCDIR@/@PACKAGE@.tag
-
-@DX_COND_doc_TRUE@doxygen-doc: doxygen-run $(DX_PS_GOAL) $(DX_PDF_GOAL)
-
-@DX_COND_doc_TRUE@@DX_DOCDIR@/@PACKAGE@.tag: $(DX_CONFIG) $(pkginclude_HEADERS)
-@DX_COND_doc_TRUE@	rm -rf $(DX_CLEANFILES)
-@DX_COND_doc_TRUE@	$(DX_ENV) $(DX_DOXYGEN) $(srcdir)/$(DX_CONFIG)
 
 install-exec-local:
 	mkdir -p ${DESTDIR}${APACHE_LIBEXECDIR}; \

@@ -8,25 +8,25 @@
 #
 # The most preferred way of configuration is to put epp in virtual host.
 # This way you can continue to run http in normal way and besides that, if
-# somebody connects to port 700 on localhost, EPP protocol will be activated
+# somebody connects to port @PORT@ on @NSHOST@, EPP protocol will be activated
 # for that connection.
 #
 
 # EPP port, assigned by IANA
-Listen 700
+Listen @PORT@
 
 #LoadModule corba_module modules/mod_corba.so
 LoadModule eppd_module  modules/mod_eppd.so
 
-<VirtualHost *:700>
+<VirtualHost *:@PORT@>
    # mod_corba's configuration, you have to have installed mod_corba module
    CorbaEnable       On
-   CorbaNameservice  localhost
-   CorbaObject       EPP EPP_alias
+   CorbaNameservice  @NSHOST@
+   CorbaObject       @OBJECTNAME@ EPP_alias
 
    EPPprotocol       On
    EPPobject         EPP_alias
-   EPPschema         "/usr/share/fred-mod-eppd/schemas/all.xsd"
+   EPPschema         @INSTALLDIR@/schemas/all.xsd"
    EPPservername     "EPP server"
    EPPlog            "/var/log/fred-eppd.log"
    EPPloglevel       info
@@ -36,8 +36,8 @@ LoadModule eppd_module  modules/mod_eppd.so
    SSLEngine on
    SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP
    SSLVerifyClient       require
-   SSLCertificateFile    /usr/share/fred-mod-eppd/ssl/test-cert.pem
-   SSLCertificateKeyFile /usr/share/fred-mod-eppd/ssl/test-key.pem
-   SSLCACertificateFile  /usr/share/fred-mod-eppd/ssl/test-cert.pem
+   SSLCertificateFile    @INSTALLDIR@/ssl/test-cert.pem
+   SSLCertificateKeyFile @INSTALLDIR@/ssl/test-key.pem
+   SSLCACertificateFile  @INSTALLDIR@/ssl/test-cert.pem
 </VirtualHost>
 

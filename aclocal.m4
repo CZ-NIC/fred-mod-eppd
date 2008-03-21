@@ -440,54 +440,11 @@ AC_ARG_WITH([pic],
     [pic_mode=default])
 test -z "$pic_mode" && pic_mode=default
 
-# Check if we have a version mismatch between libtool.m4 and ltmain.sh.
-#
-# Note:  This should be in AC_LIBTOOL_SETUP, _after_ $ltmain have been defined.
-#        We also should do it _before_ AC_LIBTOOL_LANG_C_CONFIG that actually
-#        calls AC_LIBTOOL_CONFIG and creates libtool.
-#
-_LT_VERSION_CHECK
-
 # Use C for the default configuration in the libtool script
 tagname=
 AC_LIBTOOL_LANG_C_CONFIG
 _LT_AC_TAGCONFIG
 ])# AC_LIBTOOL_SETUP
-
-
-# _LT_VERSION_CHECK
-# -----------------
-AC_DEFUN([_LT_VERSION_CHECK],
-[AC_MSG_CHECKING([for correct ltmain.sh version])
-if test "x$ltmain" = "x" ; then
-  AC_MSG_RESULT(no)
-  AC_MSG_ERROR([
-
-*** @<:@Gentoo@:>@ sanity check failed! ***
-*** \$ltmain is not defined, please check the patch for consistency! ***
-])
-fi
-gentoo_lt_version="1.5.26"
-gentoo_ltmain_version=`sed -n '/^[[ 	]]*VERSION=/{s/^[[ 	]]*VERSION=//;p;q;}' "$ltmain"`
-if test "x$gentoo_lt_version" != "x$gentoo_ltmain_version" ; then
-  AC_MSG_RESULT(no)
-  AC_MSG_ERROR([
-
-*** @<:@Gentoo@:>@ sanity check failed! ***
-*** libtool.m4 and ltmain.sh have a version mismatch! ***
-*** (libtool.m4 = $gentoo_lt_version, ltmain.sh = $gentoo_ltmain_version) ***
-
-Please run:
-
-  libtoolize --copy --force
-
-if appropriate, please contact the maintainer of this
-package (or your distribution) for help.
-])
-else
-  AC_MSG_RESULT(yes)
-fi
-])# _LT_VERSION_CHECK
 
 
 # _LT_AC_SYS_COMPILER
@@ -1805,14 +1762,7 @@ freebsd* | dragonfly*)
     *) objformat=elf ;;
     esac
   fi
-  # Handle Gentoo/FreeBSD as it was Linux
-  case $host_vendor in
-    gentoo)
-      version_type=linux ;;
-    *)
-      version_type=freebsd-$objformat ;;
-  esac
-
+  version_type=freebsd-$objformat
   case $version_type in
     freebsd-elf*)
       library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext} $libname${shared_ext}'
@@ -1822,12 +1772,6 @@ freebsd* | dragonfly*)
     freebsd-*)
       library_names_spec='${libname}${release}${shared_ext}$versuffix $libname${shared_ext}$versuffix'
       need_version=yes
-      ;;
-    linux)
-      library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}$major ${libname}${shared_ext}'
-      soname_spec='${libname}${release}${shared_ext}$major'
-      need_lib_prefix=no
-      need_version=no
       ;;
   esac
   shlibpath_var=LD_LIBRARY_PATH

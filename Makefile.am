@@ -1,7 +1,7 @@
 ACLOCAL_AMFLAGS = -I m4
-include $(top_srcdir)/am_doxygen.am
+### include $(top_srcdir)/am_doxygen.am
 
-CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la ${DX_CLEANFILES}
+CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la ${DX_CLEANFILES} conf/fred-mod-eppd-apache.conf
 
 fredschemasdir = ${pkgdatadir}/schemas
 fredssldir = ${pkgdatadir}/ssl
@@ -9,7 +9,7 @@ fredssldir = ${pkgdatadir}/ssl
 noinst_LTLIBRARIES = liborbeppd.la libxmleppd.la libmodeppd.la
 noinst_DATA        = mod_eppd.la
 noinst_PROGRAMS    = epp_test
-dist_pkgdata_DATA = conf/02-fred-mod-eppd-apache.conf
+dist_pkgdata_DATA = conf/fred-mod-eppd-apache.conf
 dist_fredschemas_DATA = ${srcdir}/schemas/*.xsd ${srcdir}/schemas/README \
 			${srcdir}/schemas/ChangeLog
 dist_fredssl_DATA = ${srcdir}/ssl/README ${srcdir}/ssl/*.pem
