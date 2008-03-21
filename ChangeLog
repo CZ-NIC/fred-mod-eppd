@@ -1,4 +1,4 @@
-2008-02-29 Jiri Sadek
+2008-02-29 Jiri Sadek (version 1.6.1)
 
 	* added configuration option 'EPPdeferErrors <num>' for defering
 	all epp error response codes (those >=2000) - ticket #1400
