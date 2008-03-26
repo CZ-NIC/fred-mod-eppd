@@ -40,12 +40,13 @@ DIST_COMMON = README $(am__configure_deps) $(dist_fredschemas_DATA) \
 	$(dist_fredssl_DATA) $(dist_pkgdata_DATA) \
 	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/config.h.in $(srcdir)/fred-mod-eppd.spec.in \
-	$(top_srcdir)/conf/fred-mod-eppd-apache.conf.in \
+	$(top_srcdir)/conf/02-fred-mod-eppd-apache.conf.in \
 	$(top_srcdir)/configure AUTHORS COPYING ChangeLog INSTALL NEWS \
 	compile config.guess config.sub depcomp install-sh ltmain.sh \
 	missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/ax_orbit_cosnaming.m4 \
+am__aclocal_m4_deps = $(top_srcdir)/m4/acinclude.m4 \
+	$(top_srcdir)/m4/ax_orbit_cosnaming.m4 \
 	$(top_srcdir)/m4/ax_prog_doxygen.m4 \
 	$(top_srcdir)/m4/ax_with_apxs.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -54,7 +55,8 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES = fred-mod-eppd.spec conf/fred-mod-eppd-apache.conf
+CONFIG_CLEAN_FILES = fred-mod-eppd.spec \
+	conf/02-fred-mod-eppd-apache.conf
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libmodeppd_la_DEPENDENCIES = liborbeppd.la libxmleppd.la
 am_libmodeppd_la_OBJECTS = libmodeppd_la-epp_common.lo \
@@ -196,12 +198,14 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
+LIBRARYDIR = @LIBRARYDIR@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
+MODULE_INSTALLDIR = @MODULE_INSTALLDIR@
 NMEDIT = @NMEDIT@
 NSHOST = @NSHOST@
 OBJECTNAME = @OBJECTNAME@
@@ -287,12 +291,12 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4
 ### include $(top_srcdir)/am_doxygen.am
-CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la ${DX_CLEANFILES} conf/fred-mod-eppd-apache.conf
+CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la ${DX_CLEANFILES} conf/02-fred-mod-eppd-apache.conf
 fredschemasdir = ${pkgdatadir}/schemas
 fredssldir = ${pkgdatadir}/ssl
 noinst_LTLIBRARIES = liborbeppd.la libxmleppd.la libmodeppd.la
 noinst_DATA = mod_eppd.la
-dist_pkgdata_DATA = conf/fred-mod-eppd-apache.conf
+dist_pkgdata_DATA = conf/02-fred-mod-eppd-apache.conf
 dist_fredschemas_DATA = ${srcdir}/schemas/*.xsd ${srcdir}/schemas/README \
 			${srcdir}/schemas/ChangeLog
 
@@ -377,7 +381,7 @@ distclean-hdr:
 	-rm -f config.h stamp-h1
 fred-mod-eppd.spec: $(top_builddir)/config.status $(srcdir)/fred-mod-eppd.spec.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
-conf/fred-mod-eppd-apache.conf: $(top_builddir)/config.status $(top_srcdir)/conf/fred-mod-eppd-apache.conf.in
+conf/02-fred-mod-eppd-apache.conf: $(top_builddir)/config.status $(top_srcdir)/conf/02-fred-mod-eppd-apache.conf.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 
 clean-noinstLTLIBRARIES:

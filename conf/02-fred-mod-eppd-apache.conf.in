@@ -16,7 +16,7 @@
 Listen @PORT@
 
 #LoadModule corba_module modules/mod_corba.so
-LoadModule eppd_module  modules/mod_eppd.so
+LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
 
 <VirtualHost *:@PORT@>
    # mod_corba's configuration, you have to have installed mod_corba module
@@ -26,7 +26,7 @@ LoadModule eppd_module  modules/mod_eppd.so
 
    EPPprotocol       On
    EPPobject         EPP_alias
-   EPPschema         @INSTALLDIR@/schemas/all.xsd"
+   EPPschema         "@INSTALLDIR@/schemas/all.xsd"
    EPPservername     "EPP server"
    EPPlog            "/var/log/fred-eppd.log"
    EPPloglevel       info
