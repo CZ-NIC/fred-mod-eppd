@@ -1,7 +1,7 @@
 ACLOCAL_AMFLAGS = -I m4
-### include $(top_srcdir)/am_doxygen.am
+include $(top_srcdir)/am_doxygen.am
 
-CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la ${DX_CLEANFILES} conf/02-fred-mod-eppd-apache.conf
+CLEANFILES = ${IDL_ALL} .libs/libmodeppd *~ mod_eppd.la conf/02-fred-mod-eppd-apache.conf
 
 fredschemasdir = ${pkgdatadir}/schemas
 fredssldir = ${pkgdatadir}/ssl
@@ -40,6 +40,12 @@ libmodeppd_la_LIBADD  = liborbeppd.la libxmleppd.la
 epp_test_SOURCES      = epp_test.c
 epp_test_CFLAGS     = ${ORBIT_CFLAGS} 
 epp_test_LDADD        = libmodeppd.la ${ORBIT_LIBS}
+
+if DX_COND_html
+doc_DATA = @DX_DOCDIR@/html/*
+$(doc_DATA): doxygen-doc
+MOSTLYCLEANFILES = ${DX_CLEANFILES}
+endif
 
 install-exec-local:
 	mkdir -p ${DESTDIR}${APACHE_LIBEXECDIR}; \

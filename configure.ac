@@ -5,23 +5,7 @@
 AC_PREREQ(2.59)
 AC_INIT([fred-mod-eppd], [HEAD], [], [fred-mod-eppd])
 AC_CONFIG_SRCDIR([mod_eppd.c])
-
-AC_DEFUN([AC_CREATE_INSTALL_DIR],
-[
- installdir="/usr/local/share/$PACKAGE"
- if test -d ${datadir}; then
-     installdir="${datadir}/${PACKAGE}"
- else
-     if test -d ${datarootdir}; then
-         installdir="${datarootdir}/${PACKAGE}"
-     else
-         if test -d ${prefix}; then
-             installdir="${prefix}/share/${PACKAGE}"
-         fi
-     fi
- fi
- AC_SUBST([INSTALLDIR], [$installdir])
-])
+AC_CONFIG_MACRO_DIR([m4])
 
 AH_TOP([#include "unconfig.h" /* why this? See comment in unconfig.h */])
 
@@ -137,11 +121,13 @@ AC_SUBST(APACHE_LIBEXECDIR)
 # create path where mod is installed
 AC_CREATE_MODULE_INSTALLDIR()
 
+AS_AC_EXPAND([DATAROOTDIR], [$datarootdir])
+
 # check IDL dir
 AC_ARG_WITH([idldir], [AS_HELP_STRING([--with-idldir],
-                        [Directory with idl [/usr/local/share/idl/fred/]])],
+                        [Directory with idl [DATAROOTDIR/idl/fred/]])],
                         [AC_SUBST([IDLDIR], [$withval])],
-                        [AC_SUBST([IDLDIR], [/usr/local/share/idl/fred])])
+                        [AC_SUBST([IDLDIR], [$DATAROOTDIR/idl/fred])])
 
 # check IDL file
 AC_ARG_WITH([idl], [AS_HELP_STRING([--with-idl],
@@ -180,8 +166,6 @@ AC_ARG_WITH([objectname], [AS_HELP_STRING([--with-objectname],
             [Name of object [EPP]])],
             [AC_SUBST([OBJECTNAME], [$withval])],
             [AC_SUBST([OBJECTNAME], [EPP])])
-
-AC_CREATE_INSTALL_DIR()
 
 # check svn revision (if available)
 AC_SUBST([SVNREV], [unknown])

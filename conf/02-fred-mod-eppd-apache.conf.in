@@ -26,7 +26,7 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
 
    EPPprotocol       On
    EPPobject         EPP_alias
-   EPPschema         "@INSTALLDIR@/schemas/all.xsd"
+   EPPschema         "@DATAROOTDIR@/@PACKAGE@/schemas/all.xsd"
    EPPservername     "EPP server"
    EPPlog            "/var/log/fred-eppd.log"
    EPPloglevel       info
@@ -36,8 +36,8 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    SSLEngine on
    SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP
    SSLVerifyClient       require
-   SSLCertificateFile    @INSTALLDIR@/ssl/test-cert.pem
-   SSLCertificateKeyFile @INSTALLDIR@/ssl/test-key.pem
-   SSLCACertificateFile  @INSTALLDIR@/ssl/test-cert.pem
+   SSLCertificateFile    @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
+   SSLCertificateKeyFile @DATAROOTDIR@/@PACKAGE@/ssl/test-key.pem
+   SSLCACertificateFile  @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
 </VirtualHost>
 
