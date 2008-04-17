@@ -122,6 +122,7 @@ AC_SUBST(APACHE_LIBEXECDIR)
 AC_CREATE_MODULE_INSTALLDIR()
 
 AS_AC_EXPAND([DATAROOTDIR], [$datarootdir])
+AS_AC_EXPAND([LOCALSTATEDIR], [$localstatedir])
 
 # check IDL dir
 AC_ARG_WITH([idldir], [AS_HELP_STRING([--with-idldir],

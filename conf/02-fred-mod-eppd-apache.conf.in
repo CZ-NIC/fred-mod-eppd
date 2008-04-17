@@ -28,7 +28,7 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    EPPobject         EPP_alias
    EPPschema         "@DATAROOTDIR@/@PACKAGE@/schemas/all.xsd"
    EPPservername     "EPP server"
-   EPPlog            "/var/log/fred-eppd.log"
+   EPPlog            "@LOCALSTATEDIR@/log/fred-eppd.log"
    EPPloglevel       info
    EPPvalidResponse  Off
  
