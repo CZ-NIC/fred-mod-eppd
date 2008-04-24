@@ -7,7 +7,7 @@ License:        GPL
 URL:            http://fred.nic.cz
 Source:         %{name}-%{version}.tar.gz
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-BuildRequires:  apr-devel, httpd-devel, libxml2-devel, openssl-devel, fred-idl
+BuildRequires:  apr-devel, httpd-devel, libxml2-devel, openssl-devel
 Requires: httpd, libxml2, openssl, fred-mod-corba, mod_ssl
 
 %description
@@ -21,12 +21,13 @@ mod_corba apache module
 %setup
 
 %build
-%configure
+%configure %idldir
 make
 
 %install
 rm -rf ${RPM_BUILD_ROOT}
 make DESTDIR=${RPM_BUILD_ROOT} install
+find ${RPM_BUILD_ROOT}/usr/share/doc/ | cut -c$(echo -n "${RPM_BUILD_ROOT} " | wc -c)- > INSTALLED_FILES
 
 %post
 test -f /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf || ln -s /usr/share/fred-mod-eppd/02-fred-mod-eppd-apache.conf /etc/httpd/conf.d/
@@ -37,7 +38,7 @@ test ! -f /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf || rm /etc/httpd/conf.d
 %clean
 rm -rf ${RPM_BUILD_ROOT}
 
-%files
+%files -f INSTALLED_FILES
 %defattr(-,root,root,-)
 %{_libdir}/httpd/modules/mod_eppd.so
 /usr/share/fred-mod-eppd/02-fred-mod-eppd-apache.conf

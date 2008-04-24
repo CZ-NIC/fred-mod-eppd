@@ -13,7 +13,7 @@ dist_pkgdata_DATA = conf/02-fred-mod-eppd-apache.conf
 dist_fredschemas_DATA = ${srcdir}/schemas/*.xsd ${srcdir}/schemas/README \
 			${srcdir}/schemas/ChangeLog
 dist_fredssl_DATA = ${srcdir}/ssl/README ${srcdir}/ssl/*.pem
-EXTRA_DIST = unconfig.h fred-mod-eppd.spec 
+EXTRA_DIST = unconfig.h fred-mod-eppd.spec doxy.conf
 BUILT_SOURCES = EPP.h EPP-common.c EPP-stubs.c
 
 INCL       = ${APACHE_CFLAGS} ${APACHE_CPPFLAGS} ${ORBIT_CFLAGS} ${CPPFLAGS} 

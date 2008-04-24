@@ -356,7 +356,7 @@ dist_fredschemas_DATA = ${srcdir}/schemas/*.xsd ${srcdir}/schemas/README \
 			${srcdir}/schemas/ChangeLog
 
 dist_fredssl_DATA = ${srcdir}/ssl/README ${srcdir}/ssl/*.pem
-EXTRA_DIST = unconfig.h fred-mod-eppd.spec 
+EXTRA_DIST = unconfig.h fred-mod-eppd.spec doxy.conf
 BUILT_SOURCES = EPP.h EPP-common.c EPP-stubs.c
 INCL = ${APACHE_CFLAGS} ${APACHE_CPPFLAGS} ${ORBIT_CFLAGS} ${CPPFLAGS} 
 AM_LDFLAGS = ${ORBIT_LIBS} ${LIBS} ${LDFLAGS}
