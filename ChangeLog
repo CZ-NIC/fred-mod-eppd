@@ -1,3 +1,9 @@
+2008-06-20 Jaromir Talir (1.7.0)
+
+	* Minor configuration and build enhancements
+
+	* Apache log messages translated in log file
+
 2008-02-29 Jiri Sadek (version 1.6.1)
 
 	* added configuration option 'EPPdeferErrors <num>' for defering
