@@ -396,6 +396,7 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 	apr_bucket_brigade *bb;
 	conn_rec	*conn = epp_ctx->conn;
 	apr_pool_t	*pool = epp_ctx->pool;
+	char buff[120];
 
 	bb = apr_brigade_create(pool, conn->bucket_alloc);
 
@@ -415,8 +416,9 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 					"proper logout.");
 			return 1;
 		}
-		epplog(epp_ctx, EPP_ERROR, "Error when reading epp header (%d)",
-				status);
+		epplog(epp_ctx, EPP_ERROR, "Error when reading epp header "
+				"(%d - %s)", status, 
+				apr_strerror(status, buff, sizeof(buff)));
 		return 2;
 	}
 
