@@ -1,3 +1,26 @@
+2008-08-13 Jaromir Talir (version 2.0.0)
+
+	* fixing removal of keysetByDs
+
+	* updating overall schema version number to 2.0
+
+2008-08-07 Juraj Vicenik
+
+	* schema for keysets added: functions check, create, delete, info, 
+	transfer, update, list, sendAuthInfo, test. Keyset contains 
+	a set of DS records which can be modified by the update function.
+	In case of deleting DS records the specific records are identified
+	by the entire content (same type as for adding)
+	
+	* in contact schema: postalInfoReadType and addrReadType added.
+	postalInfo in infoDataType changed to the type postalInfoReadType.
+	Fields name and addr in response to info_contact command are 
+	not mandatory now.
+	
+	* keyset functions added to domain schema: listKeysets, domainsByKeyset, 
+	keysetsByContact, keysetsByDs
+	
+	* new command keysetByNs in fred schema	
 
 2006-07-31 Jaromir Talir (version 1.4.2)
 

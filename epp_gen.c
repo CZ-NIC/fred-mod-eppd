@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -362,6 +362,7 @@ gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
 				q_content(&info_domain->admin));
 	}
 	WRITE_ELEMENT(writer, simple_err, "domain:nsset", info_domain->nsset);
+	WRITE_ELEMENT(writer, simple_err, "domain:keyset", info_domain->keyset);
 	WRITE_ELEMENT(writer, simple_err, "domain:clID", info_domain->clID);
 	WRITE_ELEMENT(writer, simple_err, "domain:crID", info_domain->crID);
 	WRITE_ELEMENT(writer, simple_err, "domain:crDate", info_domain->crDate);
@@ -423,7 +424,7 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 	/* print nameservers */
 	q_foreach(&info_nsset->ns) {
 		epp_ns	*ns;
-		
+
 		ns = (epp_ns *) q_content(&info_nsset->ns);
 		START_ELEMENT(writer, simple_err, "nsset:ns");
 		WRITE_ELEMENT(writer, simple_err, "nsset:name", ns->name);
@@ -441,6 +442,76 @@ gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
 	}
 	snprintf(level, 3, "%d", info_nsset->level);
 	WRITE_ELEMENT(writer, simple_err, "nsset:reportlevel", level);
+	END_ELEMENT(writer, simple_err); /* infdata */
+	return 1;
+
+simple_err:
+	return 0;
+}
+
+/**
+ * This is assistant function for generating info keyset <resData>
+ * xml subtree.
+ *
+ * @param writer   XML writer.
+ * @param cdata    Data needed to generate XML.
+ * @return         1 if OK, 0 in case of failure.
+ */
+static char
+gen_info_keyset(xmlTextWriterPtr writer, epp_command_data *cdata)
+{
+	epps_info_keyset	*info_keyset;
+
+	info_keyset = cdata->data;
+
+	START_ELEMENT(writer, simple_err, "keyset:infData");
+	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:keyset", NS_KEYSET);
+	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_KEYSET);
+	WRITE_ELEMENT(writer, simple_err, "keyset:id", info_keyset->handle);
+	WRITE_ELEMENT(writer, simple_err, "keyset:roid", info_keyset->roid);
+	/* status flags */
+	q_foreach(&info_keyset->status) {
+		epp_status	*status;
+
+		status = q_content(&info_keyset->status);
+		START_ELEMENT(writer, simple_err, "keyset:status");
+		WRITE_ATTRIBUTE(writer, simple_err, "s", status->value);
+		WRITE_STRING(writer, simple_err, status->text);
+		END_ELEMENT(writer, simple_err);
+	}
+	WRITE_ELEMENT(writer, simple_err, "keyset:clID", info_keyset->clID);
+	WRITE_ELEMENT(writer, simple_err, "keyset:crID", info_keyset->crID);
+	WRITE_ELEMENT(writer, simple_err, "keyset:crDate", info_keyset->crDate);
+	WRITE_ELEMENT(writer, simple_err, "keyset:upID", info_keyset->upID);
+	WRITE_ELEMENT(writer, simple_err, "keyset:upDate", info_keyset->upDate);
+	WRITE_ELEMENT(writer, simple_err, "keyset:trDate", info_keyset->trDate);
+	WRITE_ELEMENT(writer, simple_err, "keyset:authInfo",info_keyset->authInfo);
+	/* print nameservers */
+	q_foreach(&info_keyset->ds) {
+		epp_ds	*ds;
+		char str[10];
+
+		ds = (epp_ds *) q_content(&info_keyset->ds);
+		START_ELEMENT(writer, simple_err, "keyset:ds");
+		snprintf(str, 9, "%d", ds->keytag);
+		WRITE_ELEMENT(writer, simple_err, "keyset:keyTag", str);
+		snprintf(str, 9, "%d", ds->alg);
+		WRITE_ELEMENT(writer, simple_err, "keyset:alg", str);
+		snprintf(str, 9, "%d", ds->digestType);
+		WRITE_ELEMENT(writer, simple_err, "keyset:digestType", str);
+		WRITE_ELEMENT(writer, simple_err, "keyset:digest", ds->digest);
+		if(ds->maxSigLife) {
+			snprintf(str, 9, "%d", ds->maxSigLife);
+			WRITE_ELEMENT(writer, simple_err, "keyset:maxSigLife", str);
+		}
+
+		END_ELEMENT(writer, simple_err); /* ds */
+	}
+	/* print tech contacts */
+	q_foreach(&info_keyset->tech) {
+		WRITE_ELEMENT(writer, simple_err, "keyset:tech",
+				q_content(&info_keyset->tech));
+	}
 	END_ELEMENT(writer, simple_err); /* infdata */
 	return 1;
 
@@ -487,6 +558,20 @@ gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
 					msgdata->msg.hdt.clID);
 			END_ELEMENT(writer, simple_err); /* trnData */
 			break;
+		case pt_transfer_keyset:
+			START_ELEMENT(writer, simple_err, "keyset:trnData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:keyset",
+					NS_KEYSET);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_KEYSET);
+			WRITE_ELEMENT(writer, simple_err, "keyset:id",
+					msgdata->msg.hdt.handle);
+			WRITE_ELEMENT(writer, simple_err, "keyset:trDate",
+					msgdata->msg.hdt.date);
+			WRITE_ELEMENT(writer, simple_err, "keyset:clID",
+					msgdata->msg.hdt.clID);
+			END_ELEMENT(writer, simple_err); /* trnData */
+			break;
 		case pt_transfer_domain:
 			START_ELEMENT(writer, simple_err, "domain:trnData");
 			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain",
@@ -518,6 +603,16 @@ gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
 			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
 					LOC_NSSET);
 			WRITE_ELEMENT(writer, simple_err, "nsset:id",
+					msgdata->msg.handle);
+			END_ELEMENT(writer, simple_err); /* idleDelData */
+			break;
+		case pt_delete_keyset:
+			START_ELEMENT(writer, simple_err,"keyset:idleDelData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:keyset",
+					NS_KEYSET);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_KEYSET);
+			WRITE_ELEMENT(writer, simple_err, "keyset:id",
 					msgdata->msg.handle);
 			END_ELEMENT(writer, simple_err); /* idleDelData */
 			break;
@@ -634,7 +729,7 @@ gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
 					LOC_FRED);
 			WRITE_ELEMENT(writer, simple_err, "fred:zone",
 					msgdata->msg.lc.zone);
-			/* 
+			/*
 			 * XXX
 			 * this stupid code will be simplified after the
 			 * schemas will be corrected.
@@ -715,6 +810,27 @@ get_bad_xml(void *pool, epp_command_data *cdata, epp_error *e)
 		case errspec_nsset_tech_rem:
 			loc_spec = epp_strdup(pool, "//nsset:rem/nsset:tech");
 			break;
+		case errspec_keyset_handle:
+			loc_spec = epp_strdup(pool, "//keyset:id");
+			break;
+		case errspec_keyset_tech:
+			loc_spec = epp_strdup(pool, "//keyset:tech");
+			break;
+		case errspec_keyset_dsrecord_add:
+			loc_spec = epp_strdup(pool, "//keyset:add/keyset:ds");
+			break;
+		case errspec_keyset_dsrecord_rem:
+			loc_spec = epp_strdup(pool, "//keyset:rem/keyset:ds");
+			break;
+		case errspec_keyset_dsrecord:
+			loc_spec = epp_strdup(pool, "//keyset:ds");
+			break;
+		case errspec_keyset_tech_add:
+			loc_spec = epp_strdup(pool, "//keyset:add/keyset:tech");
+			break;
+		case errspec_keyset_tech_rem:
+			loc_spec = epp_strdup(pool, "//keyset:rem/keyset:tech");
+			break;
 		case errspec_domain_fqdn:
 			loc_spec = epp_strdup(pool, "//domain:name");
 			break;
@@ -723,6 +839,9 @@ get_bad_xml(void *pool, epp_command_data *cdata, epp_error *e)
 			break;
 		case errspec_domain_nsset:
 			loc_spec = epp_strdup(pool, "//domain:nsset");
+			break;
+		case errspec_domain_keyset:
+			loc_spec = epp_strdup(pool, "//domain:keyset");
 			break;
 		case errspec_domain_period:
 			loc_spec = epp_strdup(pool, "//domain:period");
@@ -908,6 +1027,7 @@ epp_gen_response(epp_context *epp_ctx,
 		case EPP_SENDAUTHINFO_DOMAIN:
 		case EPP_SENDAUTHINFO_CONTACT:
 		case EPP_SENDAUTHINFO_NSSET:
+		case EPP_SENDAUTHINFO_KEYSET:
 		case EPP_TEST_NSSET:
 			break;
 		*/
@@ -1025,6 +1145,42 @@ epp_gen_response(epp_context *epp_ctx,
 			END_ELEMENT(writer, simple_err); /* chkData */
 			break;
 		}
+		case EPP_CHECK_KEYSET:
+		{
+			epps_check	*check;
+
+			check = cdata->data;
+			START_ELEMENT(writer, simple_err, "keyset:chkData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:keyset",
+					NS_KEYSET);
+			WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation",
+					LOC_KEYSET);
+			q_reset(&check->avails);
+			q_foreach(&check->ids) {
+				epp_avail	*avail;
+
+				avail = q_content(&check->avails);
+				START_ELEMENT(writer, simple_err, "keyset:cd");
+				START_ELEMENT(writer, simple_err, "keyset:id");
+				if (avail->avail)
+					WRITE_ATTRIBUTE(writer, simple_err,
+							"avail", "1");
+				else
+					WRITE_ATTRIBUTE(writer, simple_err,
+							"avail", "0");
+				WRITE_STRING(writer, simple_err,
+						q_content(&check->ids));
+				END_ELEMENT(writer, simple_err); /* name */
+				if (!avail->avail)
+					WRITE_ELEMENT(writer, simple_err,
+							"keyset:reason",
+							avail->reason);
+				END_ELEMENT(writer, simple_err); /* cd */
+				q_next(&check->avails);
+			}
+			END_ELEMENT(writer, simple_err); /* chkData */
+			break;
+		}
 		case EPP_INFO_DOMAIN:
 			if (!gen_info_domain(writer, cdata)) goto simple_err;
 			break;
@@ -1034,6 +1190,10 @@ epp_gen_response(epp_context *epp_ctx,
 		case EPP_INFO_NSSET:
 			if (!gen_info_nsset(writer, cdata)) goto simple_err;
 			break;
+		case EPP_INFO_KEYSET:
+			if (!gen_info_keyset(writer, cdata)) goto simple_err;
+			break;
+
 		/* transform commands with <resData> element */
 		case EPP_CREATE_DOMAIN:
 		{
@@ -1085,6 +1245,23 @@ epp_gen_response(epp_context *epp_ctx,
 					create_nsset->id);
 			WRITE_ELEMENT(writer, simple_err, "nsset:crDate",
 					create_nsset->crDate);
+			END_ELEMENT(writer, simple_err); /* credata */
+			break;
+		}
+		case EPP_CREATE_KEYSET:
+		{
+			epps_create_keyset	*create_keyset;
+
+			create_keyset = cdata->data;
+			START_ELEMENT(writer, simple_err, "keyset:creData");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:keyset", NS_KEYSET);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_KEYSET);
+			WRITE_ELEMENT(writer, simple_err, "keyset:id",
+					create_keyset->id);
+			WRITE_ELEMENT(writer, simple_err, "keyset:crDate",
+					create_keyset->crDate);
 			END_ELEMENT(writer, simple_err); /* credata */
 			break;
 		}
@@ -1156,6 +1333,23 @@ epp_gen_response(epp_context *epp_ctx,
 			END_ELEMENT(writer, simple_err); /* listData */
 			break;
 		}
+		case EPP_LIST_KEYSET:
+		{
+			epps_list	*list;
+
+			list = cdata->data;
+			START_ELEMENT(writer, simple_err, "keyset:listData");
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xmlns:keyset", NS_KEYSET);
+			WRITE_ATTRIBUTE(writer, simple_err,
+					"xsi:schemaLocation", LOC_KEYSET);
+			q_foreach(&list->handles) {
+				WRITE_ELEMENT(writer, simple_err, "keyset:id",
+						q_content(&list->handles));
+			}
+			END_ELEMENT(writer, simple_err); /* listData */
+			break;
+		}
 		case EPP_CREDITINFO:
 		{
 			epps_creditInfo	*creditInfo;
@@ -1188,9 +1382,12 @@ epp_gen_response(epp_context *epp_ctx,
 		case EPP_INFO_LIST_CONTACTS:
 		case EPP_INFO_LIST_DOMAINS:
 		case EPP_INFO_LIST_NSSETS:
+		case EPP_INFO_LIST_KEYSETS:
 		case EPP_INFO_DOMAINS_BY_NSSET:
+		case EPP_INFO_DOMAINS_BY_KEYSET:
 		case EPP_INFO_DOMAINS_BY_CONTACT:
 		case EPP_INFO_NSSETS_BY_CONTACT:
+		case EPP_INFO_KEYSETS_BY_CONTACT:
 		case EPP_INFO_NSSETS_BY_NS:
 		{
 			epps_info	*info;

@@ -6,13 +6,14 @@
     <fred:extcommand xmlns:fred="http://www.nic.cz/xml/epp/fred-1.2"
 		  xsi:schemaLocation="http://www.nic.cz/xml/epp/fred-1.2
 		  fred-1.2.xsd">
-      <fred:sendAuthInfo>
-        <nsset:sendAuthInfo xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.2"
-		    xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.2
-		    nsset-1.2.xsd">
-	  <nsset:id>example.cz</nsset:id>
-	</nsset:sendAuthInfo>
-      </fred:sendAuthInfo>
+      <fred:test>
+        <keyset:test xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.0"
+		    xsi:schemaLocation="http://www.nic.cz/xml/epp/keyset-1.0
+		    keyset-1.0.xsd">
+	  <keyset:id>KEYSID:example</keyset:id>
+	  <keyset:name>domain.cz</keyset:name>
+	</keyset:test>
+      </fred:test>
       <fred:clTRID>ABC-12346</fred:clTRID>
     </fred:extcommand>
   </extension>

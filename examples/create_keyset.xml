@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0
+     epp-1.0.xsd">
+  <command>
+    <create>
+      <keyset:create
+        xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.0"
+        xsi:schemaLocation="http://www.nic.cz/xml/epp/keyset-1.0
+        keyset-1.0.xsd">
+        <keyset:id>TEST-KEYSET</keyset:id>
+	      <keyset:ds>
+          <keyset:keyTag>1</keyset:keyTag>
+          <keyset:alg>1</keyset:alg>
+          <keyset:digestType>1</keyset:digestType>
+          <keyset:digest>aaa12409aaaaa098</keyset:digest>
+          <keyset:maxSigLife>100</keyset:maxSigLife>
+        </keyset:ds>
+        <keyset:tech>USER1</keyset:tech>
+	      <keyset:tech>USER2</keyset:tech>
+	      <keyset:tech>USER3</keyset:tech>
+        <keyset:authInfo>2fooBAR</keyset:authInfo>
+      </keyset:create>
+    </create>
+    <clTRID>MyID12345</clTRID>
+  </command> 
+</epp>

@@ -1,0 +1,18 @@
+#!/bin/bash
+# Usage: ./check-schema       checks all xml files in directory
+#        ./check-schema FILE  checks FILE
+# Example:
+#   ./check-schema "transfer_*.xml" checks all transfer_*.xml files in directory
+
+for filename in `ls ${1-*.xml}`
+do
+    xmllint --noout --schema ../schemas/all.xsd $filename 2> /tmp/check-schema-out
+
+    if [ -z "`grep 'fails to validate' /tmp/check-schema-out`" ]
+    then
+        echo -e "\e[1;32m OK: `cat /tmp/check-schema-out` \e[m\n"
+    else
+        echo -e "\e[1;31m ERROR: `cat /tmp/check-schema-out` \e[m\n"
+    fi
+done
+

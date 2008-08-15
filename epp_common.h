@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -65,42 +65,53 @@ typedef enum {
 	EPP_CHECK_CONTACT,
 	EPP_CHECK_DOMAIN,
 	EPP_CHECK_NSSET,
+	EPP_CHECK_KEYSET,
 	EPP_INFO_CONTACT,
 	EPP_INFO_DOMAIN,
 	EPP_INFO_NSSET,
+	EPP_INFO_KEYSET,
 	EPP_LIST_CONTACT,
 	EPP_LIST_DOMAIN,
 	EPP_LIST_NSSET,
+	EPP_LIST_KEYSET,
 	EPP_POLL_REQ,
 	EPP_POLL_ACK,
 	/* transform commands */
 	EPP_CREATE_CONTACT,
 	EPP_CREATE_DOMAIN,
 	EPP_CREATE_NSSET,
+	EPP_CREATE_KEYSET,
 	EPP_DELETE_CONTACT,
 	EPP_DELETE_DOMAIN,
 	EPP_DELETE_NSSET,
+	EPP_DELETE_KEYSET,
 	EPP_UPDATE_CONTACT,
 	EPP_UPDATE_DOMAIN,
 	EPP_UPDATE_NSSET,
+	EPP_UPDATE_KEYSET,
 	EPP_TRANSFER_CONTACT,
 	EPP_TRANSFER_DOMAIN,
 	EPP_TRANSFER_NSSET,
+	EPP_TRANSFER_KEYSET,
 	EPP_RENEW_DOMAIN,
 	/* protocol extensions */
 	EPP_SENDAUTHINFO_CONTACT,
 	EPP_SENDAUTHINFO_DOMAIN,
 	EPP_SENDAUTHINFO_NSSET,
+	EPP_SENDAUTHINFO_KEYSET,
 	EPP_TEST_NSSET,
 	EPP_CREDITINFO,
 	/* info functions */
 	EPP_INFO_LIST_CONTACTS,
 	EPP_INFO_LIST_DOMAINS,
 	EPP_INFO_LIST_NSSETS,
+	EPP_INFO_LIST_KEYSETS,
 	EPP_INFO_DOMAINS_BY_NSSET,
+	EPP_INFO_DOMAINS_BY_KEYSET,
 	EPP_INFO_DOMAINS_BY_CONTACT,
 	EPP_INFO_NSSETS_BY_CONTACT,
 	EPP_INFO_NSSETS_BY_NS,
+	EPP_INFO_KEYSETS_BY_CONTACT,
 	EPP_INFO_GET_RESULTS
 }epp_command_type;
 
@@ -118,7 +129,8 @@ typedef enum {
 	EPP_UNKNOWN_OBJ = 0,
 	EPP_CONTACT,
 	EPP_DOMAIN,
-	EPP_NSSET
+	EPP_NSSET,
+	EPP_KEYSET
 }epp_object_type;
 
 /**
@@ -148,9 +160,17 @@ typedef enum {
 	errspec_nsset_dns_name_rem,
 	errspec_nsset_tech_add,
 	errspec_nsset_tech_rem,
+	errspec_keyset_handle,
+  	errspec_keyset_tech,
+  	errspec_keyset_dsrecord,
+ 	errspec_keyset_dsrecord_add,
+  	errspec_keyset_dsrecord_rem,
+  	errspec_keyset_tech_add,
+  	errspec_keyset_tech_rem,
 	errspec_domain_fqdn,
 	errspec_domain_registrant,
 	errspec_domain_nsset,
+	errspec_domain_keyset,
 	errspec_domain_period,
 	errspec_domain_admin,
 	errspec_domain_tmpcontact,
@@ -319,15 +339,20 @@ typedef struct {
  */
 typedef struct {
 	unsigned short	keytag;
+
 	unsigned char	alg;
+
 	unsigned char	digestType;
 	char	*digest;
+
 	int	maxSigLife;	/* zero means that the field is empty */
 	/* optional dns rr (-1 in theese fields means that they are empty) */
+/*
 	unsigned flags;
 	unsigned protocol;
 	unsigned key_alg;
 	char	*pubkey;
+*/
 }epp_ds;
 
 /** Type of identification number used in contact object. */
@@ -378,7 +403,9 @@ typedef enum {
 	pt_transfer_contact, /**< Contact was transferred. */
 	pt_delete_contact,   /**< Contact was deleted because not used. */
 	pt_transfer_nsset,   /**< Nsset was transferred. */
-	pt_delete_nsset,     /**< Contact was deleted because not used. */
+	pt_delete_nsset,     /**< Nsset was deleted because not used. */
+	pt_transfer_keyset,  /**< KeySet was transferred. */
+	pt_delete_keyset,    /**< KeySet was deleted because not used. */
 	pt_techcheck,        /**< Technical check results. */
 	pt_transfer_domain,  /**< Domain was transferred. */
 	pt_impexpiration,    /**< Domain will expire in near future. */
@@ -450,6 +477,7 @@ typedef struct {
 	qhead	 tmpcontact; /**< Temporary contact used for migration. */
 	qhead	 admin;   /**< Admin contact for domain. */
 	char	*nsset;   /**< Nsset of domain. */
+	char 	*keyset;  /**< Keyset for domain */
 	char	*clID;    /**< Owner's ID. */
 	char	*crID;    /**< ID of creator. */
 	char	*crDate;  /**< Creation date. */
@@ -478,6 +506,23 @@ typedef struct {
 	qhead	 tech;    /**< List of technical contacts for nsset. */
 	int	 level;   /**< Report level. */
 }epps_info_nsset;
+
+/* Info keyset parameters */
+typedef struct {
+	char	*id;      /**< Id of wanted keyset (input). */
+	char	*handle;  /**< Id of wanted keyset (output). */
+	char	*roid;    /**< ROID of object. */
+	qhead	 status;  /**< Keyset's status. */
+	char	*clID;    /**< Owner's ID. */
+	char	*crID;    /**< ID of creator. */
+	char	*crDate;  /**< Creation date. */
+	char	*upID;    /**< ID of last updater. */
+	char	*upDate;  /**< Last updated. */
+	char	*trDate;  /**< Last transfered. */
+	char	*authInfo;/**< Authorization information. */
+	qhead	 ds;      /**< List of delegation signers. */
+	qhead	 tech;    /**< List of technical contacts for keyset. */
+} epps_info_keyset;
 
 /** Poll request parameters. */
 typedef struct {
@@ -539,6 +584,7 @@ typedef struct {
 	char	*registrant; /**< Registrant of domain. */
 	qhead	 admin;   /**< Admin contact for domain. */
 	char	*nsset;   /**< Nsset of domain. */
+	char 	*keyset;  /**< Keyset for domain */
 	int	 period;  /**< Registration period in months. */
 	epp_timeunit unit;/**< Registration period's unit. */
 	char	*authInfo;/**< Authorization information. */
@@ -556,6 +602,15 @@ typedef struct {
 	char	*crDate;  /**< Creation date of nsset. */
 	int	 level;   /**< Report level. */
 }epps_create_nsset;
+
+/** Create keyset parameters */
+typedef struct {
+	char 	*id;		/**< Id of wanted keyset (input). */
+	char 	*authInfo;	/**< Authorization information. */
+	qhead	ds;		/**< List of delegation signers */
+	qhead 	tech;		/**< List of technical contacts for keyset */
+	char 	*crDate;	/**< Creation date of keyset. */
+}epps_create_keyset;
 
 /** Delete parameters. */
 typedef struct {
@@ -595,6 +650,7 @@ typedef struct {
 	qhead	 rem_admin;    /**< Admin contacts to be removed. */
 	qhead	 rem_tmpcontact; /**< Temporary contact used for migration. */
 	char	*nsset;        /**< Nsset of domain. */
+	char	*keyset;       /**< Keyset of domain. */
 	char	*authInfo;     /**< Authorization information. */
 	qhead	 extensions;   /**< List of domain extensions. */
 }epps_update_domain;
@@ -609,6 +665,16 @@ typedef struct {
 	char	*authInfo;     /**< Authorization information. */
 	int	 level;        /**< Report level. */
 }epps_update_nsset;
+
+/** Update keyset parameters */
+typedef struct {
+	char	*id;           /**< Id of wanted keyset (input). */
+	qhead	 add_tech;     /**< Technical contacts to be added. */
+	qhead	 rem_tech;     /**< Technical contacts to be removed. */
+	qhead	 add_ds;       /**< Delegation signers to be added. */
+	qhead	 rem_ds;       /**< Delegation signers to be removed. */
+	char	*authInfo;     /**< Authorization information. */
+}epps_update_keyset;
 
 /** Transfer parameters. */
 typedef struct {

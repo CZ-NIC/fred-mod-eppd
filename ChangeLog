@@ -1,3 +1,9 @@
+2008-08-14 Jaromir Talir, Juraj Vicenik (2.0.0)
+
+	* Schema updated for DNSSEC and info-contact option params
+
+	* DNSSEC functions for KeySet manipulation implemented
+
 2008-06-20 Jaromir Talir (1.7.0)
 
 	* Minor configuration and build enhancements

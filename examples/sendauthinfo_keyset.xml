@@ -7,11 +7,11 @@
 		  xsi:schemaLocation="http://www.nic.cz/xml/epp/fred-1.2
 		  fred-1.2.xsd">
       <fred:sendAuthInfo>
-        <nsset:sendAuthInfo xmlns:nsset="http://www.nic.cz/xml/epp/nsset-1.2"
-		    xsi:schemaLocation="http://www.nic.cz/xml/epp/nsset-1.2
-		    nsset-1.2.xsd">
-	  <nsset:id>example.cz</nsset:id>
-	</nsset:sendAuthInfo>
+        <keyset:sendAuthInfo xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.0"
+		    xsi:schemaLocation="http://www.nic.cz/xml/epp/keyset-1.0
+		    keyset-1.0.xsd">
+	  <keyset:id>example.cz</keyset:id>
+	</keyset:sendAuthInfo>
       </fred:sendAuthInfo>
       <fred:clTRID>ABC-12346</fred:clTRID>
     </fred:extcommand>

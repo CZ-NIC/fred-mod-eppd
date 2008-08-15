@@ -330,6 +330,7 @@ int readfile(char *text)
 	}
 	if (i == MAX_LENGTH - 1) {
 		fputs("Maximal allowed text lenght exceeded", stderr);
+		fclose(f);
 		return 0;
 	}
 	text[i] = 0;

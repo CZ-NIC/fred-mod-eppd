@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/contact-1.4"
-          xmlns:contact="http://www.nic.cz/xml/epp/contact-1.4"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/contact-1.5"
+          xmlns:contact="http://www.nic.cz/xml/epp/contact-1.5"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
           xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
           xmlns="http://www.w3.org/2001/XMLSchema"
@@ -138,6 +138,32 @@
          minOccurs="0"/>
         <element name="pc" type="contact:pcType"/>
         <element name="cc" type="contact:ccType"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="postalInfoReadType">
+      <sequence>
+        <element name="name" type="contact:postalLineType"
+         minOccurs="0"/>
+        <element name="org" type="contact:optPostalLineType"
+         minOccurs="0"/>
+        <element name="addr" type="contact:addrReadType"
+         minOccurs="0"/>
+      </sequence>
+    </complexType>
+
+    <complexType name="addrReadType">
+      <sequence>
+        <element name="street" type="contact:optPostalLineType"
+         minOccurs="0" maxOccurs="3"/>
+        <element name="city" type="contact:postalLineType"
+         minOccurs="0"/>
+        <element name="sp" type="contact:optPostalLineType"
+         minOccurs="0"/>
+        <element name="pc" type="contact:pcType"
+         minOccurs="0"/>
+        <element name="cc" type="contact:ccType"
+         minOccurs="0"/>
       </sequence>
     </complexType>
 
@@ -330,12 +356,13 @@
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="contact:statusType"
          minOccurs="0" maxOccurs="4"/>
-        <element name="postalInfo" type="contact:postalInfoType"/>
+        <element name="postalInfo" type="contact:postalInfoReadType"/>
         <element name="voice" type="contact:e164StringType"
          minOccurs="0"/>
         <element name="fax" type="contact:e164StringType"
          minOccurs="0"/>
-        <element name="email" type="contact:emailType"/>
+        <element name="email" type="contact:emailType"
+         minOccurs="0"/>
         <element name="clID" type="eppcom:clIDType"/>
         <element name="crID" type="eppcom:clIDType"/>
         <element name="crDate" type="dateTime"/>

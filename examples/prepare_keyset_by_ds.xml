@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<epp xmlns="urn:ietf:params:xml:ns:epp-1.0" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+    xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
+  <extension>
+    <fred:extcommand 
+    xmlns:fred="http://www.nic.cz/xml/epp/fred-1.2" 
+    xsi:schemaLocation="http://www.nic.cz/xml/epp/fred-1.2 fred-1.2.xsd">
+      <fred:keysetsByDs>
+        <fred:ds xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.0" 
+            xsi:schemaLocation="http://www.nic.cz/xml/epp/keyset-1.0 keyset-1.0.xsd">
+          <keyset:keyTag>1</keyset:keyTag>
+          <keyset:alg>1</keyset:alg>
+          <keyset:digestType>1</keyset:digestType>
+          <keyset:digest>aaa12409aaaaa098</keyset:digest>
+          <keyset:maxSigLife>100</keyset:maxSigLife>
+        </fred:ds>
+      </fred:keysetsByDs>
+      <fred:clTRID>002#08-08-01at10:26:38</fred:clTRID>
+    </fred:extcommand>
+  </extension>
+</epp>
+

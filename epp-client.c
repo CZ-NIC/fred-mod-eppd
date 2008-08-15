@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -83,9 +83,17 @@ static int error_translator[][2] =
   {ccReg_nsset_dns_name_rem,    errspec_nsset_dns_name_rem},
   {ccReg_nsset_tech_add,        errspec_nsset_tech_add},
   {ccReg_nsset_tech_rem,        errspec_nsset_tech_rem},
+  {ccReg_keyset_handle,		errspec_keyset_handle},
+  {ccReg_keyset_tech,		errspec_keyset_tech},
+  {ccReg_keyset_dsrecord,	errspec_keyset_dsrecord},
+  {ccReg_keyset_dsrecord_add,	errspec_keyset_dsrecord_add},
+  {ccReg_keyset_dsrecord_rem,	errspec_keyset_dsrecord_rem},
+  {ccReg_keyset_tech_add,	errspec_keyset_tech_add},
+  {ccReg_keyset_tech_rem,	errspec_keyset_tech_rem},
   {ccReg_domain_fqdn,           errspec_domain_fqdn},
   {ccReg_domain_registrant,     errspec_domain_registrant},
   {ccReg_domain_nsset,          errspec_domain_nsset},
+  {ccReg_domain_keyset,         errspec_domain_keyset},
   {ccReg_domain_period,         errspec_domain_period},
   {ccReg_domain_admin,          errspec_domain_admin},
   {ccReg_domain_tmpcontact,     errspec_domain_tmpcontact},
@@ -812,8 +820,7 @@ epp_call_check(epp_context *epp_ctx,
 					c_clTRID,
 					cdata->xml_in,
 					ev);
-		else {
-			assert(obj == EPP_NSSET);
+		else if (obj == EPP_NSSET) {
 			response = ccReg_EPP_NSSetCheck((ccReg_EPP) service,
 					c_ids,
 					&c_avails,
@@ -821,6 +828,16 @@ epp_call_check(epp_context *epp_ctx,
 					c_clTRID,
 					cdata->xml_in,
 					ev);
+		} else {
+			assert(obj == EPP_KEYSET);
+			response = ccReg_EPP_KeySetCheck((ccReg_EPP) service,
+					c_ids,
+					&c_avails,
+					loginid,
+					c_clTRID,
+					cdata->xml_in,
+					ev);
+
 		}
 
 		/* if COMM_FAILURE exception is not raised quit retry loop */
@@ -999,7 +1016,7 @@ epp_call_info_contact(epp_context *epp_ctx,
 	if (cerrno != 0) goto error;
 	for (i = 0; i < c_contact->Streets._length; i++) {
 		char	*street;
-		
+
 		street = unwrap_str(epp_ctx->pool,c_contact->Streets._buffer[i],
 				&cerrno);
 		if (cerrno != 0) goto error;
@@ -1191,6 +1208,9 @@ epp_call_info_domain(epp_context *epp_ctx,
 	if (cerrno != 0) goto error;
 	info_domain->nsset  = unwrap_str(epp_ctx->pool, c_domain->nsset,
 			&cerrno);
+	if (cerrno != 0) goto error;
+	info_domain->keyset  = unwrap_str(epp_ctx->pool, c_domain->keyset,
+	                                &cerrno);
 	if (cerrno != 0) goto error;
 	info_domain->authInfo = unwrap_str(epp_ctx->pool, c_domain->AuthInfoPw,
 			&cerrno);
@@ -1426,6 +1446,157 @@ error:
 }
 
 /**
+ * EPP info keyset.
+ *
+ * @param epp_ctx Epp context.
+ * @param service EPP service.
+ * @param loginid Session identifier.
+ * @param cdata   Data from xml request.
+ * @return        Status.
+ */
+static corba_status
+epp_call_info_keyset(epp_context *epp_ctx,
+		service_EPP service,
+		unsigned int loginid,
+		epp_command_data *cdata)
+{
+	CORBA_Environment ev[1];
+	CORBA_char	*c_clTRID;
+	ccReg_KeySet	*c_keyset;
+	ccReg_Response	*response;
+	epps_info_keyset *info_keyset;
+	int	i, retr, cerrno;
+
+	info_keyset = cdata->data;
+	/*
+	 * Input parameters:
+	 *    id (a)
+	 *    loginid
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_contact (*)
+	 */
+	assert(info_keyset->id);
+	assert(cdata->xml_in);
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev);
+		CORBA_exception_init(ev);
+
+		/* get information about nsset */
+		response = ccReg_EPP_KeySetInfo((ccReg_EPP) service,
+				info_keyset->id,
+				&c_keyset,
+				loginid,
+				c_clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+	CORBA_free(c_clTRID);
+
+	/* if it is exception then return */
+	if (raised_exception(ev))
+		return handle_exception(epp_ctx, cdata, ev);
+
+	CLEAR_CERRNO(cerrno);
+
+	/* copy output values */
+	info_keyset->roid   = unwrap_str_req(epp_ctx, c_keyset->ROID, &cerrno,
+			"ROID");
+	if (cerrno != 0) goto error;
+	info_keyset->handle = unwrap_str_req(epp_ctx, c_keyset->handle, &cerrno,
+			"handle");
+	if (cerrno != 0) goto error;
+	info_keyset->clID   = unwrap_str_req(epp_ctx, c_keyset->ClID, &cerrno,
+			"clID");
+	if (cerrno != 0) goto error;
+	info_keyset->crID   = unwrap_str_req(epp_ctx, c_keyset->CrID, &cerrno,
+			"crID");
+	if (cerrno != 0) goto error;
+	info_keyset->upID   = unwrap_str(epp_ctx->pool, c_keyset->UpID, &cerrno);
+	if (cerrno != 0) goto error;
+	info_keyset->crDate = unwrap_str_req(epp_ctx, c_keyset->CrDate, &cerrno,
+			"crDate");
+	if (cerrno != 0) goto error;
+	info_keyset->upDate = unwrap_str(epp_ctx->pool, c_keyset->UpDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_keyset->trDate = unwrap_str(epp_ctx->pool, c_keyset->TrDate, &cerrno);
+	if (cerrno != 0) goto error;
+	info_keyset->authInfo = unwrap_str(epp_ctx->pool, c_keyset->AuthInfoPw,
+			&cerrno);
+	if (cerrno != 0) goto error;
+
+	/* initialize status list */
+	for (i = 0; i < c_keyset->stat._length; i++) {
+		epp_status	*status;
+
+		status = epp_malloc(epp_ctx->pool, sizeof *status);
+		if (status == NULL)
+			goto error;
+
+		status->value = unwrap_str_req(epp_ctx,
+				c_keyset->stat._buffer[i].value, &cerrno,
+				"status flag");
+		if (cerrno != 0) goto error;
+		status->text = unwrap_str_req(epp_ctx,
+				c_keyset->stat._buffer[i].text, &cerrno,
+				"status text");
+		if (cerrno != 0) goto error;
+		if (q_add(epp_ctx->pool, &info_keyset->status, status))
+			goto error;
+	}
+	/* initialize tech list */
+	for (i = 0; i < c_keyset->tech._length; i++) {
+		char	*tech;
+
+		tech = unwrap_str_req(epp_ctx, c_keyset->tech._buffer[i], &cerrno,
+				"tech");
+		if (cerrno != 0) goto error;
+		if (q_add(epp_ctx->pool, &info_keyset->tech, tech))
+			goto error;
+	}
+	/* initialize required number of ds items */
+	for (i = 0; i < c_keyset->dsrec._length; i++) {
+		epp_ds	*ds_item;
+
+		ds_item = epp_calloc(epp_ctx->pool, sizeof *ds_item);
+		if (ds_item == NULL) goto error;
+
+		/* process of ds item */
+		ds_item->keytag =  c_keyset->dsrec._buffer[i].keyTag;
+		ds_item->alg  = c_keyset->dsrec._buffer[i].alg;
+		ds_item->digestType = c_keyset->dsrec._buffer[i].digestType;
+		ds_item->digest  = unwrap_str_req(epp_ctx, c_keyset->dsrec._buffer[i].digest, &cerrno, "digest");
+		if (cerrno != 0) goto error;
+
+		ds_item->maxSigLife  = c_keyset->dsrec._buffer[i].maxSigLife;
+
+		/* enqueue ds item */
+		if (q_add(epp_ctx->pool, &info_keyset->ds, ds_item))
+			goto error;
+	}
+
+	CORBA_free(c_keyset);
+	return epilog_success(epp_ctx, cdata, response);
+
+error:
+	CORBA_free(c_keyset);
+	CORBA_free(response);
+	return CORBA_INT_ERROR;
+}
+
+
+
+/**
  * EPP poll request.
  *
  * @param epp_ctx Epp context.
@@ -1540,6 +1711,22 @@ epp_call_poll_req(epp_context *epp_ctx,
 			ccReg_PollMsg_HandleDateReg *hdr =
 				(ccReg_PollMsg_HandleDateReg *) c_mesg->_value;
 			poll_req->type = pt_transfer_nsset;
+			poll_req->msg.hdt.handle = unwrap_str(epp_ctx->pool,
+					hdr->handle, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hdt.date = unwrap_str(epp_ctx->pool,
+					hdr->date, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.hdt.clID = unwrap_str(epp_ctx->pool,
+					hdr->clID, &cerrno);
+			if (cerrno != 0) goto error;
+			break;
+			}
+		case ccReg_polltype_transfer_keyset:
+			{
+			ccReg_PollMsg_HandleDateReg *hdr =
+				(ccReg_PollMsg_HandleDateReg *) c_mesg->_value;
+			poll_req->type = pt_transfer_keyset;
 			poll_req->msg.hdt.handle = unwrap_str(epp_ctx->pool,
 					hdr->handle, &cerrno);
 			if (cerrno != 0) goto error;
@@ -1805,7 +1992,7 @@ epp_call_create_domain(epp_context *epp_ctx,
 {
 	CORBA_Environment ev[1];
 	CORBA_char	*c_crDate, *c_exDate;
-	CORBA_char	*c_registrant, *c_nsset, *c_authInfo, *c_clTRID;
+	CORBA_char	*c_registrant, *c_nsset, *c_keyset, *c_authInfo, *c_clTRID;
 	ccReg_Response	*response = NULL;
 	ccReg_AdminContact	*c_admin;
 	ccReg_ExtensionList	*c_ext_list;
@@ -1821,6 +2008,7 @@ epp_call_create_domain(epp_context *epp_ctx,
 	c_authInfo = NULL;
 	c_period = NULL;
 	c_nsset = NULL;
+	c_keyset = NULL;
 	c_registrant = NULL;
 	c_clTRID = NULL;
 	c_admin = NULL;
@@ -1849,6 +2037,8 @@ epp_call_create_domain(epp_context *epp_ctx,
 	if (c_registrant == NULL) goto error_input;
 	c_nsset = wrap_str(create_domain->nsset);
 	if (c_nsset == NULL) goto error_input;
+	c_keyset = wrap_str(create_domain->keyset);
+	if (c_keyset == NULL) goto error_input;
 	c_authInfo = wrap_str(create_domain->authInfo);
 	if (c_authInfo == NULL) goto error_input;
 	c_period = ccReg_Period_str__alloc();
@@ -1909,6 +2099,7 @@ epp_call_create_domain(epp_context *epp_ctx,
 				create_domain->name,
 				c_registrant,
 				c_nsset,
+				c_keyset,
 				c_authInfo,
 				c_period,
 				c_admin,
@@ -1933,6 +2124,7 @@ error_input:
 	CORBA_free(c_authInfo);
 	CORBA_free(c_period);
 	CORBA_free(c_nsset);
+	CORBA_free(c_keyset);
 	CORBA_free(c_registrant);
 	CORBA_free(c_clTRID);
 	if (!input_ok)
@@ -2389,6 +2581,169 @@ epp_call_create_nsset(epp_context *epp_ctx,
 }
 
 /**
+ * EPP create keyset.
+ *
+ * @param epp_ctx Epp context.
+ * @param service EPP service.
+ * @param loginid Session identifier.
+ * @param cdata   Data from xml request.
+ * @return        Status.
+ */
+static corba_status
+epp_call_create_keyset(epp_context *epp_ctx,
+		service_EPP service,
+		unsigned int loginid,
+		epp_command_data *cdata)
+{
+	CORBA_Environment ev[1];
+	ccReg_Response *response;
+	ccReg_DSRecord	*c_dsrecord;
+	ccReg_TechContact	*c_tech;
+	CORBA_char	*c_crDate, *c_clTRID, *c_authInfo;
+	int	len, i, retr, cerrno;
+	epps_create_keyset	*create_keyset;
+
+	create_keyset = cdata->data;
+	/*
+	 * Input parameters:
+	 *    id (a)
+	 *    c_authInfo (*)
+	 *    c_tech (*)
+	 *    c_dsrecord (*)
+	 *    level
+	 *    loginid
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_crDate (*)
+	 */
+	assert(create_keyset->id != NULL);
+	assert(cdata->xml_in != NULL);
+
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+	c_authInfo = wrap_str(create_keyset->authInfo);
+	if (c_authInfo == NULL) {
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+
+	/* alloc & init sequence of nameservers */
+	c_dsrecord = ccReg_DSRecord__alloc();
+	if (c_dsrecord == NULL) {
+		CORBA_free(c_authInfo);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	len = q_length(create_keyset->ds);
+	c_dsrecord->_buffer = ccReg_DSRecord_allocbuf(len);
+	if (len != 0 && c_dsrecord->_buffer == NULL) {
+		CORBA_free(c_dsrecord);
+		CORBA_free(c_authInfo);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_dsrecord->_maximum = c_dsrecord->_length = len;
+	c_dsrecord->_release = CORBA_TRUE;
+	i = 0;
+	q_foreach(&create_keyset->ds) {
+		epp_ds	*ds;
+
+		ds = q_content(&create_keyset->ds);
+
+		c_dsrecord->_buffer[i].keyTag = ds->keytag;
+		c_dsrecord->_buffer[i].alg = ds->alg;
+		c_dsrecord->_buffer[i].digestType = ds->digestType;
+
+		c_dsrecord->_buffer[i].digest = wrap_str(ds->digest);
+		if (c_dsrecord->_buffer[i].digest == NULL) {
+			CORBA_free(c_dsrecord);
+			CORBA_free(c_authInfo);
+			CORBA_free(c_clTRID);
+			return CORBA_INT_ERROR;
+		}
+
+		c_dsrecord->_buffer[i].maxSigLife = ds->maxSigLife;
+
+		i++;
+	}
+	/* alloc & init sequence of tech contacts */
+	c_tech = ccReg_TechContact__alloc();
+	if (c_tech == NULL) {
+		CORBA_free(c_dsrecord);
+		CORBA_free(c_authInfo);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	len = q_length(create_keyset->tech);
+	c_tech->_buffer = ccReg_TechContact_allocbuf(len);
+	if (len != 0 && c_tech->_buffer == NULL) {
+		CORBA_free(c_tech);
+		CORBA_free(c_dsrecord);
+		CORBA_free(c_authInfo);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	c_tech->_release = CORBA_TRUE;
+	c_tech->_maximum = c_tech->_length = len;
+	i = 0;
+	q_foreach(&create_keyset->tech) {
+		c_tech->_buffer[i] = wrap_str(q_content(&create_keyset->tech));
+		if (c_tech->_buffer[i++] == NULL) {
+			CORBA_free(c_tech);
+			CORBA_free(c_dsrecord);
+			CORBA_free(c_authInfo);
+			CORBA_free(c_clTRID);
+			return CORBA_INT_ERROR;
+		}
+	}
+
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev);
+		CORBA_exception_init(ev);
+
+		/* send new nsset to repository */
+		response = ccReg_EPP_KeySetCreate((ccReg_EPP) service,
+				create_keyset->id,
+				c_authInfo,
+				c_tech,
+				c_dsrecord,
+				&c_crDate,
+				loginid,
+				c_clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+	CORBA_free(c_tech);
+	CORBA_free(c_dsrecord);
+	CORBA_free(c_authInfo);
+	CORBA_free(c_clTRID);
+
+	/* if it is exception then return */
+	if (raised_exception(ev))
+		return handle_exception(epp_ctx, cdata, ev);
+
+	CLEAR_CERRNO(cerrno);
+
+	create_keyset->crDate = unwrap_str(epp_ctx->pool, c_crDate, &cerrno);
+	if (cerrno != 0) {
+		CORBA_free(c_crDate);
+		CORBA_free(response);
+		return CORBA_INT_ERROR;
+	}
+
+	CORBA_free(c_crDate);
+	return epilog_success(epp_ctx, cdata, response);
+}
+
+
+/**
  * EPP delete for domain, nsset and contact is so similar that it is worth of
  * having the code in one function and pass object type as parameter.
  *
@@ -2440,6 +2795,13 @@ epp_call_delete(epp_context *epp_ctx,
 					ev);
 		else if (obj == EPP_CONTACT)
 			response = ccReg_EPP_ContactDelete((ccReg_EPP) service,
+					delete->id,
+					loginid,
+					c_clTRID,
+					cdata->xml_in,
+					ev);
+		else if (obj == EPP_KEYSET)
+			response = ccReg_EPP_KeySetDelete((ccReg_EPP) service,
 					delete->id,
 					loginid,
 					c_clTRID,
@@ -2621,7 +2983,7 @@ epp_call_update_domain(epp_context *epp_ctx,
 	ccReg_AdminContact	*c_admin_add, *c_admin_rem, *c_tmpcontact_rem;
 	ccReg_ExtensionList	*c_ext_list;
 	epps_update_domain	*update_domain;
-	CORBA_char	*c_clTRID, *c_registrant, *c_authInfo, *c_nsset;
+	CORBA_char	*c_clTRID, *c_registrant, *c_authInfo, *c_nsset, *c_keyset;
 	ccReg_Response	*response = NULL;
 	int	i, len, retr, input_ok;
 
@@ -2631,6 +2993,7 @@ epp_call_update_domain(epp_context *epp_ctx,
 	c_registrant = NULL;
 	c_authInfo   = NULL;
 	c_nsset      = NULL;
+	c_keyset     = NULL;
 	c_admin_rem  = NULL;
 	c_admin_add  = NULL;
 	c_ext_list   = NULL;
@@ -2662,6 +3025,8 @@ epp_call_update_domain(epp_context *epp_ctx,
 	if (c_authInfo == NULL) goto error_input;
 	c_nsset = wrap_str_upd(update_domain->nsset);
 	if (c_nsset == NULL) goto error_input;
+	c_keyset = wrap_str_upd(update_domain->keyset);
+	if (c_keyset == NULL) goto error_input;
 
 	/* admin add */
 	c_admin_add = ccReg_AdminContact__alloc();
@@ -2751,6 +3116,7 @@ epp_call_update_domain(epp_context *epp_ctx,
 				c_registrant,
 				c_authInfo,
 				c_nsset,
+				c_keyset,
 				c_admin_add,
 				c_admin_rem,
 				c_tmpcontact_rem,
@@ -2772,6 +3138,7 @@ error_input:
 	CORBA_free(c_registrant);
 	CORBA_free(c_authInfo);
 	CORBA_free(c_nsset);
+	CORBA_free(c_keyset);
 	CORBA_free(c_admin_rem);
 	CORBA_free(c_admin_add);
 	CORBA_free(c_ext_list);
@@ -3131,7 +3498,191 @@ error_input:
 }
 
 /**
- * EPP transfer for domain, contact and nsset is so similar that it is worth of
+ * EPP update keyset.
+ *
+ * @param epp_ctx Epp context.
+ * @param service EPP service.
+ * @param loginid Session identifier.
+ * @param cdata   Data from xml request.
+ * @return        Status.
+ */
+static corba_status
+epp_call_update_keyset(epp_context *epp_ctx,
+		service_EPP service,
+		unsigned int loginid,
+		epp_command_data *cdata)
+{
+	CORBA_Environment ev[1];
+	CORBA_char	*c_clTRID, *c_authInfo;
+	ccReg_Response	*response;
+	ccReg_DSRecord	*c_ds_add;
+	ccReg_DSRecord	*c_ds_rem;
+	ccReg_TechContact	*c_tech_add;
+	ccReg_TechContact	*c_tech_rem;
+	int	i, len, retr, input_ok;
+	epps_update_keyset *update_keyset;
+
+	input_ok = 0;
+	update_keyset = cdata->data;
+	c_ds_rem = NULL;
+	c_ds_add = NULL;
+	c_tech_rem = NULL;
+	c_tech_add = NULL;
+	c_authInfo = NULL;
+	c_clTRID = NULL;
+	/*
+	 * Input parameters:
+	 *    id            (a)
+	 *    c_authInfo    (*)
+	 *    c_ds_add (*)
+	 *    c_ds_rem (*)
+	 *    c_tech_add    (*)
+	 *    c_tech_rem    (*)
+	 *    level
+	 *    loginid
+	 *    c_clTRID      (*)
+	 *    xml_in        (a)
+	 * Output parameters: none
+	 */
+	assert(update_keyset->id);
+	assert(cdata->xml_in);
+
+	c_clTRID = wrap_str(cdata->clTRID);
+	if (c_clTRID == NULL)
+		return CORBA_INT_ERROR;
+	c_authInfo = wrap_str_upd(update_keyset->authInfo);
+	if (c_authInfo == NULL) goto error_input;
+
+	/* tech add */
+	c_tech_add = ccReg_TechContact__alloc();
+	if (c_tech_add == NULL) goto error_input;
+	len = q_length(update_keyset->add_tech);
+	c_tech_add->_buffer = ccReg_TechContact_allocbuf(len);
+	if (len != 0 && c_tech_add->_buffer == NULL) goto error_input;
+	c_tech_add->_maximum = c_tech_add->_length = len;
+	c_tech_add->_release = CORBA_TRUE;
+	i = 0;
+	q_foreach(&update_keyset->add_tech) {
+		char	*tech;
+
+		tech = wrap_str(q_content(&update_keyset->add_tech));
+		if (tech == NULL) goto error_input;
+		c_tech_add->_buffer[i++] = tech;
+	}
+	/* tech rem */
+	c_tech_rem = ccReg_TechContact__alloc();
+	if (c_tech_rem == NULL) goto error_input;
+	len = q_length(update_keyset->rem_tech);
+	c_tech_rem->_buffer = ccReg_TechContact_allocbuf(len);
+	if (len != 0 && c_tech_rem->_buffer == NULL) goto error_input;
+	c_tech_rem->_maximum = c_tech_rem->_length = len;
+	c_tech_rem->_release = CORBA_TRUE;
+	i = 0;
+	q_foreach(&update_keyset->rem_tech) {
+		char	*tech;
+
+		tech = wrap_str(q_content(&update_keyset->rem_tech));
+		if (tech == NULL) goto error_input;
+		c_tech_rem->_buffer[i++] = tech;
+	}
+
+	/* delegation signers add */
+	c_ds_add = ccReg_DSRecord__alloc();
+	if (c_ds_add == NULL) goto error_input;
+	len = q_length(update_keyset->add_ds);
+	c_ds_add->_buffer = ccReg_DSRecord_allocbuf(len);
+	if (len != 0 && c_ds_add->_buffer == NULL) goto error_input;
+	c_ds_add->_maximum = c_ds_add->_length = len;
+	c_ds_add->_release = CORBA_TRUE;
+	i = 0;
+	q_foreach(&update_keyset->add_ds) {
+		epp_ds	*ds;
+		char *digest;
+
+		ds = q_content(&update_keyset->add_ds);
+
+		digest = wrap_str(ds->digest);
+		if (digest==NULL) goto error_input;
+
+		c_ds_add->_buffer[i].keyTag = ds->keytag;
+		c_ds_add->_buffer[i].alg = ds->alg;
+		c_ds_add->_buffer[i].digestType = ds->digestType;
+		c_ds_add->_buffer[i].digest = digest;
+
+		c_ds_add->_buffer[i].maxSigLife = ds->maxSigLife;
+
+		i++;
+	}
+
+	/* name servers rem */
+	c_ds_rem = ccReg_DSRecord__alloc();
+	if (c_ds_rem == NULL) goto error_input;
+	len = q_length(update_keyset->rem_ds);
+	c_ds_rem->_buffer = ccReg_DSRecord_allocbuf(len);
+	if (len != 0 && c_ds_rem->_buffer == NULL) goto error_input;
+	c_ds_rem->_maximum = c_ds_rem->_length = len;
+	c_ds_rem->_release = CORBA_TRUE;
+	i = 0;
+	q_foreach(&update_keyset->rem_ds) {
+  		epp_ds *ds;
+
+		// ds record is identified by all the required fields 
+		ds = q_content(&update_keyset->rem_ds);
+
+		c_ds_rem->_buffer[i].keyTag = ds->keytag;
+		c_ds_rem->_buffer[i].alg = ds->alg;
+		c_ds_rem->_buffer[i].digestType = ds->digestType;
+		c_ds_rem->_buffer[i].maxSigLife = ds->maxSigLife;
+		c_ds_rem->_buffer[i].digest = wrap_str(ds->digest);
+
+		i++;
+	}
+
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev);
+		CORBA_exception_init(ev);
+
+		/* send the updates to repository */
+		response = ccReg_EPP_KeySetUpdate((ccReg_EPP) service,
+				update_keyset->id,
+				c_authInfo,
+				c_tech_add,
+				c_tech_rem,
+				c_ds_add,
+				c_ds_rem,
+				loginid,
+				c_clTRID,
+				cdata->xml_in,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+	input_ok = 1;
+
+error_input:
+	CORBA_free(c_ds_rem);
+	CORBA_free(c_ds_add);
+	CORBA_free(c_tech_rem);
+	CORBA_free(c_tech_add);
+	CORBA_free(c_authInfo);
+	CORBA_free(c_clTRID);
+	if (!input_ok)
+		return CORBA_INT_ERROR;
+
+	/* if it is exception then return */
+	if (raised_exception(ev))
+		return handle_exception(epp_ctx, cdata, ev);
+
+	return epilog_success(epp_ctx, cdata, response);
+}
+
+
+
+/**
+ * EPP transfer for domain, contact, nsset and keyset is so similar that it is worth of
  * having the code in one function and pass object type as parameter.
  *
  * @param epp_ctx Epp context.
@@ -3191,6 +3742,15 @@ epp_call_transfer(epp_context *epp_ctx,
 		}
 		else if (obj == EPP_CONTACT) {
 			response = ccReg_EPP_ContactTransfer((ccReg_EPP) service,
+					transfer->id,
+					c_authInfo,
+					loginid,
+					c_clTRID,
+					cdata->xml_in,
+					ev);
+		}
+		else if (obj == EPP_KEYSET) {
+			response = ccReg_EPP_KeySetTransfer((ccReg_EPP) service,
 					transfer->id,
 					c_authInfo,
 					loginid,
@@ -3277,6 +3837,14 @@ epp_call_list(epp_context *epp_ctx,
 		}
 		else if (obj == EPP_CONTACT) {
 			response = ccReg_EPP_ContactList((ccReg_EPP) service,
+					&c_handles,
+					loginid,
+					c_clTRID,
+					cdata->xml_in,
+					ev);
+		}
+		else if(obj == EPP_KEYSET) {
+			response = ccReg_EPP_KeySetList((ccReg_EPP) service,
 					&c_handles,
 					loginid,
 					c_clTRID,
@@ -3384,6 +3952,15 @@ epp_call_sendauthinfo(epp_context *epp_ctx,
 		}
 		else if (obj == EPP_CONTACT) {
 			response = ccReg_EPP_contactSendAuthInfo(
+					(ccReg_EPP) service,
+					c_handle,
+					loginid,
+					c_clTRID,
+					cdata->xml_in,
+					ev);
+		}
+		else if (obj == EPP_KEYSET) {
+			response = ccReg_EPP_keysetSendAuthInfo(
 					(ccReg_EPP) service,
 					c_handle,
 					loginid,
@@ -3587,7 +4164,7 @@ epp_call_test_nsset(epp_context *epp_ctx,
 		usleep(RETR_SLEEP);
 	}
 	input_ok = 1;
-	
+
 error_input:
 	CORBA_free(c_handle);
 	CORBA_free(c_names);
@@ -3789,6 +4366,10 @@ epp_call_cmd(epp_context *epp_ctx,
 			cstat = epp_call_check(epp_ctx, service, loginid, cdata,
 					EPP_NSSET);
 			break;
+		case EPP_CHECK_KEYSET:
+			cstat = epp_call_check(epp_ctx, service, loginid, cdata,
+					EPP_KEYSET);
+			break;
 		case EPP_INFO_CONTACT:
 			cstat = epp_call_info_contact(epp_ctx, service, loginid,
 					cdata);
@@ -3799,6 +4380,10 @@ epp_call_cmd(epp_context *epp_ctx,
 			break;
 		case EPP_INFO_NSSET:
 			cstat = epp_call_info_nsset(epp_ctx, service, loginid,
+					cdata);
+			break;
+		case EPP_INFO_KEYSET:
+			cstat = epp_call_info_keyset(epp_ctx, service, loginid,
 					cdata);
 			break;
 		case EPP_LIST_CONTACT:
@@ -3812,6 +4397,10 @@ epp_call_cmd(epp_context *epp_ctx,
 		case EPP_LIST_NSSET:
 			cstat = epp_call_list(epp_ctx, service, loginid, cdata,
 					EPP_NSSET);
+			break;
+		case EPP_LIST_KEYSET:
+			cstat = epp_call_list(epp_ctx, service, loginid, cdata,
+					EPP_KEYSET);
 			break;
 		case EPP_POLL_REQ:
 			cdata->noresdata = 1;
@@ -3835,6 +4424,10 @@ epp_call_cmd(epp_context *epp_ctx,
 			cstat = epp_call_create_nsset(epp_ctx, service, loginid,
 					cdata);
 			break;
+		case EPP_CREATE_KEYSET:
+			cstat = epp_call_create_keyset(epp_ctx, service, loginid,
+					cdata);
+			break;
 		case EPP_DELETE_CONTACT:
 			cdata->noresdata = 1;
 			cstat = epp_call_delete(epp_ctx, service, loginid, cdata,
@@ -3849,6 +4442,11 @@ epp_call_cmd(epp_context *epp_ctx,
 			cdata->noresdata = 1;
 			cstat = epp_call_delete(epp_ctx, service, loginid, cdata,
 					EPP_NSSET);
+			break;
+		case EPP_DELETE_KEYSET:
+			cdata->noresdata = 1;
+			cstat = epp_call_delete(epp_ctx, service, loginid, cdata,
+					EPP_KEYSET);
 			break;
 		case EPP_RENEW_DOMAIN:
 			cstat = epp_call_renew_domain(epp_ctx, service, loginid,
@@ -3869,6 +4467,12 @@ epp_call_cmd(epp_context *epp_ctx,
 			cstat = epp_call_update_nsset(epp_ctx, service, loginid,
 					cdata);
 			break;
+		case EPP_UPDATE_KEYSET:
+			cdata->noresdata = 1;
+			cstat = epp_call_update_keyset(epp_ctx, service, loginid,
+					cdata);
+			break;
+
 		case EPP_TRANSFER_CONTACT:
 			cdata->noresdata = 1;
 			cstat = epp_call_transfer(epp_ctx, service, loginid,
@@ -3883,6 +4487,11 @@ epp_call_cmd(epp_context *epp_ctx,
 			cdata->noresdata = 1;
 			cstat = epp_call_transfer(epp_ctx, service, loginid,
 					cdata, EPP_NSSET);
+			break;
+		case EPP_TRANSFER_KEYSET:
+			cdata->noresdata = 1;
+			cstat = epp_call_transfer(epp_ctx, service, loginid,
+					cdata, EPP_KEYSET);
 			break;
 		case EPP_SENDAUTHINFO_DOMAIN:
 			cdata->noresdata = 1;
@@ -3899,6 +4508,12 @@ epp_call_cmd(epp_context *epp_ctx,
 			cstat = epp_call_sendauthinfo(epp_ctx, service, loginid,
 					cdata, EPP_NSSET);
 			break;
+		case EPP_SENDAUTHINFO_KEYSET:
+			cdata->noresdata = 1;
+			cstat = epp_call_sendauthinfo(epp_ctx, service, loginid,
+					cdata, EPP_KEYSET);
+			break;
+
 		case EPP_CREDITINFO:
 			cstat = epp_call_creditinfo(epp_ctx, service, loginid,
 					cdata);
@@ -3920,9 +4535,17 @@ epp_call_cmd(epp_context *epp_ctx,
 			cstat = epp_call_info(epp_ctx, service, loginid,
 					cdata, ccReg_IT_LIST_NSSETS);
 			break;
+		case EPP_INFO_LIST_KEYSETS:
+			cstat = epp_call_info(epp_ctx, service, loginid,
+					cdata, ccReg_IT_LIST_KEYSETS);
+			break;
 		case EPP_INFO_DOMAINS_BY_NSSET:
 			cstat = epp_call_info(epp_ctx, service, loginid,
 					cdata, ccReg_IT_DOMAINS_BY_NSSET);
+			break;
+		case EPP_INFO_DOMAINS_BY_KEYSET:
+			cstat = epp_call_info(epp_ctx, service, loginid,
+					cdata, ccReg_IT_DOMAINS_BY_KEYSET);
 			break;
 		case EPP_INFO_DOMAINS_BY_CONTACT:
 			cstat = epp_call_info(epp_ctx, service, loginid,
@@ -3931,6 +4554,10 @@ epp_call_cmd(epp_context *epp_ctx,
 		case EPP_INFO_NSSETS_BY_CONTACT:
 			cstat = epp_call_info(epp_ctx, service, loginid,
 					cdata, ccReg_IT_NSSETS_BY_CONTACT);
+			break;
+		case EPP_INFO_KEYSETS_BY_CONTACT:
+			cstat = epp_call_info(epp_ctx, service, loginid,
+					cdata, ccReg_IT_KEYSETS_BY_CONTACT);
 			break;
 		case EPP_INFO_NSSETS_BY_NS:
 			cstat = epp_call_info(epp_ctx, service, loginid,

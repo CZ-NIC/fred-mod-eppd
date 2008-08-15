@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -65,6 +65,7 @@
  * Macro checks given variable for an error, if the variable has error
  * status, a flow of a program is redirected to given label.
  */
+// TODO shouldn't xmlXPathFreeObject(xpathObj) be called in this macro? (or in many cases when this macro is used)
 #define CHK_XERR(_var, _label)	if ((_var) != XERR_OK) goto _label
 
 /**
@@ -87,6 +88,8 @@
  */
 #define TEXT_CONTENT(_xpathObj, _i)	\
 	((char *) ((xmlXPathNodeSetItem((_xpathObj)->nodesetval, (_i))->xmlChildrenNode) ? (xmlXPathNodeSetItem((_xpathObj)->nodesetval, (_i))->xmlChildrenNode)->content : NULL))
+
+int read_epp_ds(void *pool, xmlXPathContextPtr xpathCtx, epp_ds *ds);
 
 /**
  * This function returns specified attribute value of given node.
@@ -706,6 +709,18 @@ parse_check(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 		goto error;
 	RESET_XERR(xerr); /* clear value of errno */
 
+	xpath_chroot(xpathCtx, "keyset:check", 0, &xerr);
+	if (xerr == XERR_OK) {
+		xpath_getn(pool, &check->ids, xpathCtx, "keyset:id", &xerr);
+		CHK_XERR(xerr, error);
+		cdata->type = EPP_CHECK_KEYSET;
+		return;
+	}
+	else if (xerr != XERR_CONSTR)
+		goto error;
+	RESET_XERR(xerr); /* clear value of errno */
+
+
 	/* unexpected object type (should not happen) */
 	cdata->rc = 2000;
 	cdata->type = EPP_DUMMY;
@@ -762,6 +777,14 @@ parse_info(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 		cdata->type = EPP_LIST_NSSET;
 		return;
 	}
+	exists = xpath_count(xpathCtx, "keyset:list", &xerr);
+	CHK_XERR(xerr, error);
+	if (exists) {
+		if ((cdata->data = epp_calloc(pool, sizeof(epps_list))) == NULL)
+			goto error;
+		cdata->type = EPP_LIST_KEYSET;
+		return;
+	}
 
 	/* info commands */
 
@@ -810,6 +833,22 @@ parse_info(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 		info_nsset->id = xpath_get1(pool, xpathCtx, "nsset:id",1, &xerr);
 		CHK_XERR(xerr, error);
 		cdata->type = EPP_INFO_NSSET;
+		return;
+	}
+	else if (xerr != XERR_CONSTR) goto error;
+	RESET_XERR(xerr); /* clear value of errno */
+
+	xpath_chroot(xpathCtx, "keyset:info", 0, &xerr);
+	if (xerr == XERR_OK) {
+		epps_info_keyset *info_keyset;
+
+		if ((cdata->data = epp_calloc(pool, sizeof *info_keyset)) == NULL)
+			goto error;
+		info_keyset = cdata->data;
+
+		info_keyset->id = xpath_get1(pool, xpathCtx, "keyset:id",1, &xerr);
+		CHK_XERR(xerr, error);
+		cdata->type = EPP_INFO_KEYSET;
 		return;
 	}
 	else if (xerr != XERR_CONSTR) goto error;
@@ -916,6 +955,9 @@ parse_create_domain(void *pool,
 	CHK_XERR(xerr, error);
 	create_domain->nsset = xpath_get1(pool, xpathCtx,
 			"domain:nsset", 0, &xerr);
+	CHK_XERR(xerr, error);
+	create_domain->keyset = xpath_get1(pool, xpathCtx,
+			"domain:keyset", 0, &xerr);
 	CHK_XERR(xerr, error);
 	create_domain->authInfo = xpath_get1(pool, xpathCtx,
 			"domain:authInfo", 0, &xerr);
@@ -1166,20 +1208,18 @@ parse_create_nsset(void *pool,
 		/* allocate data structures */
 		if ((ns = epp_calloc(pool, sizeof *ns)) == NULL)
 		{
-			xmlXPathFreeObject(xpathObj);
-			goto error;
+			goto err_free;
 		}
 		/* get data */
 		xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
 		ns->name = xpath_get1(pool, xpathCtx, "nsset:name", 1, &xerr);
-		CHK_XERR(xerr, error);
+		CHK_XERR(xerr, err_free);
 		xpath_getn(pool, &ns->addr, xpathCtx, "nsset:addr", &xerr);
-		CHK_XERR(xerr, error);
+		CHK_XERR(xerr, err_free);
 		/* enqueue ns record */
 		if (q_add(pool, &create_nsset->ns, ns))
 		{
-			xmlXPathFreeObject(xpathObj);
-			goto error;
+			goto err_free;
 		}
 	}
 	xmlXPathFreeObject(xpathObj);
@@ -1187,9 +1227,121 @@ parse_create_nsset(void *pool,
 	cdata->type = EPP_CREATE_NSSET;
 	return;
 
+err_free:
+	xmlXPathFreeObject(xpathObj);
 error:
 	cdata->rc = 2400;
 	cdata->type = EPP_DUMMY;
+}
+
+/**
+ * Parser of EPP create-keyset command.
+ *
+ * @param pool      Pool for memory allocations.
+ * @param xpathCtx  XPath context.
+ * @param cdata     Output of parsing stage.
+ */
+static void
+parse_create_keyset(void *pool,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	epps_create_keyset	*create_keyset;
+	xmlXPathObjectPtr	 xpathObj;
+	int	 j, xerr;
+
+	RESET_XERR(xerr); /* clear value of errno */
+
+	/* allocate necessary structures */
+	if ((cdata->data = epp_calloc(pool, sizeof *create_keyset)) == NULL)
+		goto error;
+	create_keyset = cdata->data;
+
+	/* get the nsset data */
+	create_keyset->id = xpath_get1(pool, xpathCtx, "keyset:id", 1, &xerr);
+	CHK_XERR(xerr, error);
+	create_keyset->authInfo = xpath_get1(pool, xpathCtx,
+			"keyset:authInfo", 0, &xerr);
+	CHK_XERR(xerr, error);
+	/* process "unbounded" number of tech contacts */
+	xpath_getn(pool, &create_keyset->tech, xpathCtx, "keyset:tech", &xerr);
+	CHK_XERR(xerr, error);
+	/* process multiple ds records which have in turn multiple addresses */
+	xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:ds", xpathCtx);
+	if (xpathObj == NULL)
+		goto error;
+
+	for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++) {
+		epp_ds	*ds;
+
+		/* allocate data structures */
+		if ((ds = epp_calloc(pool, sizeof *ds)) == NULL)
+		{
+			xmlXPathFreeObject(xpathObj);
+			goto error;
+		}
+		/* get data */
+		xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
+
+		if (read_epp_ds(pool, xpathCtx, ds) == 0) {
+			xmlXPathFreeObject(xpathObj);
+			goto error;
+		}
+
+		/* enqueue ds record */
+		if (q_add(pool, &create_keyset->ds, ds))
+		{
+			xmlXPathFreeObject(xpathObj);
+			goto error;
+		}
+	}
+	xmlXPathFreeObject(xpathObj);
+
+	cdata->type = EPP_CREATE_KEYSET;
+	return;
+
+error:
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
+/**
+ * Read Delegation signer information from xml into epp_ds structure
+ *
+ *
+ * @returns 	1 on success, 0 on failure (goto error in other functions
+ */
+int read_epp_ds(void *pool, xmlXPathContextPtr xpathCtx, epp_ds *ds)
+{
+	char *str;
+	int xerr;
+
+	RESET_XERR(xerr);
+
+	str = xpath_get1(pool, xpathCtx, "keyset:keyTag", 1, &xerr);
+	CHK_XERR(xerr, error);
+	ds->keytag = (unsigned short)atoi(str);
+
+	str = xpath_get1(pool, xpathCtx, "keyset:alg", 1, &xerr);
+	CHK_XERR(xerr, error);
+	ds->alg = (unsigned char)atoi(str);
+
+	str = xpath_get1(pool, xpathCtx, "keyset:digestType", 1, &xerr);
+	CHK_XERR(xerr, error);
+	ds->digestType = (unsigned char)atoi(str);
+
+	ds->digest = xpath_get1(pool, xpathCtx, "keyset:digest", 1, &xerr);
+	CHK_XERR(xerr, error);
+
+	str = xpath_get1(pool, xpathCtx, "keyset:maxSigLife", 0, &xerr);
+	CHK_XERR(xerr, error);
+	if(str) {
+		ds->maxSigLife = atoi(str);
+	}
+
+	return 1;
+error:
+	return 0;
 }
 
 /**
@@ -1226,6 +1378,14 @@ parse_create(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 	xpath_chroot(xpathCtx, "nsset:create", 0, &xerr);
 	if (xerr == XERR_OK) {
 		parse_create_nsset(pool, xpathCtx, cdata);
+		return;
+	}
+	else if (xerr != XERR_CONSTR) goto error;
+	RESET_XERR(xerr); /* clear value of errno */
+
+	xpath_chroot(xpathCtx, "keyset:create", 0, &xerr);
+	if (xerr == XERR_OK) {
+		parse_create_keyset(pool, xpathCtx, cdata);
 		return;
 	}
 	else if (xerr != XERR_CONSTR) goto error;
@@ -1290,6 +1450,17 @@ parse_delete(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 		delete->id = xpath_get1(pool, xpathCtx, "nsset:id", 1, &xerr);
 		CHK_XERR(xerr, error);
 		cdata->type = EPP_DELETE_NSSET;
+		return;
+	}
+	else if (xerr != XERR_CONSTR) goto error;
+	RESET_XERR(xerr); /* clear value of errno */
+
+	xpath_chroot(xpathCtx, "keyset:delete", 0, &xerr);
+	if (xerr == XERR_OK) {
+		/* object is nsset */
+		delete->id = xpath_get1(pool, xpathCtx, "keyset:id", 1, &xerr);
+		CHK_XERR(xerr, error);
+		cdata->type = EPP_DELETE_KEYSET;
 		return;
 	}
 	else if (xerr != XERR_CONSTR) goto error;
@@ -1398,6 +1569,10 @@ parse_update_domain(void *pool,
 		update_domain->nsset = xpath_get1(pool, xpathCtx,
 				"domain:nsset", 0, &xerr);
 		CHK_XERR(xerr, error);
+		update_domain->keyset = xpath_get1(pool, xpathCtx,
+				"domain:keyset", 0, &xerr);
+		CHK_XERR(xerr, error);
+
 		update_domain->authInfo = xpath_get1(pool, xpathCtx,
 				"domain:authInfo", 0, &xerr);
 		CHK_XERR(xerr, error);
@@ -1628,6 +1803,147 @@ error:
 }
 
 /**
+ * Parser of EPP update-keyset command.
+ *
+ * @param pool      Pool for memory allocations.
+ * @param xpathCtx  XPath context.
+ * @param cdata     Output of parsing stage.
+ */
+static void
+parse_update_keyset(void *pool,
+		xmlXPathContextPtr xpathCtx,
+		epp_command_data *cdata)
+{
+	epps_update_keyset	*update_keyset;
+	xmlXPathObjectPtr	xpathObj;
+	xmlNodePtr	 	par_node;
+	int	 j, xerr;
+
+	RESET_XERR(xerr); /* clear value of errno */
+
+	/* allocate necessary structures */
+	if ((cdata->data = epp_calloc(pool, sizeof *update_keyset)) == NULL)
+		goto error;
+	update_keyset = cdata->data;
+
+	/* get the update-nsset data */
+	update_keyset->id = xpath_get1(pool, xpathCtx, "keyset:id", 1, &xerr);
+	CHK_XERR(xerr, error);
+	/* chg data */
+	update_keyset->authInfo = xpath_get1(pool, xpathCtx,
+			"keyset:chg/keyset:authInfo", 0, &xerr);
+	CHK_XERR(xerr, error);
+
+
+	par_node = xpathCtx->node;
+
+	/* rem data */
+	xpath_chroot(xpathCtx, "keyset:rem", 0, &xerr);
+	if (xerr == XERR_LIBXML)
+		goto error;
+	else if (xerr == XERR_OK) {
+		/*
+		xpath_getn(pool, &update_keyset->rem_tech, xpathCtx,
+				"keyset:tech", &xerr);
+		CHK_XERR(xerr, error);
+		xpath_getn(pool, &update_keyset->rem_ds, xpathCtx,
+				"keyset:name", &xerr);
+		CHK_XERR(xerr, error);
+		xpathCtx->node = xpathCtx->node->parent;
+		*/
+		xpath_getn(pool, &update_keyset->rem_tech, xpathCtx,
+				"keyset:tech", &xerr);
+		CHK_XERR(xerr, error);
+		/* rem Delegation Signer */
+		xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:ds", xpathCtx);
+		if (xpathObj == NULL)
+			goto error;
+
+		/* process all nameservers */
+		for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
+				j++)
+		{
+			epp_ds	*ds;
+
+			/* allocate and initialize data structures */
+			if ((ds = epp_calloc(pool, sizeof *ds)) == NULL) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+
+			/* get data */
+			xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
+
+			if (read_epp_ds(pool, xpathCtx, ds) == 0) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+
+			/* enqueue ns record */
+			if (q_add(pool, &update_keyset->rem_ds, ds)) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+		}
+		xmlXPathFreeObject(xpathObj);
+		xpathCtx->node = par_node;
+	}
+	else
+		RESET_XERR(xerr); /* clear value of errno */
+
+	/* add data */
+	xpath_chroot(xpathCtx, "keyset:add", 0, &xerr);
+	if (xerr == XERR_LIBXML)
+		goto error;
+	else if (xerr == XERR_OK) {
+		xpath_getn(pool, &update_keyset->add_tech, xpathCtx,
+				"keyset:tech", &xerr);
+		CHK_XERR(xerr, error);
+		/* add Delegation Signer */
+		xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:ds", xpathCtx);
+		if (xpathObj == NULL)
+			goto error;
+
+		/* process all nameservers */
+		for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
+				j++)
+		{
+			epp_ds	*ds;
+
+			/* allocate and initialize data structures */
+			if ((ds = epp_calloc(pool, sizeof *ds)) == NULL) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+
+			/* get data */
+			xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
+
+			if (read_epp_ds(pool, xpathCtx, ds) == 0) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+
+			/* enqueue ns record */
+			if (q_add(pool, &update_keyset->add_ds, ds)) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+		}
+		xmlXPathFreeObject(xpathObj);
+	}
+	else RESET_XERR(xerr); /* clear value of errno */
+
+	cdata->type = EPP_UPDATE_KEYSET;
+	return;
+
+error:
+	cdata->rc = 2400;
+	cdata->type = EPP_DUMMY;
+}
+
+
+/**
  * Parser of EPP update-nsset command.
  *
  * @param pool      Pool for memory allocations.
@@ -1783,6 +2099,18 @@ parse_update(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 	else
 		RESET_XERR(xerr);
 
+	xpath_chroot(xpathCtx, "keyset:update", 0, &xerr);
+	if (xerr == XERR_OK) {
+		parse_update_keyset(pool, xpathCtx, cdata);
+		return;
+	}
+	else if (xerr == XERR_LIBXML)
+		goto error;
+	else
+		RESET_XERR(xerr);
+
+
+
 	/* unexpected object type (should not happen) */
 	cdata->rc = 2000;
 	cdata->type = EPP_DUMMY;
@@ -1879,6 +2207,22 @@ parse_transfer(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 	else
 		RESET_XERR(xerr);
 
+	xpath_chroot(xpathCtx, "keyset:transfer", 0, &xerr);
+	if (xerr == XERR_OK) {
+		transfer->id = xpath_get1(pool, xpathCtx, "keyset:id", 1, &xerr);
+		CHK_XERR(xerr, error);
+		transfer->authInfo = xpath_get1(pool, xpathCtx,
+				"keyset:authInfo", 0, &xerr);
+		CHK_XERR(xerr, error);
+		cdata->type = EPP_TRANSFER_KEYSET;
+		return;
+	}
+	else if (xerr == XERR_LIBXML)
+		goto error;
+	else
+		RESET_XERR(xerr);
+
+
 	/* unexpected object type (should not happen) */
 	cdata->rc = 2000;
 	cdata->type = EPP_DUMMY;
@@ -1952,6 +2296,20 @@ parse_sendAuthInfo(void *pool,
 		goto error;
 	else
 		RESET_XERR(xerr);
+
+	xpath_chroot(xpathCtx, "keyset:sendAuthInfo", 0, &xerr);
+	if (xerr == XERR_OK) {
+		sendAuthInfo->id = xpath_get1(pool, xpathCtx,
+				"keyset:id", 1, &xerr);
+		CHK_XERR(xerr, error);
+		cdata->type = EPP_SENDAUTHINFO_KEYSET;
+		return;
+	}
+	else if (xerr == XERR_LIBXML)
+		goto error;
+	else
+		RESET_XERR(xerr);
+
 
 	/* unexpected object type (should not happen) */
 	cdata->rc = 2000;
@@ -2426,7 +2784,7 @@ parse_extension(void *pool,
 		case 'l':
 		{
 
-			/* It is listDomains,listContacts,listNssets */
+			/* It is listDomains,listContacts,listNssets,listKeysets */
 			if (!strcmp(elemname, "listDomains")) {
 				cdata->type = EPP_INFO_LIST_DOMAINS;
 				matched = 1;
@@ -2439,6 +2797,12 @@ parse_extension(void *pool,
 				cdata->type = EPP_INFO_LIST_NSSETS;
 				matched = 1;
 			}
+			else if (!strcmp(elemname, "listKeysets")) {
+				cdata->type = EPP_INFO_LIST_KEYSETS;
+				matched = 1;
+			}
+
+
 			/* allocate I/O structure if matched */
 			if (matched) {
 				cdata->data = epp_calloc(pool,sizeof(epps_info));
@@ -2460,6 +2824,11 @@ parse_extension(void *pool,
 			if (!strcmp(elemname, "domainsByContact")) {
 				matched = 1;
 				cdata->type = EPP_INFO_DOMAINS_BY_CONTACT;
+				parse_infoKey(pool, xpathCtx, cdata, "fred:id");
+			}
+			if (!strcmp(elemname, "domainsByKeyset")) {
+				matched = 1;
+				cdata->type = EPP_INFO_DOMAINS_BY_KEYSET;
 				parse_infoKey(pool, xpathCtx, cdata, "fred:id");
 			}
 			break;
@@ -2489,6 +2858,15 @@ parse_extension(void *pool,
 					cdata->type = EPP_DUMMY;
 					return PARSER_CMD_OTHER;
 				}
+			}
+			break;
+		}
+		case 'k':
+		{
+			if (!strcmp(elemname, "keysetsByContact")) {
+				matched = 1;
+				cdata->type = EPP_INFO_KEYSETS_BY_CONTACT;
+				parse_infoKey(pool, xpathCtx, cdata, "fred:id");
 			}
 			break;
 		}
@@ -2599,6 +2977,8 @@ epp_parse_command(epp_context *epp_ctx,
 			BAD_CAST NS_DOMAIN) ||
 		xmlXPathRegisterNs(xpathCtx, BAD_CAST "nsset",
 			BAD_CAST NS_NSSET) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "keyset",
+			BAD_CAST NS_KEYSET) ||
 		xmlXPathRegisterNs(xpathCtx, BAD_CAST "fred",
 			BAD_CAST NS_FRED) ||
 #ifdef SECDNS_ENABLE
