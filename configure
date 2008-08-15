@@ -1602,7 +1602,7 @@ Optional Packages:
   --with-idl              location of idl file containing EPP interface
                           [IDLDIR/EPP.idl]
   --with-schema           xml schema defining EPP protocol
-                          [schemas/all-1.5.xsd]
+                          [schemas/all-2.0.xsd]
   --with-port             Port where mod_eppd listen [700]
   --with-nshost           Location of CORBA nameservice host (host[:port])
                           [localhost]
@@ -23213,7 +23213,7 @@ if test "${with_schema+set}" = set; then
   withval=$with_schema; SCHEMA=$withval
 
 else
-  SCHEMA=$srcdir/schemas/all-1.5.xsd
+  SCHEMA=$srcdir/schemas/all-2.0.xsd
 
 fi
 
