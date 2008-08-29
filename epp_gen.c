@@ -136,6 +136,7 @@ epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_CONTACT);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_DOMAIN);
 	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_NSSET);
+	WRITE_ELEMENT(writer, greeting_err, "objURI", NS_KEYSET);
 	START_ELEMENT(writer, greeting_err, "svcExtension");
 	/* not yet
 	WRITE_ELEMENT(writer, greeting_err, "extURI", NS_SECDNS);
