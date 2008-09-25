@@ -1750,6 +1750,12 @@ epp_call_poll_req(epp_context *epp_ctx,
 					*((char **) c_mesg->_value), &cerrno);
 			if (cerrno != 0) goto error;
 			break;
+		case ccReg_polltype_delete_keyset:
+			poll_req->type = pt_delete_keyset;
+			poll_req->msg.handle = unwrap_str(epp_ctx->pool,
+					*((char **) c_mesg->_value), &cerrno);
+			if (cerrno != 0) goto error;
+			break;
 		case ccReg_polltype_delete_domain:
 			{
 			ccReg_PollMsg_HandleDate *hd =
