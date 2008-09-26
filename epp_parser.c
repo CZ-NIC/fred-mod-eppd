@@ -1826,7 +1826,7 @@ parse_update_keyset(void *pool,
 		goto error;
 	update_keyset = cdata->data;
 
-	/* get the update-nsset data */
+	/* get the update-keyset data */
 	update_keyset->id = xpath_get1(pool, xpathCtx, "keyset:id", 1, &xerr);
 	CHK_XERR(xerr, error);
 	/* chg data */
@@ -1859,7 +1859,7 @@ parse_update_keyset(void *pool,
 		if (xpathObj == NULL)
 			goto error;
 
-		/* process all nameservers */
+		/* process all ds records */
 		for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
 				j++)
 		{
@@ -2161,7 +2161,7 @@ parse_transfer(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 
 	RESET_XERR(xerr); /* clear value of errno */
 
-	/* get object type - domain, contact or nsset */
+	/* get object type - domain, contact, nsset or keyset */
 	xpath_chroot(xpathCtx, "domain:transfer", 0, &xerr);
 	if (xerr == XERR_OK) {
 		transfer->id = xpath_get1(pool, xpathCtx, "domain:name", 1, &xerr);

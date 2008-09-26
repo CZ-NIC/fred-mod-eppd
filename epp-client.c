@@ -295,7 +295,7 @@ epp_call_hello(epp_context *epp_ctx, service_EPP service, char **version,
 }
 
 /**
- * This function creates answer eventhough it has not enough data for that
+ * This function creates answer even though it has not enough data for that
  * from CORBA server.
  *
  * This behaviour is in conflict with EPP standard, but it was enforced
@@ -2709,7 +2709,7 @@ epp_call_create_keyset(epp_context *epp_ctx,
 		if (retr != 0) CORBA_exception_free(ev);
 		CORBA_exception_init(ev);
 
-		/* send new nsset to repository */
+		/* send new keyset to repository */
 		response = ccReg_EPP_KeySetCreate((ccReg_EPP) service,
 				create_keyset->id,
 				c_authInfo,
