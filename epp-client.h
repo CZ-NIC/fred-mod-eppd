@@ -35,6 +35,7 @@ typedef enum {
 	CORBA_REMOTE_ERROR
 }corba_status;
 
+/** Reference to CORBA service */
 typedef void *service_EPP;
 
 /**

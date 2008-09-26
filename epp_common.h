@@ -42,8 +42,8 @@ typedef enum {
  * to export apache datatypes in all other modules sharing this header file.
  */
 typedef struct {
-	void *pool;
-	void *conn;
+	void *pool; 	/**< Pool for allocations */
+	void *conn;	/**< Connection handler */
 	int session;
 }epp_context;
 
@@ -221,9 +221,12 @@ typedef struct {
  */
 
 /**
- * Definition of queue item type.
+ * Queue item type.
  */
 typedef struct queue_item_t qitem;
+/**
+ * Definition of queue item type.
+ */
 struct queue_item_t {
 	qitem   *next;	  /**< Link to next item in a queue. */
 	void	*content; /**< Pointer to content of item. */
@@ -277,8 +280,8 @@ int q_add(void *pool, qhead *head, void *data);
  * Structure for holding status' names and values.
  */
 typedef struct {
-	char	*value;
-	char	*text;
+	char	*value;	/**< Status name. */
+	char	*text;  /**< Status value. */
 }epp_status;
 
 /**
@@ -338,14 +341,12 @@ typedef struct {
  * RFC 4310.
  */
 typedef struct {
-	unsigned short	keytag;
+	unsigned short	keytag;  	/**< Key tag for DNSKEY RR (RFC 4043 for details) */
+	unsigned char	alg;		/**< Algorithm type */
+	unsigned char	digestType;	/**< Digest type (must be SHA-1) */
+	char	*digest;		/**< Key digest (currently it must a valid SHA-1 */
 
-	unsigned char	alg;
-
-	unsigned char	digestType;
-	char	*digest;
-
-	int	maxSigLife;	/* zero means that the field is empty */
+	int	maxSigLife;		/**< Signature expiration period, zero means that the field is empty */
 	/* optional dns rr (-1 in theese fields means that they are empty) */
 /*
 	unsigned flags;
@@ -432,8 +433,8 @@ typedef struct {
 	char	*clID;   /**< Client ID. */
 	char	*pw;     /**< Password. */
 	char	*newPW;  /**< New password. */
-	qhead	 objuri; // currently not used
-	qhead	 exturi; // currently not used
+	qhead	 objuri; /**< currently not used */
+	qhead	 exturi; /**< currently not used */
 	unsigned lang;   /**< Language. */
 }epps_login;
 
@@ -467,7 +468,7 @@ typedef struct {
 	char	*notify_email; /**< Notification email. */
 }epps_info_contact;
 
-/* Info domain parameters. */
+/** Info domain parameters. */
 typedef struct {
 	char	*name;    /**< FQDN of wanted domain (input). */
 	char	*handle;  /**< FQDN of wanted domain (output). */
@@ -489,7 +490,7 @@ typedef struct {
 	qhead	 extensions; /**< List of domain extensions. */
 }epps_info_domain;
 
-/* Info nsset parameters. */
+/** Info nsset parameters. */
 typedef struct {
 	char	*id;      /**< Id of wanted nsset (input). */
 	char	*handle;  /**< Id of wanted nsset (output). */
@@ -507,7 +508,7 @@ typedef struct {
 	int	 level;   /**< Report level. */
 }epps_info_nsset;
 
-/* Info keyset parameters */
+/** Info keyset parameters */
 typedef struct {
 	char	*id;      /**< Id of wanted keyset (input). */
 	char	*handle;  /**< Id of wanted keyset (output). */
@@ -530,7 +531,6 @@ typedef struct {
 	char	*msgid;    /**< ID of next message in a queue. */
 	char	*qdate;    /**< Date of message submission. */
 	epp_pollType type; /**< Type of poll message. */
-	/** Message data. */
 	union {
 		char	*handle;
 		struct {
@@ -552,7 +552,7 @@ typedef struct {
 			unsigned long limit;
 			unsigned long credit;
 		}lc; /**< Low credit structure. */
-	}msg;
+	}msg; 	/**< Message data. */
 }epps_poll_req;
 
 /** Poll acknoledge parameters. */

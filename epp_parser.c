@@ -1308,7 +1308,9 @@ error:
 /**
  * Read Delegation signer information from xml into epp_ds structure
  *
- *
+ * @param pool 		Pool for allocating memory
+ * @param xpathCtx 	XML parsing context
+ * @param ds 		ds record to be filled with data
  * @returns 	1 on success, 0 on failure (goto error in other functions
  */
 int read_epp_ds(void *pool, xmlXPathContextPtr xpathCtx, epp_ds *ds)
@@ -2544,7 +2546,7 @@ error:
  * @param pool       Memory pool.
  * @param loggedin   True if user is logged in.
  * @param cdata      Command data.
- * @param xpathctx   XPath context.
+ * @param xpathCtx   XPath context.
  * @return           Status.
  */
 static parser_status
@@ -2713,7 +2715,7 @@ parse_command(void *pool,
  *
  * @param pool       Memory pool.
  * @param cdata      Command data.
- * @param xpathctx   XPath context.
+ * @param xpathCtx   XPath context.
  * @return           Status.
  */
 static parser_status

@@ -2163,7 +2163,7 @@ error:
 /**
  * Convert our SSN enum to IDL's SSNtyp enum.
  *
- * @param our_ssn Our ssn's type.
+ * @param our_ident Our ssn's type.
  * @return        SSN type as defined in IDL.
  */
 static ccReg_identtyp
@@ -4192,7 +4192,7 @@ error_input:
  * @param service  EPP service.
  * @param loginid  Session identifier.
  * @param cdata    Data from xml request.
- * @param infotype Type of info query.
+ * @param c_infotype Type of info query.
  * @return         Status.
  */
 static corba_status

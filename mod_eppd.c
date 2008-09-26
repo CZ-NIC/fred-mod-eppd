@@ -761,6 +761,7 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 	return 1;
 }
 
+/** Read and process EPP requests waiting in the queue */
 static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		service_EPP *EPPservice, eppd_server_conf *sc,
 		unsigned int *loginid_save)

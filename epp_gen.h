@@ -85,9 +85,9 @@ epp_gen_response(epp_context *epp_ctx,
 
 /**
  * Convenient wrapper around epp_gen_response for error cases.
- * @param epp_ctx  Epp context (session id, connection and pool).
- * @param cdata    Input values
- * @param response Result of generation phase = generated string.
+ * @param p_epp_ctx  Epp context (session id, connection and pool).
+ * @param p_cdata    Input values
+ * @param pp_response Result of generation phase = generated string.
  */
 #define epp_gen_dummy_response(p_epp_ctx, p_cdata, pp_response) \
 	epp_gen_response(p_epp_ctx, 0, NULL, LANG_EN, p_cdata, pp_response, NULL)
