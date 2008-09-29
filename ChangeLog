@@ -1,3 +1,7 @@
+2008-09-29 Jaromir Talir (2.0.2)
+	
+	* Missing handling of poll delete_keyset message
+	
 2008-08-29 Juraj Vicenik (2.0.1)
 
 	* Hello message support keyset version
