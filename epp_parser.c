@@ -65,7 +65,6 @@
  * Macro checks given variable for an error, if the variable has error
  * status, a flow of a program is redirected to given label.
  */
-// TODO shouldn't xmlXPathFreeObject(xpathObj) be called in this macro? (or in many cases when this macro is used)
 #define CHK_XERR(_var, _label)	if ((_var) != XERR_OK) goto _label
 
 /**
@@ -1295,6 +1294,39 @@ parse_create_keyset(void *pool,
 			goto error;
 		}
 	}
+
+	xmlXPathFreeObject(xpathObj);
+
+	/* process multiple DNSKEY reocrds */
+	xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:dnskey", xpathCtx);
+	if (xpathObj == NULL) 
+		goto error;
+
+	for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++) {
+		epp_dnskey *key;
+
+		/* allocate data structures */
+		if ((key = epp_calloc(pool, sizeof(epp_dnskey))) == NULL)
+		{
+			xmlXPathFreeObject(xpathObj);
+			goto error;
+		}
+		/* get data */
+		xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
+
+		if (read_epp_dnskey(pool, xpathCtx, key) == 0) {
+			xmlXPathFreeObject(xpathObj);
+			goto error;
+		}
+
+		/* enqueue ds record */
+		if (q_add(pool, &create_keyset->keys, key))
+		{
+			xmlXPathFreeObject(xpathObj);
+			goto error;
+		}
+	}
+
 	xmlXPathFreeObject(xpathObj);
 
 	cdata->type = EPP_CREATE_KEYSET;
@@ -1345,6 +1377,43 @@ int read_epp_ds(void *pool, xmlXPathContextPtr xpathCtx, epp_ds *ds)
 error:
 	return 0;
 }
+
+
+/**
+ * Read DNSKEY information from xml into epp_dnskey structure
+ *
+ * @param pool 		Pool for allocating memory
+ * @param xpathCtx 	XML parsing context
+ * @param key		DNSKEY structure filled with data
+ * @returns 		1 on success, 0 on failure (goto error in other functions
+ */
+int read_epp_dnskey(void *pool, xmlXPathContextPtr xpathCtx, epp_dnskey *key)
+{
+	char *str;
+	int xerr;
+
+	RESET_XERR(xerr);
+
+	str = xpath_get1(pool, xpathCtx, "keyset:flags", 1, &xerr);
+	CHK_XERR(xerr, error);
+	key->flags = (unsigned short)atoi(str);
+
+	str = xpath_get1(pool, xpathCtx, "keyset:protocol", 1, &xerr);
+	CHK_XERR(xerr, error);
+	key->protocol = (unsigned char)atoi(str);
+
+	str = xpath_get1(pool, xpathCtx, "keyset:alg", 1, &xerr);
+	CHK_XERR(xerr, error);
+	key->alg = (unsigned char)atoi(str);
+
+	key->public_key = xpath_get1(pool, xpathCtx, "keyset:public_key", 1, &xerr);
+	CHK_XERR(xerr, error);
+
+	return 1;
+error:
+	return 0;
+}
+
 
 /**
  * Parser of EPP create command.
@@ -1840,8 +1909,7 @@ parse_update_keyset(void *pool,
 	par_node = xpathCtx->node;
 
 	/* rem data */
-	xpath_chroot(xpathCtx, "keyset:rem", 0, &xerr);
-	if (xerr == XERR_LIBXML)
+	xpath_chroot(xpathCtx, "keyset:rem", 0, &xerr); if (xerr == XERR_LIBXML)
 		goto error;
 	else if (xerr == XERR_OK) {
 		/*
@@ -1881,13 +1949,48 @@ parse_update_keyset(void *pool,
 				goto error;
 			}
 
-			/* enqueue ns record */
+			/* enqueue ds record */
 			if (q_add(pool, &update_keyset->rem_ds, ds)) {
 				xmlXPathFreeObject(xpathObj);
 				goto error;
 			}
 		}
 		xmlXPathFreeObject(xpathObj);
+
+		xpathCtx->node = par_node;
+
+		/* rem DNSKEY records */
+		xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:dnskey", xpathCtx);
+		if (xpathObj == NULL)
+			goto error;
+
+		for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
+				j++)
+		{
+			epp_dnskey *key;
+
+			/* allocate and initialize data structures */
+			if ((key = epp_calloc(pool, sizeof (epp_dnskey))) == NULL) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+
+			/* get data */
+			xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
+
+			if (read_epp_dnskey(pool, xpathCtx, key) == 0) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+
+			/* enqueue dnskey record */
+			if (q_add(pool, &update_keyset->rem_dnskey, key)) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+		}
+		xmlXPathFreeObject(xpathObj);
+
 		xpathCtx->node = par_node;
 	}
 	else
@@ -1906,7 +2009,7 @@ parse_update_keyset(void *pool,
 		if (xpathObj == NULL)
 			goto error;
 
-		/* process all nameservers */
+		/* process all ds records */
 		for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
 				j++)
 		{
@@ -1926,13 +2029,48 @@ parse_update_keyset(void *pool,
 				goto error;
 			}
 
-			/* enqueue ns record */
+			/* enqueue ds record */
 			if (q_add(pool, &update_keyset->add_ds, ds)) {
 				xmlXPathFreeObject(xpathObj);
 				goto error;
 			}
 		}
 		xmlXPathFreeObject(xpathObj);
+
+		xpathCtx->node = par_node;
+
+		/* add DNSKEY record */
+		xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:dnskey", xpathCtx);
+		if (xpathObj == NULL)
+			goto error;
+
+		for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
+				j++)
+		{
+			epp_dnskey *key;
+
+			/* allocate and initialize data structures */
+			if ((key = epp_calloc(pool, sizeof (epp_dnskey))) == NULL) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+
+			/* get data */
+			xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
+
+			if (read_epp_dnskey(pool, xpathCtx, key) == 0) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+
+			/* enqueue dnskey record */
+			if (q_add(pool, &update_keyset->add_dnskey, key)) {
+				xmlXPathFreeObject(xpathObj);
+				goto error;
+			}
+		}
+		xmlXPathFreeObject(xpathObj);
+
 	}
 	else RESET_XERR(xerr); /* clear value of errno */
 

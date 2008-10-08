@@ -508,6 +508,25 @@ gen_info_keyset(xmlTextWriterPtr writer, epp_command_data *cdata)
 
 		END_ELEMENT(writer, simple_err); /* ds */
 	}
+	/* print dnskey records */
+	q_foreach(&info_keyset->keys) {
+		epp_dnskey *key;
+		char str[10];
+
+		key = (epp_dnskey *) q_content(&info_keyset->keys);
+		START_ELEMENT(writer, simple_err, "keyset:dnskey");
+
+		snprintf(str, 9, "%d", key->flags);
+		WRITE_ELEMENT(writer, simple_err, "keyset:flags", str);
+		snprintf(str, 9, "%d", key->protocol);
+		WRITE_ELEMENT(writer, simple_err, "keyset:protocol", str);
+		snprintf(str, 9, "%d", key->alg);
+		WRITE_ELEMENT(writer, simple_err, "keyset:alg", str);
+		WRITE_ELEMENT(writer, simple_err, "keyset:public_key", key->public_key);
+
+		END_ELEMENT(writer, simple_err); /* dnskey */
+	}
+		
 	/* print tech contacts */
 	q_foreach(&info_keyset->tech) {
 		WRITE_ELEMENT(writer, simple_err, "keyset:tech",
@@ -825,6 +844,15 @@ get_bad_xml(void *pool, epp_command_data *cdata, epp_error *e)
 			break;
 		case errspec_keyset_dsrecord:
 			loc_spec = epp_strdup(pool, "//keyset:ds");
+			break;
+		case errspec_keyset_dnskey_add:
+			loc_spec = epp_strdup(pool, "//keyset:add/keyset:dnskey");
+			break;
+		case errspec_keyset_dnskey_rem:
+			loc_spec = epp_strdup(pool, "//keyset:rem/keyset:dnskey");
+			break;
+		case errspec_keyset_dnskey:
+			loc_spec = epp_strdup(pool, "//keyset:dnskey");
 			break;
 		case errspec_keyset_tech_add:
 			loc_spec = epp_strdup(pool, "//keyset:add/keyset:tech");

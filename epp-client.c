@@ -88,8 +88,12 @@ static int error_translator[][2] =
   {ccReg_keyset_dsrecord,	errspec_keyset_dsrecord},
   {ccReg_keyset_dsrecord_add,	errspec_keyset_dsrecord_add},
   {ccReg_keyset_dsrecord_rem,	errspec_keyset_dsrecord_rem},
+  {ccReg_keyset_dnskey,		errspec_keyset_dnskey},
+  {ccReg_keyset_dnskey_add,	errspec_keyset_dnskey_add},
+  {ccReg_keyset_dnskey_rem,	errspec_keyset_dnskey_rem},
   {ccReg_keyset_tech_add,	errspec_keyset_tech_add},
   {ccReg_keyset_tech_rem,	errspec_keyset_tech_rem},
+  {ccReg_registrar_autor,	errspec_registrar_author},
   {ccReg_domain_fqdn,           errspec_domain_fqdn},
   {ccReg_domain_registrant,     errspec_domain_registrant},
   {ccReg_domain_nsset,          errspec_domain_nsset},
@@ -1584,6 +1588,24 @@ epp_call_info_keyset(epp_context *epp_ctx,
 		if (q_add(epp_ctx->pool, &info_keyset->ds, ds_item))
 			goto error;
 	}
+	/* initialize dnskey items */
+	for (i = 0; i < c_keyset->dnsk._length; i++) {
+		epp_dnskey *dnskey_item;
+	
+		dnskey_item = epp_calloc(epp_ctx->pool, sizeof *dnskey_item);
+		if (dnskey_item == NULL) goto error;
+
+		/* process of dnskey item */ 
+		dnskey_item->flags = c_keyset->dnsk._buffer[i].flags;	
+		dnskey_item->alg = c_keyset->dnsk._buffer[i].alg;	
+		dnskey_item->protocol = c_keyset->dnsk._buffer[i].protocol;	
+		dnskey_item->public_key = unwrap_str_req(epp_ctx, c_keyset->dnsk._buffer[i].key, &cerrno, "public_key");	
+		if (cerrno != 0) goto error;
+		
+		/* enqueue dnskey item */
+		if (q_add(epp_ctx->pool, &info_keyset->keys, dnskey_item))
+			goto error;
+	}
 
 	CORBA_free(c_keyset);
 	return epilog_success(epp_ctx, cdata, response);
@@ -2604,6 +2626,7 @@ epp_call_create_keyset(epp_context *epp_ctx,
 	CORBA_Environment ev[1];
 	ccReg_Response *response;
 	ccReg_DSRecord	*c_dsrecord;
+	ccReg_DNSKey *c_dnskey;
 	ccReg_TechContact	*c_tech;
 	CORBA_char	*c_crDate, *c_clTRID, *c_authInfo;
 	int	len, i, retr, cerrno;
@@ -2635,7 +2658,7 @@ epp_call_create_keyset(epp_context *epp_ctx,
 		return CORBA_INT_ERROR;
 	}
 
-	/* alloc & init sequence of nameservers */
+	/* alloc & init sequence of delegation signer records */
 	c_dsrecord = ccReg_DSRecord__alloc();
 	if (c_dsrecord == NULL) {
 		CORBA_free(c_authInfo);
@@ -2674,9 +2697,52 @@ epp_call_create_keyset(epp_context *epp_ctx,
 
 		i++;
 	}
+	/* alloc & init sequence of DNSKEY records */
+
+	c_dnskey = ccReg_DNSKey__alloc();
+	if (c_dnskey == NULL) {
+		CORBA_free(c_dsrecord);
+		CORBA_free(c_authInfo);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+	len = q_length(create_keyset->keys);
+	c_dnskey->_buffer = ccReg_DNSKey_allocbuf(len);
+	if (len != 0 && c_dnskey->_buffer == NULL) {
+		CORBA_free(c_dsrecord);
+		CORBA_free(c_authInfo);
+		CORBA_free(c_clTRID);
+		return CORBA_INT_ERROR;
+	}
+
+	c_dnskey->_maximum = c_dnskey->_length = len;
+	c_dnskey->_release = CORBA_TRUE;
+	i = 0;
+	q_foreach(&create_keyset->keys) {
+		epp_dnskey *dnskey;
+
+		dnskey = q_content(&create_keyset->keys);
+
+		c_dnskey->_buffer[i].flags = dnskey->flags;
+		c_dnskey->_buffer[i].protocol = dnskey->protocol;
+		c_dnskey->_buffer[i].alg = dnskey->alg;
+
+		c_dnskey->_buffer[i].key = wrap_str(dnskey->public_key);
+		if(c_dnskey->_buffer[i].key == NULL) {
+			CORBA_free(c_dnskey);
+			CORBA_free(c_dsrecord);
+			CORBA_free(c_authInfo);
+			CORBA_free(c_clTRID);
+			return CORBA_INT_ERROR;
+		}	
+
+		i++;
+	}
+
 	/* alloc & init sequence of tech contacts */
 	c_tech = ccReg_TechContact__alloc();
 	if (c_tech == NULL) {
+		CORBA_free(c_dnskey);
 		CORBA_free(c_dsrecord);
 		CORBA_free(c_authInfo);
 		CORBA_free(c_clTRID);
@@ -2686,6 +2752,7 @@ epp_call_create_keyset(epp_context *epp_ctx,
 	c_tech->_buffer = ccReg_TechContact_allocbuf(len);
 	if (len != 0 && c_tech->_buffer == NULL) {
 		CORBA_free(c_tech);
+		CORBA_free(c_dnskey);
 		CORBA_free(c_dsrecord);
 		CORBA_free(c_authInfo);
 		CORBA_free(c_clTRID);
@@ -2698,6 +2765,7 @@ epp_call_create_keyset(epp_context *epp_ctx,
 		c_tech->_buffer[i] = wrap_str(q_content(&create_keyset->tech));
 		if (c_tech->_buffer[i++] == NULL) {
 			CORBA_free(c_tech);
+			CORBA_free(c_dnskey);
 			CORBA_free(c_dsrecord);
 			CORBA_free(c_authInfo);
 			CORBA_free(c_clTRID);
@@ -2715,6 +2783,7 @@ epp_call_create_keyset(epp_context *epp_ctx,
 				c_authInfo,
 				c_tech,
 				c_dsrecord,
+				c_dnskey,
 				&c_crDate,
 				loginid,
 				c_clTRID,
@@ -2727,6 +2796,7 @@ epp_call_create_keyset(epp_context *epp_ctx,
 		usleep(RETR_SLEEP);
 	}
 	CORBA_free(c_tech);
+	CORBA_free(c_dnskey);
 	CORBA_free(c_dsrecord);
 	CORBA_free(c_authInfo);
 	CORBA_free(c_clTRID);
@@ -3523,6 +3593,8 @@ epp_call_update_keyset(epp_context *epp_ctx,
 	ccReg_Response	*response;
 	ccReg_DSRecord	*c_ds_add;
 	ccReg_DSRecord	*c_ds_rem;
+	ccReg_DNSKey	*c_dnskey_add;
+	ccReg_DNSKey	*c_dnskey_rem;
 	ccReg_TechContact	*c_tech_add;
 	ccReg_TechContact	*c_tech_rem;
 	int	i, len, retr, input_ok;
@@ -3532,6 +3604,8 @@ epp_call_update_keyset(epp_context *epp_ctx,
 	update_keyset = cdata->data;
 	c_ds_rem = NULL;
 	c_ds_add = NULL;
+	c_dnskey_add = NULL;
+	c_dnskey_rem = NULL;
 	c_tech_rem = NULL;
 	c_tech_add = NULL;
 	c_authInfo = NULL;
@@ -3644,6 +3718,50 @@ epp_call_update_keyset(epp_context *epp_ctx,
 		i++;
 	}
 
+	/* DNSKEY records add */
+	c_dnskey_add = ccReg_DNSKey__alloc();
+	if (c_dnskey_add == NULL) goto error_input;
+	len = q_length(update_keyset->add_dnskey);
+	c_dnskey_add->_buffer = ccReg_DNSKey_allocbuf(len);
+	if (len != 0 && c_dnskey_add->_buffer == NULL) goto error_input;
+	c_dnskey_add->_maximum = c_dnskey_add->_length = len;
+	c_dnskey_add->_release = CORBA_TRUE;
+	i = 0;
+	q_foreach(&update_keyset->add_dnskey) {
+		epp_dnskey *key;
+
+		key = q_content(&update_keyset->add_dnskey);
+
+		c_dnskey_add->_buffer[i].flags = key->flags;
+		c_dnskey_add->_buffer[i].protocol = key->protocol;
+		c_dnskey_add->_buffer[i].alg = key->alg;
+		c_dnskey_add->_buffer[i].key = wrap_str(key->public_key);
+	
+		i++;
+	}
+
+	/* DNSKEY records rem */
+	c_dnskey_rem = ccReg_DNSKey__alloc();
+	if (c_dnskey_rem == NULL) goto error_input;
+	len = q_length(update_keyset->add_dnskey);
+	c_dnskey_rem->_buffer = ccReg_DNSKey_allocbuf(len);
+	if (len != 0 && c_dnskey_rem->_buffer == NULL) goto error_input;
+	c_dnskey_rem->_maximum = c_dnskey_rem->_length = len;
+	c_dnskey_rem->_release = CORBA_TRUE;
+	i = 0;
+	q_foreach(&update_keyset->rem_dnskey) {
+		epp_dnskey *key;
+
+		key = q_content(&update_keyset->rem_dnskey);
+
+		c_dnskey_rem->_buffer[i].flags = key->flags;
+		c_dnskey_rem->_buffer[i].protocol = key->protocol;
+		c_dnskey_rem->_buffer[i].alg = key->alg;
+		c_dnskey_rem->_buffer[i].key = wrap_str(key->public_key);
+	
+		i++;
+	}
+
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
 		CORBA_exception_init(ev);
@@ -3656,6 +3774,8 @@ epp_call_update_keyset(epp_context *epp_ctx,
 				c_tech_rem,
 				c_ds_add,
 				c_ds_rem,
+				c_dnskey_add,
+				c_dnskey_rem,
 				loginid,
 				c_clTRID,
 				cdata->xml_in,
@@ -3671,6 +3791,8 @@ epp_call_update_keyset(epp_context *epp_ctx,
 error_input:
 	CORBA_free(c_ds_rem);
 	CORBA_free(c_ds_add);
+	CORBA_free(c_dnskey_rem);
+	CORBA_free(c_dnskey_add);
 	CORBA_free(c_tech_rem);
 	CORBA_free(c_tech_add);
 	CORBA_free(c_authInfo);

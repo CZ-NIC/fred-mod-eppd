@@ -165,8 +165,12 @@ typedef enum {
   	errspec_keyset_dsrecord,
  	errspec_keyset_dsrecord_add,
   	errspec_keyset_dsrecord_rem,
+	errspec_keyset_dnskey,
+	errspec_keyset_dnskey_add,
+	errspec_keyset_dnskey_rem,
   	errspec_keyset_tech_add,
   	errspec_keyset_tech_rem,
+	errspec_registrar_author,
 	errspec_domain_fqdn,
 	errspec_domain_registrant,
 	errspec_domain_nsset,
@@ -354,7 +358,15 @@ typedef struct {
 	unsigned key_alg;
 	char	*pubkey;
 */
-}epp_ds;
+} epp_ds;
+
+/** DNS Key record - http://rfc-ref.org/RFC-TEXTS/4034/chapter2.html */
+typedef struct {
+	unsigned short flags;		/**< key properties. supported values are 0, 256, 257 */
+	unsigned char  protocol;	/**< = 3 */
+	unsigned char  alg;		/**< algorithm type */
+	char 	*public_key;		/**< base64 encoded public key */
+} epp_dnskey;
 
 /** Type of identification number used in contact object. */
 typedef enum {
@@ -522,6 +534,7 @@ typedef struct {
 	char	*trDate;  /**< Last transfered. */
 	char	*authInfo;/**< Authorization information. */
 	qhead	 ds;      /**< List of delegation signers. */
+	qhead 	 keys;	  /**< List of DNS Key records */
 	qhead	 tech;    /**< List of technical contacts for keyset. */
 } epps_info_keyset;
 
@@ -608,6 +621,7 @@ typedef struct {
 	char 	*id;		/**< Id of wanted keyset (input). */
 	char 	*authInfo;	/**< Authorization information. */
 	qhead	ds;		/**< List of delegation signers */
+	qhead   keys;		/**< List of DNS Key records */
 	qhead 	tech;		/**< List of technical contacts for keyset */
 	char 	*crDate;	/**< Creation date of keyset. */
 }epps_create_keyset;
@@ -673,6 +687,8 @@ typedef struct {
 	qhead	 rem_tech;     /**< Technical contacts to be removed. */
 	qhead	 add_ds;       /**< Delegation signers to be added. */
 	qhead	 rem_ds;       /**< Delegation signers to be removed. */
+	qhead 	 add_dnskey;   /**< DNSKEYs to be added. */
+	qhead 	 rem_dnskey;   /**< DNSKEYs to be removed. */
 	char	*authInfo;     /**< Authorization information. */
 }epps_update_keyset;
 
