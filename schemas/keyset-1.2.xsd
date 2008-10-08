@@ -50,6 +50,8 @@
         <element name="id" type="fredcom:objIDType"/>
         <element name="ds" type="keyset:dsT"
          maxOccurs="10"/>
+	<element name="dnskey" type="keyset:dnskeyT"
+	 maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          maxOccurs="unbounded"/>
         <element name="authInfo" type="fredcom:authInfoType"
@@ -73,6 +75,21 @@
           minOccurs="0"/>
       </sequence>
     </complexType>
+
+    <complexType name="dnskeyT">
+      <sequence>
+         <element name="flags" type="unsignedShort"/>
+    	 <element name="protocol" type="unsignedByte"/>
+    	 <element name="alg" type="unsignedByte"/>
+    	 <element name="pubKey" type="keyset:keyT"/>
+      </sequence>
+    </complexType>
+
+    <simpleType name="keyT">
+      <restriction base="base64Binary">
+        <minLength value="1"/>
+      </restriction>
+    </simpleType>
 
     <!--
     Child element of commands that require only an identifier (delete and info).
@@ -122,6 +139,8 @@
       <sequence>
         <element name="ds" type="keyset:dsT"
          minOccurs="0" maxOccurs="10"/>
+	<element name="dnskey" tyep="keyset:dnskeyT"
+	 minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>
@@ -228,7 +247,10 @@
          minOccurs="0"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
-        <element name="ds" type="keyset:dsT" minOccurs="0" maxOccurs="10"/>
+        <element name="ds" type="keyset:dsT" minOccurs="0" 
+	 maxOccurs="10"/>
+	<element name="dnskey" type="keyset:dnskeyT" 
+	 minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          maxOccurs="unbounded"/>
       </sequence>
