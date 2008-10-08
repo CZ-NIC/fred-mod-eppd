@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/keyset-1.1"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/keyset-1.2"
           elementFormDefault="qualified" 
-          xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.1" 
+          xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.2" 
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0" 
           xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1" 
           xmlns="http://www.w3.org/2001/XMLSchema">
@@ -50,8 +50,8 @@
         <element name="id" type="fredcom:objIDType"/>
         <element name="ds" type="keyset:dsT"
          maxOccurs="10"/>
-	<element name="dnskey" type="keyset:dnskeyT"
-	 maxOccurs="10"/>
+        <element name="dnskey" type="keyset:dnskeyT"
+         maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          maxOccurs="unbounded"/>
         <element name="authInfo" type="fredcom:authInfoType"
@@ -139,8 +139,8 @@
       <sequence>
         <element name="ds" type="keyset:dsT"
          minOccurs="0" maxOccurs="10"/>
-	<element name="dnskey" tyep="keyset:dnskeyT"
-	 minOccurs="0" maxOccurs="10"/>
+        <element name="dnskey" type="keyset:dnskeyT"
+         minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          minOccurs="0" maxOccurs="unbounded"/>
       </sequence>

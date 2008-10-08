@@ -1,28 +1,72 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
-     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0
-     epp-1.0.xsd">
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<epp xmlns="urn:ietf:params:xml:ns:epp-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
   <command>
     <create>
-      <keyset:create
-        xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.0"
-        xsi:schemaLocation="http://www.nic.cz/xml/epp/keyset-1.0
-        keyset-1.0.xsd">
-        <keyset:id>TEST-KEYSET</keyset:id>
-	      <keyset:ds>
+      <keyset:create xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.2" 
+        xsi:schemaLocation="http://www.nic.cz/xml/epp/keyset-1.2 keyset-1.2.xsd">
+        <keyset:id>keysid:01</keyset:id>
+        <keyset:ds>
           <keyset:keyTag>1</keyset:keyTag>
           <keyset:alg>1</keyset:alg>
           <keyset:digestType>1</keyset:digestType>
-          <keyset:digest>aaa12409aaaaa098</keyset:digest>
-          <keyset:maxSigLife>100</keyset:maxSigLife>
+          <keyset:digest>499602d2</keyset:digest>
         </keyset:ds>
-        <keyset:tech>USER1</keyset:tech>
-	      <keyset:tech>USER2</keyset:tech>
-	      <keyset:tech>USER3</keyset:tech>
-        <keyset:authInfo>2fooBAR</keyset:authInfo>
+        <keyset:ds>
+          <keyset:keyTag>2</keyset:keyTag>
+          <keyset:alg>1</keyset:alg>
+          <keyset:digestType>1</keyset:digestType>
+          <keyset:digest>499602d2</keyset:digest>
+          <keyset:maxSigLife>1</keyset:maxSigLife>
+        </keyset:ds>
+
+        <keyset:dnskey>
+            <keyset:flags>1</keyset:flags>
+            <keyset:protocol>2</keyset:protocol>
+            <keyset:alg>3</keyset:alg>
+            <keyset:pubKey>
+LS0tLS1CRUdJTiBQR1AgUFVCTElDIEtFWSBCTE9DSy0tLS0tClZlcnNpb246IEdu
+dVBHIHYxLjQuNiAoR05VL0xpbnV4KQoKbVFHaUJFWTE4Z3dSQkFDOGUyUFJnTGIr
+VEdtVjFaSThaZ2Jmb2U5a1Fua29nQnVvbTNZTXlZQmljeC9oaG93awpTVTl3OVFV
+c2g3N1hzL2ZUZ3p4Q2dhd0ZIRmo2b1l4YWNIVEcyU09tdkh6Z3FwQUtoMmxJcEE3
+dUxLZnpHTHNzCkZ4cXhza3Bua3FSODRSMXc2UTJidk0zRWxSU1lVQ2hsbk1aMi92
+MmtjeE02N24wNngzcjhBb25GaXdDZ3RUK2cKUnZ3TFRYSFRhZVNmcnlQYmF4Q2g3
+QThFQUxnOTI1SzJ4bHI5VnQ2b1pmMk9GcWJ6NmVicTBiYlRtd2ZHWnpBMApYc0Z6
+NVQ2ZEgvNVRWWFFPSHpHWXp0OWIrcGVlM2l2am1rT3dvdCs4d1lXMVRkcGZwRmZw
+VEhPazVQaUpsMzFLCjkrbEczWWxQY3NzUzhvUjhzNkkrUDREOFBQbHF0Tll3UUpK
+YnE1WnJFNVRJOUt4ZmpCTElyNEUyMkt4SWpFR0sKRFhiUUJBQ2g5QWMvSkk2Wjh3
+K1Y2T3lXQkZ3eFpmMTNsWC9ybUZvSzFJUzJDTGlFemdseW5nWWJpUE1YeHhZQQpi
+aFNtTnNXVnBzcmFOVDVRRlpzcWdyQ0lHaDRtdGxuUWhYdE5HMFVvRTl5ZTNIaGJw
+cTJTMjlSZVg1V0Z1MU1ZClU4M3BzbDlCNHdMQWpPeGk1VlZ6Vk1QU1llQUFreXh5
+cjZseU9OY2pOYmFMamxvUFhyUWpXbVJsYm1WcklFSnYKYUcwZ1BIcGtaVzVsYXk1
+aWIyaHRRSE5sZW01aGJTNWplajZJWUFRVEVRSUFJQVVDUmpYeURBSWJBd1lMQ1Fn
+SApBd0lFRlFJSUF3UVdBZ01CQWg0QkFoZUFBQW9KRU5oaFZYcktmSElqbjBJQW9J
+NWlKRkxoNkdWYTBOWjQ0MzZDCkpBcSthZ3F1QUo5VWdUWFdqK2g3L011WCttTFlw
+Wlc2L0ZTMGY3a0NEUVJHTmZJaEVBZ0E3MGV1b0ZVY245djMKekpRc255MjBWR2ZV
+aEFhVE44RUd3K2RYTE9kMEtEbmZjVWZjWTYxTldMaGNHaTh0UTF3ano3S2ZtZHY5
+Z05sNgpZbU1JL2NZMVJud0dnT0RRTmp5eVYzMkhaUlFoRktsdGYrMjh5YnNRcTdN
+bjNqSXFmNlVwWTFzK3FaWjBKTkFaCjJUMXFqV2NuanZSaDRKWTNJY1F2NW1aYlFU
+ZWxmSmloMU83MHJ6ck5XOUpDOXcweFZsR0hkT0FhOEpqMjdBT1MKSUNxa1VZcDBX
+eU0rbUV6NmxBbk5wZlVRcWFkSkRka082dmwrNGlwWXNycTN3eHIzTmZKTUJrWXhX
+ZHBYV3BNOQpTWkVwRVpkOWhERDN5N0hHdmM0TE80MG40a05HRDAzc0dJNks5Mkl1
+M0F1eVM0djFRb1RRcnk2bTd3aDNYYTNOCm9lVUM1OHRHK3dBREJRZi9WZ3MwOEhI
+NmR5cTc5bVZ5cVRXSnhVZ2dEaGNManc1R0UvYnh6VWdqczNwT01qSFQKZmZ6ME1J
+eW55VW5CdTF3dE1MdzNFTVZ3ZDE3SllBSzExdnZTNEM2Q3ZJWUtCaUdHOC85RkpW
+N3BiL3RQalVaSgpzWnNRQmhrbXZBOXhWWjlyZmxXelBoWkhnTG5XcEd0K0wyTGN3
+b3FDMWtGeUdpWXNhMHY5eUhFNnJuaTVWRkJmClFqWFVWaExqN2dwQ0JQaEw3clpn
+TDVMOUlhQkUzdHFOMjZ6WmZlMHkyQ2I2Q2FFNVB2Y2ZyNFNyZDhxS3hZOGQKVmk5
+VWVsZDU5ZFMzNFFuYTI1MTNCZGx2WFRTMzNHK1duRWdHRzBTU2piWk5QN2cvUVpa
+bjdmRUYwYTY0SkY1dAp3MmJGU2VRK1hkYitrTGhPb25Rb1lmNG1IdFJ2ODl4Q0Yw
+UVZUNGhKQkJnUkFnQUpCUUpHTmZJaEFoc01BQW9KCkVOaGhWWHJLZkhJam04UUFu
+MG5ZVUo3eDhmclMyMC9EZkozdk45Y08rb2xwQUtDVXArUFVIdVNCN2dTdndiT3MK
+Mktlcmh1ZkVGQT09Cj1kbE85Ci0tLS0tRU5EIFBHUCBQVUJMSUMgS0VZIEJMT0NL
+LS0tLS0K
+</keyset:pubKey>
+        </keyset:dnskey>
+
+        <keyset:tech>cid:regid</keyset:tech>
+        <keyset:authInfo>passw</keyset:authInfo>
       </keyset:create>
     </create>
-    <clTRID>MyID12345</clTRID>
-  </command> 
+    <clTRID>006#08-10-08at12:18:06</clTRID>
+  </command>
 </epp>

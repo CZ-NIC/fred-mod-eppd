@@ -1,32 +1,48 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
-     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0
-     epp-1.0.xsd">
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<epp xmlns="urn:ietf:params:xml:ns:epp-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
   <command>
     <update>
-      <update xmlns="http://www.nic.cz/xml/epp/keyset-1.0"
-       xsi:schemaLocation="http://www.nic.cz/xml/epp/keyset-1.0
-       keyset-1.0.xsd">
-        <id>KEYSID:LEVEL</id>
-	<add>
-        <ds>
-          <keyTag>1</keyTag>
-          <alg>1</alg>
-          <digestType>1</digestType>
-          <digest>aaa12409aaaaa098</digest>
-        </ds>
-		<tech>jouda</tech>
-	</add>
-	<rem>
-		<name>ns1.bazmek.net</name>
-		<tech>regcontact2</tech>
-	</rem>
-	<chg>
-		<authInfo>blebleble</authInfo>
-	</chg>
-      </update>
+      <keyset:update xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.2" 
+        xsi:schemaLocation="http://www.nic.cz/xml/epp/keyset-1.2 keyset-1.2.xsd">
+        <keyset:id>keysid:k01</keyset:id>
+        <keyset:add>
+          <keyset:ds>
+            <keyset:keyTag>1</keyset:keyTag>
+            <keyset:alg>1</keyset:alg>
+            <keyset:digestType>1</keyset:digestType>
+            <keyset:digest>499602d2</keyset:digest>
+          </keyset:ds>
+          <keyset:ds>
+            <keyset:keyTag>2</keyset:keyTag>
+            <keyset:alg>1</keyset:alg>
+            <keyset:digestType>1</keyset:digestType>
+            <keyset:digest>499602d2</keyset:digest>
+            <keyset:maxSigLife>1</keyset:maxSigLife>
+          </keyset:ds>
+        </keyset:add>
+        <keyset:rem>
+          <keyset:ds>
+            <keyset:keyTag>1</keyset:keyTag>
+            <keyset:alg>1</keyset:alg>
+            <keyset:digestType>1</keyset:digestType>
+            <keyset:digest>499602d2</keyset:digest>
+          </keyset:ds>
+          <keyset:ds>
+            <keyset:keyTag>2</keyset:keyTag>
+            <keyset:alg>1</keyset:alg>
+            <keyset:digestType>1</keyset:digestType>
+            <keyset:digest>499602d2</keyset:digest>
+            <keyset:maxSigLife>1</keyset:maxSigLife>
+          </keyset:ds>
+          <keyset:tech>cid:tech1</keyset:tech>
+          <keyset:tech>cid:tech2</keyset:tech>
+          <keyset:tech>cid:tech3</keyset:tech>
+        </keyset:rem>
+        <keyset:chg>
+          <keyset:authInfo>password</keyset:authInfo>
+        </keyset:chg>
+      </keyset:update>
     </update>
-    <clTRID>ABC-12345</clTRID>
+    <clTRID>007#08-10-08at14:30:36</clTRID>
   </command>
 </epp>

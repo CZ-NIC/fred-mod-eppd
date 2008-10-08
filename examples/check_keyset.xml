@@ -4,9 +4,9 @@
      xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
   <command>
     <check>
-    <check xmlns="http://www.nic.cz/xml/epp/keyset-1.0"
-	    xsi:schemaLocation="http://www.nic.cz/xml/epp/keyset-1.0
-	    keyset-1.0.xsd">
+    <check xmlns="http://www.nic.cz/xml/epp/keyset-1.2"
+	    xsi:schemaLocation="http://www.nic.cz/xml/epp/keyset-1.2
+	    keyset-1.2.xsd">
         <id>exampleNsset</id>
         <id>necocz</id>
         <id>xxxx</id>
