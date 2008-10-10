@@ -1247,6 +1247,7 @@ parse_create_keyset(void *pool,
 {
 	epps_create_keyset	*create_keyset;
 	xmlXPathObjectPtr	 xpathObj;
+	xmlNodePtr	 	par_node;
 	int	 j, xerr;
 
 	RESET_XERR(xerr); /* clear value of errno */
@@ -1255,6 +1256,9 @@ parse_create_keyset(void *pool,
 	if ((cdata->data = epp_calloc(pool, sizeof *create_keyset)) == NULL)
 		goto error;
 	create_keyset = cdata->data;
+
+	/* save the root node */
+	par_node = xpathCtx->node;
 
 	/* get the nsset data */
 	create_keyset->id = xpath_get1(pool, xpathCtx, "keyset:id", 1, &xerr);
@@ -1296,6 +1300,7 @@ parse_create_keyset(void *pool,
 	}
 
 	xmlXPathFreeObject(xpathObj);
+	xpathCtx->node = par_node;
 
 	/* process multiple DNSKEY reocrds */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:dnskey", xpathCtx);
@@ -1328,6 +1333,7 @@ parse_create_keyset(void *pool,
 	}
 
 	xmlXPathFreeObject(xpathObj);
+	xpathCtx->node = par_node;
 
 	cdata->type = EPP_CREATE_KEYSET;
 	return;
@@ -1406,7 +1412,7 @@ int read_epp_dnskey(void *pool, xmlXPathContextPtr xpathCtx, epp_dnskey *key)
 	CHK_XERR(xerr, error);
 	key->alg = (unsigned char)atoi(str);
 
-	key->public_key = xpath_get1(pool, xpathCtx, "keyset:public_key", 1, &xerr);
+	key->public_key = xpath_get1(pool, xpathCtx, "keyset:pubKey", 1, &xerr);
 	CHK_XERR(xerr, error);
 
 	return 1;
@@ -1887,7 +1893,7 @@ parse_update_keyset(void *pool,
 {
 	epps_update_keyset	*update_keyset;
 	xmlXPathObjectPtr	xpathObj;
-	xmlNodePtr	 	par_node;
+	xmlNodePtr	 	par_node, root_node;
 	int	 j, xerr;
 
 	RESET_XERR(xerr); /* clear value of errno */
@@ -1905,13 +1911,12 @@ parse_update_keyset(void *pool,
 			"keyset:chg/keyset:authInfo", 0, &xerr);
 	CHK_XERR(xerr, error);
 
-
-	par_node = xpathCtx->node;
-
 	/* rem data */
-	xpath_chroot(xpathCtx, "keyset:rem", 0, &xerr); if (xerr == XERR_LIBXML)
+	root_node = xpath_chroot(xpathCtx, "keyset:rem", 0, &xerr); if (xerr == XERR_LIBXML)
 		goto error;
 	else if (xerr == XERR_OK) {
+		par_node = xpathCtx->node;
+
 		/*
 		xpath_getn(pool, &update_keyset->rem_tech, xpathCtx,
 				"keyset:tech", &xerr);
@@ -1996,11 +2001,16 @@ parse_update_keyset(void *pool,
 	else
 		RESET_XERR(xerr); /* clear value of errno */
 
+
+	xpathCtx->node = root_node;
+
 	/* add data */
 	xpath_chroot(xpathCtx, "keyset:add", 0, &xerr);
 	if (xerr == XERR_LIBXML)
 		goto error;
 	else if (xerr == XERR_OK) {
+		par_node = xpathCtx->node;
+
 		xpath_getn(pool, &update_keyset->add_tech, xpathCtx,
 				"keyset:tech", &xerr);
 		CHK_XERR(xerr, error);

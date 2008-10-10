@@ -3743,7 +3743,7 @@ epp_call_update_keyset(epp_context *epp_ctx,
 	/* DNSKEY records rem */
 	c_dnskey_rem = ccReg_DNSKey__alloc();
 	if (c_dnskey_rem == NULL) goto error_input;
-	len = q_length(update_keyset->add_dnskey);
+	len = q_length(update_keyset->rem_dnskey);
 	c_dnskey_rem->_buffer = ccReg_DNSKey_allocbuf(len);
 	if (len != 0 && c_dnskey_rem->_buffer == NULL) goto error_input;
 	c_dnskey_rem->_maximum = c_dnskey_rem->_length = len;
