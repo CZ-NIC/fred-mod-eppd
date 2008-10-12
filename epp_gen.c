@@ -522,11 +522,11 @@ gen_info_keyset(xmlTextWriterPtr writer, epp_command_data *cdata)
 		WRITE_ELEMENT(writer, simple_err, "keyset:protocol", str);
 		snprintf(str, 9, "%d", key->alg);
 		WRITE_ELEMENT(writer, simple_err, "keyset:alg", str);
-		WRITE_ELEMENT(writer, simple_err, "keyset:public_key", key->public_key);
+		WRITE_ELEMENT(writer, simple_err, "keyset:pubKey", key->public_key);
 
 		END_ELEMENT(writer, simple_err); /* dnskey */
 	}
-		
+
 	/* print tech contacts */
 	q_foreach(&info_keyset->tech) {
 		WRITE_ELEMENT(writer, simple_err, "keyset:tech",
