@@ -1912,7 +1912,9 @@ parse_update_keyset(void *pool,
 	CHK_XERR(xerr, error);
 
 	/* rem data */
-	root_node = xpath_chroot(xpathCtx, "keyset:rem", 0, &xerr); if (xerr == XERR_LIBXML)
+	root_node = xpath_chroot(xpathCtx, "keyset:rem", 0, &xerr); 
+
+	if (xerr == XERR_LIBXML)
 		goto error;
 	else if (xerr == XERR_OK) {
 		par_node = xpathCtx->node;
@@ -1997,12 +1999,13 @@ parse_update_keyset(void *pool,
 		xmlXPathFreeObject(xpathObj);
 
 		xpathCtx->node = par_node;
-	}
-	else
+	} else {
 		RESET_XERR(xerr); /* clear value of errno */
+	}
 
 
-	xpathCtx->node = root_node;
+	/* go back to the root node */
+	if(root_node != NULL) xpathCtx->node = root_node;
 
 	/* add data */
 	xpath_chroot(xpathCtx, "keyset:add", 0, &xerr);
@@ -2081,8 +2084,9 @@ parse_update_keyset(void *pool,
 		}
 		xmlXPathFreeObject(xpathObj);
 
+	} else {
+		RESET_XERR(xerr); /* clear value of errno */
 	}
-	else RESET_XERR(xerr); /* clear value of errno */
 
 	cdata->type = EPP_UPDATE_KEYSET;
 	return;
