@@ -49,11 +49,11 @@
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
         <element name="ds" type="keyset:dsT"
-         maxOccurs="10"/>
+         minOccurs="0" maxOccurs="10"/>
         <element name="dnskey" type="keyset:dnskeyT"
-         maxOccurs="10"/>
+         minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
-         maxOccurs="unbounded"/>
+         maxOccurs="10"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
       </sequence>
