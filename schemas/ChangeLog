@@ -1,3 +1,17 @@
+2008-10-19 Jaromir Talir (version 2.1.0)
+
+	* updateded keyset.xsd from 1.1 to 1.2
+	   - new types dnskeyT (DNSKEY RR) and keyT (key data)
+	   - changing structures crType, addType, infDataType to add dnskey
+           - removing lower limits for ds records to allow keyset withou ds
+	   - adding upper limits to tech contacts
+	
+	* update fred.xsd from 1.3 to 1.4
+	   - removing reference to keyset schema (not needed)
+
+	* update all.xsd from 2.0 to 2.1
+	   - changing reference to keyset.xsd and fred.xsd to new versions
+
 2008-08-13 Jaromir Talir (version 2.0.0)
 
 	* fixing removal of keysetByDs function in fred-1.3.xsd. schemas

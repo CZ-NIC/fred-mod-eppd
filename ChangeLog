@@ -1,3 +1,7 @@
+2008-10-18 Jaromir Talir (2.1.0)
+
+	* Adding dnskey list to keysets
+
 2008-09-29 Jaromir Talir (2.0.2)
 	
 	* Missing handling of poll delete_keyset message

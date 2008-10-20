@@ -36,7 +36,7 @@
 /** Our custom namespace used for keyset object */
 #define NS_KEYSET	"http://www.nic.cz/xml/epp/keyset-1.2"
 /** Our custom namespace used for extensions definition */
-#define NS_FRED		"http://www.nic.cz/xml/epp/fred-1.3"
+#define NS_FRED		"http://www.nic.cz/xml/epp/fred-1.4"
 /** Our custom namespace used for enum validation extension */
 #define NS_ENUMVAL	"http://www.nic.cz/xml/epp/enumval-1.1"
 /** Namespace + location of epp xml schema */
