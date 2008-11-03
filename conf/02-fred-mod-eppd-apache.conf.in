@@ -23,9 +23,11 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    CorbaEnable       On
    CorbaNameservice  @NSHOST@
    CorbaObject       @OBJECTNAME@ EPP_alias
+   CorbaObject		 @LOGGER_OBJECTNAME@ Logger_alias
 
    EPPprotocol       On
    EPPobject         EPP_alias
+   EPPlogdObject	 Logger_alias
    EPPschema         "@DATAROOTDIR@/@PACKAGE@/schemas/all.xsd"
    EPPservername     "EPP server"
    EPPlog            "@LOCALSTATEDIR@/log/fred-eppd.log"

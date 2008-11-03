@@ -252,6 +252,51 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
 	return res;
 }
 
+int epp_log_message(service_Logger service,
+		const char *sourceIP,
+		ccReg_LogEventType event_type,
+		const char *content,
+		ccReg_LogProperties *properties,
+		char *errmsg)
+{
+	CORBA_Environment	 ev[1];
+	int	 retr;  /* retry counter */
+	int	 ret;
+	int 	 success;
+
+	if(properties == NULL) {
+		properties = ccReg_LogProperties__alloc();
+		if(properties == NULL) return CORBA_INT_ERROR;
+
+		properties->_maximum = properties->_length = 0;
+	}
+
+	/* retry loop */
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev); /* valid first time */
+		CORBA_exception_init(ev);
+
+		/* call logger method */
+		success = ccReg_Log_message((ccReg_Log) service, sourceIP,  ccReg_LC_EPP, event_type, content, properties, 0, ev);
+
+		/* if COMM_FAILURE is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+
+	if (raised_exception(ev)) {
+		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
+		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
+		CORBA_exception_free(ev);
+		return CORBA_ERROR;
+	}
+	CORBA_exception_free(ev);
+
+	ret = CORBA_OK;
+	return ret;
+}
+
 int
 epp_call_hello(epp_context *epp_ctx, service_EPP service, char **version,
 		char **curdate)
@@ -1591,17 +1636,17 @@ epp_call_info_keyset(epp_context *epp_ctx,
 	/* initialize dnskey items */
 	for (i = 0; i < c_keyset->dnsk._length; i++) {
 		epp_dnskey *dnskey_item;
-	
+
 		dnskey_item = epp_calloc(epp_ctx->pool, sizeof *dnskey_item);
 		if (dnskey_item == NULL) goto error;
 
-		/* process of dnskey item */ 
-		dnskey_item->flags = c_keyset->dnsk._buffer[i].flags;	
-		dnskey_item->alg = c_keyset->dnsk._buffer[i].alg;	
-		dnskey_item->protocol = c_keyset->dnsk._buffer[i].protocol;	
-		dnskey_item->public_key = unwrap_str_req(epp_ctx, c_keyset->dnsk._buffer[i].key, &cerrno, "public_key");	
+		/* process of dnskey item */
+		dnskey_item->flags = c_keyset->dnsk._buffer[i].flags;
+		dnskey_item->alg = c_keyset->dnsk._buffer[i].alg;
+		dnskey_item->protocol = c_keyset->dnsk._buffer[i].protocol;
+		dnskey_item->public_key = unwrap_str_req(epp_ctx, c_keyset->dnsk._buffer[i].key, &cerrno, "public_key");
 		if (cerrno != 0) goto error;
-		
+
 		/* enqueue dnskey item */
 		if (q_add(epp_ctx->pool, &info_keyset->keys, dnskey_item))
 			goto error;
@@ -2734,7 +2779,7 @@ epp_call_create_keyset(epp_context *epp_ctx,
 			CORBA_free(c_authInfo);
 			CORBA_free(c_clTRID);
 			return CORBA_INT_ERROR;
-		}	
+		}
 
 		i++;
 	}
@@ -3706,7 +3751,7 @@ epp_call_update_keyset(epp_context *epp_ctx,
 	q_foreach(&update_keyset->rem_ds) {
   		epp_ds *ds;
 
-		// ds record is identified by all the required fields 
+		// ds record is identified by all the required fields
 		ds = q_content(&update_keyset->rem_ds);
 
 		c_ds_rem->_buffer[i].keyTag = ds->keytag;
@@ -3736,7 +3781,7 @@ epp_call_update_keyset(epp_context *epp_ctx,
 		c_dnskey_add->_buffer[i].protocol = key->protocol;
 		c_dnskey_add->_buffer[i].alg = key->alg;
 		c_dnskey_add->_buffer[i].key = wrap_str(key->public_key);
-	
+
 		i++;
 	}
 
@@ -3758,7 +3803,7 @@ epp_call_update_keyset(epp_context *epp_ctx,
 		c_dnskey_rem->_buffer[i].protocol = key->protocol;
 		c_dnskey_rem->_buffer[i].alg = key->alg;
 		c_dnskey_rem->_buffer[i].key = wrap_str(key->public_key);
-	
+
 		i++;
 	}
 

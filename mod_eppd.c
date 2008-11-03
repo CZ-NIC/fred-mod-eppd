@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -124,6 +124,11 @@
 module AP_MODULE_DECLARE_DATA eppd_module;
 
 /**
+ * function for obtaining a reference to a CORBA object
+ */
+static void *get_corba_service(epp_context *epp_ctx, char *name);
+
+/**
  * SSL variable lookup function pointer used for client's PEM encoded
  * certificate retrieval.
  */
@@ -136,7 +141,8 @@ typedef struct {
 	int	epp_enabled;/**< Decides whether mod_eppd is enabled for host.*/
 	char	*servername;/**< Epp server name used in <greeting> frame. */
 	char	*ns_loc;    /**< Location of CORBA nameservice. */
-	char	*object;    /**< Name under which is object known. */
+	char	*object;    	   /**< Name under which the object is known. */
+	char	*logger_object;    /**< Name of fred-logd object */
 	void	*schema;    /**< URL of EPP schema (use just path). */
 	int	valid_resp; /**< Validate response before sending it to client.*/
 	char	*epplog;    /**< Epp log filename. */
@@ -284,7 +290,7 @@ void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
 	apr_size_t	 nbytes; /* length of logline */
 	apr_status_t	 rv;
 	eppd_server_conf *sc;
- 
+
 	/* copy items from context struct to individual variables */
 	conn = epp_ctx->conn;
 	pool = epp_ctx->pool;
@@ -299,7 +305,7 @@ void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
 	va_start(ap, fmt);
 	text = apr_pvsprintf(pool, fmt, ap);
 	va_end(ap);
- 
+
 	/* substitute newlines in text */
 	for (i = 0; text[i] != '\0'; i++) {
 		if (text[i] == '\n') text[i] = ' ';
@@ -417,7 +423,7 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 			return 1;
 		}
 		epplog(epp_ctx, EPP_ERROR, "Error when reading epp header "
-				"(%d - %s)", status, 
+				"(%d - %s)", status,
 				apr_strerror(status, buff, sizeof(buff)));
 		return 2;
 	}
@@ -561,7 +567,7 @@ static int get_md5(char *cert_md5, char *pem)
 	}
 
 	/* compute md5 hash of certificate */
-	if (!X509_digest(x, EVP_md5(), md5, &len)) { 
+	if (!X509_digest(x, EVP_md5(), md5, &len)) {
 		BIO_free_all(bio);
 		X509_free(x);
 		return 0;
@@ -761,13 +767,87 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 	return 1;
 }
 
+
+static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *request, epp_command_data *cdata)
+{
+
+	//ccReg_LogProperties *c_props;
+	char errmsg[MAX_ERROR_MSG_LEN];
+/*
+	c_props = ccReg_LogProperties__alloc();
+	if (c_props == NULL) return HTTP_INTERNAL_SERVER_ERROR;
+
+	c_props->_maximum = c_props->_length = 4;
+
+
+	cdata
+
+	EPP_DUMMY,
+		EPP_LOGIN,
+		EPP_LOGOUT,
+		EPP_CHECK_CONTACT,
+		EPP_CHECK_DOMAIN,
+		EPP_CHECK_NSSET,
+		EPP_CHECK_KEYSET,
+		EPP_INFO_CONTACT,
+		EPP_INFO_DOMAIN,
+		EPP_INFO_NSSET,
+		EPP_INFO_KEYSET,
+		EPP_LIST_CONTACT,
+		EPP_LIST_DOMAIN,
+		EPP_LIST_NSSET,
+		EPP_LIST_KEYSET,
+		EPP_POLL_REQ,
+		EPP_POLL_ACK,
+		EPP_CREATE_CONTACT,
+		EPP_CREATE_DOMAIN,
+		EPP_CREATE_NSSET,
+		EPP_CREATE_KEYSET,
+		EPP_DELETE_CONTACT,
+		EPP_DELETE_DOMAIN,
+		EPP_DELETE_NSSET,
+		EPP_DELETE_KEYSET,
+		EPP_UPDATE_CONTACT,
+		EPP_UPDATE_DOMAIN,
+		EPP_UPDATE_NSSET,
+		EPP_UPDATE_KEYSET,
+		EPP_TRANSFER_CONTACT,
+		EPP_TRANSFER_DOMAIN,
+		EPP_TRANSFER_NSSET,
+		EPP_TRANSFER_KEYSET,
+		EPP_RENEW_DOMAIN,
+		EPP_SENDAUTHINFO_CONTACT,
+		EPP_SENDAUTHINFO_DOMAIN,
+		EPP_SENDAUTHINFO_NSSET,
+		EPP_SENDAUTHINFO_KEYSET,
+		EPP_TEST_NSSET,
+		EPP_CREDITINFO,
+		EPP_INFO_LIST_CONTACTS,
+		EPP_INFO_LIST_DOMAINS,
+		EPP_INFO_LIST_NSSETS,
+		EPP_INFO_LIST_KEYSETS,
+		EPP_INFO_DOMAINS_BY_NSSET,
+		EPP_INFO_DOMAINS_BY_KEYSET,
+		EPP_INFO_DOMAINS_BY_CONTACT,
+		EPP_INFO_NSSETS_BY_CONTACT,
+		EPP_INFO_NSSETS_BY_NS,
+		EPP_INFO_KEYSETS_BY_CONTACT,
+		EPP_INFO_GET_RESULTS
+		*/
+
+
+
+	errmsg[0] = '\0';
+	epp_log_message(service, c->remote_ip, ccReg_LT_REQUEST, request, NULL, &errmsg);
+}
+
 /** Read and process EPP requests waiting in the queue */
 static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		service_EPP *EPPservice, eppd_server_conf *sc,
 		unsigned int *loginid_save)
 {
 	epp_lang	 lang;   /* session's language */
-	apr_pool_t	*rpool;  /* conntection memory pool */
+	apr_pool_t	*rpool;  /* connection memory pool */
 	parser_status	 pstat;  /* parser's return code */
 	apr_status_t	 status; /* used to store rc of apr functions */
 	epp_command_data *cdata; /* command data structure */
@@ -776,6 +856,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	char	*response;       /* generated XML answer to client */
 	int	 retval;         /* return code of read_request */
 	unsigned int	 loginid;        /* login id of client's session */
+	service_Logger   *logger_service;  /* reference to the fred-logd service */
 #ifdef EPP_PERF
 	/*
 	 * array of timestamps for perf measurement:
@@ -907,8 +988,18 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			/* log request which doesn't validate */
 			if (pstat == PARSER_NOT_VALID) {
 				epplog(epp_ctx, EPP_WARNING,
-						"Request doest not validate");
+						"Request does not validate");
 			}
+
+			logger_service = get_corba_service(epp_ctx, sc->logger_object);
+			if (logger_service == NULL) {
+				epplog(epp_ctx, EPP_ERROR, "Could not obtain object reference "
+						"for alias '%s'.", sc->logger_object);
+				return HTTP_INTERNAL_SERVER_ERROR;
+			}
+
+			log_epp_command(logger_service, epp_ctx->conn, request, cdata);
+
 			/* call function from corba backend */
 			if (!call_corba(epp_ctx, EPPservice, cdata, pstat,
 						&loginid, &lang))
@@ -930,7 +1021,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 #endif
 			/* error response will be deferred */
 			if (cdata->rc >= 2000) {
-				epplog(epp_ctx, EPP_DEBUG, "(epp-cmd %d) response code %d: sleeping for %d ms", 
+				epplog(epp_ctx, EPP_DEBUG, "(epp-cmd %d) response code %d: sleeping for %d ms",
 					cdata->type, cdata->rc, sc->defer_err);
 				/* sleep time conversion to microsec */
 				apr_sleep(sc->defer_err * 1000);
@@ -1009,6 +1100,58 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 }
 
 /**
+ * Get a reference to the CORBA service with the given name
+ *
+ * @param c   	Connection.
+ * @param name  Name of the service.
+ */
+static void *get_corba_service(epp_context *epp_ctx, char *name)
+{
+	int 		i;
+	apr_hash_t	*references;
+	module		*corba_module;
+	void		*service;
+	conn_rec 	*c = (conn_rec*)epp_ctx->conn;
+
+	/*
+	 * get module structure for mod_corba, in order to retrieve service
+	 * stored by that module in connection config.
+	 */
+	corba_module = NULL;
+	for (i = 0; ap_loaded_modules[i] != NULL; i++)
+		if (!strcmp(ap_loaded_modules[i]->name, "mod_corba.c")) {
+			corba_module = ap_loaded_modules[i];
+			break;
+		}
+
+	if (corba_module == NULL) {
+		epplog(epp_ctx, EPP_FATAL,
+				"mod_corba module was not loaded - unable to "
+				"handle a whois request");
+		return NULL;
+	}
+
+	references = (apr_hash_t *)
+		ap_get_module_config(c->conn_config, corba_module);
+	if (references == NULL) {
+		epplog(epp_ctx, EPP_FATAL,
+			"mod_corba is not enabled for this server though it "
+			"should be! Cannot handle whois request.");
+		return NULL;
+	}
+
+	service = (void *) apr_hash_get(references, name, strlen(name));
+	if (service == NULL) {
+		epplog(epp_ctx, EPP_ERROR,
+			"Could not obtain object reference for alias '%s'. "
+			"Check mod_corba's configuration.", name);
+		return NULL;
+	}
+
+	return service;
+}
+
+/**
  * EPP Connection handler.
  *
  * When EPP engine is turn on for connection, this handler takes care
@@ -1054,34 +1197,7 @@ static int epp_process_connection(conn_rec *c)
 	 */
 	epp_ctx.session = (apr_time_now() * (c->id + 1)) % 524288;
 
-	/*
-	 * get module structure for mod_corba, in order to retrieve service
-	 * stored by that module in connection config.
-	 */
-	corba_module = NULL;
-	for (i = 0; ap_loaded_modules[i] != NULL; i++) {
-		if (!strcmp(ap_loaded_modules[i]->name, "mod_corba.c")) {
-			corba_module = ap_loaded_modules[i];
-			break;
-		}
-	}
-	if (corba_module == NULL) {
-		epplog(&epp_ctx, EPP_FATAL, "mod_corba module was not loaded - "
-				"unable to handle an EPP request");
-		return HTTP_INTERNAL_SERVER_ERROR;
-	}
-	references = (apr_hash_t *)
-		ap_get_module_config(c->conn_config, corba_module);
-	if (references == NULL) {
-		epplog(&epp_ctx, EPP_FATAL, "mod_corba is not enabled for this "
-				"server though it should be! Cannot handle EPP "
-				"request.");
-		return HTTP_INTERNAL_SERVER_ERROR;
-	}
-
-	/* check that our reference is available */
-	EPPservice = (service_EPP) apr_hash_get(references, sc->object,
-			strlen(sc->object));
+	EPPservice = get_corba_service(&epp_ctx, sc->object);
 	if (EPPservice == NULL) {
 		epplog(&epp_ctx, EPP_ERROR, "Could not obtain object reference "
 				"for alias '%s'.", sc->object);
@@ -1261,8 +1377,8 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 				"mod_eppd: could not create epp_log_lock");
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
- 
-//#ifdef AP_NEED_SET_MUTEX_PERMS  
+
+//#ifdef AP_NEED_SET_MUTEX_PERMS
 	rv = unixd_set_global_mutex_perms(epp_log_lock);
 	if (rv != APR_SUCCESS) {
 		ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
@@ -1312,7 +1428,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 						APR_EBADPATH, s,
 						"mod_eppd: Invalid "
 						"EPPlog path %s", sc->epplog);
-					return HTTP_INTERNAL_SERVER_ERROR; 
+					return HTTP_INTERNAL_SERVER_ERROR;
 				}
 				if ((rv = apr_file_open(&sc->epplogfp, fname,
 					(APR_WRITE | APR_APPEND | APR_CREATE),
@@ -1394,6 +1510,42 @@ static const char *set_epp_object(cmd_parms *cmd, void *dummy,
 }
 
 /**
+ * Handler for apache's configuration directive "EPPlogdObject".
+ * Sets the name under which is Logger object known to nameservice.
+ *
+ * @param cmd       Command structure.
+ * @param dummy     Not used parameter.
+ * @param obj_name  A name of object.
+ * @return          Error string in case of failure otherwise NULL.
+ */
+static const char *set_logger_object(cmd_parms *cmd, void *dummy,
+		const char *obj_name)
+{
+	const char *err;
+	server_rec *s = cmd->server;
+	eppd_server_conf *sc = (eppd_server_conf *)
+		ap_get_module_config(s->module_config, &eppd_module);
+
+	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
+	if (err) return err;
+
+	/*
+	 * catch double definition of object's name
+	 * that's not serious fault so we will just print message in log
+	 */
+	if (sc->logger_object != NULL) {
+		ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+				"mod_eppd: more than one definition of object's "
+				"name. All but the first one will be ignored");
+		return NULL;
+	}
+
+	sc->logger_object = apr_pstrdup(cmd->pool, obj_name);
+
+	return NULL;
+}
+
+/**
  * Handler for apache's configuration directive "EPPschema".
  *
  * The xml schema file is herewith read and parsed and stays in use for life-time
@@ -1438,7 +1590,7 @@ static const char *set_schema(cmd_parms *cmd, void *dummy,
 				schemaurl);
 	}
 	/*
-	 * Register cleanup for xml 
+	 * Register cleanup for xml
 	 */
 	apr_pool_cleanup_register(cmd->pool, sc->schema, epp_cleanup_xml,
 			apr_pool_cleanup_null);
@@ -1597,7 +1749,7 @@ static const char *set_valid_resp(cmd_parms *cmd, void *dummy, int flag)
  *                deferring error responses from CR
  * @return        Error string in case of failure otherwise NULL.
  */
-static const char *set_defer_errors(cmd_parms *cmd, void *dummy, 
+static const char *set_defer_errors(cmd_parms *cmd, void *dummy,
 		const char *a1)
 {
 	const char 	*err;
@@ -1607,7 +1759,7 @@ static const char *set_defer_errors(cmd_parms *cmd, void *dummy,
 	/* don't allow negative and to high values */
 	if (val < DEFER_MIN || val > DEFER_MAX)
 		return "Defer time for error responses out of range";
-	
+
 	server_rec *s = cmd->server;
 	eppd_server_conf *sc = (eppd_server_conf *)
 		ap_get_module_config(s->module_config, &eppd_module);
@@ -1615,7 +1767,7 @@ static const char *set_defer_errors(cmd_parms *cmd, void *dummy,
 	err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE|NOT_IN_LIMIT);
 	if (err) return err;
 
-	sc->defer_err = val; 
+	sc->defer_err = val;
 
 	return NULL;
 }
@@ -1643,6 +1795,9 @@ static const command_rec eppd_cmds[] = {
 	AP_INIT_TAKE1("EPPobject", set_epp_object, NULL, RSRC_CONF,
 			"Alias under which is the reference to EPP object "
 			"exported from mod_corba module. Default is \"EPP\"."),
+    	AP_INIT_TAKE1("EPPlogdObject", set_logger_object, NULL, RSRC_CONF,
+			"Alias under which is the reference to Logger object "
+			"exported from mod_corba module. Default is \"Logger\"."),
 	AP_INIT_TAKE1("EPPdeferErrors", set_defer_errors, NULL, RSRC_CONF,
 			"Integer value representing time value (in miliseconds)"
 			"for deferring error response from Central Registry."

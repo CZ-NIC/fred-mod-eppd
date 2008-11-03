@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -35,8 +35,11 @@ typedef enum {
 	CORBA_REMOTE_ERROR
 }corba_status;
 
-/** Reference to CORBA service */
+/** Reference to EPP CORBA service */
 typedef void *service_EPP;
+/** Reference to fred-logd CORBA service */
+typedef void *service_Logger;
+
 
 /**
  * Purpose of this function is to get version string of ccReg from
@@ -139,5 +142,7 @@ epp_call_save_output_xml(epp_context *epp_ctx,
 void
 epp_call_end_session(epp_context *epp_ctx, service_EPP service,
 		unsigned int loginid);
+
+#define MAX_ERROR_MSG_LEN	100
 
 #endif /* EPP_CLIENT_H */

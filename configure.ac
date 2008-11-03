@@ -167,7 +167,13 @@ AC_ARG_WITH([objectname], [AS_HELP_STRING([--with-objectname],
             [Name of object [EPP]])],
             [AC_SUBST([OBJECTNAME], [$withval])],
             [AC_SUBST([OBJECTNAME], [EPP])])
-
+            
+#object name
+AC_ARG_WITH([logger_objectname], [AS_HELP_STRING([--with-logger-objectname],
+            [Name of logger object [Logger]])],
+            [AC_SUBST([LOGGER_OBJECTNAME], [$withval])],
+            [AC_SUBST([LOGGER_OBJECTNAME], [Logger])])            
+            
 # check svn revision (if available)
 AC_SUBST([SVNREV], [unknown])
 AC_MSG_NOTICE([trying to get svn revision])
