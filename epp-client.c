@@ -277,7 +277,7 @@ int epp_log_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		success = ccReg_Log_message((ccReg_Log) service, sourceIP,  ccReg_LC_EPP, event_type, content, properties, 0, ev);
+		success = ccReg_Log_message((ccReg_Log) service, sourceIP,  ccReg_LC_EPP, event_type, content, properties, ev);
 
 		/* if COMM_FAILURE is not raised then quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
