@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -54,6 +54,25 @@ typedef enum {
 }parser_status;
 
 /**
+ * Enumeration of all implemented EPP commands as defined in rfc.
+ * It is REDuced form - without object suffix. And is used as hash
+ * value in command hash table for fast recognition of commands.
+ */
+typedef enum {
+	EPP_RED_UNKNOWN_CMD,
+	EPP_RED_LOGIN,
+	EPP_RED_LOGOUT,
+	EPP_RED_CHECK,
+	EPP_RED_INFO,
+	EPP_RED_POLL,
+	EPP_RED_TRANSFER,
+	EPP_RED_CREATE,
+	EPP_RED_DELETE,
+	EPP_RED_RENEW,
+	EPP_RED_UPDATE
+}epp_red_command_type;
+
+/**
  * This routine initializes libxml's parser, hash table for command
  * recognition and parses xml schema, which is returned.
  *
@@ -90,7 +109,8 @@ epp_parse_command(epp_context *epp_ctx,
 		void *schema,
 		const char *request,
 		unsigned bytes,
-		epp_command_data **cdata);
+		epp_command_data **cdata,
+		epp_red_command_type *cmd_type);
 
 /**
  * This will cleanup xpath context and parsed document tree.

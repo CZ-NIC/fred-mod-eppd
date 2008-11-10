@@ -767,78 +767,362 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 	return 1;
 }
 
-
-static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *request, epp_command_data *cdata)
+static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *request, epp_command_data *cdata, epp_red_command_type cmdtype)
 {
+#define BASIC_PROPERTIES_COUNT 5
 
-	//ccReg_LogProperties *c_props;
+#define ALLOC_PROPERTIES(count)										\
+	c_props = epp_property_alloc(count + BASIC_PROPERTIES_COUNT);	\
+	if(c_props == NULL) {											\
+		return HTTP_INTERNAL_SERVER_ERROR;							\
+	}
+
+	char *cmd_name = NULL;
 	char errmsg[MAX_ERROR_MSG_LEN];
-/*
-	c_props = ccReg_LogProperties__alloc();
-	if (c_props == NULL) return HTTP_INTERNAL_SERVER_ERROR;
+	ccReg_LogProperties *c_props;
+	epps_create_contact *cc;
+	epps_create_domain *cd;
+	epps_create_nsset *cn;
+	epps_create_keyset *ck;
+	epps_delete *ed;
+	epps_renew *er;
+	epps_update_contact *uc;
+	epps_update_domain *ud;
+	epps_update_nsset *un;
+	epps_update_keyset *uk;
+	epps_transfer *et;
+	epps_login *el;
 
-	c_props->_maximum = c_props->_length = 4;
+	if(cdata->type == EPP_DUMMY) {
+		cmd_name = "dummy";
+		// ALLOC_PROPERTIES(0);
+		cmdtype = EPP_RED_UNKNOWN_CMD; // ugly way how to go into default in the following switch
+			// TODO some error
+	}
+
+	switch(cmdtype) {
+
+		case EPP_RED_LOGIN:
+			if (cdata->type == EPP_LOGIN){
+				cmd_name = "login";
+
+				el = cdata->data;
+				ALLOC_PROPERTIES(2);
+				epp_property_push(c_props, "client_id", el->clID);
+				// type epp_lang:
+				if (el->lang == LANG_CS) {
+					epp_property_push(c_props, "lang", "CZ");
+				} else if (el->lang == LANG_EN) {
+					epp_property_push(c_props, "lang", "EN");
+				} else {
+					epp_property_push_int(c_props, "lang", el->lang);
+				}
+				/*	char	*pw;     < Password.
+					char	*newPW;  < New password.
+					qhead	 objuri; < currently not used
+					qhead	 exturi; < currently not used
+					*/
+			} else {
+				return HTTP_OK;
+			}
+
+			break;
+		case EPP_RED_LOGOUT:
+			cmd_name = "logout";
+			ALLOC_PROPERTIES(0);
+			break;
+		case EPP_RED_CHECK:
+			cmd_name = "check";
+			ALLOC_PROPERTIES(0);
+			/* qhead	ids;  < IDs of checked objects.
+			qhead	avails;   < Booleans + reasons.
+			*/
+			break;
+		case EPP_RED_INFO:
+			cmd_name = "info";
+
+#define _QUOTE_STR(s) #s
+
+#define INFO_CMD_CASE(lower, upper, field)									\
+			case EPP_INFO_##upper:											\
+			{ 																\
+				epps_info_##lower *i = cdata->data;							\
+				ALLOC_PROPERTIES(1);										\
+				epp_property_push(c_props, _QUOTE_STR(field), i->field);	\
+				cmd_name = _QUOTE_STR(info_ ## lower);						\
+				break;														\
+			}
+
+#define LIST_CMD_CASE(lower, upper)						\
+			case EPP_LIST_##upper:						\
+				ALLOC_PROPERTIES(0);					\
+				cmd_name = _QUOTE_STR(list_ ## lower);	\
+				break;
 
 
-	cdata
+			switch(cdata->type) {
+				LIST_CMD_CASE(contact, CONTACT);
+				LIST_CMD_CASE(keyset, KEYSET);
+				LIST_CMD_CASE(nsset, NSSET);
+				LIST_CMD_CASE(domain, DOMAIN);
+				INFO_CMD_CASE(contact, CONTACT, id);
+				INFO_CMD_CASE(keyset, KEYSET,   id);
+				INFO_CMD_CASE(nsset, NSSET,     id);
+				INFO_CMD_CASE(domain, DOMAIN,   name);
+			}
 
-	EPP_DUMMY,
-		EPP_LOGIN,
-		EPP_LOGOUT,
-		EPP_CHECK_CONTACT,
-		EPP_CHECK_DOMAIN,
-		EPP_CHECK_NSSET,
-		EPP_CHECK_KEYSET,
-		EPP_INFO_CONTACT,
-		EPP_INFO_DOMAIN,
-		EPP_INFO_NSSET,
-		EPP_INFO_KEYSET,
-		EPP_LIST_CONTACT,
-		EPP_LIST_DOMAIN,
-		EPP_LIST_NSSET,
-		EPP_LIST_KEYSET,
-		EPP_POLL_REQ,
-		EPP_POLL_ACK,
-		EPP_CREATE_CONTACT,
-		EPP_CREATE_DOMAIN,
-		EPP_CREATE_NSSET,
-		EPP_CREATE_KEYSET,
-		EPP_DELETE_CONTACT,
-		EPP_DELETE_DOMAIN,
-		EPP_DELETE_NSSET,
-		EPP_DELETE_KEYSET,
-		EPP_UPDATE_CONTACT,
-		EPP_UPDATE_DOMAIN,
-		EPP_UPDATE_NSSET,
-		EPP_UPDATE_KEYSET,
-		EPP_TRANSFER_CONTACT,
-		EPP_TRANSFER_DOMAIN,
-		EPP_TRANSFER_NSSET,
-		EPP_TRANSFER_KEYSET,
-		EPP_RENEW_DOMAIN,
-		EPP_SENDAUTHINFO_CONTACT,
-		EPP_SENDAUTHINFO_DOMAIN,
-		EPP_SENDAUTHINFO_NSSET,
-		EPP_SENDAUTHINFO_KEYSET,
-		EPP_TEST_NSSET,
-		EPP_CREDITINFO,
-		EPP_INFO_LIST_CONTACTS,
-		EPP_INFO_LIST_DOMAINS,
-		EPP_INFO_LIST_NSSETS,
-		EPP_INFO_LIST_KEYSETS,
-		EPP_INFO_DOMAINS_BY_NSSET,
-		EPP_INFO_DOMAINS_BY_KEYSET,
-		EPP_INFO_DOMAINS_BY_CONTACT,
-		EPP_INFO_NSSETS_BY_CONTACT,
-		EPP_INFO_NSSETS_BY_NS,
-		EPP_INFO_KEYSETS_BY_CONTACT,
-		EPP_INFO_GET_RESULTS
-		*/
+			break;
+		case EPP_RED_POLL:
+			cmd_name = "poll";
+			if(cdata->type == EPP_POLL_ACK) {
+				epps_poll_ack *pa = cdata->data;
+				ALLOC_PROPERTIES(1);
+				epp_property_push(c_props, "msgID", pa->msgid);
+			} else {
+				ALLOC_PROPERTIES(0);
+			}
+
+			break;
+		case EPP_RED_CREATE:
+			// parse_create(pool, xpathCtx, cdata);
+			switch(cdata->type) {
+				case EPP_CREATE_CONTACT:
+					cmd_name = "create contact";
+					cc = cdata->data;
+
+					c_props = epp_property_alloc(9 + BASIC_PROPERTIES_COUNT);
+					if(c_props == NULL) {
+						return HTTP_INTERNAL_SERVER_ERROR;
+					}
+
+					epp_property_push(c_props, "id", cc->id);
+					// epp_postalInfo *pi;     **< Postal info.
+					epp_property_push(c_props, "voice", cc->voice);
+					epp_property_push(c_props, "fax", cc->fax);
+					epp_property_push(c_props, "email", cc->email);
+					// char	*authInfo;      < Authorization information.
+					// epp_discl discl;     < Disclose information section.
+					epp_property_push(c_props, "vat", cc->vat);
+					epp_property_push(c_props, "ident", cc->ident);
+					// TODO identtype epp_property_push(c_props, "identtype", cc->identtype);
+					epp_property_push(c_props, "notify_email", cc->notify_email);
+						// COMMON
+
+					epp_property_push(c_props, "creation_date", cc->crDate);
+					break;
+
+				case EPP_CREATE_DOMAIN:
+					cmd_name = "create domain";
+					cd = cdata->data;
+
+					c_props = epp_property_alloc(8 + BASIC_PROPERTIES_COUNT);
+					if(c_props == NULL) {
+						return HTTP_INTERNAL_SERVER_ERROR;
+					}
+
+					epp_property_push(c_props, "name", cd->name);
+					epp_property_push(c_props, "registrant", cd->registrant);
+					epp_property_push(c_props, "nsset", cd->nsset);
+					epp_property_push(c_props, "keyset", cd->keyset);
+					// qhead	 extensions;   /**< List of domain extensions.
+					// char	*authInfo;  < Authorization
+					// COMMON
+
+					// epp_property_push(c_props, "admin", cd->admin);
+					epp_property_push_int(c_props, "period", cd->period);
+					if (cd->unit == TIMEUNIT_MONTH) {
+						epp_property_push(c_props, "timeunit", "Month");
+					} else if(cd->unit == TIMEUNIT_YEAR) {
+						epp_property_push(c_props, "timeunit", "Year");
+					}
+					epp_property_push(c_props, "creation_date", cd->crDate);
+					epp_property_push(c_props, "expiration_date", cd->exDate);
+					break;
+
+				case EPP_CREATE_NSSET:
+					cmd_name = "create nsset";
+					cn = cdata->data;
+
+					c_props = epp_property_alloc(3 + BASIC_PROPERTIES_COUNT);
+					if(c_props == NULL) {
+						return HTTP_INTERNAL_SERVER_ERROR;
+					}
+
+					epp_property_push(c_props, "id", cn->id);
+					// char	*authInfo;     < Authorization information.
+					epp_property_push_int(c_props, "report_level", cn->level);
+									// COMMON
 
 
+					epp_property_push(c_props, "creation_date", cn->crDate);
+
+					break;
+				case EPP_CREATE_KEYSET:
+					cmd_name = "create keyset";
+					ck = cdata->data;
+
+					c_props = epp_property_alloc(2 + BASIC_PROPERTIES_COUNT);
+					if(c_props == NULL) {
+						return HTTP_INTERNAL_SERVER_ERROR;
+					}
+
+					epp_property_push(c_props, "id", ck->id);
+					// char 	*authInfo;	*< Authorization information.
+					// COMMON
+
+					epp_property_push(c_props, "creation_date", ck->crDate);
+					/*
+						qhead	ds;		/**< List of delegation signers
+						qhead   keys;		/**< List of DNS Key records
+						qhead 	tech;		/**< List of technical contacts for keyset
+					*/
+					break;
+				default:
+					c_props = epp_property_alloc(BASIC_PROPERTIES_COUNT);
+					if (c_props == NULL) {
+							return HTTP_INTERNAL_SERVER_ERROR;
+					}
+					break;
+			}
+
+			break;
+		case EPP_RED_DELETE:
+			// parse_delete(pool, xpathCtx, cdata);
+			cmd_name = "delete";
+			ed = cdata->data;
+
+			ALLOC_PROPERTIES(1);
+
+			epp_property_push(c_props, "id", ed->id);
+
+			break;
+		case EPP_RED_RENEW:
+			cmd_name = "renew";
+			er = cdata->data;
+
+			ALLOC_PROPERTIES(5);
+
+			epp_property_push(c_props, "name", er->name);
+			epp_property_push(c_props, "cur_exdate", er->curExDate);
+			epp_property_push_int(c_props, "renew_period", er->period);
+			if (er->unit == TIMEUNIT_MONTH) {
+				epp_property_push(c_props, "timeunit", "Month");
+			} else if(cd->unit == TIMEUNIT_YEAR) {
+				epp_property_push(c_props, "timeunit", "Year");
+			}
+			epp_property_push(c_props, "expiration_date", er->exDate);
+
+			break;
+		case EPP_RED_UPDATE:
+
+			switch(cdata->type) {
+				case EPP_UPDATE_CONTACT:
+					cmd_name = "update contact";
+
+					uc = cdata->data;
+					ALLOC_PROPERTIES(7);
+
+					epp_property_push(c_props, "id", uc->id);
+					// epp_postalInfo *pi;     **< Postal info.
+					epp_property_push(c_props, "voice", uc->voice);
+					epp_property_push(c_props, "fax", uc->fax);
+					epp_property_push(c_props, "email", uc->email);
+					// char	*authInfo;      /**< Authorization information. */
+					// epp_discl discl;        /**< Disclose information section. */
+					epp_property_push(c_props, "vat", uc->vat);
+					epp_property_push(c_props, "ident", uc->ident);
+					// TODO identtype epp_property_push(c_props, "identtype", uc->identtype);
+					epp_property_push(c_props, "notify_email", uc->notify_email);
+						// COMMON
+					break;
+
+				case EPP_UPDATE_DOMAIN:
+					cmd_name = "update domain";
+
+					ud = cdata->data;
+
+					ALLOC_PROPERTIES(4);
+
+					epp_property_push(c_props, "name", ud->name);
+					epp_property_push(c_props, "registrant", ud->registrant);
+					epp_property_push(c_props, "nsset", ud->nsset);
+					epp_property_push(c_props, "keyset", ud->keyset);
+					// qhead	 extensions;   /**< List of domain extensions.
+					// char	*authInfo;  < Authorizatio
+					// COMMONs
+
+
+//						qhead	 add_admin;    /**< Admin contacts to be added.
+//						qhead	 rem_admin;    /**< Admin contacts to be removed.
+//						qhead	 rem_tmpcontact; /**< Temporary contact used for migration.
+
+						break;
+
+				case EPP_UPDATE_NSSET:
+					cmd_name = "update nsset";
+					un = cdata->data;
+
+					ALLOC_PROPERTIES(2);
+
+					epp_property_push(c_props, "id", un->id);
+					// char	*authInfo;     < Authorization information.
+					epp_property_push_int(c_props, "report_level", un->level);
+					// COMMON
+
+//					qhead	 add_tech;     /**< Technical contacts to be added.
+//					qhead	 rem_tech;     /**< Technical contacts to be removed.
+//					qhead	 add_ns;       /**< Nameservers to be added.
+//					qhead	 rem_ns;       /**< Nameservers to be removed.
+
+				case EPP_UPDATE_KEYSET:
+					cmd_name = "update keyset";
+					uk = cdata->data;
+
+					ALLOC_PROPERTIES(1);
+
+					epp_property_push(c_props, "id", uk->id);
+					// char 	*authInfo;	*< Authorization information.
+					// COMMON
+
+					/** Update keyset parameters
+						qhead	 add_tech;     /**< Technical contacts to be added.
+						qhead	 rem_tech;     /**< Technical contacts to be removed.
+						qhead	 add_ds;       /**< Delegation signers to be added.
+						qhead	 rem_ds;       /**< Delegation signers to be removed.
+						qhead 	 add_dnskey;   /**< DNSKEYs to be added.
+						qhead 	 rem_dnskey;   /**< DNSKEYs to be removed.
+					*/
+					break;
+			}
+
+			break;
+		case EPP_RED_TRANSFER:
+			cmd_name = "transfer";
+			et = cdata->data;
+
+			ALLOC_PROPERTIES(1);
+
+			epp_property_push(c_props, "id", et->id);
+
+			break;
+
+		default:
+			ALLOC_PROPERTIES(0);
+			break;
+	}
+
+	epp_property_push (c_props, "command", cmd_name);
+	epp_property_push (c_props, "clTRID", cdata->clTRID);
+	epp_property_push (c_props, "svTRID", cdata->svTRID);
+	epp_property_push_int (c_props, "rc", cdata->rc);
+	epp_property_push (c_props, "msg", cdata->msg);
 
 	errmsg[0] = '\0';
-	epp_log_message(service, c->remote_ip, ccReg_LT_REQUEST, request, NULL, &errmsg);
+	epp_log_message(service, c->remote_ip, ccReg_LT_REQUEST, request, c_props, &errmsg);
+
+#undef _QUOTE_STR
+#undef INFO_CMD_CASE
+#undef BASIC_PROPERTIES_COUNT
 }
 
 /** Read and process EPP requests waiting in the queue */
@@ -851,12 +1135,15 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	parser_status	 pstat;  /* parser's return code */
 	apr_status_t	 status; /* used to store rc of apr functions */
 	epp_command_data *cdata; /* command data structure */
+	epp_red_command_type cmd_type; /* command type determined by the parser */
 	unsigned int	 bytes;  /* length of request */
 	char	*request;        /* raw request read from socket */
 	char	*response;       /* generated XML answer to client */
 	int	 retval;         /* return code of read_request */
 	unsigned int	 loginid;        /* login id of client's session */
 	service_Logger   *logger_service;  /* reference to the fred-logd service */
+
+
 #ifdef EPP_PERF
 	/*
 	 * array of timestamps for perf measurement:
@@ -867,6 +1154,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	 */
 	apr_time_t	times[4];
 #endif
+
 
 	/* initialize variables used inside the loop */
 	*loginid_save = loginid = 0; /* zero means that client isn't logged in*/
@@ -907,7 +1195,17 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		 * to fill cdata structure with data.
 		 */
 		pstat = epp_parse_command(epp_ctx, (loginid != 0), sc->schema,
-				request, bytes, &cdata);
+				request, bytes, &cdata, &cmd_type);
+
+		logger_service = get_corba_service(epp_ctx, sc->logger_object);
+		if (logger_service == NULL) {
+			epplog(epp_ctx, EPP_ERROR, "Could not obtain object reference "
+					"for alias '%s'.", sc->logger_object);
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+
+		log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type);
+
 #ifdef EPP_PERF
 		times[1] = apr_time_now(); /* after parsing */
 #endif
@@ -991,6 +1289,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 						"Request does not validate");
 			}
 
+			/*
+			 * TODO probably improper spot for logging
 			logger_service = get_corba_service(epp_ctx, sc->logger_object);
 			if (logger_service == NULL) {
 				epplog(epp_ctx, EPP_ERROR, "Could not obtain object reference "
@@ -999,6 +1299,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			}
 
 			log_epp_command(logger_service, epp_ctx->conn, request, cdata);
+			*/
 
 			/* call function from corba backend */
 			if (!call_corba(epp_ctx, EPPservice, cdata, pstat,
@@ -1182,7 +1483,7 @@ static int epp_process_connection(conn_rec *c)
 	apr_bucket_brigade *bb;
 	server_rec	*s = c->base_server;
 	eppd_server_conf *sc = (eppd_server_conf *)
-		ap_get_module_config(s->module_config, &eppd_module);
+	ap_get_module_config(s->module_config, &eppd_module);
 
 	/* do nothing if eppd is disabled */
 	if (!sc->epp_enabled)

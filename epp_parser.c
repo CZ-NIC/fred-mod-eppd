@@ -358,25 +358,6 @@ xpath_get_attr(void *pool,
  * @}
  */
 
-/**
- * Enumeration of all implemented EPP commands as defined in rfc.
- * It is REDuced form - without object suffix. And is used as hash
- * value in command hash table for fast recognition of commands.
- */
-typedef enum {
-	EPP_RED_UNKNOWN_CMD,
-	EPP_RED_LOGIN,
-	EPP_RED_LOGOUT,
-	EPP_RED_CHECK,
-	EPP_RED_INFO,
-	EPP_RED_POLL,
-	EPP_RED_TRANSFER,
-	EPP_RED_CREATE,
-	EPP_RED_DELETE,
-	EPP_RED_RENEW,
-	EPP_RED_UPDATE
-}epp_red_command_type;
-
 typedef struct cmd_hash_item_t cmd_hash_item;
 
 /**
@@ -1304,7 +1285,7 @@ parse_create_keyset(void *pool,
 
 	/* process multiple DNSKEY reocrds */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:dnskey", xpathCtx);
-	if (xpathObj == NULL) 
+	if (xpathObj == NULL)
 		goto error;
 
 	for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++) {
@@ -1912,7 +1893,7 @@ parse_update_keyset(void *pool,
 	CHK_XERR(xerr, error);
 
 	/* rem data */
-	root_node = xpath_chroot(xpathCtx, "keyset:rem", 0, &xerr); 
+	root_node = xpath_chroot(xpathCtx, "keyset:rem", 0, &xerr);
 
 	if (xerr == XERR_LIBXML)
 		goto error;
@@ -2698,6 +2679,7 @@ error:
  * @param pool       Memory pool.
  * @param loggedin   True if user is logged in.
  * @param cdata      Command data.
+ * @param cmd		 Command type - output parameter
  * @param xpathCtx   XPath context.
  * @return           Status.
  */
@@ -2705,9 +2687,9 @@ static parser_status
 parse_command(void *pool,
 		int loggedin,
 		epp_command_data *cdata,
+		epp_red_command_type *cmd,
 		xmlXPathContextPtr xpathCtx)
 {
-	epp_red_command_type	 cmd;
 	xmlXPathObjectPtr	 xpathObj;
 	xmlNodePtr	 node;
 	int	 xerr;
@@ -2726,7 +2708,7 @@ parse_command(void *pool,
 	assert(xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1);
 
 	/* command lookup through hash table .. huraaa :) */
-	cmd = cmd_hash_lookup( (char *)
+	*cmd = cmd_hash_lookup( (char *)
 			xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->name);
 	/* change relative root to command's node */
 	xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
@@ -2737,15 +2719,15 @@ parse_command(void *pool,
 	 * 	- the user is not logged in and attempts to issue a command
 	 * 	- the user is already logged in and issues another login
 	 */
-	if ((cmd != EPP_RED_LOGIN && !loggedin) ||
-		(cmd == EPP_RED_LOGIN && loggedin))
+	if ((*cmd != EPP_RED_LOGIN && !loggedin) ||
+		(*cmd == EPP_RED_LOGIN && loggedin))
 	{
 		cdata->type = EPP_DUMMY;
 		cdata->rc = 2002;
 		return PARSER_CMD_OTHER;
 	}
 
-	switch (cmd) {
+	switch (*cmd) {
 		case EPP_RED_LOGIN:
 			parse_login(pool, xpathCtx, cdata);
 			break;
@@ -3049,7 +3031,8 @@ epp_parse_command(epp_context *epp_ctx,
 		void *schema,
 		const char *request,
 		unsigned bytes,
-		epp_command_data **cdata_arg)
+		epp_command_data **cdata_arg,
+		epp_red_command_type *cmd_type)
 {
 	xmlXPathContextPtr	 xpathCtx;
 	xmlXPathObjectPtr	 xpathObj;
@@ -3058,6 +3041,7 @@ epp_parse_command(epp_context *epp_ctx,
 	epp_command_data	*cdata;
 	valid_status	 val_ret;
 	parser_status	 ret;
+
 	const char	*elemname;
 
 	/* check input parameters */
@@ -3172,7 +3156,7 @@ epp_parse_command(epp_context *epp_ctx,
 			/* It is a <command> element. */
 			if (!strcmp(elemname, "command")) {
 				ret = parse_command(epp_ctx->pool, loggedin,
-						cdata, xpathCtx);
+						cdata, cmd_type, xpathCtx);
 				break;
 			}
 			/* fall through if not matched */

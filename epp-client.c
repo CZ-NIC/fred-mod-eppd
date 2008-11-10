@@ -252,6 +252,43 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
 	return res;
 }
 
+ccReg_LogProperties * epp_property_alloc(int count)
+{
+	ccReg_LogProperties *ret;
+
+	ret = ccReg_LogProperties__alloc();
+	if (ret == NULL) {
+		return NULL;
+	}
+
+	ret->_maximum = count;
+	ret->_buffer = ccReg_LogProperties_allocbuf(ret->_maximum);
+	if (ret->_maximum != 0 && ret->_buffer == NULL) {
+		return NULL;
+	}
+	ret->_release = CORBA_TRUE;
+	ret->_length = 0;
+	return ret;
+}
+
+void epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value)
+{
+	if (value != NULL) {
+		c_props->_buffer[c_props->_length].name = wrap_str(name);
+		c_props->_buffer[c_props->_length].value = wrap_str(value);
+		c_props->_length++;
+	}
+}
+
+void epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value)
+{
+	char str[12];
+	snprintf(str, 12, "%i", value);
+	c_props->_buffer[c_props->_length].name = wrap_str(name);
+	c_props->_buffer[c_props->_length].value = wrap_str(str);
+	c_props->_length++;
+}
+
 int epp_log_message(service_Logger service,
 		const char *sourceIP,
 		ccReg_LogEventType event_type,

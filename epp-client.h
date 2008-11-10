@@ -24,6 +24,7 @@
 #define EPP_CLIENT_H
 
 #include "epp_common.h"
+#include "EPP.h"
 
 /** Possible return values of functions from corba module. */
 typedef enum {
@@ -142,6 +143,16 @@ epp_call_save_output_xml(epp_context *epp_ctx,
 void
 epp_call_end_session(epp_context *epp_ctx, service_EPP service,
 		unsigned int loginid);
+
+struct ccReg_LogProperties;
+
+/* functions for filling log properties */
+ccReg_LogProperties * epp_property_alloc(int count);
+
+void epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value);
+
+void epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value);
+
 
 #define MAX_ERROR_MSG_LEN	100
 

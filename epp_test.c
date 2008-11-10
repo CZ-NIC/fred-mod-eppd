@@ -410,6 +410,7 @@ int main(int argc, char *argv[])
 	int	ret;
 	CORBA_Environment ev[1];
 	epp_context	epp_ctx;
+	epp_red_command_type cmdtype;
 
 	/* parse parameters */
 	for (ar = 1; ar < argc; ar++) {
@@ -549,7 +550,7 @@ int main(int argc, char *argv[])
 
 		  /* API: process command */
 		  pstat = epp_parse_command(&epp_ctx, (loginid != 0), schema , text,
-				strlen(text), &cdata);
+				strlen(text), &cdata, &cmdtype);
 		}
 
 		if (pstat == PARSER_HELLO) {
