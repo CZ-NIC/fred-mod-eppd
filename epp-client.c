@@ -256,13 +256,15 @@ ccReg_LogProperties * epp_property_alloc(int count)
 {
 	ccReg_LogProperties *ret;
 
-	ret = ccReg_LogProperties__alloc();
+	// ret = ccReg_LogProperties__alloc();
+	ret = (ccReg_LogProperties*) malloc(sizeof(ccReg_LogProperties));
 	if (ret == NULL) {
 		return NULL;
 	}
 
 	ret->_maximum = count;
-	ret->_buffer = ccReg_LogProperties_allocbuf(ret->_maximum);
+	// ret->_buffer = ccReg_LogProperties_allocbuf(ret->_maximum);
+	ret->_buffer = (ccReg_LogProperty*)malloc(ret->_maximum * sizeof(ccReg_LogProperty));
 	if (ret->_maximum != 0 && ret->_buffer == NULL) {
 		return NULL;
 	}
