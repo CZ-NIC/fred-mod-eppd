@@ -252,44 +252,104 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
 	return res;
 }
 
-ccReg_LogProperties * epp_property_alloc(int count)
+/* returns NULL in case of an allocation error
+ * TODO: list_name size should be checked */
+
+
+ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead *list, char *list_name)
 {
+#define NUM_BEGIN 1
+	int  i;
+	char str[LOG_PROP_NAME_LENGTH], *value;
 	ccReg_LogProperties *ret;
 
-	// ret = ccReg_LogProperties__alloc();
-	ret = (ccReg_LogProperties*) malloc(sizeof(ccReg_LogProperties));
-	if (ret == NULL) {
-		return NULL;
+	i = NUM_BEGIN;
+	q_foreach(list) {
+		value = q_content(list);
+		str[0] = '\0';
+		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i", list_name, i);
+		if ((ret = epp_property_push(c_props, str, value)) == NULL) {
+			return NULL;
+		}
+		i++;
 	}
 
-	ret->_maximum = count;
-	// ret->_buffer = ccReg_LogProperties_allocbuf(ret->_maximum);
-	ret->_buffer = (ccReg_LogProperty*)malloc(ret->_maximum * sizeof(ccReg_LogProperty));
-	if (ret->_maximum != 0 && ret->_buffer == NULL) {
-		return NULL;
+	if(i == NUM_BEGIN) {
+		return c_props;
+	} else {
+		return ret;
 	}
-	ret->_release = CORBA_TRUE;
-	ret->_length = 0;
-	return ret;
+#undef NUM_BEGIN
 }
 
-void epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value)
+
+#define ALLOC_STEP 4
+
+ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value)
 {
+	if(c_props == NULL) {
+		c_props = ccReg_LogProperties__alloc();
+		if (c_props == NULL) {
+				return NULL;
+		}
+		c_props->_maximum = ALLOC_STEP;
+		c_props->_buffer = (ccReg_LogProperty*)malloc(c_props->_maximum * sizeof(ccReg_LogProperty));
+		if (c_props->_buffer == NULL) {
+				return NULL;
+		}
+		c_props->_length = 0;
+	}
+
 	if (value != NULL) {
+		if(c_props->_length >= c_props->_maximum) {
+			c_props->_maximum += ALLOC_STEP;
+			c_props->_buffer = (ccReg_LogProperty*)realloc(c_props->_buffer, c_props->_maximum*sizeof(ccReg_LogProperty));
+			if (c_props->_buffer == NULL) {
+				return NULL;
+			}
+		}
 		c_props->_buffer[c_props->_length].name = wrap_str(name);
 		c_props->_buffer[c_props->_length].value = wrap_str(value);
 		c_props->_length++;
 	}
+	return c_props;
 }
 
-void epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value)
+
+/* returns NULL in case of an allocation error */
+ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value)
 {
 	char str[12];
+
+	if(c_props == NULL) {
+		c_props = ccReg_LogProperties__alloc();
+		if (c_props == NULL) {
+				return NULL;
+		}
+		c_props->_maximum = ALLOC_STEP;
+		c_props->_buffer = (ccReg_LogProperty*)malloc(c_props->_maximum * sizeof(ccReg_LogProperty));
+		if (c_props->_buffer == NULL) {
+				return NULL;
+		}
+		c_props->_length = 0;
+	}
+
+
+	if(c_props->_length >= c_props->_maximum) {
+		c_props->_maximum += ALLOC_STEP;
+		c_props->_buffer = (ccReg_LogProperty*)realloc(c_props->_buffer, c_props->_maximum*sizeof(ccReg_LogProperty));
+		if (c_props->_buffer == NULL) {
+			return NULL;
+		}
+	}
 	snprintf(str, 12, "%i", value);
 	c_props->_buffer[c_props->_length].name = wrap_str(name);
 	c_props->_buffer[c_props->_length].value = wrap_str(str);
 	c_props->_length++;
+
+	return c_props;
 }
+#undef ALLOC_STEP
 
 int epp_log_message(service_Logger service,
 		const char *sourceIP,

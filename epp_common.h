@@ -36,6 +36,9 @@ typedef enum {
 	EPP_DEBUG     /**< Contents of requests and responses are logged. */
 }epp_loglevel;
 
+/** Maximum property name length for fred-logd logging facility */
+#define LOG_PROP_NAME_LENGTH 50
+
 /** EPP context is a group of variables used often together.
  *
  * The two items inside the struct are void pointers because we don't want
