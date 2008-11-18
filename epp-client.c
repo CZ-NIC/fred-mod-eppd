@@ -252,10 +252,19 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
 	return res;
 }
 
-/* returns NULL in case of an allocation error
- * TODO: list_name size should be checked */
 
-
+/**
+ * Add the content of a qhead linked list to the properties.
+ * The list should contain only strings
+ *
+ * @param c_props	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ * @param list		list of strings
+ * @param list_name	base name for the inserted properties
+ *
+ * @returns 		log entry properties or NULL in case of an allocation error
+ *
+ */
 ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead *list, char *list_name)
 {
 #define NUM_BEGIN 1
@@ -282,9 +291,17 @@ ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead
 #undef NUM_BEGIN
 }
 
-
 #define ALLOC_STEP 4
-
+/**
+ * Add a name, value pair to the properties. Allocate memory and the property list itself
+ * on demand
+ * @param c_props	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ * @param name		property name
+ * @param value		property value
+ *
+ * @returns			NULL in case of an allocation error, modified c_props otherwise
+ */
 ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value)
 {
 	if(c_props == NULL) {
@@ -315,8 +332,17 @@ ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char 
 	return c_props;
 }
 
-
-/* returns NULL in case of an allocation error */
+/**
+ * Add a name, value pair to the properties, where value is an integer
+ * Allocate buffer on demand.
+ *
+ * @param c_props	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ * @param name		property name
+ * @param value		property integer value
+ *
+ * @returns			NULL in case of an allocation error, modified c_props otherwise
+ */
 ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value)
 {
 	char str[12];

@@ -1107,36 +1107,6 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 			break;
 
 		case EPP_RED_INFO:
-			cmd_name = "info";
-
-	/*		----------------------
-#define _QUOTE_STR(s) #s
-
-#define INFO_CMD_CASE(lower, upper, field)									\
-			case EPP_INFO_##upper:											\
-			{ 																\
-				epps_info_##lower *i = cdata->data;							\
-				PUSH_PROPERTY(c_props, _QUOTE_STR(field), i->field);		\
-				cmd_name = _QUOTE_STR(info_ ## lower);						\
-				break;														\
-			}
-
-#define LIST_CMD_CASE(lower, upper)						\
-			case EPP_LIST_##upper:						\
-				cmd_name = _QUOTE_STR(list_ ## lower);	\
-				break;
-
-			switch(cdata->type) {
-				LIST_CMD_CASE(contact, CONTACT);
-				LIST_CMD_CASE(keyset, KEYSET);
-				LIST_CMD_CASE(nsset, NSSET);
-				LIST_CMD_CASE(domain, DOMAIN);
-				INFO_CMD_CASE(contact, CONTACT, id);
-				INFO_CMD_CASE(keyset, KEYSET,   id);
-				INFO_CMD_CASE(nsset, NSSET,     id);
-				INFO_CMD_CASE(domain, DOMAIN,   name);
-			}
-*/
 
 			switch(cdata->type) {
 				case EPP_LIST_CONTACT:
