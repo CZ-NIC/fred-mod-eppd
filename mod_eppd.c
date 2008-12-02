@@ -780,56 +780,51 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
  */
 ccReg_LogProperties *epp_property_push_ds(ccReg_LogProperties *c_props, qhead *list, char *list_name)
 {
-#define NUM_BEGIN 1
-	int  i;						/* index of a record */
 	char str[LOG_PROP_NAME_LENGTH]; /* property name */
 
 	epp_ds *value;				/* ds record data structure */
 	ccReg_LogProperties *ret;	/* return value in case the list is not empty	*/
 
-	i = NUM_BEGIN;
-	q_foreach(list) {
-		value = (epp_ds*)q_content(list);
+	if (q_length(*list) > 0) {
 
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "keytag");
-		if ((ret = epp_property_push_int(c_props, str, value->keytag)) == NULL) {
-			return NULL;
+		q_foreach(list) {
+			value = (epp_ds*)q_content(list);
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "keytag");
+			if ((ret = epp_property_push_int(c_props, str, value->keytag)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "alg");
+			if ((ret = epp_property_push_int(c_props, str, value->alg)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "digestType");
+			if ((ret = epp_property_push_int(c_props, str, value->digestType)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "digest");
+			if ((ret = epp_property_push(c_props, str, value->digest)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "maxSigLife");
+			if ((ret = epp_property_push_int(c_props, str, value->maxSigLife)) == NULL) {
+				return NULL;
+			}
 		}
-
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "alg");
-		if ((ret = epp_property_push_int(c_props, str, value->alg)) == NULL) {
-			return NULL;
-		}
-
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "digestType");
-		if ((ret = epp_property_push_int(c_props, str, value->digestType)) == NULL) {
-			return NULL;
-		}
-
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "digest");
-		if ((ret = epp_property_push(c_props, str, value->digest)) == NULL) {
-			return NULL;
-		}
-
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "maxSigLife");
-		if ((ret = epp_property_push_int(c_props, str, value->maxSigLife)) == NULL) {
-			return NULL;
-		}
-
-		i++;
-	}
-
-	if(i == NUM_BEGIN) {
-		return c_props;
-	} else {
 		return ret;
+	} else {
+		return c_props;
 	}
-#undef NUM_BEGIN
+
 }
 
 /**
@@ -845,38 +840,33 @@ ccReg_LogProperties *epp_property_push_ds(ccReg_LogProperties *c_props, qhead *l
  */
 ccReg_LogProperties *epp_property_push_nsset(ccReg_LogProperties *c_props, qhead *list, char *list_name)
 {
-#define NUM_BEGIN 1
-	int  i;						/* index of a record */
 	char str[LOG_PROP_NAME_LENGTH]; /* property name */
 
 	epp_ns *value;				/* ds record data structure */
 	ccReg_LogProperties *ret;	/* return value in case the list is not empty	*/
 
-	i = NUM_BEGIN;
-	q_foreach(list) {
-		value = (epp_ds*)q_content(list);
+	if (q_length(*list) > 0) {
 
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "name");
-		if ((ret = epp_property_push(c_props, str, value->name)) == NULL) {
-			return NULL;
+		q_foreach(list) {
+			value = (epp_ds*)q_content(list);
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "name");
+			if ((ret = epp_property_push(c_props, str, value->name)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "addr");
+			if ((ret = epp_property_push_qhead(c_props, &value->addr, str)) == NULL) {
+				return NULL;
+			}
 		}
-
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "addr");
-		if ((ret = epp_property_push_qhead(c_props, &value->addr, str)) == NULL) {
-			return NULL;
-		}
-
-		i++;
-	}
-
-	if(i == NUM_BEGIN) {
-		return c_props;
-	} else {
 		return ret;
+	} else {
+		return c_props;
 	}
-#undef NUM_BEGIN
+
 }
 
 /**
@@ -892,49 +882,45 @@ ccReg_LogProperties *epp_property_push_nsset(ccReg_LogProperties *c_props, qhead
  */
 ccReg_LogProperties *epp_property_push_dnskey(ccReg_LogProperties *c_props, qhead *list, char *list_name)
 {
-#define NUM_BEGIN 1
-	int  i;
 	char str[LOG_PROP_NAME_LENGTH];
 	epp_dnskey *value;
 	ccReg_LogProperties *ret;
 
-	i = NUM_BEGIN;
-	q_foreach(list) {
-		value = (epp_dnskey*)q_content(list);
+	if (q_length(*list) > 0) {
+		q_foreach(list) {
+			value = (epp_dnskey*)q_content(list);
 
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "flags");
-		if ((ret = epp_property_push_int(c_props, str, value->flags)) == NULL) {
-			return NULL;
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "flags");
+			if ((ret = epp_property_push_int(c_props, str, value->flags)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "protocol");
+			if ((ret = epp_property_push_int(c_props, str, value->protocol)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "alg");
+			if ((ret = epp_property_push_int(c_props, str, value->alg)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "publicKey");
+			if ((ret = epp_property_push(c_props, str, value->public_key)) == NULL) {
+				return NULL;
+			}
+
 		}
-
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "protocol");
-		if ((ret = epp_property_push_int(c_props, str, value->protocol)) == NULL) {
-			return NULL;
-		}
-
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "alg");
-		if ((ret = epp_property_push_int(c_props, str, value->alg)) == NULL) {
-			return NULL;
-		}
-
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i.%s", list_name, i, "public_key");
-		if ((ret = epp_property_push(c_props, str, value->public_key)) == NULL) {
-			return NULL;
-		}
-
-		i++;
-	}
-
-	if(i == NUM_BEGIN) {
-		return c_props;
-	} else {
 		return ret;
+
+	} else {
+		return c_props;
 	}
-#undef NUM_BEGIN
+
 }
 
 /**
@@ -959,9 +945,9 @@ ccReg_LogProperties *epp_log_postal_info(ccReg_LogProperties *p, epp_postalInfo 
 	if (p == NULL) return p;
 	p = epp_property_push(p, "pi.state", pi->sp);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.postal_code", pi->pc);
+	p = epp_property_push(p, "pi.postalCode", pi->pc);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.country_code", pi->cc);
+	p = epp_property_push(p, "pi.countryCode", pi->cc);
 	if (p == NULL) return p;
 
 	return p;
@@ -1068,7 +1054,8 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 		PUSH_PROPERTY_INT (c_props, "rc", cdata->rc);
 		PUSH_PROPERTY (c_props, "msg", cdata->msg);
 
-		epp_log_message(service, c->remote_ip, ccReg_LT_REQUEST, request, c_props, &errmsg);
+		// epp_log_message(service, c->remote_ip, request, c_props, &errmsg); TODO
+		epp_log_message(service, c->remote_ip, request, c_props, &errmsg);
 
 		return;
 	}
@@ -1080,7 +1067,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 
 				el = cdata->data;
 
-				PUSH_PROPERTY(c_props, "client_id", el->clID);
+				PUSH_PROPERTY(c_props, "clientId", el->clID);
 				// type epp_lang:
 				if (el->lang == LANG_CS) {
 					PUSH_PROPERTY(c_props, "lang", "CZ");
@@ -1090,7 +1077,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_PROPERTY_INT(c_props, "lang", el->lang);
 				}
 				PUSH_PROPERTY(c_props, "password", el->pw);
-				PUSH_PROPERTY(c_props, "new password", el->newPW);
+				PUSH_PROPERTY(c_props, "newPassword", el->newPW);
 			} else {
 				return HTTP_OK;
 			}
@@ -1103,23 +1090,23 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 		case EPP_RED_CHECK:
 			cmd_name = "check";
 			ec = cdata->data;
-			PUSH_QHEAD(c_props, &ec->ids, "check_id");
+			PUSH_QHEAD(c_props, &ec->ids, "checkId");
 			break;
 
 		case EPP_RED_INFO:
 
 			switch(cdata->type) {
 				case EPP_LIST_CONTACT:
-					cmd_name = "list_contact";
+					cmd_name = "listContact";
 					break;
 				case EPP_LIST_KEYSET:
-					cmd_name = "list_keyset";
+					cmd_name = "listKeyset";
 					break;
 				case EPP_LIST_NSSET:
-					cmd_name = "list_nsset";
+					cmd_name = "listNsset";
 					break;
 				case EPP_LIST_DOMAIN:
-					cmd_name = "list_domain";
+					cmd_name = "listDomain";
 					break;
 
 				case EPP_INFO_CONTACT: {
@@ -1128,7 +1115,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					if (c_props == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
-					cmd_name = "info_contact";
+					cmd_name = "infoContact";
 					break;
 				}
 				case EPP_INFO_KEYSET: {
@@ -1137,7 +1124,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					if (c_props == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
-					cmd_name = "info_keyset";
+					cmd_name = "infoKeyset";
 					break;
 				}
 				case EPP_INFO_NSSET: {
@@ -1146,7 +1133,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					if (c_props == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
-					cmd_name = "info_nsset";
+					cmd_name = "infoNsset";
 					break;
 				}
 				case EPP_INFO_DOMAIN: {
@@ -1155,7 +1142,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					if (c_props == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
-					cmd_name = "info_domain";
+					cmd_name = "infoDomain";
 					break;
 				}
 			}
@@ -1165,14 +1152,14 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 			cmd_name = "poll";
 			if(cdata->type == EPP_POLL_ACK) {
 				epps_poll_ack *pa = cdata->data;
-				PUSH_PROPERTY(c_props, "msgID", pa->msgid);
+				PUSH_PROPERTY(c_props, "msgId", pa->msgid);
 			}
 			break;
 
 		case EPP_RED_CREATE:
 			switch(cdata->type) {
 				case EPP_CREATE_CONTACT:
-					cmd_name = "create contact";
+					cmd_name = "createContact";
 					cc = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", cc->id);
@@ -1202,14 +1189,14 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 						case ident_ICO:     PUSH_PROPERTY(c_props, "identtype", "ICO"); break;
 						case ident_BIRTHDAY: PUSH_PROPERTY(c_props, "identtype", "birthdate"); break;
 					}
-					PUSH_PROPERTY(c_props, "notify_email", cc->notify_email);
+					PUSH_PROPERTY(c_props, "notifyEmail", cc->notify_email);
 						// COMMON
 
-					PUSH_PROPERTY(c_props, "creation_date", cc->crDate);
+					PUSH_PROPERTY(c_props, "creationDate", cc->crDate);
 					break;
 
 				case EPP_CREATE_DOMAIN:
-					cmd_name = "create domain";
+					cmd_name = "createDomain";
 					cd = cdata->data;
 
 					PUSH_PROPERTY(c_props, "name", cd->name);
@@ -1227,35 +1214,35 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					} else if(cd->unit == TIMEUNIT_YEAR) {
 						PUSH_PROPERTY(c_props, "timeunit", "Year");
 					}
-					PUSH_PROPERTY(c_props, "creation_date", cd->crDate);
-					PUSH_PROPERTY(c_props, "expiration_date", cd->exDate);
+					PUSH_PROPERTY(c_props, "creationDate", cd->crDate);
+					PUSH_PROPERTY(c_props, "expirationDate", cd->exDate);
 					break;
 
 				case EPP_CREATE_NSSET:
-					cmd_name = "create nsset";
+					cmd_name = "createNsset";
 					cn = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", cn->id);
 					PUSH_PROPERTY(c_props, "authInfo", cn->authInfo);
-					PUSH_PROPERTY_INT(c_props, "report_level", cn->level);
+					PUSH_PROPERTY_INT(c_props, "reportLevel", cn->level);
 									// COMMON
 					if((c_props = epp_property_push_nsset(c_props, &cn->ns, "ns")) == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
-					PUSH_QHEAD(c_props, &cn->tech, "tech_c");
+					PUSH_QHEAD(c_props, &cn->tech, "techC");
 
-					PUSH_PROPERTY(c_props, "creation_date", cn->crDate);
+					PUSH_PROPERTY(c_props, "creationDate", cn->crDate);
 
 					break;
 				case EPP_CREATE_KEYSET:
-					cmd_name = "create keyset";
+					cmd_name = "createKeyset";
 					ck = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", ck->id);
 					PUSH_PROPERTY(c_props, "authInfo", ck->authInfo);
 					// COMMON
 
-					PUSH_PROPERTY(c_props, "creation_date", ck->crDate);
+					PUSH_PROPERTY(c_props, "creationDate", ck->crDate);
 
 					if((c_props=epp_property_push_ds(c_props, &ck->ds, "ds")) == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
@@ -1264,7 +1251,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
 
-					PUSH_QHEAD(c_props, &ck->tech, "tech_contact");
+					PUSH_QHEAD(c_props, &ck->tech, "techContact");
 					break;
 				default:
 					break;
@@ -1283,21 +1270,21 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 			er = cdata->data;
 
 			PUSH_PROPERTY(c_props, "name", er->name);
-			PUSH_PROPERTY(c_props, "cur_exdate", er->curExDate);
-			PUSH_PROPERTY_INT(c_props, "renew_period", er->period);
+			PUSH_PROPERTY(c_props, "curExDate", er->curExDate);
+			PUSH_PROPERTY_INT(c_props, "renewPeriod", er->period);
 			if (er->unit == TIMEUNIT_MONTH) {
 				PUSH_PROPERTY(c_props, "timeunit", "Month");
 			} else if(cd->unit == TIMEUNIT_YEAR) {
 				PUSH_PROPERTY(c_props, "timeunit", "Year");
 			}
-			PUSH_PROPERTY(c_props, "expiration_date", er->exDate);
+			PUSH_PROPERTY(c_props, "expirationDate", er->exDate);
 			break;
 
 		case EPP_RED_UPDATE:
 
 			switch(cdata->type) {
 				case EPP_UPDATE_CONTACT:
-					cmd_name = "update contact";
+					cmd_name = "updateContact";
 
 					uc = cdata->data;
 
@@ -1320,20 +1307,20 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_PROPERTY(c_props, "ident", uc->ident);
 
 					switch(uc->identtype) {
-						case ident_UNKNOWN: PUSH_PROPERTY(c_props, "identtype", "unknown"); break;
-						case ident_OP:      PUSH_PROPERTY(c_props, "identtype", "ID card"); break;
-						case ident_PASSPORT: PUSH_PROPERTY(c_props, "identtype", "passport"); break;
-						case ident_MPSV:    PUSH_PROPERTY(c_props, "identtype", "number assinged by ministry"); break;
-						case ident_ICO:     PUSH_PROPERTY(c_props, "identtype", "ICO"); break;
-						case ident_BIRTHDAY: PUSH_PROPERTY(c_props, "identtype", "birthdate"); break;
+						case ident_UNKNOWN: PUSH_PROPERTY(c_props, "identType", "unknown"); break;
+						case ident_OP:      PUSH_PROPERTY(c_props, "identType", "ID card"); break;
+						case ident_PASSPORT: PUSH_PROPERTY(c_props, "identType", "passport"); break;
+						case ident_MPSV:    PUSH_PROPERTY(c_props, "identType", "number assinged by ministry"); break;
+						case ident_ICO:     PUSH_PROPERTY(c_props, "identType", "ICO"); break;
+						case ident_BIRTHDAY: PUSH_PROPERTY(c_props, "identType", "birthdate"); break;
 					}
 
-					PUSH_PROPERTY(c_props, "notify_email", uc->notify_email);
+					PUSH_PROPERTY(c_props, "notifyEmail", uc->notify_email);
 						// COMMON
 					break;
 
 				case EPP_UPDATE_DOMAIN:
-					cmd_name = "update domain";
+					cmd_name = "updateDomain";
 
 					ud = cdata->data;
 
@@ -1345,51 +1332,51 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_PROPERTY(c_props, "authInfo", ud->authInfo);
 					// COMMONs
 
-					PUSH_QHEAD(c_props, &ud->add_admin, "add_admin");
-					PUSH_QHEAD(c_props, &ud->rem_admin, "rem_admin");
-					PUSH_QHEAD(c_props, &ud->rem_tmpcontact, "rem_tmpcontact");
+					PUSH_QHEAD(c_props, &ud->add_admin, "addAdmin");
+					PUSH_QHEAD(c_props, &ud->rem_admin, "remAdmin");
+					PUSH_QHEAD(c_props, &ud->rem_tmpcontact, "remTmpcontact");
 
 					break;
 
 				case EPP_UPDATE_NSSET:
-					cmd_name = "update nsset";
+					cmd_name = "updateNsset";
 					un = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", un->id);
 					PUSH_PROPERTY(c_props, "authInfo", un->authInfo);
-					PUSH_PROPERTY_INT(c_props, "report_level", un->level);
+					PUSH_PROPERTY_INT(c_props, "reportLevel", un->level);
 					// COMMON
 
-					PUSH_QHEAD(c_props, &un->add_tech, "add_tech_c");
-					PUSH_QHEAD(c_props, &un->rem_tech, "rem_tech_c");
-					if((c_props = epp_property_push_nsset(c_props, &un->add_ns, "add_ns")) == NULL) {
+					PUSH_QHEAD(c_props, &un->add_tech, "addTechC");
+					PUSH_QHEAD(c_props, &un->rem_tech, "remTechC");
+					if((c_props = epp_property_push_nsset(c_props, &un->add_ns, "addNs")) == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
-					PUSH_QHEAD(c_props, &un->rem_ns, "rem_ns");
+					PUSH_QHEAD(c_props, &un->rem_ns, "remNs");
 
 					break;
 
 				case EPP_UPDATE_KEYSET:
-					cmd_name = "update keyset";
+					cmd_name = "updateKeyset";
 					uk = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", uk->id);
 					PUSH_PROPERTY(c_props, "authInfo", uk->authInfo);
 					// COMMON
 
-					PUSH_QHEAD(c_props, &uk->add_tech, "add_tech");
-					PUSH_QHEAD(c_props, &uk->rem_tech, "rem_tech");
-					if((c_props = epp_property_push_ds(c_props, &uk->add_ds, "add_ds")) == NULL) {
+					PUSH_QHEAD(c_props, &uk->add_tech, "addTech");
+					PUSH_QHEAD(c_props, &uk->rem_tech, "remTech");
+					if((c_props = epp_property_push_ds(c_props, &uk->add_ds, "addDs")) == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
-					if((c_props = epp_property_push_ds(c_props, &uk->rem_ds, "rem_ds")) == NULL) {
+					if((c_props = epp_property_push_ds(c_props, &uk->rem_ds, "remDs")) == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
 
-					if((c_props = epp_property_push_dnskey(c_props, &uk->add_dnskey, "add_key")) == NULL) {
+					if((c_props = epp_property_push_dnskey(c_props, &uk->add_dnskey, "addKeys")) == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
-					if((c_props = epp_property_push_dnskey(c_props, &uk->rem_dnskey, "rem_key")) == NULL) {
+					if((c_props = epp_property_push_dnskey(c_props, &uk->rem_dnskey, "remKeys")) == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
 					}
 
@@ -1414,7 +1401,8 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 	PUSH_PROPERTY_INT (c_props, "rc", cdata->rc);
 	PUSH_PROPERTY (c_props, "msg", cdata->msg);
 
-	epp_log_message(service, c->remote_ip, ccReg_LT_REQUEST, request, c_props, &errmsg);
+	epp_log_message(service, c->remote_ip, request, c_props, &errmsg);
+
 
 #undef _QUOTE_STR
 #undef INFO_CMD_CASE

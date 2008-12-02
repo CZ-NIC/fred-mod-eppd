@@ -54,6 +54,9 @@
 /** Number of microseconds between retries when connection failure occurs. */
 #define RETR_SLEEP  100000
 
+/** Maximal size of property value in database */
+#define DB_FIELD_SIZE 2000
+
 /** True if exception is COMM_FAILURE, which is used in retry loop. */
 #define IS_NOT_COMM_FAILURE_EXCEPTION(_ev)                             \
 	(strcmp((_ev)->_id, "IDL:omg.org/CORBA/COMM_FAILURE:1.0"))
@@ -265,30 +268,65 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
  * @returns 		log entry properties or NULL in case of an allocation error
  *
  */
+
 ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead *list, char *list_name)
 {
-#define NUM_BEGIN 1
-	int  i;
-	char str[LOG_PROP_NAME_LENGTH], *value;
+	int  len, size, tooshort;
+	char str[DB_FIELD_SIZE+1], *value;
 	ccReg_LogProperties *ret;
+	qitem *iter;
 
-	i = NUM_BEGIN;
-	q_foreach(list) {
-		value = q_content(list);
-		str[0] = '\0';
-		snprintf(str, LOG_PROP_NAME_LENGTH, "%s%i", list_name, i);
-		if ((ret = epp_property_push(c_props, str, value)) == NULL) {
+	tooshort = 0;
+	if (list->count > 0) {
+		len = 0;
+		str[DB_FIELD_SIZE] = '\0';
+
+		for(iter = list->body; iter->next != NULL; iter=iter->next) {
+			value = iter->content;
+
+			size = DB_FIELD_SIZE-len;
+			if (size < 0) {
+				tooshort = 1;
+				break;
+			}
+			strncat(str, value, size);
+
+			len += strlen(value);
+
+			size = DB_FIELD_SIZE-len;
+			if (size < 0) {
+				tooshort = 1;
+				break;
+			}
+			strncat(str, ", ", size);
+			len += 2;
+		}
+
+		if(tooshort) {
+			// size value should be still present
+
+		} else {
+		// insert the last element (without separator)
+			value = iter->content;
+
+			size = DB_FIELD_SIZE-len;
+			if(size<0) {
+				tooshort = 1;
+			} else {
+				strncat(str, value, size);
+				len += strlen(value);
+			}
+		}
+
+		if ((ret = epp_property_push(c_props, list_name, str)) == NULL) {
 			return NULL;
 		}
-		i++;
+
+		return ret;
+	} else {
+		return c_props;
 	}
 
-	if(i == NUM_BEGIN) {
-		return c_props;
-	} else {
-		return ret;
-	}
-#undef NUM_BEGIN
 }
 
 #define ALLOC_STEP 4
@@ -327,6 +365,7 @@ ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char 
 		}
 		c_props->_buffer[c_props->_length].name = wrap_str(name);
 		c_props->_buffer[c_props->_length].value = wrap_str(value);
+		c_props->_buffer[c_props->_length].output = CORBA_FALSE;   // TODO true if it's output
 		c_props->_length++;
 	}
 	return c_props;
@@ -371,6 +410,7 @@ ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const c
 	snprintf(str, 12, "%i", value);
 	c_props->_buffer[c_props->_length].name = wrap_str(name);
 	c_props->_buffer[c_props->_length].value = wrap_str(str);
+	c_props->_buffer[c_props->_length].output = CORBA_FALSE;   // TODO true if it's output
 	c_props->_length++;
 
 	return c_props;
@@ -379,7 +419,6 @@ ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const c
 
 int epp_log_message(service_Logger service,
 		const char *sourceIP,
-		ccReg_LogEventType event_type,
 		const char *content,
 		ccReg_LogProperties *properties,
 		char *errmsg)
@@ -388,6 +427,8 @@ int epp_log_message(service_Logger service,
 	int	 retr;  /* retry counter */
 	int	 ret;
 	int 	 success;
+	// TODO
+	unsigned long long eid;
 
 	if(properties == NULL) {
 		properties = ccReg_LogProperties__alloc();
@@ -402,7 +443,14 @@ int epp_log_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		success = ccReg_Log_message((ccReg_Log) service, sourceIP,  ccReg_LC_EPP, event_type, content, properties, ev);
+		eid = ccReg_Log_new_event((ccReg_Log) service, sourceIP,  ccReg_LC_EPP, content, properties, ev);
+
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+
+		usleep(RETR_SLEEP);
+
+		success = ccReg_Log_update_event_close((ccReg_Log) service, eid, NULL, NULL, ev);
 
 		/* if COMM_FAILURE is not raised then quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
