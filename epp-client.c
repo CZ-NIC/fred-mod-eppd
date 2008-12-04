@@ -117,6 +117,9 @@ static int error_translator[][2] =
   {-1, -1}
 };
 
+/** ID of a new entry in the logging database */
+static ccReg_TID log_act_entry_id;
+
 /**
  * Translate error code from IDL code to mod_eppd's code.
  *
@@ -264,12 +267,13 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
  * 					case a new data structure is allocated and returned)
  * @param list		list of strings
  * @param list_name	base name for the inserted properties
+ * @param output 	whether the properties are related to output
  *
  * @returns 		log entry properties or NULL in case of an allocation error
  *
  */
 
-ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead *list, char *list_name)
+ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead *list, char *list_name, CORBA_boolean output)
 {
 	int  len, size, tooshort;
 	char str[DB_FIELD_SIZE+1], *value;
@@ -318,7 +322,7 @@ ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead
 			}
 		}
 
-		if ((ret = epp_property_push(c_props, list_name, str)) == NULL) {
+		if ((ret = epp_property_push(c_props, list_name, str, output)) == NULL) {
 			return NULL;
 		}
 
@@ -337,10 +341,11 @@ ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead
  * 					case a new data structure is allocated and returned)
  * @param name		property name
  * @param value		property value
+ * @param output	whether the property is related to output
  *
  * @returns			NULL in case of an allocation error, modified c_props otherwise
  */
-ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value)
+ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value, CORBA_boolean output)
 {
 	if(c_props == NULL) {
 		c_props = ccReg_LogProperties__alloc();
@@ -365,7 +370,7 @@ ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char 
 		}
 		c_props->_buffer[c_props->_length].name = wrap_str(name);
 		c_props->_buffer[c_props->_length].value = wrap_str(value);
-		c_props->_buffer[c_props->_length].output = CORBA_FALSE;   // TODO true if it's output
+		c_props->_buffer[c_props->_length].output = output;   // TODO true if it's output
 		c_props->_length++;
 	}
 	return c_props;
@@ -382,7 +387,7 @@ ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char 
  *
  * @returns			NULL in case of an allocation error, modified c_props otherwise
  */
-ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value)
+ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value, CORBA_boolean output)
 {
 	char str[12];
 
@@ -410,14 +415,14 @@ ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const c
 	snprintf(str, 12, "%i", value);
 	c_props->_buffer[c_props->_length].name = wrap_str(name);
 	c_props->_buffer[c_props->_length].value = wrap_str(str);
-	c_props->_buffer[c_props->_length].output = CORBA_FALSE;   // TODO true if it's output
+	c_props->_buffer[c_props->_length].output = output;   // TODO true if it's output
 	c_props->_length++;
 
 	return c_props;
 }
 #undef ALLOC_STEP
 
-int epp_log_message(service_Logger service,
+int epp_log_new_message(service_Logger service,
 		const char *sourceIP,
 		const char *content,
 		ccReg_LogProperties *properties,
@@ -427,8 +432,6 @@ int epp_log_message(service_Logger service,
 	int	 retr;  /* retry counter */
 	int	 ret;
 	int 	 success;
-	// TODO
-	unsigned long long eid;
 
 	if(properties == NULL) {
 		properties = ccReg_LogProperties__alloc();
@@ -443,14 +446,50 @@ int epp_log_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		eid = ccReg_Log_new_event((ccReg_Log) service, sourceIP,  ccReg_LC_EPP, content, properties, ev);
+		log_act_entry_id = ccReg_Log_new_event((ccReg_Log) service, sourceIP,  ccReg_LC_EPP, content, properties, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 
 		usleep(RETR_SLEEP);
+	}
 
-		success = ccReg_Log_update_event_close((ccReg_Log) service, eid, NULL, NULL, ev);
+	if (raised_exception(ev)) {
+		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
+		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
+		CORBA_exception_free(ev);
+		return CORBA_ERROR;
+	}
+	CORBA_exception_free(ev);
+
+	ret = CORBA_OK;
+	return ret;
+}
+
+int epp_log_close_message(service_Logger service,
+		const char *content,
+		ccReg_LogProperties *properties,
+		char *errmsg)
+{
+	CORBA_Environment	 ev[1];
+	int	 retr;  /* retry counter */
+	int	 ret;
+	CORBA_boolean 		success;
+
+	if(properties == NULL) {
+		properties = ccReg_LogProperties__alloc();
+		if(properties == NULL) return CORBA_INT_ERROR;
+
+		properties->_maximum = properties->_length = 0;
+	}
+
+	/* retry loop */
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev); /* valid first time */
+		CORBA_exception_init(ev);
+
+		/* call logger method */
+		success = ccReg_Log_update_event_close((ccReg_Log) service, log_act_entry_id, content, properties, ev);
 
 		/* if COMM_FAILURE is not raised then quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
@@ -466,7 +505,11 @@ int epp_log_message(service_Logger service,
 	}
 	CORBA_exception_free(ev);
 
-	ret = CORBA_OK;
+	if(success == CORBA_FALSE) {
+		ret = CORBA_REMOTE_ERROR;
+	} else {
+		ret = CORBA_OK;
+	}
 	return ret;
 }
 

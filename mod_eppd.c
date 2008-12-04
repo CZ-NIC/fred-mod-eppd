@@ -127,6 +127,9 @@ module AP_MODULE_DECLARE_DATA eppd_module;
  */
 static void *get_corba_service(epp_context *epp_ctx, char *name);
 
+static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c,
+		int stat, qhead *valerr, const char *response, const epp_command_data *cdata);
+
 /**
  * SSL variable lookup function pointer used for client's PEM encoded
  * certificate retrieval.
@@ -689,8 +692,10 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service,
 /**
  * Function generates XML response.
  *
+ * @param logger_service
+ * 					Logger CORBA object reference.
  * @param epp_ctx   EPP context.
- * @param service   CORBA object reference.
+ * @param service   EPP CORBA object reference.
  * @param cdata     Command data.
  * @param validate  Validate responses.
  * @param schema    Parsed XML schema.
@@ -698,11 +703,10 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service,
  * @param response  On return holds response if ret code is 1.
  * @return          0 in case of internal error, 1 if ok.
  */
-static int gen_response(epp_context *epp_ctx, service_EPP *service,
+static int gen_response(service_Logger *logger_service, epp_context *epp_ctx, service_EPP *service,
 		epp_command_data *cdata, int validate, void *schema,
 		epp_lang lang, char **response)
 {
-
 	qhead	 valerr; /* encountered errors when validating response */
 	gen_status	gstat; /* generator's return code */
 
@@ -761,6 +765,9 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 					"generator module");
 			break;
 	}
+
+	log_epp_response(logger_service, epp_ctx->conn, gstat, &valerr, *response, cdata);
+
 	/* XXX ugly hack */
 	if (strcmp(cdata->svTRID, "DUMMY-SVTRID"))
 		epp_call_save_output_xml(epp_ctx, service, cdata, *response);
@@ -792,33 +799,77 @@ ccReg_LogProperties *epp_property_push_ds(ccReg_LogProperties *c_props, qhead *l
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "keytag");
-			if ((ret = epp_property_push_int(c_props, str, value->keytag)) == NULL) {
+			if ((ret = epp_property_push_int(c_props, str, value->keytag, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "alg");
-			if ((ret = epp_property_push_int(c_props, str, value->alg)) == NULL) {
+			if ((ret = epp_property_push_int(c_props, str, value->alg, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "digestType");
-			if ((ret = epp_property_push_int(c_props, str, value->digestType)) == NULL) {
+			if ((ret = epp_property_push_int(c_props, str, value->digestType, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "digest");
-			if ((ret = epp_property_push(c_props, str, value->digest)) == NULL) {
+			if ((ret = epp_property_push(c_props, str, value->digest, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "maxSigLife");
-			if ((ret = epp_property_push_int(c_props, str, value->maxSigLife)) == NULL) {
+			if ((ret = epp_property_push_int(c_props, str, value->maxSigLife, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
+		}
+		return ret;
+	} else {
+		return c_props;
+	}
+
+}
+
+/**
+ * ############################
+ * Add qhead with xml errors to properties
+ *
+ * @param c_props	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ * @param list		list of xml elements and error messages
+ * @param list_name	base name for the inserted properties
+ *
+ * @returns 		log entry properties or NULL in case of an allocation error
+ *
+ */
+ccReg_LogProperties *epp_property_push_valerr(ccReg_LogProperties *c_props, qhead *list, char *list_name)
+{
+	char str[LOG_PROP_NAME_LENGTH]; /* property name */
+
+	epp_error *value;			/* ds record data structure */
+	ccReg_LogProperties *ret;	/* return value in case the list is not empty	*/
+
+	if (q_length(*list) > 0) {
+
+		q_foreach(list) {
+			value = (epp_error*)q_content(list);
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "element");
+			if ((ret = epp_property_push(c_props, str, value->value, CORBA_TRUE)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "reason");
+			if ((ret = epp_property_push(c_props, str, value->reason, CORBA_TRUE)) == NULL) {
+				return NULL;
+			}
+
 		}
 		return ret;
 	} else {
@@ -852,13 +903,13 @@ ccReg_LogProperties *epp_property_push_nsset(ccReg_LogProperties *c_props, qhead
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "name");
-			if ((ret = epp_property_push(c_props, str, value->name)) == NULL) {
+			if ((ret = epp_property_push(c_props, str, value->name, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "addr");
-			if ((ret = epp_property_push_qhead(c_props, &value->addr, str)) == NULL) {
+			if ((ret = epp_property_push_qhead(c_props, &value->addr, str, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 		}
@@ -892,25 +943,25 @@ ccReg_LogProperties *epp_property_push_dnskey(ccReg_LogProperties *c_props, qhea
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "flags");
-			if ((ret = epp_property_push_int(c_props, str, value->flags)) == NULL) {
+			if ((ret = epp_property_push_int(c_props, str, value->flags, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "protocol");
-			if ((ret = epp_property_push_int(c_props, str, value->protocol)) == NULL) {
+			if ((ret = epp_property_push_int(c_props, str, value->protocol, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "alg");
-			if ((ret = epp_property_push_int(c_props, str, value->alg)) == NULL) {
+			if ((ret = epp_property_push_int(c_props, str, value->alg, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "publicKey");
-			if ((ret = epp_property_push(c_props, str, value->public_key)) == NULL) {
+			if ((ret = epp_property_push(c_props, str, value->public_key, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
@@ -935,19 +986,19 @@ ccReg_LogProperties *epp_log_postal_info(ccReg_LogProperties *p, epp_postalInfo 
 {
 	if(pi == NULL) return p;
 
-	p = epp_property_push(p, "pi.name", pi->name);
+	p = epp_property_push(p, "pi.name", pi->name, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.organization", pi->org);
+	p = epp_property_push(p, "pi.organization", pi->org, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push_qhead(p, &pi->streets, "pi.street");
+	p = epp_property_push_qhead(p, &pi->streets, "pi.street", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.city", pi->city);
+	p = epp_property_push(p, "pi.city", pi->city, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.state", pi->sp);
+	p = epp_property_push(p, "pi.state", pi->sp, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.postalCode", pi->pc);
+	p = epp_property_push(p, "pi.postalCode", pi->pc, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.countryCode", pi->cc);
+	p = epp_property_push(p, "pi.countryCode", pi->cc, CORBA_FALSE);
 	if (p == NULL) return p;
 
 	return p;
@@ -964,32 +1015,32 @@ ccReg_LogProperties *epp_log_postal_info(ccReg_LogProperties *p, epp_postalInfo 
 ccReg_LogProperties *epp_log_disclose_info(ccReg_LogProperties *p, epp_discl *ed)
 {
 	if(ed->flag == 1) {
-		p = epp_property_push(p, "discl.policy", "private");
+		p = epp_property_push(p, "discl.policy", "private", CORBA_FALSE);
 	} else if(ed->flag == 0) {
-		p = epp_property_push(p, "discl.policy", "public");
+		p = epp_property_push(p, "discl.policy", "public", CORBA_FALSE);
 	} else {
-		p = epp_property_push(p, "discl.policy", "no exceptions");
+		p = epp_property_push(p, "discl.policy", "no exceptions", CORBA_FALSE);
 	}
 
 	if (p == NULL) return p;
 
-	p = epp_property_push(p, "discl.name", ed->name ? "true" : "false");
+	p = epp_property_push(p, "discl.name", ed->name ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.org", ed->org ? "true" : "false");
+	p = epp_property_push(p, "discl.org", ed->org ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.addr", ed->addr ? "true" : "false");
+	p = epp_property_push(p, "discl.addr", ed->addr ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.voice", ed->voice ? "true" : "false");
+	p = epp_property_push(p, "discl.voice", ed->voice ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.fax", ed->fax ? "true" : "false");
+	p = epp_property_push(p, "discl.fax", ed->fax ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.email", ed->email ? "true" : "false");
+	p = epp_property_push(p, "discl.email", ed->email ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.vat", ed->vat ? "true" : "false");
+	p = epp_property_push(p, "discl.vat", ed->vat ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.ident", ed->ident ? "true" : "false");
+	p = epp_property_push(p, "discl.ident", ed->ident ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.notifyEmail", ed->notifyEmail ? "true" : "false");
+	p = epp_property_push(p, "discl.notifyEmail", ed->notifyEmail ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
 
 	return p;
@@ -1010,23 +1061,24 @@ ccReg_LogProperties *epp_log_disclose_info(ccReg_LogProperties *p, epp_discl *ed
 static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *request, epp_command_data *cdata, epp_red_command_type cmdtype)
 {
 #define PUSH_PROPERTY(seq, name, value)								\
-	seq = epp_property_push(seq, name, value);						\
+	seq = epp_property_push(seq, name, value, CORBA_FALSE);			\
 	if(seq == NULL) {												\
 		return HTTP_INTERNAL_SERVER_ERROR;							\
 	}
 
 #define PUSH_PROPERTY_INT(seq, name, value)							\
-	seq = epp_property_push_int(seq, name, value);					\
+	seq = epp_property_push_int(seq, name, value, CORBA_FALSE);		\
 	if(seq == NULL) {												\
 		return HTTP_INTERNAL_SERVER_ERROR;							\
 	}
 
 #define PUSH_QHEAD(seq, list, name)									\
-	seq = epp_property_push_qhead(seq, list, name);			 		\
+	seq = epp_property_push_qhead(seq, list, name, CORBA_FALSE);	\
 	if(seq == NULL) {												\
 		return HTTP_INTERNAL_SERVER_ERROR;							\
 	}
 
+	int res;								/* response from corba call wrapper */
 	char *cmd_name = NULL;					/* command name to be used
 												one of the basic properties */
 	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
@@ -1051,13 +1103,11 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 		PUSH_PROPERTY (c_props, "command", "dummy");
 		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 		PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
-		PUSH_PROPERTY_INT (c_props, "rc", cdata->rc);
-		PUSH_PROPERTY (c_props, "msg", cdata->msg);
 
-		// epp_log_message(service, c->remote_ip, request, c_props, &errmsg); TODO
-		epp_log_message(service, c->remote_ip, request, c_props, &errmsg);
+		res = epp_log_new_message(service, c->remote_ip, request, c_props, &errmsg);
 
-		return;
+		if(res == CORBA_OK) return HTTP_OK;
+		else return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
 	switch(cmdtype) {
@@ -1111,37 +1161,29 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 
 				case EPP_INFO_CONTACT: {
 					epps_info_contact *i = cdata->data;
-					c_props = epp_property_push(c_props, "id", i->id);
-					if (c_props == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
-					}
+
+					PUSH_PROPERTY(c_props, "id", i->id)
 					cmd_name = "infoContact";
 					break;
 				}
 				case EPP_INFO_KEYSET: {
 					epps_info_keyset *i = cdata->data;
-					c_props = epp_property_push(c_props, "id", i->id);
-					if (c_props == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
-					}
+
+					PUSH_PROPERTY(c_props, "id", i->id)
 					cmd_name = "infoKeyset";
 					break;
 				}
 				case EPP_INFO_NSSET: {
 					epps_info_nsset *i = cdata->data;
-					c_props = epp_property_push(c_props, "id", i->id);
-					if (c_props == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
-					}
+
+					PUSH_PROPERTY(c_props, "id", i->id)
 					cmd_name = "infoNsset";
 					break;
 				}
 				case EPP_INFO_DOMAIN: {
 					epps_info_domain *i = cdata->data;
-					c_props = epp_property_push(c_props, "name", i->name);
-					if (c_props == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
-					}
+
+					PUSH_PROPERTY(c_props, "name", i->name)
 					cmd_name = "infoDomain";
 					break;
 				}
@@ -1398,14 +1440,67 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 	PUSH_PROPERTY (c_props, "command", cmd_name);
   	PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 	PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
-	PUSH_PROPERTY_INT (c_props, "rc", cdata->rc);
-	PUSH_PROPERTY (c_props, "msg", cdata->msg);
 
-	epp_log_message(service, c->remote_ip, request, c_props, &errmsg);
+	res = epp_log_new_message(service, c->remote_ip, request, c_props, &errmsg);
 
+	if(res == CORBA_OK) return HTTP_OK;
+	else return HTTP_INTERNAL_SERVER_ERROR;
 
+#undef PUSH_PROPERTY
+#undef PUSH_PROPERTY_INT
 #undef _QUOTE_STR
 #undef INFO_CMD_CASE
+}
+
+/**
+ * Log an epp response using fred-logd service. Raw content as well as
+ * parsed values inserted as properties are sent to the logging facility
+ *
+ * @param	log_service a reference to the logging service CORBA object
+ * @param	c			connection record
+ * @param 	stat		status returned by epp_gen_response
+ * @param	valerr		list of errors in input xml
+ * @param	response	raw content of the response
+ * @param 	cdata		command data, parsed content
+ *
+ * @return  status
+ */
+static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, int stat, qhead *valerr, const char *response, const epp_command_data *cdata)
+{
+	int res;
+
+#define PUSH_PROPERTY(seq, name, value)								\
+	seq = epp_property_push(seq, name, value, CORBA_TRUE);			\
+	if(seq == NULL) {												\
+		return HTTP_INTERNAL_SERVER_ERROR;							\
+	}
+
+	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
+	ccReg_LogProperties *c_props = NULL;	/* properties to be sent to the log */
+
+	// output properties
+	c_props = epp_property_push_int(c_props, "rc", cdata->rc, CORBA_TRUE);
+	if (c_props == NULL) {
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_TRUE);
+	if (c_props == NULL) {
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+	c_props = epp_property_push(c_props, "genStat", stat, CORBA_TRUE);
+	if (c_props == NULL) {
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	if ((c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL) {
+		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	res = epp_log_close_message(log_service, response, c_props, &errmsg);
+
+	if(res == CORBA_OK) return HTTP_OK;
+	else return HTTP_INTERNAL_SERVER_ERROR;
 }
 
 /** Read and process EPP requests waiting in the queue */
@@ -1487,6 +1582,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
+		// log the request
 		log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type);
 
 #ifdef EPP_PERF
@@ -1572,18 +1668,6 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 						"Request does not validate");
 			}
 
-			/*
-			 * TODO probably improper spot for logging
-			logger_service = get_corba_service(epp_ctx, sc->logger_object);
-			if (logger_service == NULL) {
-				epplog(epp_ctx, EPP_ERROR, "Could not obtain object reference "
-						"for alias '%s'.", sc->logger_object);
-				return HTTP_INTERNAL_SERVER_ERROR;
-			}
-
-			log_epp_command(logger_service, epp_ctx->conn, request, cdata);
-			*/
-
 			/* call function from corba backend */
 			if (!call_corba(epp_ctx, EPPservice, cdata, pstat,
 						&loginid, &lang))
@@ -1611,7 +1695,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 				apr_sleep(sc->defer_err * 1000);
 			}
 			/* generate response */
-			if (!gen_response(epp_ctx, EPPservice, cdata,
+			if (!gen_response(logger_service, epp_ctx, EPPservice, cdata,
 						sc->valid_resp, sc->schema,
 						lang, &response))
 				return HTTP_INTERNAL_SERVER_ERROR;
