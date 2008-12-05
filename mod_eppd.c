@@ -1488,7 +1488,8 @@ static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, i
 	if (c_props == NULL) {
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
-	c_props = epp_property_push(c_props, "genStat", stat, CORBA_TRUE);
+	// this could be translated to text message
+	c_props = epp_property_push_int(c_props, "genStat", stat, CORBA_TRUE);
 	if (c_props == NULL) {
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
