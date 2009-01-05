@@ -899,7 +899,7 @@ ccReg_LogProperties *epp_property_push_nsset(ccReg_LogProperties *c_props, qhead
 	if (q_length(*list) > 0) {
 
 		q_foreach(list) {
-			value = (epp_ds*)q_content(list);
+			value = (epp_ns*)q_content(list);
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "name");
@@ -1008,7 +1008,7 @@ ccReg_LogProperties *epp_log_postal_info(ccReg_LogProperties *p, epp_postalInfo 
  * 	Add disclose info to log item properties
  *  @param 	p 	log entry properties or a NULL pointer (in which
  * 					case a new data structure is allocated and returned)
- *  @param  pi	disclose info
+ *  @param  ed	disclose info
  *
  *  @returns 	log entry properties or NULL in case of an allocation error
  */
@@ -1224,12 +1224,12 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_PROPERTY(c_props, "vat", cc->vat);
 					PUSH_PROPERTY(c_props, "ident", cc->ident);
 					switch(cc->identtype) {
-						case ident_UNKNOWN: PUSH_PROPERTY(c_props, "identtype", "unknown"); break;
-						case ident_OP:      PUSH_PROPERTY(c_props, "identtype", "ID card"); break;
-						case ident_PASSPORT: PUSH_PROPERTY(c_props, "identtype", "passport"); break;
-						case ident_MPSV:    PUSH_PROPERTY(c_props, "identtype", "number assinged by ministry"); break;
-						case ident_ICO:     PUSH_PROPERTY(c_props, "identtype", "ICO"); break;
-						case ident_BIRTHDAY: PUSH_PROPERTY(c_props, "identtype", "birthdate"); break;
+						case ident_UNKNOWN: PUSH_PROPERTY(c_props, "identType", "unknown"); break;
+						case ident_OP:      PUSH_PROPERTY(c_props, "identType", "ID card"); break;
+						case ident_PASSPORT: PUSH_PROPERTY(c_props, "identType", "passport"); break;
+						case ident_MPSV:    PUSH_PROPERTY(c_props, "identType", "number assinged by ministry"); break;
+						case ident_ICO:     PUSH_PROPERTY(c_props, "identType", "ICO"); break;
+						case ident_BIRTHDAY: PUSH_PROPERTY(c_props, "identType", "birthdate"); break;
 					}
 					PUSH_PROPERTY(c_props, "notifyEmail", cc->notify_email);
 						// COMMON
@@ -1583,8 +1583,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
-		// log the request
-		log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type);
+
 
 #ifdef EPP_PERF
 		times[1] = apr_time_now(); /* after parsing */
@@ -1627,6 +1626,9 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 					return HTTP_BAD_REQUEST;
 			}
 		}
+
+		// if there wasn't anything seriously wrong, log the request
+		log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type);
 
 		/* hello and other frames are processed in different way */
 		if (pstat == PARSER_HELLO) {
@@ -1771,8 +1773,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 /**
  * Get a reference to the CORBA service with the given name
  *
- * @param c   	Connection.
- * @param name  Name of the service.
+ * @param epp_ctx   EPP context.
+ * @param name  	Name of the service.
  */
 static void *get_corba_service(epp_context *epp_ctx, char *name)
 {
