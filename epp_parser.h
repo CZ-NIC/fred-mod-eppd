@@ -101,6 +101,7 @@ epp_parser_init_cleanup(void *schema);
  * @param request   Request to be processed.
  * @param bytes     Length of the request.
  * @param cdata     Output of parsing stage (xml data converted to structure).
+ * @param cmd_type	Output of commnad type (used also by logging)
  * @return          Status of parsing.
  */
 parser_status

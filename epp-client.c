@@ -283,7 +283,7 @@ ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead
 	tooshort = 0;
 	if (list->count > 0) {
 		len = 0;
-		str[DB_FIELD_SIZE] = '\0';
+		str[0] = '\0';
 
 		for(iter = list->body; iter->next != NULL; iter=iter->next) {
 			value = iter->content;
@@ -355,6 +355,7 @@ ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char 
 		c_props->_maximum = ALLOC_STEP;
 		c_props->_buffer = (ccReg_LogProperty*)malloc(c_props->_maximum * sizeof(ccReg_LogProperty));
 		if (c_props->_buffer == NULL) {
+				CORBA_free(c_props);
 				return NULL;
 		}
 		c_props->_length = 0;
@@ -365,11 +366,21 @@ ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char 
 			c_props->_maximum += ALLOC_STEP;
 			c_props->_buffer = (ccReg_LogProperty*)realloc(c_props->_buffer, c_props->_maximum*sizeof(ccReg_LogProperty));
 			if (c_props->_buffer == NULL) {
+				CORBA_free(c_props);
 				return NULL;
 			}
 		}
 		c_props->_buffer[c_props->_length].name = wrap_str(name);
+		if(c_props->_buffer[c_props->_length].name == NULL) {
+			CORBA_free(c_props);
+			return NULL;
+		}
 		c_props->_buffer[c_props->_length].value = wrap_str(value);
+		if(c_props->_buffer[c_props->_length].value == NULL) {
+			CORBA_free(c_props);
+			CORBA_free(c_props->_buffer[c_props->_length].name);
+			return NULL;
+		}
 		c_props->_buffer[c_props->_length].output = output;   // TODO true if it's output
 		c_props->_length++;
 	}
@@ -384,9 +395,11 @@ ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char 
  * 					case a new data structure is allocated and returned)
  * @param name		property name
  * @param value		property integer value
+ * @param output	true if this property is related to output (response), false otherwise
  *
  * @returns			NULL in case of an allocation error, modified c_props otherwise
  */
+
 ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value, CORBA_boolean output)
 {
 	char str[12];
@@ -399,6 +412,7 @@ ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const c
 		c_props->_maximum = ALLOC_STEP;
 		c_props->_buffer = (ccReg_LogProperty*)malloc(c_props->_maximum * sizeof(ccReg_LogProperty));
 		if (c_props->_buffer == NULL) {
+				CORBA_free(c_props);
 				return NULL;
 		}
 		c_props->_length = 0;
@@ -409,19 +423,44 @@ ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const c
 		c_props->_maximum += ALLOC_STEP;
 		c_props->_buffer = (ccReg_LogProperty*)realloc(c_props->_buffer, c_props->_maximum*sizeof(ccReg_LogProperty));
 		if (c_props->_buffer == NULL) {
+			CORBA_free(c_props);
 			return NULL;
 		}
 	}
 	snprintf(str, 12, "%i", value);
 	c_props->_buffer[c_props->_length].name = wrap_str(name);
+
+	if(c_props->_buffer[c_props->_length].name == NULL) {
+		CORBA_free(c_props);
+		return NULL;
+	}
 	c_props->_buffer[c_props->_length].value = wrap_str(str);
+
+	if(c_props->_buffer[c_props->_length].value == NULL) {
+		CORBA_free(c_props);
+		CORBA_free(c_props->_buffer[c_props->_length].name);
+		return NULL;
+	}
+
 	c_props->_buffer[c_props->_length].output = output;   // TODO true if it's output
 	c_props->_length++;
 
 	return c_props;
+
 }
 #undef ALLOC_STEP
 
+/**
+ * Log a new event using fred-logd
+ *
+ * @param service 		Reference to the CORBA service
+ * @param sourceIP		IP address of the client
+ * @param content		content of the request
+ * @param properties	List of properties (name, value pairs)
+ * @param errmsg		Output of a CORBA error message
+ *
+ * @returns				CORBA status code
+ */
 int epp_log_new_message(service_Logger service,
 		const char *sourceIP,
 		const char *content,
@@ -429,13 +468,28 @@ int epp_log_new_message(service_Logger service,
 		char *errmsg)
 {
 	CORBA_Environment	 ev[1];
+	CORBA_char *c_sourceIP, *c_content;
 	int	 retr;  /* retry counter */
 	int	 ret;
 	int 	 success;
 
+	c_sourceIP = wrap_str(sourceIP);
+	if(c_sourceIP == NULL) {
+		return CORBA_INT_ERROR;
+	}
+	c_content = wrap_str(content);
+	if(c_content == NULL) {
+		CORBA_free(c_sourceIP);
+		return CORBA_INT_ERROR;
+	}
+
 	if(properties == NULL) {
 		properties = ccReg_LogProperties__alloc();
-		if(properties == NULL) return CORBA_INT_ERROR;
+		if(properties == NULL) {
+			CORBA_free(c_sourceIP);
+			CORBA_free(c_content);
+			return CORBA_INT_ERROR;
+		}
 
 		properties->_maximum = properties->_length = 0;
 	}
@@ -446,13 +500,17 @@ int epp_log_new_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		log_act_entry_id = ccReg_Log_new_event((ccReg_Log) service, sourceIP,  ccReg_LC_EPP, content, properties, ev);
+		log_act_entry_id = ccReg_Log_new_event((ccReg_Log) service, c_sourceIP,  ccReg_LC_EPP, c_content, properties, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 
 		usleep(RETR_SLEEP);
 	}
+
+	CORBA_free(c_sourceIP);
+	CORBA_free(c_content);
+	CORBA_free(properties);
 
 	if (raised_exception(ev)) {
 		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
@@ -466,19 +524,38 @@ int epp_log_new_message(service_Logger service,
 	return ret;
 }
 
+/**
+ * Finish a log event
+ *
+ * @param service 		reference to CORBA service
+ * @param content		content of the response
+ * @param properties	list of properties associated with response
+ * @param errmsg		output of CORBA errors
+ *
+ * @returns				CORBA status code
+ */
 int epp_log_close_message(service_Logger service,
 		const char *content,
 		ccReg_LogProperties *properties,
 		char *errmsg)
 {
 	CORBA_Environment	 ev[1];
+	CORBA_char *c_content;
 	int	 retr;  /* retry counter */
 	int	 ret;
 	CORBA_boolean 		success;
 
+	c_content = wrap_str(content);
+	if(c_content == NULL) {
+		return CORBA_INT_ERROR;
+	}
+
 	if(properties == NULL) {
 		properties = ccReg_LogProperties__alloc();
-		if(properties == NULL) return CORBA_INT_ERROR;
+		if(properties == NULL) {
+			CORBA_free(c_content);
+			return CORBA_INT_ERROR;
+		}
 
 		properties->_maximum = properties->_length = 0;
 	}
@@ -489,13 +566,16 @@ int epp_log_close_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		success = ccReg_Log_update_event_close((ccReg_Log) service, log_act_entry_id, content, properties, ev);
+		success = ccReg_Log_update_event_close((ccReg_Log) service, log_act_entry_id, c_content, properties, ev);
 
 		/* if COMM_FAILURE is not raised then quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
 		usleep(RETR_SLEEP);
 	}
+
+	CORBA_free(c_content);
+	CORBA_free(properties);
 
 	if (raised_exception(ev)) {
 		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
@@ -2300,8 +2380,6 @@ epp_call_create_domain(epp_context *epp_ctx,
 	c_keyset = NULL;
 	c_registrant = NULL;
 	c_clTRID = NULL;
-	c_admin = NULL;
-	c_ext_list = NULL;
 	/*
 	 * Input parameters:
 	 *    name (a)
@@ -3159,6 +3237,8 @@ epp_call_delete(epp_context *epp_ctx,
 			break;
 		usleep(RETR_SLEEP);
 	}
+
+	CORBA_free(c_clTRID);
 
 	/* if it is exception then return */
 	if (raised_exception(ev))
