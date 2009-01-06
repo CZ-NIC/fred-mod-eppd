@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -218,7 +218,7 @@ get_service(CORBA_ORB orb, const char *ns_loc, const char *obj_name)
 	CosNaming_NameComponent	*name_component; /* EPP's name */
 	CosNaming_Name	*cos_name; /* Cos name used in service lookup */
 	char	ns_string[150];
- 
+
 	CORBA_exception_init(ev);
 
 	assert(ns_loc != NULL);
@@ -437,7 +437,7 @@ int main(int argc, char *argv[])
 				test = 1;
 				break;
 			case 's':
-				if (schemafile == NULL && ++ar < argc) schemafile = argv[++ar];
+				if (schemafile == NULL && ++ar < argc) schemafile = argv[ar];
 				else {
 					usage();
 					return 1;
@@ -506,7 +506,7 @@ int main(int argc, char *argv[])
 		  if (interactive) {
 
 			fputs("Command: ", stderr);
-			switch (cmd = getcmd()) 
+			switch (cmd = getcmd())
 					{
 				case CMD_CUSTOM:
 					if (!readinput(text)) {
@@ -529,17 +529,17 @@ int main(int argc, char *argv[])
 					continue;
 			}
 		  }
-		  else { 
+		  else {
 			  cmd = CMD_FILE;
-			  if( ar < argc ) 
+			  if( ar < argc )
 			  {
 					openfile(text , argv[ar++] );
-			  } 
+			  }
 			  else {
 					quit = 1;
 					ret = 0;
 					goto epilog;
-			  } 
+			  }
 		  }
 
 		  // show file
