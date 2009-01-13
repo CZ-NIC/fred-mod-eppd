@@ -817,7 +817,7 @@ ccReg_LogProperties *epp_property_push_ds(ccReg_LogProperties *c_props, qhead *l
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "digest");
-			if ((ret = epp_property_push(c_props, str, value->digest, CORBA_FALSE)) == NULL) {
+			if ((ret = epp_property_push(c_props, str, value->digest, CORBA_FALSE, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
@@ -860,13 +860,13 @@ ccReg_LogProperties *epp_property_push_valerr(ccReg_LogProperties *c_props, qhea
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "element");
-			if ((ret = epp_property_push(c_props, str, value->value, CORBA_TRUE)) == NULL) {
+			if ((ret = epp_property_push(c_props, str, value->value, CORBA_TRUE, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "reason");
-			if ((ret = epp_property_push(c_props, str, value->reason, CORBA_TRUE)) == NULL) {
+			if ((ret = epp_property_push(c_props, str, value->reason, CORBA_TRUE, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
@@ -903,13 +903,13 @@ ccReg_LogProperties *epp_property_push_nsset(ccReg_LogProperties *c_props, qhead
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "name");
-			if ((ret = epp_property_push(c_props, str, value->name, CORBA_FALSE)) == NULL) {
+			if ((ret = epp_property_push(c_props, str, value->name, CORBA_FALSE, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "addr");
-			if ((ret = epp_property_push_qhead(c_props, &value->addr, str, CORBA_FALSE)) == NULL) {
+			if ((ret = epp_property_push_qhead(c_props, &value->addr, str, CORBA_FALSE, CORBA_TRUE)) == NULL) {
 				return NULL;
 			}
 		}
@@ -961,7 +961,7 @@ ccReg_LogProperties *epp_property_push_dnskey(ccReg_LogProperties *c_props, qhea
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "publicKey");
-			if ((ret = epp_property_push(c_props, str, value->public_key, CORBA_FALSE)) == NULL) {
+			if ((ret = epp_property_push(c_props, str, value->public_key, CORBA_FALSE, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
@@ -986,19 +986,19 @@ ccReg_LogProperties *epp_log_postal_info(ccReg_LogProperties *p, epp_postalInfo 
 {
 	if(pi == NULL) return p;
 
-	p = epp_property_push(p, "pi.name", pi->name, CORBA_FALSE);
+	p = epp_property_push(p, "pi.name", pi->name, CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.organization", pi->org, CORBA_FALSE);
+	p = epp_property_push(p, "pi.organization", pi->org, CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push_qhead(p, &pi->streets, "pi.street", CORBA_FALSE);
+	p = epp_property_push_qhead(p, &pi->streets, "pi.street", CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.city", pi->city, CORBA_FALSE);
+	p = epp_property_push(p, "pi.city", pi->city, CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.state", pi->sp, CORBA_FALSE);
+	p = epp_property_push(p, "pi.state", pi->sp, CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.postalCode", pi->pc, CORBA_FALSE);
+	p = epp_property_push(p, "pi.postalCode", pi->pc, CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.countryCode", pi->cc, CORBA_FALSE);
+	p = epp_property_push(p, "pi.countryCode", pi->cc, CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
 
 	return p;
@@ -1015,32 +1015,32 @@ ccReg_LogProperties *epp_log_postal_info(ccReg_LogProperties *p, epp_postalInfo 
 ccReg_LogProperties *epp_log_disclose_info(ccReg_LogProperties *p, epp_discl *ed)
 {
 	if(ed->flag == 1) {
-		p = epp_property_push(p, "discl.policy", "private", CORBA_FALSE);
+		p = epp_property_push(p, "discl.policy", "private", CORBA_FALSE, CORBA_FALSE);
 	} else if(ed->flag == 0) {
-		p = epp_property_push(p, "discl.policy", "public", CORBA_FALSE);
+		p = epp_property_push(p, "discl.policy", "public", CORBA_FALSE, CORBA_FALSE);
 	} else {
-		p = epp_property_push(p, "discl.policy", "no exceptions", CORBA_FALSE);
+		p = epp_property_push(p, "discl.policy", "no exceptions", CORBA_FALSE, CORBA_FALSE);
 	}
 
 	if (p == NULL) return p;
 
-	p = epp_property_push(p, "discl.name", ed->name ? "true" : "false", CORBA_FALSE);
+	p = epp_property_push(p, "discl.name", ed->name ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.org", ed->org ? "true" : "false", CORBA_FALSE);
+	p = epp_property_push(p, "discl.org", ed->org ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.addr", ed->addr ? "true" : "false", CORBA_FALSE);
+	p = epp_property_push(p, "discl.addr", ed->addr ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.voice", ed->voice ? "true" : "false", CORBA_FALSE);
+	p = epp_property_push(p, "discl.voice", ed->voice ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.fax", ed->fax ? "true" : "false", CORBA_FALSE);
+	p = epp_property_push(p, "discl.fax", ed->fax ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.email", ed->email ? "true" : "false", CORBA_FALSE);
+	p = epp_property_push(p, "discl.email", ed->email ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.vat", ed->vat ? "true" : "false", CORBA_FALSE);
+	p = epp_property_push(p, "discl.vat", ed->vat ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.ident", ed->ident ? "true" : "false", CORBA_FALSE);
+	p = epp_property_push(p, "discl.ident", ed->ident ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.notifyEmail", ed->notifyEmail ? "true" : "false", CORBA_FALSE);
+	p = epp_property_push(p, "discl.notifyEmail", ed->notifyEmail ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
 	if (p == NULL) return p;
 
 	return p;
@@ -1061,7 +1061,7 @@ ccReg_LogProperties *epp_log_disclose_info(ccReg_LogProperties *p, epp_discl *ed
 static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *request, epp_command_data *cdata, epp_red_command_type cmdtype)
 {
 #define PUSH_PROPERTY(seq, name, value)								\
-	seq = epp_property_push(seq, name, value, CORBA_FALSE);			\
+	seq = epp_property_push(seq, name, value, CORBA_FALSE, CORBA_FALSE);	\
 	if(seq == NULL) {												\
 		return HTTP_INTERNAL_SERVER_ERROR;							\
 	}
@@ -1073,7 +1073,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 	}
 
 #define PUSH_QHEAD(seq, list, name)									\
-	seq = epp_property_push_qhead(seq, list, name, CORBA_FALSE);	\
+	seq = epp_property_push_qhead(seq, list, name, CORBA_FALSE, CORBA_FALSE);	\
 	if(seq == NULL) {												\
 		return HTTP_INTERNAL_SERVER_ERROR;							\
 	}
@@ -1484,7 +1484,7 @@ static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, i
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_TRUE);
+	c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_TRUE, CORBA_FALSE);
 	if (c_props == NULL) {
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}

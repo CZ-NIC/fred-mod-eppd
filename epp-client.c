@@ -268,69 +268,28 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
  * @param list		list of strings
  * @param list_name	base name for the inserted properties
  * @param output 	whether the properties are related to output
+ * @param child		true if the items in the list are children of the last property
+ * 					with child = false
  *
  * @returns 		log entry properties or NULL in case of an allocation error
  *
  */
 
-ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead *list, char *list_name, CORBA_boolean output)
+ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead *list, char *list_name, CORBA_boolean output, CORBA_boolean child)
 {
-	int  len, size, tooshort;
-	char str[DB_FIELD_SIZE+1], *value;
 	ccReg_LogProperties *ret;
-	qitem *iter;
 
-	tooshort = 0;
-	if (list->count > 0) {
-		len = 0;
-		str[0] = '\0';
-
-		for(iter = list->body; iter->next != NULL; iter=iter->next) {
-			value = iter->content;
-
-			size = DB_FIELD_SIZE-len;
-			if (size < 0) {
-				tooshort = 1;
-				break;
-			}
-			strncat(str, value, size);
-
-			len += strlen(value);
-
-			size = DB_FIELD_SIZE-len;
-			if (size < 0) {
-				tooshort = 1;
-				break;
-			}
-			strncat(str, ", ", size);
-			len += 2;
-		}
-
-		if(tooshort) {
-			// size value should be still present
-
-		} else {
-		// insert the last element (without separator)
-			value = iter->content;
-
-			size = DB_FIELD_SIZE-len;
-			if(size<0) {
-				tooshort = 1;
-			} else {
-				strncat(str, value, size);
-				len += strlen(value);
-			}
-		}
-
-		if ((ret = epp_property_push(c_props, list_name, str, output)) == NULL) {
-			return NULL;
-		}
-
-		return ret;
-	} else {
+	if (list->count == 0) {
 		return c_props;
 	}
 
+	q_foreach(list) {
+		if ((ret = epp_property_push(c_props, list_name, (char*)q_content(list), output, child)) == NULL) {
+			return NULL;
+		}
+	}
+
+	return ret;
 }
 
 #define ALLOC_STEP 4
@@ -342,10 +301,11 @@ ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead
  * @param name		property name
  * @param value		property value
  * @param output	whether the property is related to output
+ * @param child 	true if the property is child to the last property with child = false
  *
  * @returns			NULL in case of an allocation error, modified c_props otherwise
  */
-ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value, CORBA_boolean output)
+ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child)
 {
 	if(c_props == NULL) {
 		c_props = ccReg_LogProperties__alloc();
@@ -382,6 +342,7 @@ ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char 
 			return NULL;
 		}
 		c_props->_buffer[c_props->_length].output = output;   // TODO true if it's output
+		c_props->_buffer[c_props->_length].child = child;
 		c_props->_length++;
 	}
 	return c_props;
@@ -442,11 +403,12 @@ ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const c
 		return NULL;
 	}
 
-	c_props->_buffer[c_props->_length].output = output;   // TODO true if it's output
+	c_props->_buffer[c_props->_length].output = output;
+	c_props->_buffer[c_props->_length].child = CORBA_FALSE;
 	c_props->_length++;
 
 	return c_props;
-
+	
 }
 #undef ALLOC_STEP
 

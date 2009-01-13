@@ -147,10 +147,10 @@ epp_call_end_session(epp_context *epp_ctx, service_EPP service,
 struct ccReg_LogProperties;
 
 /* functions for filling log properties */
-ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead *list, char *list_name, CORBA_boolean output);
-ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value, CORBA_boolean output);
+ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead *list, char *list_name, CORBA_boolean output, CORBA_boolean child);
+ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child);
 ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value, CORBA_boolean output);
-ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value, CORBA_boolean output);
+
 
 #define MAX_ERROR_MSG_LEN	100
 
