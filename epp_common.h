@@ -745,7 +745,7 @@ typedef struct {
 typedef struct {
 	char	*clTRID;/**< client's TRID */
 	char	*svTRID;/**< server's TRID */
-	int	 rc;    /**< EPP return code defined in standard. */
+	int	 	rc;    /**< EPP return code defined in standard. */
 	char	*msg;   /**< Text message coresponding to return code. */
 	char	*xml_in;/**< XML as it is received from client. */
 	/* parsed_doc and xpath_ctx are needed for error reporting. */

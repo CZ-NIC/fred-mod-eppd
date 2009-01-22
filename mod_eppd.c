@@ -128,7 +128,7 @@ module AP_MODULE_DECLARE_DATA eppd_module;
 static void *get_corba_service(epp_context *epp_ctx, char *name);
 
 static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c,
-		int stat, qhead *valerr, const char *response, const epp_command_data *cdata);
+		int stat, qhead *valerr, const char *response, const epp_command_data *cdata,  int session_id);
 
 /**
  * SSL variable lookup function pointer used for client's PEM encoded
@@ -151,7 +151,7 @@ typedef struct {
 	apr_file_t	*epplogfp; /**< File descriptor of epp log file. */
 	epp_loglevel	loglevel;  /**< Epp log level. */
 	int	defer_err;  /**< Time value for deferring error response. */
-}eppd_server_conf;
+} eppd_server_conf;
 
 /** Used for access serialization to epp log file. */
 static apr_global_mutex_t *epp_log_lock;
@@ -650,21 +650,21 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
  */
 static int call_corba(epp_context *epp_ctx, service_EPP *service,
 		epp_command_data *cdata, parser_status pstat,
-		unsigned int *loginid, epp_lang *lang)
+		unsigned int *sessionid, epp_lang *lang)
 {
 	corba_status	cstat; /* ret code of corba component */
 
 	if (pstat == PARSER_CMD_LOGIN) {
-		if (!call_login(epp_ctx, service, cdata, loginid, lang, &cstat))
+		if (!call_login(epp_ctx, service, cdata, sessionid, lang, &cstat))
 			return 0;
 	}
 	else if (pstat == PARSER_CMD_LOGOUT) {
-		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
-		epplog(epp_ctx, EPP_DEBUG, "login id after logout command is %d", *loginid);
+		cstat = epp_call_logout(epp_ctx, service, sessionid, cdata);
+		epplog(epp_ctx, EPP_DEBUG, "login id after logout command is %d", *sessionid);
 	}
 	else {
 		/* go ahead to generic corba function call */
-		cstat = epp_call_cmd(epp_ctx, service, *loginid, cdata);
+		cstat = epp_call_cmd(epp_ctx, service, *sessionid, cdata);
 	}
 
 	/* catch corba failures */
@@ -701,23 +701,23 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service,
  * @param schema    Parsed XML schema.
  * @param lang      Language of session.
  * @param response  On return holds response if ret code is 1.
+ * @param gstat		generator's return code
+ * @param valerr    encountered errors when validating response
  * @return          0 in case of internal error, 1 if ok.
  */
 static int gen_response(service_Logger *logger_service, epp_context *epp_ctx, service_EPP *service,
 		epp_command_data *cdata, int validate, void *schema,
-		epp_lang lang, char **response)
+		epp_lang lang, char **response, gen_status *gstat, qhead *valerr)
 {
-	qhead	 valerr; /* encountered errors when validating response */
-	gen_status	gstat; /* generator's return code */
 
-	valerr.body = NULL;
-	valerr.count = 0;
+	valerr->body = NULL;
+	valerr->count = 0;
 
 	/* generate xml response */
-	gstat = epp_gen_response(epp_ctx, validate, schema, lang, cdata,
-			response, &valerr);
+	*gstat = epp_gen_response(epp_ctx, validate, schema, lang, cdata,
+			response, valerr);
 
-	switch (gstat) {
+	switch (*gstat) {
 		case GEN_OK:
 			break;
 		/*
@@ -751,8 +751,8 @@ static int gen_response(service_Logger *logger_service, epp_context *epp_ctx, se
 			epplog(epp_ctx, EPP_ERROR,
 					"Generated response does not validate");
 			/* print more information about validation errors */
-			q_foreach(&valerr) {
-				epp_error *e = q_content(&valerr);
+			q_foreach(valerr) {
+				epp_error *e = q_content(valerr);
 
 				epplog(epp_ctx, EPP_ERROR, "Element: %s",
 						e->value);
@@ -765,8 +765,6 @@ static int gen_response(service_Logger *logger_service, epp_context *epp_ctx, se
 					"generator module");
 			break;
 	}
-
-	log_epp_response(logger_service, epp_ctx->conn, gstat, &valerr, *response, cdata);
 
 	/* XXX ugly hack */
 	if (strcmp(cdata->svTRID, "DUMMY-SVTRID"))
@@ -1055,10 +1053,11 @@ ccReg_LogProperties *epp_log_disclose_info(ccReg_LogProperties *p, epp_discl *ed
  * @param	request		raw content of the request
  * @param 	cdata		command data, parsed content
  * @param   cmdtype 	command type returned by parse_command function
+ * @param 	sessionid   login id for the session
  *
  * @return  status
  */
-static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *request, epp_command_data *cdata, epp_red_command_type cmdtype)
+static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *request, epp_command_data *cdata, epp_red_command_type cmdtype, int sessionid)
 {
 #define PUSH_PROPERTY(seq, name, value)								\
 	seq = epp_property_push(seq, name, value, CORBA_FALSE, CORBA_FALSE);	\
@@ -1117,7 +1116,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 
 				el = cdata->data;
 
-				PUSH_PROPERTY(c_props, "clientId", el->clID);
+				PUSH_PROPERTY(c_props, "registrarId", el->clID);
 				// type epp_lang:
 				if (el->lang == LANG_CS) {
 					PUSH_PROPERTY(c_props, "lang", "CZ");
@@ -1440,6 +1439,9 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 	PUSH_PROPERTY (c_props, "command", cmd_name);
   	PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 	PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
+	if(sessionid != 0) {
+		PUSH_PROPERTY_INT (c_props, "sessionId", sessionid);
+	}
 
 	res = epp_log_new_message(service, c->remote_ip, request, c_props, &errmsg);
 
@@ -1462,40 +1464,46 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
  * @param	valerr		list of errors in input xml
  * @param	response	raw content of the response
  * @param 	cdata		command data, parsed content
+ * @param 	session_id		id into the login database table for this session
  *
  * @return  status
  */
-static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, int stat, qhead *valerr, const char *response, const epp_command_data *cdata)
+static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, int stat, qhead *valerr,
+		const char *response, const epp_command_data *cdata, int session_id)
 {
 	int res;
-
-#define PUSH_PROPERTY(seq, name, value)								\
-	seq = epp_property_push(seq, name, value, CORBA_TRUE);			\
-	if(seq == NULL) {												\
-		return HTTP_INTERNAL_SERVER_ERROR;							\
-	}
 
 	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
 	ccReg_LogProperties *c_props = NULL;	/* properties to be sent to the log */
 
 	// output properties
-	c_props = epp_property_push_int(c_props, "rc", cdata->rc, CORBA_TRUE);
-	if (c_props == NULL) {
-		return HTTP_INTERNAL_SERVER_ERROR;
+	if (cdata != NULL) {
+		c_props = epp_property_push_int(c_props, "rc", cdata->rc, CORBA_TRUE);
+		if (c_props == NULL) {
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+
+		c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_TRUE, CORBA_FALSE);
+		if (c_props == NULL) {
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
 	}
 
-	c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_TRUE, CORBA_FALSE);
-	if (c_props == NULL) {
-		return HTTP_INTERNAL_SERVER_ERROR;
-	}
 	// this could be translated to text message
 	c_props = epp_property_push_int(c_props, "genStat", stat, CORBA_TRUE);
 	if (c_props == NULL) {
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	if ((c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL) {
+	if (valerr != NULL && (c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL) {
 		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	if (session_id != 0) {
+		c_props = epp_property_push_int(c_props, "sessionId", session_id, CORBA_TRUE);
+		if (c_props == NULL) {
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
 	}
 
 	res = epp_log_close_message(log_service, response, c_props, &errmsg);
@@ -1507,7 +1515,7 @@ static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, i
 /** Read and process EPP requests waiting in the queue */
 static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		service_EPP *EPPservice, eppd_server_conf *sc,
-		unsigned int *loginid_save)
+		unsigned int *session_id_save)
 {
 	epp_lang	 lang;   /* session's language */
 	apr_pool_t	*rpool;  /* connection memory pool */
@@ -1519,7 +1527,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	char	*request;        /* raw request read from socket */
 	char	*response;       /* generated XML answer to client */
 	int	 retval;         /* return code of read_request */
-	unsigned int	 loginid;        /* login id of client's session */
+	unsigned int	 session_id;        /* login id of client's session */
 	service_Logger   *logger_service;  /* reference to the fred-logd service */
 
 
@@ -1531,12 +1539,12 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	 *     time[2] - after corba call and before response generation
 	 *     time[3] - after response generation
 	 */
-	apr_time_t	times[4];
+	apr_time_t	times[5];
 #endif
 
 
 	/* initialize variables used inside the loop */
-	*loginid_save = loginid = 0; /* zero means that client isn't logged in*/
+	*session_id_save = session_id = 0; /* zero means that client isn't logged in*/
 	lang = LANG_EN;	/* default language is english */
 
 	/*
@@ -1545,7 +1553,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	 */
 	while (1) {
 #ifdef EPP_PERF
-		bzero(times, 4 * sizeof(times[0]));
+		bzero(times, 5 * sizeof(times[0]));
 #endif
 		/* allocate new pool for request */
 		apr_pool_create(&rpool, ((conn_rec *) epp_ctx->conn)->pool);
@@ -1573,7 +1581,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		 * Deliver request to XML parser, the task of parser is
 		 * to fill cdata structure with data.
 		 */
-		pstat = epp_parse_command(epp_ctx, (loginid != 0), sc->schema,
+		pstat = epp_parse_command(epp_ctx, (session_id != 0), sc->schema,
 				request, bytes, &cdata, &cmd_type);
 
 		logger_service = get_corba_service(epp_ctx, sc->logger_object);
@@ -1583,11 +1591,6 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
-
-
-#ifdef EPP_PERF
-		times[1] = apr_time_now(); /* after parsing */
-#endif
 		/*
 		 * Register cleanup for cdata structure. The most of the
 		 * items in this structure are allocated from pool, but
@@ -1627,8 +1630,18 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			}
 		}
 
+
+#ifdef EPP_PERF
+		times[1] = apr_time_now(); /* after parsing */
+#endif
+
+
 		// if there wasn't anything seriously wrong, log the request
-		log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type);
+		log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type, session_id);
+
+#ifdef EPP_PERF
+		times[2] = apr_time_now(); /* after logging */
+#endif
 
 		/* hello and other frames are processed in different way */
 		if (pstat == PARSER_HELLO) {
@@ -1646,7 +1659,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 #ifdef EPP_PERF
-			times[2] = apr_time_now();
+			times[3] = apr_time_now();	/* after corba calls */
 #endif
 			/*
 			 * generate greeting (server name is concatenation of
@@ -1662,9 +1675,15 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 						"creating epp greeting");
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
+
+			// log_epp_response(logger_service, epp_ctx->conn, gstat, NULL, response, cdata, loginid);
 		}
 		/* it is a command */
 		else {
+			gen_status gstat; /* XML generator return status */
+			qhead valerr;	/* encountered errors when validating response */
+			int gret;     /* return value from XML generator */
+
 			/* log request which doesn't validate */
 			if (pstat == PARSER_NOT_VALID) {
 				epplog(epp_ctx, EPP_WARNING,
@@ -1673,22 +1692,22 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 			/* call function from corba backend */
 			if (!call_corba(epp_ctx, EPPservice, cdata, pstat,
-						&loginid, &lang))
+						&session_id, &lang))
 				return HTTP_INTERNAL_SERVER_ERROR;
 			/* did successfull login occured? */
 			epplog(epp_ctx, EPP_DEBUG, "after corba call command "
-				"saved login id is %d, login id is %d", *loginid_save, loginid);
-			if (*loginid_save == 0 && loginid != 0) {
-				*loginid_save = loginid;
+				"saved login id is %d, login id is %d", *session_id_save, session_id);
+			if (*session_id_save == 0 && session_id != 0) {
+				*session_id_save = session_id;
 				/*
 				 * this event should be logged explicitly if
 				 * login was successfull
 				 */
 				epplog(epp_ctx, EPP_INFO, "Logged in "
-					"successfully, login id is %d",loginid);
+					"successfully, login id is %d",session_id);
 			}
 #ifdef EPP_PERF
-			times[2] = apr_time_now();
+			times[3] = apr_time_now(); /* after corba calls */
 #endif
 			/* error response will be deferred */
 			if (cdata->rc >= 2000) {
@@ -1697,14 +1716,25 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 				/* sleep time conversion to microsec */
 				apr_sleep(sc->defer_err * 1000);
 			}
+
 			/* generate response */
-			if (!gen_response(logger_service, epp_ctx, EPPservice, cdata,
+			gret = gen_response(logger_service, epp_ctx, EPPservice, cdata,
 						sc->valid_resp, sc->schema,
-						lang, &response))
-				return HTTP_INTERNAL_SERVER_ERROR;
+						lang, &response, &gstat, &valerr);
+
+			/* put login id to the log record if it's not already there
+			 * (i.e. only in case we just logged in)
+			 */
+			if (pstat == PARSER_CMD_LOGIN) {
+				log_epp_response(logger_service, epp_ctx->conn, gstat, &valerr, response, cdata, session_id);
+			} else {
+				log_epp_response(logger_service, epp_ctx->conn, gstat, &valerr, response, cdata, 0);
+			}
+
+			if (!gret) return HTTP_INTERNAL_SERVER_ERROR;
 		}
 #ifdef EPP_PERF
-		times[3] = apr_time_now();
+		times[4] = apr_time_now();
 #endif
 		/* send response back to client */
 		apr_brigade_puts(bb, NULL, NULL, response);
@@ -1716,12 +1746,13 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		 * therefore we overtype the results to a more common numeric
 		 * values.
 		 */
-		epplog(epp_ctx, EPP_DEBUG, "Perf data: p(%u), c(%u), "
+		epplog(epp_ctx, EPP_DEBUG, "Perf data: p(%u), l(%u), c(%u), "
 				"g(%u), s(%u)",
 				(unsigned) (times[1] - times[0]),/* parser */
-				(unsigned) (times[2] - times[1]),/* CORBA */
-				(unsigned) (times[3] - times[2]),/* generator */
-				(unsigned) (apr_time_now() - times[3]));/*send*/
+				(unsigned) (times[2] - times[1]),/* logging */
+				(unsigned) (times[3] - times[2]),/* CORBA */
+				(unsigned) (times[4] - times[3]),/* generator */
+				(unsigned) (apr_time_now() - times[4]));/*send*/
 #endif
 		status = ap_fflush(((conn_rec *) epp_ctx->conn)->output_filters,
 			       bb);
@@ -1734,8 +1765,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		}
 
 		/* check if successful logout appeared */
-		if (pstat == PARSER_CMD_LOGOUT && loginid == 0) {
-			*loginid_save = 0;
+		if (pstat == PARSER_CMD_LOGOUT && session_id == 0) {
+			*session_id_save = 0;
 			break;
 		}
 
