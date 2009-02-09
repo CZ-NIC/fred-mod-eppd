@@ -1233,7 +1233,6 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_PROPERTY(c_props, "notifyEmail", cc->notify_email);
 						// COMMON
 
-					PUSH_PROPERTY(c_props, "creationDate", cc->crDate);
 					break;
 
 				case EPP_CREATE_DOMAIN:
@@ -1255,7 +1254,6 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					} else if(cd->unit == TIMEUNIT_YEAR) {
 						PUSH_PROPERTY(c_props, "timeunit", "Year");
 					}
-					PUSH_PROPERTY(c_props, "creationDate", cd->crDate);
 					PUSH_PROPERTY(c_props, "expirationDate", cd->exDate);
 					break;
 
@@ -1272,8 +1270,6 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					}
 					PUSH_QHEAD(c_props, &cn->tech, "techC");
 
-					PUSH_PROPERTY(c_props, "creationDate", cn->crDate);
-
 					break;
 				case EPP_CREATE_KEYSET:
 					cmd_name = "createKeyset";
@@ -1282,8 +1278,6 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_PROPERTY(c_props, "id", ck->id);
 					PUSH_PROPERTY(c_props, "authInfo", ck->authInfo);
 					// COMMON
-
-					PUSH_PROPERTY(c_props, "creationDate", ck->crDate);
 
 					if((c_props=epp_property_push_ds(c_props, &ck->ds, "ds")) == NULL) {
 						return HTTP_INTERNAL_SERVER_ERROR;
@@ -1497,6 +1491,24 @@ static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, i
 
 	if (valerr != NULL && (c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL) {
 		return HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	if(cdata->type ==  EPP_CREATE_CONTACT) {
+		epps_create_contact *cc = cdata->data;
+		epp_property_push(c_props, "creationDate", cc->crDate, CORBA_TRUE, CORBA_FALSE);
+
+	} else if(cdata->type ==  EPP_CREATE_DOMAIN) {
+		epps_create_domain *cd = cdata->data;
+		epp_property_push(c_props, "creationDate", cd->crDate, CORBA_TRUE, CORBA_FALSE);
+
+	} else if(cdata->type ==  EPP_CREATE_KEYSET) {
+		epps_create_keyset *ck = cdata->data;
+		epp_property_push(c_props, "creationDate", ck->crDate, CORBA_TRUE, CORBA_FALSE);
+
+	} else if(cdata->type ==  EPP_CREATE_NSSET) {
+		epps_create_nsset *cn = cdata->data;
+		epp_property_push(c_props, "creationDate", cn->crDate, CORBA_TRUE, CORBA_FALSE);
+
 	}
 
 	if (session_id != 0) {
