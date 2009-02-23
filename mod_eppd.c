@@ -648,23 +648,36 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
  * @param lang      Language selected by client.
  * @return          0 in case of internal error, 1 if ok.
  */
-static int call_corba(epp_context *epp_ctx, service_EPP *service,
+static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger *service_log,
 		epp_command_data *cdata, parser_status pstat,
-		unsigned int *sessionid, epp_lang *lang)
+		unsigned int *loginid, ccReg_TID const *session_id, epp_lang *lang)
 {
 	corba_status	cstat; /* ret code of corba component */
+	char errmsg[MAX_ERROR_MSG_LEN];		/* error message returned from corba call */
 
+	errmsg[0] = '\0';
 	if (pstat == PARSER_CMD_LOGIN) {
-		if (!call_login(epp_ctx, service, cdata, sessionid, lang, &cstat))
+		if (!call_login(epp_ctx, service, cdata, loginid, lang, &cstat))
 			return 0;
+
+		if (cstat == CORBA_OK) {
+			char *registrar_id;
+
+			registrar_id = ((epps_login*)cdata->data)->clID;
+			cstat = epp_log_new_session(service_log, registrar_id, cdata->clTRID, *lang, session_id, errmsg);
+		}	
 	}
 	else if (pstat == PARSER_CMD_LOGOUT) {
-		cstat = epp_call_logout(epp_ctx, service, sessionid, cdata);
-		epplog(epp_ctx, EPP_DEBUG, "login id after logout command is %d", *sessionid);
+		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
+		epplog(epp_ctx, EPP_DEBUG, "login id after logout command is %d", *loginid);
+		
+		if(cstat == CORBA_OK) {
+			cstat = epp_log_end_session(service_log, cdata->clTRID, *session_id, errmsg);
+		}
 	}
 	else {
 		/* go ahead to generic corba function call */
-		cstat = epp_call_cmd(epp_ctx, service, *sessionid, cdata);
+		cstat = epp_call_cmd(epp_ctx, service, *loginid, cdata);
 	}
 
 	/* catch corba failures */
@@ -1527,7 +1540,7 @@ static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, i
 /** Read and process EPP requests waiting in the queue */
 static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		service_EPP *EPPservice, eppd_server_conf *sc,
-		unsigned int *session_id_save)
+		unsigned int *login_id_save)
 {
 	epp_lang	 lang;   /* session's language */
 	apr_pool_t	*rpool;  /* connection memory pool */
@@ -1539,7 +1552,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	char	*request;        /* raw request read from socket */
 	char	*response;       /* generated XML answer to client */
 	int	 retval;         /* return code of read_request */
-	unsigned int	 session_id;        /* login id of client's session */
+	unsigned int	 login_id;        /* login id of client's session */
+	ccReg_TID 	 session_id;	  /* id for log_session table */
 	service_Logger   *logger_service;  /* reference to the fred-logd service */
 
 
@@ -1556,7 +1570,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 
 	/* initialize variables used inside the loop */
-	*session_id_save = session_id = 0; /* zero means that client isn't logged in*/
+	*login_id_save = login_id = session_id = 0; /* zero means that client isn't logged in*/
 	lang = LANG_EN;	/* default language is english */
 
 	/*
@@ -1593,7 +1607,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		 * Deliver request to XML parser, the task of parser is
 		 * to fill cdata structure with data.
 		 */
-		pstat = epp_parse_command(epp_ctx, (session_id != 0), sc->schema,
+		pstat = epp_parse_command(epp_ctx, (login_id != 0), sc->schema,
 				request, bytes, &cdata, &cmd_type);
 
 		logger_service = get_corba_service(epp_ctx, sc->logger_object);
@@ -1703,20 +1717,20 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			}
 
 			/* call function from corba backend */
-			if (!call_corba(epp_ctx, EPPservice, cdata, pstat,
-						&session_id, &lang))
+			if (!call_corba(epp_ctx, EPPservice, logger_service, cdata, pstat,
+						&login_id, &session_id, &lang))
 				return HTTP_INTERNAL_SERVER_ERROR;
 			/* did successfull login occured? */
 			epplog(epp_ctx, EPP_DEBUG, "after corba call command "
-				"saved login id is %d, login id is %d", *session_id_save, session_id);
-			if (*session_id_save == 0 && session_id != 0) {
-				*session_id_save = session_id;
+				"saved login id is %d, login id is %d", *login_id_save, login_id);
+			if (*login_id_save == 0 && login_id != 0) {
+				*login_id_save = login_id;
 				/*
 				 * this event should be logged explicitly if
 				 * login was successfull
 				 */
 				epplog(epp_ctx, EPP_INFO, "Logged in "
-					"successfully, login id is %d",session_id);
+					"successfully, login id is %d",login_id);
 			}
 #ifdef EPP_PERF
 			times[3] = apr_time_now(); /* after corba calls */
@@ -1777,8 +1791,9 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		}
 
 		/* check if successful logout appeared */
-		if (pstat == PARSER_CMD_LOGOUT && session_id == 0) {
-			*session_id_save = 0;
+		if (pstat == PARSER_CMD_LOGOUT && login_id == 0) {
+			*login_id_save = 0;
+			session_id = 0;
 			break;
 		}
 
@@ -1882,6 +1897,7 @@ static int epp_process_connection(conn_rec *c)
 {
 	int	 i;
 	unsigned int	 loginid; /* login id of client */
+	ccReg_TID	 sessionid;	/* id for table log_session */
 	int	 rc;      /* corba ret code */
 	int	 ret;     /* command loop return code */
 	char	*version; /* version of fred_rifd */
@@ -1971,8 +1987,9 @@ static int epp_process_connection(conn_rec *c)
 
 	ret = epp_request_loop(&epp_ctx, bb, EPPservice, sc, &loginid);
 	/* send notification about session end to CR */
-	if (loginid > 0)
+	if (loginid > 0) {
 		epp_call_end_session(&epp_ctx, EPPservice, loginid);
+	}
 
 	epp_ctx.pool = c->pool;
 

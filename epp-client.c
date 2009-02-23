@@ -341,7 +341,7 @@ ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char 
 			CORBA_free(c_props->_buffer[c_props->_length].name);
 			return NULL;
 		}
-		c_props->_buffer[c_props->_length].output = output;   // TODO true if it's output
+		c_props->_buffer[c_props->_length].output = output;   
 		c_props->_buffer[c_props->_length].child = child;
 		c_props->_length++;
 	}
@@ -408,9 +408,118 @@ ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const c
 	c_props->_length++;
 
 	return c_props;
-	
+
 }
 #undef ALLOC_STEP
+
+/** Log a new session using fred-logd
+ * @param service 	Reference to the CORBA service 
+ * @param name		handle of the registrar
+ * @param clTRID	client transaction id of the login
+ * @param lang		language (en,cs,...)
+ * @param log_session_id id for log_session table
+ *
+ * @returns		CORBA status code
+ */
+int epp_log_new_session(service_Logger service, const char *name, const char *clTRID, epp_lang lang, ccReg_TID * const log_session_id, char *errmsg)
+{
+	CORBA_Environment ev[1];
+	CORBA_char *c_name, *c_clTRID;
+	ccReg_Languages c_lang;
+	int retr;
+
+	c_name = wrap_str(name);
+	if(c_name == NULL) {
+		return CORBA_INT_ERROR;
+	}
+	
+	c_clTRID = wrap_str(clTRID);
+	if(c_clTRID == NULL) {
+		CORBA_free(c_name);
+		return CORBA_INT_ERROR;
+	}
+	
+	c_lang = (lang == LANG_EN) ? ccReg_EN : ccReg_CS;
+
+	/* retry loop */
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev); // valid first time 
+		CORBA_exception_init(ev);
+
+		*log_session_id = ccReg_Logger_new_session((ccReg_Logger) service, c_lang, c_name, c_clTRID, ev);
+		// *log_session_id = ccReg_Logger_new_session((ccReg_Logger) service, c_name, c_clTRID, ev);
+
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+
+		usleep(RETR_SLEEP);
+	}
+
+	CORBA_free(c_name);
+	CORBA_free(c_clTRID);
+
+	if (raised_exception(ev)) {
+		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
+		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
+		CORBA_exception_free(ev);
+		return CORBA_ERROR;
+	}
+	CORBA_exception_free(ev);
+
+	return CORBA_OK;
+}
+
+/** End a log session through fred-logd
+ * @param service 	Reference to the CORBA service 
+ * @param clTRID	client transaction id of the login
+ * @param log_session_id id for log_session table - session which is to be ended
+ * @param errmsg	error message
+ *
+ * @returns		CORBA status code
+ */
+int epp_log_end_session(service_Logger service, const char *clTRID, ccReg_TID log_session_id, char *errmsg)
+{
+	CORBA_Environment ev[1];
+	CORBA_char *c_clTRID;
+	CORBA_boolean success;
+	int retr;
+
+	c_clTRID = wrap_str(clTRID);
+	if(c_clTRID == NULL) {
+		return CORBA_INT_ERROR;
+	}
+
+	/* retry loop */
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev); /* valid first time */
+		CORBA_exception_init(ev);
+
+		/* call logger method */
+		
+		success = ccReg_Logger_end_session((ccReg_Logger) service, log_session_id, c_clTRID, ev);
+
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+
+		usleep(RETR_SLEEP);
+	}
+	CORBA_free(c_clTRID);
+	
+	if (raised_exception(ev)) {
+		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
+		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
+		CORBA_exception_free(ev);
+		return CORBA_ERROR;
+	}
+	CORBA_exception_free(ev);
+
+	if(success == CORBA_FALSE) {
+		return CORBA_REMOTE_ERROR;
+	} else {
+		return CORBA_OK;
+	}
+}
+
 
 /**
  * Log a new event using fred-logd
@@ -433,7 +542,6 @@ int epp_log_new_message(service_Logger service,
 	CORBA_char *c_sourceIP, *c_content;
 	int	 retr;  /* retry counter */
 	int	 ret;
-	int 	 success;
 
 	c_sourceIP = wrap_str(sourceIP);
 	if(c_sourceIP == NULL) {
@@ -462,7 +570,7 @@ int epp_log_new_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		log_act_entry_id = ccReg_Log_new_event((ccReg_Log) service, c_sourceIP,  ccReg_LC_EPP, c_content, properties, ev);
+		log_act_entry_id = ccReg_Logger_new_event((ccReg_Logger) service, c_sourceIP,  ccReg_LC_EPP, c_content, properties, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
@@ -528,7 +636,7 @@ int epp_log_close_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		success = ccReg_Log_update_event_close((ccReg_Log) service, log_act_entry_id, c_content, properties, ev);
+		success = ccReg_Logger_update_event_close((ccReg_Logger) service, log_act_entry_id, c_content, properties, ev);
 
 		/* if COMM_FAILURE is not raised then quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
