@@ -117,6 +117,11 @@
  */
 #define MAX_FRAME_LENGTH	16000
 
+/** logging (fred-logd) : error codes, they shouldn't collide with database IDs
+ */
+#define LOG_IGNORED_REQUEST -1
+#define LOG_INTERNAL_ERROR   0
+
 /**
  * eppd_module declaration.
  */
@@ -128,7 +133,7 @@ module AP_MODULE_DECLARE_DATA eppd_module;
 static void *get_corba_service(epp_context *epp_ctx, char *name);
 
 static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c,
-		int stat, qhead *valerr, const char *response, const epp_command_data *cdata,  int session_id);
+		int stat, qhead *valerr, const char *response, const epp_command_data *cdata,  int session_id, ccReg_TID log_entry_id);
 
 /**
  * SSL variable lookup function pointer used for client's PEM encoded
@@ -1065,34 +1070,35 @@ ccReg_LogProperties *epp_log_disclose_info(ccReg_LogProperties *p, epp_discl *ed
  * @param	c			connection record
  * @param	request		raw content of the request
  * @param 	cdata		command data, parsed content
- * @param   cmdtype 	command type returned by parse_command function
+ * @param   	cmdtype 	command type returned by parse_command function
  * @param 	sessionid   login id for the session
  *
- * @return  status
+ * @return  database ID of the new logging record or a status code
  */
-static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *request, epp_command_data *cdata, epp_red_command_type cmdtype, int sessionid)
+static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *request, epp_command_data *cdata, epp_red_command_type cmdtype, int sessionid)
 {
 #define PUSH_PROPERTY(seq, name, value)								\
 	seq = epp_property_push(seq, name, value, CORBA_FALSE, CORBA_FALSE);	\
 	if(seq == NULL) {												\
-		return HTTP_INTERNAL_SERVER_ERROR;							\
+		return LOG_INTERNAL_ERROR;							\
 	}
 
 #define PUSH_PROPERTY_INT(seq, name, value)							\
 	seq = epp_property_push_int(seq, name, value, CORBA_FALSE);		\
 	if(seq == NULL) {												\
-		return HTTP_INTERNAL_SERVER_ERROR;							\
+		return LOG_INTERNAL_ERROR;							\
 	}
 
 #define PUSH_QHEAD(seq, list, name)									\
 	seq = epp_property_push_qhead(seq, list, name, CORBA_FALSE, CORBA_FALSE);	\
 	if(seq == NULL) {												\
-		return HTTP_INTERNAL_SERVER_ERROR;							\
+		return LOG_INTERNAL_ERROR;							\
 	}
 
 	int res;								/* response from corba call wrapper */
-	char *cmd_name = NULL;					/* command name to be used
-												one of the basic properties */
+	char *cmd_name = NULL;					/* command name to be used one of the basic properties */
+	ccReg_TID log_entry_id;
+
 	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
 	ccReg_LogProperties *c_props = NULL;	/* properties to be sent to the log */
 	/* data structures for every command */
@@ -1116,10 +1122,10 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 		PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
 
-		res = epp_log_new_message(service, c->remote_ip, request, c_props, &errmsg);
+		res = epp_log_new_message(service, c->remote_ip, request, c_props, &errmsg, &log_entry_id);
 
-		if(res == CORBA_OK) return HTTP_OK;
-		else return HTTP_INTERNAL_SERVER_ERROR;
+		if(res == CORBA_OK) return log_entry_id;
+		else return LOG_INTERNAL_ERROR;
 	}
 
 	switch(cmdtype) {
@@ -1141,7 +1147,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 				PUSH_PROPERTY(c_props, "password", el->pw);
 				PUSH_PROPERTY(c_props, "newPassword", el->newPW);
 			} else {
-				return HTTP_OK;
+				return LOG_IGNORED_REQUEST;
 			}
 			break;
 
@@ -1220,7 +1226,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 
 					// postal info
 					if ((c_props = epp_log_postal_info(c_props, &cc->pi)) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 
 					PUSH_PROPERTY(c_props, "voice", cc->voice);
@@ -1230,7 +1236,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 
 					// disclose info
 					if ((c_props = epp_log_disclose_info(c_props, &cc->discl)) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 
 					PUSH_PROPERTY(c_props, "vat", cc->vat);
@@ -1279,7 +1285,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_PROPERTY_INT(c_props, "reportLevel", cn->level);
 									// COMMON
 					if((c_props = epp_property_push_nsset(c_props, &cn->ns, "ns")) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 					PUSH_QHEAD(c_props, &cn->tech, "techC");
 
@@ -1293,10 +1299,10 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					// COMMON
 
 					if((c_props=epp_property_push_ds(c_props, &ck->ds, "ds")) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 					if((c_props=epp_property_push_dnskey(c_props, &ck->keys, "keys")) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 
 					PUSH_QHEAD(c_props, &ck->tech, "techContact");
@@ -1339,7 +1345,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_PROPERTY(c_props, "id", uc->id);
 
 					if ( (c_props=epp_log_postal_info(c_props, uc->pi)) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 
 					PUSH_PROPERTY(c_props, "voice", uc->voice);
@@ -1348,7 +1354,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_PROPERTY(c_props, "authInfo", uc->authInfo);
 
 					if ( (c_props=epp_log_disclose_info(c_props, &uc->discl)) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 
 					PUSH_PROPERTY(c_props, "vat", uc->vat);
@@ -1398,7 +1404,7 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_QHEAD(c_props, &un->add_tech, "addTechC");
 					PUSH_QHEAD(c_props, &un->rem_tech, "remTechC");
 					if((c_props = epp_property_push_nsset(c_props, &un->add_ns, "addNs")) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 					PUSH_QHEAD(c_props, &un->rem_ns, "remNs");
 
@@ -1415,17 +1421,17 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 					PUSH_QHEAD(c_props, &uk->add_tech, "addTech");
 					PUSH_QHEAD(c_props, &uk->rem_tech, "remTech");
 					if((c_props = epp_property_push_ds(c_props, &uk->add_ds, "addDs")) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 					if((c_props = epp_property_push_ds(c_props, &uk->rem_ds, "remDs")) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 
 					if((c_props = epp_property_push_dnskey(c_props, &uk->add_dnskey, "addKeys")) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 					if((c_props = epp_property_push_dnskey(c_props, &uk->rem_dnskey, "remKeys")) == NULL) {
-						return HTTP_INTERNAL_SERVER_ERROR;
+						return LOG_INTERNAL_ERROR;
 					}
 
 					break;
@@ -1450,10 +1456,10 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
 		PUSH_PROPERTY_INT (c_props, "sessionId", sessionid);
 	}
 
-	res = epp_log_new_message(service, c->remote_ip, request, c_props, &errmsg);
+	res = epp_log_new_message(service, c->remote_ip, request, c_props, &errmsg, &log_entry_id);
 
-	if(res == CORBA_OK) return HTTP_OK;
-	else return HTTP_INTERNAL_SERVER_ERROR;
+	if(res == CORBA_OK) return log_entry_id;
+	else return LOG_INTERNAL_ERROR;
 
 #undef PUSH_PROPERTY
 #undef PUSH_PROPERTY_INT
@@ -1471,12 +1477,12 @@ static apr_status_t log_epp_command(service_Logger *service, conn_rec *c, char *
  * @param	valerr		list of errors in input xml
  * @param	response	raw content of the response
  * @param 	cdata		command data, parsed content
- * @param 	session_id		id into the login database table for this session
+ * @param 	session_id		Id into the login database table for this session
+ * @param	log_entry_id 	Id of the log_entry record which will be updated by this call. The Id was obtained by log_epp_command()
  *
  * @return  status
  */
-static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, int stat, qhead *valerr,
-		const char *response, const epp_command_data *cdata, int session_id)
+static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, int stat, qhead *valerr, const char *response, const epp_command_data *cdata, int session_id, ccReg_TID log_entry_id)
 {
 	int res;
 
@@ -1531,7 +1537,7 @@ static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, i
 		}
 	}
 
-	res = epp_log_close_message(log_service, response, c_props, &errmsg);
+	res = epp_log_close_message(log_service, response, c_props, log_entry_id, &errmsg);
 
 	if(res == CORBA_OK) return HTTP_OK;
 	else return HTTP_INTERNAL_SERVER_ERROR;
@@ -1554,6 +1560,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	int	 retval;         /* return code of read_request */
 	unsigned int	 login_id;        /* login id of client's session */
 	ccReg_TID 	 session_id;	  /* id for log_session table */
+	ccReg_TID 	 act_log_entry_id;
 	service_Logger   *logger_service;  /* reference to the fred-logd service */
 
 
@@ -1663,7 +1670,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 
 		// if there wasn't anything seriously wrong, log the request
-		log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type, session_id);
+		act_log_entry_id = log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type, session_id);
 
 #ifdef EPP_PERF
 		times[2] = apr_time_now(); /* after logging */
@@ -1702,10 +1709,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 				return HTTP_INTERNAL_SERVER_ERROR;
 			}
 
-			// log_epp_response(logger_service, epp_ctx->conn, gstat, NULL, response, cdata, loginid);
-		}
 		/* it is a command */
-		else {
+		} else {
 			gen_status gstat; /* XML generator return status */
 			qhead valerr;	/* encountered errors when validating response */
 			int gret;     /* return value from XML generator */
@@ -1751,10 +1756,14 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			/* put login id to the log record if it's not already there
 			 * (i.e. only in case we just logged in)
 			 */
-			if (pstat == PARSER_CMD_LOGIN) {
-				log_epp_response(logger_service, epp_ctx->conn, gstat, &valerr, response, cdata, session_id);
-			} else {
-				log_epp_response(logger_service, epp_ctx->conn, gstat, &valerr, response, cdata, 0);
+
+			// if we have a valid log_entry id (if not, there was some error 
+ 			if (act_log_entry_id > 0) {
+				if (pstat == PARSER_CMD_LOGIN) {
+					log_epp_response(logger_service, epp_ctx->conn, gstat, &valerr, response, cdata, session_id, act_log_entry_id);
+				} else {
+					log_epp_response(logger_service, epp_ctx->conn, gstat, &valerr, response, cdata, 0, act_log_entry_id);
+				}
 			}
 
 			if (!gret) return HTTP_INTERNAL_SERVER_ERROR;

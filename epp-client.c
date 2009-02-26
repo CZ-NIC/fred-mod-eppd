@@ -117,9 +117,6 @@ static int error_translator[][2] =
   {-1, -1}
 };
 
-/** ID of a new entry in the logging database */
-static ccReg_TID log_act_entry_id;
-
 /**
  * Translate error code from IDL code to mod_eppd's code.
  *
@@ -528,6 +525,7 @@ int epp_log_end_session(service_Logger service, const char *clTRID, ccReg_TID lo
  * @param sourceIP		IP address of the client
  * @param content		content of the request
  * @param properties	List of properties (name, value pairs)
+ * @param log_entry_id		output of ID of the new entry in log_entry database table. Id is used in other calls to logging
  * @param errmsg		Output of a CORBA error message
  *
  * @returns				CORBA status code
@@ -536,6 +534,7 @@ int epp_log_new_message(service_Logger service,
 		const char *sourceIP,
 		const char *content,
 		ccReg_LogProperties *properties,
+         	ccReg_TID *log_entry_id,
 		char *errmsg)
 {
 	CORBA_Environment	 ev[1];
@@ -551,8 +550,7 @@ int epp_log_new_message(service_Logger service,
 	if(c_content == NULL) {
 		CORBA_free(c_sourceIP);
 		return CORBA_INT_ERROR;
-	}
-
+	} 
 	if(properties == NULL) {
 		properties = ccReg_LogProperties__alloc();
 		if(properties == NULL) {
@@ -570,7 +568,7 @@ int epp_log_new_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		log_act_entry_id = ccReg_Logger_new_event((ccReg_Logger) service, c_sourceIP,  ccReg_LC_EPP, c_content, properties, ev);
+		*log_entry_id = ccReg_Logger_new_event((ccReg_Logger) service, c_sourceIP,  ccReg_LC_EPP, c_content, properties, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
@@ -601,12 +599,14 @@ int epp_log_new_message(service_Logger service,
  * @param content		content of the response
  * @param properties	list of properties associated with response
  * @param errmsg		output of CORBA errors
+ * @param log_entry_id		ID of entry to close in log_entry table
  *
  * @returns				CORBA status code
  */
 int epp_log_close_message(service_Logger service,
 		const char *content,
 		ccReg_LogProperties *properties,
+		ccReg_TID log_entry_id,
 		char *errmsg)
 {
 	CORBA_Environment	 ev[1];
@@ -636,7 +636,7 @@ int epp_log_close_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		success = ccReg_Logger_update_event_close((ccReg_Logger) service, log_act_entry_id, c_content, properties, ev);
+		success = ccReg_Logger_update_event_close((ccReg_Logger) service, log_entry_id, c_content, properties, ev);
 
 		/* if COMM_FAILURE is not raised then quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
