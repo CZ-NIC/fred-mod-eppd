@@ -135,6 +135,8 @@ static void *get_corba_service(epp_context *epp_ctx, char *name);
 static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c,
 		int stat, qhead *valerr, const char *response, const epp_command_data *cdata,  int session_id, ccReg_TID log_entry_id);
 
+static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *request, epp_command_data *cdata, epp_red_command_type cmdtype, int sessionid);
+
 /**
  * SSL variable lookup function pointer used for client's PEM encoded
  * certificate retrieval.
@@ -1122,7 +1124,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 		PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
 
-		res = epp_log_new_message(service, c->remote_ip, request, c_props, &errmsg, &log_entry_id);
+		res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, &errmsg);
 
 		if(res == CORBA_OK) return log_entry_id;
 		else return LOG_INTERNAL_ERROR;
@@ -1456,7 +1458,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 		PUSH_PROPERTY_INT (c_props, "sessionId", sessionid);
 	}
 
-	res = epp_log_new_message(service, c->remote_ip, request, c_props, &errmsg, &log_entry_id);
+	res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, &errmsg);
 
 	if(res == CORBA_OK) return log_entry_id;
 	else return LOG_INTERNAL_ERROR;
@@ -1671,6 +1673,10 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 		// if there wasn't anything seriously wrong, log the request
 		act_log_entry_id = log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type, session_id);
+
+		if(act_log_entry_id == 0) {
+			epplog(epp_ctx, EPP_WARNING, "Error while logging the request" );
+		}
 
 #ifdef EPP_PERF
 		times[2] = apr_time_now(); /* after logging */
