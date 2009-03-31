@@ -151,6 +151,21 @@ ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead
 ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child);
 ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value, CORBA_boolean output);
 
+int epp_log_close_message(service_Logger service,
+		const char *content,
+		ccReg_LogProperties *properties,
+		ccReg_TID log_entry_id,
+		char *errmsg);
+int epp_log_end_session(service_Logger service, const char *clTRID, ccReg_TID log_session_id, char *errmsg);
+int epp_log_new_message(service_Logger service,
+		const char *sourceIP,
+		const char *content,
+		ccReg_LogProperties *properties,
+         	ccReg_TID *log_entry_id,
+         	epp_action_type action_type,
+		char *errmsg);
+int epp_log_new_session(service_Logger service, const char *name, const char *clTRID, epp_lang lang, ccReg_TID * const log_session_id, char *errmsg);
+
 
 #define MAX_ERROR_MSG_LEN	100
 

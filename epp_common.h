@@ -222,6 +222,58 @@ typedef struct {
 	int	 position;
 }epp_error;
 
+/** EPP action types
+ * for now only a copy of current enum_action
+ *
+ * TODO maybe it should be updated
+ */
+typedef enum {
+	ClientLogin = 100,
+	ClientLogout = 101,
+	PollAcknowledgement = 120,
+	PollResponse = 121,
+	ContactCheck = 200,
+	ContactInfo = 201,
+	ContactDelete = 202,
+	ContactUpdate = 203,
+	ContactCreate = 204,
+	ContactTransfer = 205,
+	NSsetCheck = 400,
+	NSsetInfo = 401,
+	NSsetDelete = 402,
+	NSsetUpdate = 403,
+	NSsetCreate = 404,
+	NSsetTransfer = 405,
+	DomainCheck = 500,
+	DomainInfo = 501,
+	DomainDelete = 502,
+	DomainUpdate = 503,
+	DomainCreate = 504,
+	DomainTransfer = 505,
+	DomainRenew = 506,
+	DomainTrade = 507,
+	KeysetCheck = 600,
+	KeysetInfo = 601,
+	KeysetDelete = 602,
+	KeysetUpdate = 603,
+	KeysetCreate = 604,
+	KeysetTransfer = 605,
+	UnknownAction = 1000,
+	ListContact = 1002,
+	ListNSset = 1004,
+	ListDomain = 1005,
+	ListKeySet = 1006,
+	ClientCredit = 1010,
+	nssetTest = 1012,
+	ContactSendAuthInfo = 1101,
+	NSSetSendAuthInfo = 1102,
+	DomainSendAuthInfo = 1103,
+	Info = 1104,
+	GetInfoResults = 1105,
+	KeySetSendAuthInfo = 1106
+} epp_action_type;
+
+
 /**
  * @defgroup queuegroup Queue structure and utilities
  * @{

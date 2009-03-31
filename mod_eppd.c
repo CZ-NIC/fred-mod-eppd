@@ -117,10 +117,10 @@
  */
 #define MAX_FRAME_LENGTH	16000
 
-/** logging (fred-logd) : error codes, they shouldn't collide with database IDs
+/** logging (fred-logd) : error code, it shouldn't collide with database IDs
+ *  and also it's an unsigned type
  */
-#define LOG_IGNORED_REQUEST -1
-#define LOG_INTERNAL_ERROR   0
+#define LOG_REQ_NOT_SAVED   0
 
 /**
  * eppd_module declaration.
@@ -657,7 +657,7 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
  */
 static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger *service_log,
 		epp_command_data *cdata, parser_status pstat,
-		unsigned int *loginid, ccReg_TID const *session_id, epp_lang *lang)
+		unsigned int *loginid, ccReg_TID * const session_id, epp_lang *lang)
 {
 	corba_status	cstat; /* ret code of corba component */
 	char errmsg[MAX_ERROR_MSG_LEN];		/* error message returned from corba call */
@@ -672,12 +672,12 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 
 			registrar_id = ((epps_login*)cdata->data)->clID;
 			cstat = epp_log_new_session(service_log, registrar_id, cdata->clTRID, *lang, session_id, errmsg);
-		}	
+		}
 	}
 	else if (pstat == PARSER_CMD_LOGOUT) {
 		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
 		epplog(epp_ctx, EPP_DEBUG, "login id after logout command is %d", *loginid);
-		
+
 		if(cstat == CORBA_OK) {
 			cstat = epp_log_end_session(service_log, cdata->clTRID, *session_id, errmsg);
 		}
@@ -1072,7 +1072,7 @@ ccReg_LogProperties *epp_log_disclose_info(ccReg_LogProperties *p, epp_discl *ed
  * @param	c			connection record
  * @param	request		raw content of the request
  * @param 	cdata		command data, parsed content
- * @param   	cmdtype 	command type returned by parse_command function
+ * @param   cmdtype 	command type returned by parse_command function
  * @param 	sessionid   login id for the session
  *
  * @return  database ID of the new logging record or a status code
@@ -1082,28 +1082,30 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 #define PUSH_PROPERTY(seq, name, value)								\
 	seq = epp_property_push(seq, name, value, CORBA_FALSE, CORBA_FALSE);	\
 	if(seq == NULL) {												\
-		return LOG_INTERNAL_ERROR;							\
+		return LOG_REQ_NOT_SAVED;							\
 	}
 
 #define PUSH_PROPERTY_INT(seq, name, value)							\
 	seq = epp_property_push_int(seq, name, value, CORBA_FALSE);		\
 	if(seq == NULL) {												\
-		return LOG_INTERNAL_ERROR;							\
+		return LOG_REQ_NOT_SAVED;							\
 	}
 
 #define PUSH_QHEAD(seq, list, name)									\
 	seq = epp_property_push_qhead(seq, list, name, CORBA_FALSE, CORBA_FALSE);	\
 	if(seq == NULL) {												\
-		return LOG_INTERNAL_ERROR;							\
+		return LOG_REQ_NOT_SAVED;							\
 	}
 
 	int res;								/* response from corba call wrapper */
+	epp_action_type action_type = UnknownAction;
 	char *cmd_name = NULL;					/* command name to be used one of the basic properties */
 	ccReg_TID log_entry_id;
 
 	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
 	ccReg_LogProperties *c_props = NULL;	/* properties to be sent to the log */
 	/* data structures for every command */
+	epps_sendAuthInfo *ai;
 	epps_create_contact *cc;
 	epps_create_domain *cd;
 	epps_create_nsset *cn;
@@ -1124,15 +1126,16 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 		PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
 
-		res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, &errmsg);
+		res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, action_type, errmsg);
 
 		if(res == CORBA_OK) return log_entry_id;
-		else return LOG_INTERNAL_ERROR;
+		else return LOG_REQ_NOT_SAVED;
 	}
 
 	switch(cmdtype) {
 		case EPP_RED_LOGIN:
 			if (cdata->type == EPP_LOGIN){
+				action_type = ClientLogin;
 				cmd_name = "login";
 
 				el = cdata->data;
@@ -1149,15 +1152,53 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 				PUSH_PROPERTY(c_props, "password", el->pw);
 				PUSH_PROPERTY(c_props, "newPassword", el->newPW);
 			} else {
-				return LOG_IGNORED_REQUEST;
+				ai = cdata->data;
+
+				switch(cdata->type) {
+					case EPP_SENDAUTHINFO_CONTACT:
+						action_type = ContactSendAuthInfo;
+						cmd_name = "sendAuthInfoContact";
+						break;
+					case EPP_SENDAUTHINFO_DOMAIN:
+						action_type = DomainSendAuthInfo;
+						cmd_name = "sendAuthInfoContact";
+						break;
+					case EPP_SENDAUTHINFO_NSSET:
+						action_type = NSSetSendAuthInfo;
+						cmd_name = "sendAuthInfoContact";
+						break;
+					case EPP_SENDAUTHINFO_KEYSET:
+						action_type = KeySetSendAuthInfo;
+						cmd_name = "sendAuthInfoContact";
+						break;
+					default:
+						return LOG_REQ_NOT_SAVED;
+				}
+
+				PUSH_PROPERTY(c_props, "id", ai->id);
 			}
 			break;
 
 		case EPP_RED_LOGOUT:
+			action_type = ClientLogout;
 			cmd_name = "logout";
 			break;
 
 		case EPP_RED_CHECK:
+			switch(cdata->type) {
+				case EPP_CHECK_CONTACT:
+					action_type = ContactCheck;
+					break;
+				case EPP_CHECK_DOMAIN:
+					action_type = DomainCheck;
+					break;
+				case EPP_CHECK_NSSET:
+					action_type = NSsetCheck;
+					break;
+				case EPP_CHECK_KEYSET:
+					action_type = KeysetCheck;
+					break;
+			}
 			cmd_name = "check";
 			ec = cdata->data;
 			PUSH_QHEAD(c_props, &ec->ids, "checkId");
@@ -1167,15 +1208,19 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 			switch(cdata->type) {
 				case EPP_LIST_CONTACT:
+					action_type = ListContact;
 					cmd_name = "listContact";
 					break;
 				case EPP_LIST_KEYSET:
+					action_type = ListKeySet;
 					cmd_name = "listKeyset";
 					break;
 				case EPP_LIST_NSSET:
+					action_type = ListNSset;
 					cmd_name = "listNsset";
 					break;
 				case EPP_LIST_DOMAIN:
+					action_type = ListDomain;
 					cmd_name = "listDomain";
 					break;
 
@@ -1183,6 +1228,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					epps_info_contact *i = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", i->id)
+					action_type = ContactInfo;
 					cmd_name = "infoContact";
 					break;
 				}
@@ -1190,6 +1236,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					epps_info_keyset *i = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", i->id)
+					action_type = KeysetInfo;
 					cmd_name = "infoKeyset";
 					break;
 				}
@@ -1197,6 +1244,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					epps_info_nsset *i = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", i->id)
+					action_type = NSsetInfo;
 					cmd_name = "infoNsset";
 					break;
 				}
@@ -1204,23 +1252,30 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					epps_info_domain *i = cdata->data;
 
 					PUSH_PROPERTY(c_props, "name", i->name)
+					action_type = DomainInfo;
 					cmd_name = "infoDomain";
 					break;
 				}
+				default:
+					break;
 			}
 			break;
 
 		case EPP_RED_POLL:
 			cmd_name = "poll";
 			if(cdata->type == EPP_POLL_ACK) {
+				action_type = PollAcknowledgement;
 				epps_poll_ack *pa = cdata->data;
 				PUSH_PROPERTY(c_props, "msgId", pa->msgid);
+			} else {
+				action_type = PollResponse;
 			}
 			break;
 
 		case EPP_RED_CREATE:
 			switch(cdata->type) {
 				case EPP_CREATE_CONTACT:
+					action_type = ContactCreate;
 					cmd_name = "createContact";
 					cc = cdata->data;
 
@@ -1228,7 +1283,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 					// postal info
 					if ((c_props = epp_log_postal_info(c_props, &cc->pi)) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 
 					PUSH_PROPERTY(c_props, "voice", cc->voice);
@@ -1238,7 +1293,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 					// disclose info
 					if ((c_props = epp_log_disclose_info(c_props, &cc->discl)) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 
 					PUSH_PROPERTY(c_props, "vat", cc->vat);
@@ -1257,6 +1312,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					break;
 
 				case EPP_CREATE_DOMAIN:
+					action_type = DomainCreate;
 					cmd_name = "createDomain";
 					cd = cdata->data;
 
@@ -1279,6 +1335,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					break;
 
 				case EPP_CREATE_NSSET:
+					action_type = NSsetCreate;
 					cmd_name = "createNsset";
 					cn = cdata->data;
 
@@ -1287,12 +1344,13 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					PUSH_PROPERTY_INT(c_props, "reportLevel", cn->level);
 									// COMMON
 					if((c_props = epp_property_push_nsset(c_props, &cn->ns, "ns")) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 					PUSH_QHEAD(c_props, &cn->tech, "techC");
 
 					break;
 				case EPP_CREATE_KEYSET:
+					action_type = KeysetCreate;
 					cmd_name = "createKeyset";
 					ck = cdata->data;
 
@@ -1301,10 +1359,10 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					// COMMON
 
 					if((c_props=epp_property_push_ds(c_props, &ck->ds, "ds")) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 					if((c_props=epp_property_push_dnskey(c_props, &ck->keys, "keys")) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 
 					PUSH_QHEAD(c_props, &ck->tech, "techContact");
@@ -1315,6 +1373,22 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 			break;
 		case EPP_RED_DELETE:
+			switch(cdata->type) {
+				case EPP_DELETE_CONTACT:
+					action_type = ContactDelete;
+					break;
+				case EPP_DELETE_DOMAIN:
+					action_type = DomainDelete;
+					break;
+				case EPP_DELETE_NSSET:
+					action_type = NSsetDelete;
+					break;
+				case EPP_DELETE_KEYSET:
+					action_type = KeysetDelete;
+					break;
+				default:
+					break;
+			}
 			cmd_name = "delete";
 			ed = cdata->data;
 
@@ -1322,6 +1396,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 			break;
 
 		case EPP_RED_RENEW:
+			action_type = DomainRenew;
 			cmd_name = "renew";
 			er = cdata->data;
 
@@ -1340,6 +1415,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 			switch(cdata->type) {
 				case EPP_UPDATE_CONTACT:
+					action_type = ContactUpdate;
 					cmd_name = "updateContact";
 
 					uc = cdata->data;
@@ -1347,7 +1423,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					PUSH_PROPERTY(c_props, "id", uc->id);
 
 					if ( (c_props=epp_log_postal_info(c_props, uc->pi)) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 
 					PUSH_PROPERTY(c_props, "voice", uc->voice);
@@ -1356,7 +1432,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					PUSH_PROPERTY(c_props, "authInfo", uc->authInfo);
 
 					if ( (c_props=epp_log_disclose_info(c_props, &uc->discl)) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 
 					PUSH_PROPERTY(c_props, "vat", uc->vat);
@@ -1376,6 +1452,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					break;
 
 				case EPP_UPDATE_DOMAIN:
+					action_type = DomainUpdate;
 					cmd_name = "updateDomain";
 
 					ud = cdata->data;
@@ -1395,6 +1472,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					break;
 
 				case EPP_UPDATE_NSSET:
+					action_type = NSsetUpdate;
 					cmd_name = "updateNsset";
 					un = cdata->data;
 
@@ -1406,13 +1484,14 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					PUSH_QHEAD(c_props, &un->add_tech, "addTechC");
 					PUSH_QHEAD(c_props, &un->rem_tech, "remTechC");
 					if((c_props = epp_property_push_nsset(c_props, &un->add_ns, "addNs")) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 					PUSH_QHEAD(c_props, &un->rem_ns, "remNs");
 
 					break;
 
 				case EPP_UPDATE_KEYSET:
+					action_type = KeysetUpdate;
 					cmd_name = "updateKeyset";
 					uk = cdata->data;
 
@@ -1423,17 +1502,17 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					PUSH_QHEAD(c_props, &uk->add_tech, "addTech");
 					PUSH_QHEAD(c_props, &uk->rem_tech, "remTech");
 					if((c_props = epp_property_push_ds(c_props, &uk->add_ds, "addDs")) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 					if((c_props = epp_property_push_ds(c_props, &uk->rem_ds, "remDs")) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 
 					if((c_props = epp_property_push_dnskey(c_props, &uk->add_dnskey, "addKeys")) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 					if((c_props = epp_property_push_dnskey(c_props, &uk->rem_dnskey, "remKeys")) == NULL) {
-						return LOG_INTERNAL_ERROR;
+						return LOG_REQ_NOT_SAVED;
 					}
 
 					break;
@@ -1441,6 +1520,21 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 			break;
 
 		case EPP_RED_TRANSFER:
+			switch(cdata->type) {
+				case EPP_TRANSFER_CONTACT:
+					action_type = ContactTransfer;
+					break;
+				case EPP_TRANSFER_DOMAIN:
+					action_type = DomainTransfer;
+					break;
+				case EPP_TRANSFER_NSSET:
+					action_type = NSsetTransfer;
+					break;
+				case EPP_TRANSFER_KEYSET:
+					action_type = KeysetTransfer;
+					break;
+			}
+
 			cmd_name = "transfer";
 			et = cdata->data;
 
@@ -1458,10 +1552,10 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 		PUSH_PROPERTY_INT (c_props, "sessionId", sessionid);
 	}
 
-	res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, &errmsg);
+	res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, action_type, errmsg);
 
 	if(res == CORBA_OK) return log_entry_id;
-	else return LOG_INTERNAL_ERROR;
+	else return LOG_REQ_NOT_SAVED;
 
 #undef PUSH_PROPERTY
 #undef PUSH_PROPERTY_INT
@@ -1539,7 +1633,7 @@ static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, i
 		}
 	}
 
-	res = epp_log_close_message(log_service, response, c_props, log_entry_id, &errmsg);
+	res = epp_log_close_message(log_service, response, c_props, log_entry_id, errmsg);
 
 	if(res == CORBA_OK) return HTTP_OK;
 	else return HTTP_INTERNAL_SERVER_ERROR;
@@ -1763,7 +1857,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			 * (i.e. only in case we just logged in)
 			 */
 
-			// if we have a valid log_entry id (if not, there was some error 
+			// if we have a valid log_entry id (if not, there was some error
  			if (act_log_entry_id > 0) {
 				if (pstat == PARSER_CMD_LOGIN) {
 					log_epp_response(logger_service, epp_ctx->conn, gstat, &valerr, response, cdata, session_id, act_log_entry_id);
@@ -1852,7 +1946,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 static void *get_corba_service(epp_context *epp_ctx, char *name)
 {
 	int 		i;
-	apr_hash_t	*references;
+	apr_hash_t	*references; /* directory of CORBA object references */
 	module		*corba_module;
 	void		*service;
 	conn_rec 	*c = (conn_rec*)epp_ctx->conn;
@@ -1910,9 +2004,7 @@ static void *get_corba_service(epp_context *epp_ctx, char *name)
  */
 static int epp_process_connection(conn_rec *c)
 {
-	int	 i;
 	unsigned int	 loginid; /* login id of client */
-	ccReg_TID	 sessionid;	/* id for table log_session */
 	int	 rc;      /* corba ret code */
 	int	 ret;     /* command loop return code */
 	char	*version; /* version of fred_rifd */
@@ -1922,8 +2014,6 @@ static int epp_process_connection(conn_rec *c)
 	gen_status	 gstat; /* generator's return code */
 	epp_context	 epp_ctx;    /* context (session , connection, pool) */
 	service_EPP	 EPPservice; /* CORBA object reference */
-	apr_hash_t	*references; /* directory of CORBA object references */
-	module	*corba_module;
 	apr_bucket_brigade *bb;
 	server_rec	*s = c->base_server;
 	eppd_server_conf *sc = (eppd_server_conf *)
