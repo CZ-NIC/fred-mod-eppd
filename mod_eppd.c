@@ -1099,7 +1099,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 	int res;								/* response from corba call wrapper */
 	epp_action_type action_type = UnknownAction;
-	char *cmd_name = NULL;					/* command name to be used one of the basic properties */
 	ccReg_TID log_entry_id;
 
 	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
@@ -1122,7 +1121,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 	errmsg[0] = '\0';
 	if(cdata->type == EPP_DUMMY) {
-		PUSH_PROPERTY (c_props, "command", "dummy");
 		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 		PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
 
@@ -1136,7 +1134,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 		case EPP_RED_LOGIN:
 			if (cdata->type == EPP_LOGIN){
 				action_type = ClientLogin;
-				cmd_name = "login";
 
 				el = cdata->data;
 
@@ -1157,19 +1154,15 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 				switch(cdata->type) {
 					case EPP_SENDAUTHINFO_CONTACT:
 						action_type = ContactSendAuthInfo;
-						cmd_name = "sendAuthInfoContact";
 						break;
 					case EPP_SENDAUTHINFO_DOMAIN:
 						action_type = DomainSendAuthInfo;
-						cmd_name = "sendAuthInfoContact";
 						break;
 					case EPP_SENDAUTHINFO_NSSET:
 						action_type = NSSetSendAuthInfo;
-						cmd_name = "sendAuthInfoContact";
 						break;
 					case EPP_SENDAUTHINFO_KEYSET:
 						action_type = KeySetSendAuthInfo;
-						cmd_name = "sendAuthInfoContact";
 						break;
 					default:
 						return LOG_REQ_NOT_SAVED;
@@ -1181,7 +1174,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 		case EPP_RED_LOGOUT:
 			action_type = ClientLogout;
-			cmd_name = "logout";
 			break;
 
 		case EPP_RED_CHECK:
@@ -1199,7 +1191,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					action_type = KeysetCheck;
 					break;
 			}
-			cmd_name = "check";
 			ec = cdata->data;
 			PUSH_QHEAD(c_props, &ec->ids, "checkId");
 			break;
@@ -1209,19 +1200,15 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 			switch(cdata->type) {
 				case EPP_LIST_CONTACT:
 					action_type = ListContact;
-					cmd_name = "listContact";
 					break;
 				case EPP_LIST_KEYSET:
 					action_type = ListKeySet;
-					cmd_name = "listKeyset";
 					break;
 				case EPP_LIST_NSSET:
 					action_type = ListNSset;
-					cmd_name = "listNsset";
 					break;
 				case EPP_LIST_DOMAIN:
 					action_type = ListDomain;
-					cmd_name = "listDomain";
 					break;
 
 				case EPP_INFO_CONTACT: {
@@ -1229,7 +1216,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 					PUSH_PROPERTY(c_props, "id", i->id)
 					action_type = ContactInfo;
-					cmd_name = "infoContact";
 					break;
 				}
 				case EPP_INFO_KEYSET: {
@@ -1237,7 +1223,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 					PUSH_PROPERTY(c_props, "id", i->id)
 					action_type = KeysetInfo;
-					cmd_name = "infoKeyset";
 					break;
 				}
 				case EPP_INFO_NSSET: {
@@ -1245,7 +1230,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 					PUSH_PROPERTY(c_props, "id", i->id)
 					action_type = NSsetInfo;
-					cmd_name = "infoNsset";
 					break;
 				}
 				case EPP_INFO_DOMAIN: {
@@ -1253,7 +1237,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 					PUSH_PROPERTY(c_props, "name", i->name)
 					action_type = DomainInfo;
-					cmd_name = "infoDomain";
 					break;
 				}
 				default:
@@ -1262,7 +1245,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 			break;
 
 		case EPP_RED_POLL:
-			cmd_name = "poll";
+			// cmd_name = "poll";
 			if(cdata->type == EPP_POLL_ACK) {
 				action_type = PollAcknowledgement;
 				epps_poll_ack *pa = cdata->data;
@@ -1276,7 +1259,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 			switch(cdata->type) {
 				case EPP_CREATE_CONTACT:
 					action_type = ContactCreate;
-					cmd_name = "createContact";
 					cc = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", cc->id);
@@ -1313,7 +1295,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 				case EPP_CREATE_DOMAIN:
 					action_type = DomainCreate;
-					cmd_name = "createDomain";
 					cd = cdata->data;
 
 					PUSH_PROPERTY(c_props, "name", cd->name);
@@ -1336,7 +1317,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 				case EPP_CREATE_NSSET:
 					action_type = NSsetCreate;
-					cmd_name = "createNsset";
 					cn = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", cn->id);
@@ -1351,7 +1331,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					break;
 				case EPP_CREATE_KEYSET:
 					action_type = KeysetCreate;
-					cmd_name = "createKeyset";
 					ck = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", ck->id);
@@ -1389,7 +1368,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 				default:
 					break;
 			}
-			cmd_name = "delete";
 			ed = cdata->data;
 
 			PUSH_PROPERTY(c_props, "id", ed->id);
@@ -1397,7 +1375,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 		case EPP_RED_RENEW:
 			action_type = DomainRenew;
-			cmd_name = "renew";
 			er = cdata->data;
 
 			PUSH_PROPERTY(c_props, "name", er->name);
@@ -1416,7 +1393,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 			switch(cdata->type) {
 				case EPP_UPDATE_CONTACT:
 					action_type = ContactUpdate;
-					cmd_name = "updateContact";
 
 					uc = cdata->data;
 
@@ -1453,7 +1429,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 				case EPP_UPDATE_DOMAIN:
 					action_type = DomainUpdate;
-					cmd_name = "updateDomain";
 
 					ud = cdata->data;
 
@@ -1473,7 +1448,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 				case EPP_UPDATE_NSSET:
 					action_type = NSsetUpdate;
-					cmd_name = "updateNsset";
 					un = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", un->id);
@@ -1492,7 +1466,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 				case EPP_UPDATE_KEYSET:
 					action_type = KeysetUpdate;
-					cmd_name = "updateKeyset";
 					uk = cdata->data;
 
 					PUSH_PROPERTY(c_props, "id", uk->id);
@@ -1535,7 +1508,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					break;
 			}
 
-			cmd_name = "transfer";
 			et = cdata->data;
 
 			PUSH_PROPERTY(c_props, "id", et->id);
@@ -1545,7 +1517,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 			break;
 	}
 
-	PUSH_PROPERTY (c_props, "command", cmd_name);
   	PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 	PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
 	if(sessionid != 0) {
