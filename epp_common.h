@@ -268,9 +268,19 @@ typedef enum {
 	ContactSendAuthInfo = 1101,
 	NSSetSendAuthInfo = 1102,
 	DomainSendAuthInfo = 1103,
-	Info = 1104,
-	GetInfoResults = 1105,
-	KeySetSendAuthInfo = 1106
+	KeySetSendAuthInfo = 1106,
+	InfoListContacts = 1200,
+	InfoListDomains = 1201,
+	InfoListNssets = 1202,
+	InfoListKeysets = 1203,
+	InfoDomainsByNsset = 1204,
+	InfoDomainsByKeyset = 1205,
+	InfoDomainsByContact = 1206,
+	InfoNssetsByContact = 1207,
+	InfoNssetsByNs = 1208,
+	InfoKeysetsByContact = 1209,
+	InfoGetResults = 1210
+
 } epp_action_type;
 
 

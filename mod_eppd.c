@@ -1164,6 +1164,47 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					case EPP_SENDAUTHINFO_KEYSET:
 						action_type = KeySetSendAuthInfo;
 						break;
+
+					case EPP_CREDITINFO:
+						action_type = ClientCredit;
+						break;
+					case EPP_TEST_NSSET:
+						action_type = nssetTest;
+						break;
+
+					case EPP_INFO_LIST_CONTACTS:
+						action_type = InfoListContacts;
+						break;
+					case EPP_INFO_LIST_DOMAINS:
+						action_type = InfoListDomains;
+						break;
+					case EPP_INFO_LIST_NSSETS:
+						action_type = InfoListNssets;
+						break;
+					case EPP_INFO_LIST_KEYSETS:
+						action_type = InfoListKeysets;
+						break;
+					case EPP_INFO_DOMAINS_BY_NSSET:
+						action_type = InfoDomainsByNsset;
+						break;
+					case EPP_INFO_DOMAINS_BY_KEYSET:
+						action_type = InfoDomainsByKeyset;
+						break;
+					case EPP_INFO_DOMAINS_BY_CONTACT:
+						action_type = InfoDomainsByContact;
+						break;
+					case EPP_INFO_NSSETS_BY_CONTACT:
+						action_type = InfoNssetsByContact;
+						break;
+					case EPP_INFO_NSSETS_BY_NS:
+						action_type = InfoNssetsByNs;
+						break;
+					case EPP_INFO_KEYSETS_BY_CONTACT:
+						action_type = InfoKeysetsByContact;
+						break;
+					case EPP_INFO_GET_RESULTS:
+						action_type = InfoGetResults;
+						break;
 					default:
 						return LOG_REQ_NOT_SAVED;
 				}
