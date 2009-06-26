@@ -41,7 +41,6 @@ typedef void *service_EPP;
 /** Reference to fred-logd CORBA service */
 typedef void *service_Logger;
 
-
 /**
  * Purpose of this function is to get version string of ccReg from
  * corba server, which is used as part of server's name in <greeting>
@@ -141,30 +140,33 @@ epp_call_save_output_xml(epp_context *epp_ctx,
  * @param loginid     Login ID of client.
  */
 void
-epp_call_end_session(epp_context *epp_ctx, service_EPP service,
+epp_call_CloseSession(epp_context *epp_ctx, service_EPP service,
 		unsigned int loginid);
 
-struct ccReg_LogProperties;
+struct ccReg_RequestProperties;
 
 /* functions for filling log properties */
-ccReg_LogProperties *epp_property_push_qhead(ccReg_LogProperties *c_props, qhead *list, char *list_name, CORBA_boolean output, CORBA_boolean child);
-ccReg_LogProperties *epp_property_push(ccReg_LogProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child);
-ccReg_LogProperties *epp_property_push_int(ccReg_LogProperties *c_props, const char *name, int value, CORBA_boolean output);
+ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean output, CORBA_boolean child);
+ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child);
+ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value, CORBA_boolean output);
 
 int epp_log_close_message(service_Logger service,
 		const char *content,
-		ccReg_LogProperties *properties,
+		ccReg_RequestProperties *properties,
 		ccReg_TID log_entry_id,
+		ccReg_TID session_id,
 		char *errmsg);
-int epp_log_end_session(service_Logger service, const char *clTRID, ccReg_TID log_session_id, char *errmsg);
+
+int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char *errmsg);
 int epp_log_new_message(service_Logger service,
 		const char *sourceIP,
 		const char *content,
-		ccReg_LogProperties *properties,
+		ccReg_RequestProperties *properties,
          	ccReg_TID *log_entry_id,
          	epp_action_type action_type,
+		ccReg_TID sessionid, 
 		char *errmsg);
-int epp_log_new_session(service_Logger service, const char *name, const char *clTRID, epp_lang lang, ccReg_TID * const log_session_id, char *errmsg);
+int epp_log_CreateSession(service_Logger service, const char *name, epp_lang lang, ccReg_TID * const log_session_id, char *errmsg);
 
 
 #define MAX_ERROR_MSG_LEN	100

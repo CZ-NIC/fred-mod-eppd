@@ -671,18 +671,16 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 			char *registrar_id;
 
 			registrar_id = ((epps_login*)cdata->data)->clID;
-			cstat = epp_log_new_session(service_log, registrar_id, cdata->clTRID, *lang, session_id, errmsg);
+			cstat = epp_log_CreateSession(service_log, registrar_id, *lang, session_id, errmsg);
 		}
-	}
-	else if (pstat == PARSER_CMD_LOGOUT) {
+	} else if (pstat == PARSER_CMD_LOGOUT) {
 		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
 		epplog(epp_ctx, EPP_DEBUG, "login id after logout command is %d", *loginid);
 
 		if(cstat == CORBA_OK) {
-			cstat = epp_log_end_session(service_log, cdata->clTRID, *session_id, errmsg);
+			cstat = epp_log_CloseSession(service_log, *session_id, errmsg);
 		}
-	}
-	else {
+	} else {
 		/* go ahead to generic corba function call */
 		cstat = epp_call_cmd(epp_ctx, service, *loginid, cdata);
 	}
@@ -803,12 +801,12 @@ static int gen_response(service_Logger *logger_service, epp_context *epp_ctx, se
  * @returns 		log entry properties or NULL in case of an allocation error
  *
  */
-ccReg_LogProperties *epp_property_push_ds(ccReg_LogProperties *c_props, qhead *list, char *list_name)
+ccReg_RequestProperties *epp_property_push_ds(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
 {
 	char str[LOG_PROP_NAME_LENGTH]; /* property name */
 
 	epp_ds *value;				/* ds record data structure */
-	ccReg_LogProperties *ret;	/* return value in case the list is not empty	*/
+	ccReg_RequestProperties *ret;	/* return value in case the list is not empty	*/
 
 	if (q_length(*list) > 0) {
 
@@ -864,12 +862,12 @@ ccReg_LogProperties *epp_property_push_ds(ccReg_LogProperties *c_props, qhead *l
  * @returns 		log entry properties or NULL in case of an allocation error
  *
  */
-ccReg_LogProperties *epp_property_push_valerr(ccReg_LogProperties *c_props, qhead *list, char *list_name)
+ccReg_RequestProperties *epp_property_push_valerr(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
 {
 	char str[LOG_PROP_NAME_LENGTH]; /* property name */
 
 	epp_error *value;			/* ds record data structure */
-	ccReg_LogProperties *ret;	/* return value in case the list is not empty	*/
+	ccReg_RequestProperties *ret;	/* return value in case the list is not empty	*/
 
 	if (q_length(*list) > 0) {
 
@@ -907,12 +905,12 @@ ccReg_LogProperties *epp_property_push_valerr(ccReg_LogProperties *c_props, qhea
  * @returns 		log entry properties or NULL in case of an allocation error
  *
  */
-ccReg_LogProperties *epp_property_push_nsset(ccReg_LogProperties *c_props, qhead *list, char *list_name)
+ccReg_RequestProperties *epp_property_push_nsset(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
 {
 	char str[LOG_PROP_NAME_LENGTH]; /* property name */
 
 	epp_ns *value;				/* ds record data structure */
-	ccReg_LogProperties *ret;	/* return value in case the list is not empty	*/
+	ccReg_RequestProperties *ret;	/* return value in case the list is not empty	*/
 
 	if (q_length(*list) > 0) {
 
@@ -949,11 +947,11 @@ ccReg_LogProperties *epp_property_push_nsset(ccReg_LogProperties *c_props, qhead
  * @returns 		log entry properties or NULL in case of an allocation error
  *
  */
-ccReg_LogProperties *epp_property_push_dnskey(ccReg_LogProperties *c_props, qhead *list, char *list_name)
+ccReg_RequestProperties *epp_property_push_dnskey(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
 {
 	char str[LOG_PROP_NAME_LENGTH];
 	epp_dnskey *value;
-	ccReg_LogProperties *ret;
+	ccReg_RequestProperties *ret;
 
 	if (q_length(*list) > 0) {
 		q_foreach(list) {
@@ -1000,7 +998,7 @@ ccReg_LogProperties *epp_property_push_dnskey(ccReg_LogProperties *c_props, qhea
  *
  *  @returns 	log entry properties or NULL in case of an allocation error
  */
-ccReg_LogProperties *epp_log_postal_info(ccReg_LogProperties *p, epp_postalInfo *pi)
+ccReg_RequestProperties *epp_log_postal_info(ccReg_RequestProperties *p, epp_postalInfo *pi)
 {
 	if(pi == NULL) return p;
 
@@ -1030,7 +1028,7 @@ ccReg_LogProperties *epp_log_postal_info(ccReg_LogProperties *p, epp_postalInfo 
  *
  *  @returns 	log entry properties or NULL in case of an allocation error
  */
-ccReg_LogProperties *epp_log_disclose_info(ccReg_LogProperties *p, epp_discl *ed)
+ccReg_RequestProperties *epp_log_disclose_info(ccReg_RequestProperties *p, epp_discl *ed)
 {
 	if(ed->flag == 1) {
 		p = epp_property_push(p, "discl.policy", "private", CORBA_FALSE, CORBA_FALSE);
@@ -1102,7 +1100,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 	ccReg_TID log_entry_id;
 
 	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
-	ccReg_LogProperties *c_props = NULL;	/* properties to be sent to the log */
+	ccReg_RequestProperties *c_props = NULL;	/* properties to be sent to the log */
 	/* data structures for every command */
 	epps_sendAuthInfo *ai;
 	epps_create_contact *cc;
@@ -1124,7 +1122,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 		PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
 
-		res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, action_type, errmsg);
+		res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, action_type, 0, errmsg);
 
 		if(res == CORBA_OK) return log_entry_id;
 		else return LOG_REQ_NOT_SAVED;
@@ -1230,6 +1228,8 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					break;
 				case EPP_CHECK_KEYSET:
 					action_type = KeysetCheck;
+					break;
+				default:
 					break;
 			}
 			ec = cdata->data;
@@ -1560,11 +1560,13 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
   	PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 	PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
+/*
 	if(sessionid != 0) {
 		PUSH_PROPERTY_INT (c_props, "sessionId", sessionid);
 	}
+*/
 
-	res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, action_type, errmsg);
+	res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, action_type, sessionid, errmsg);
 
 	if(res == CORBA_OK) return log_entry_id;
 	else return LOG_REQ_NOT_SAVED;
@@ -1595,7 +1597,7 @@ static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, i
 	int res;
 
 	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
-	ccReg_LogProperties *c_props = NULL;	/* properties to be sent to the log */
+	ccReg_RequestProperties *c_props = NULL;	/* properties to be sent to the log */
 
 	// output properties
 	if (cdata != NULL) {
@@ -1638,14 +1640,8 @@ static apr_status_t log_epp_response(service_Logger *log_service, conn_rec *c, i
 
 	}
 
-	if (session_id != 0) {
-		c_props = epp_property_push_int(c_props, "sessionId", session_id, CORBA_TRUE);
-		if (c_props == NULL) {
-			return HTTP_INTERNAL_SERVER_ERROR;
-		}
-	}
+	res = epp_log_close_message(log_service, response, c_props, log_entry_id, session_id, errmsg);
 
-	res = epp_log_close_message(log_service, response, c_props, log_entry_id, errmsg);
 
 	if(res == CORBA_OK) return HTTP_OK;
 	else return HTTP_INTERNAL_SERVER_ERROR;
@@ -1770,7 +1766,6 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 					return HTTP_BAD_REQUEST;
 			}
 		}
-
 
 #ifdef EPP_PERF
 		times[1] = apr_time_now(); /* after parsing */
@@ -2105,7 +2100,7 @@ static int epp_process_connection(conn_rec *c)
 	ret = epp_request_loop(&epp_ctx, bb, EPPservice, sc, &loginid);
 	/* send notification about session end to CR */
 	if (loginid > 0) {
-		epp_call_end_session(&epp_ctx, EPPservice, loginid);
+		epp_call_CloseSession(&epp_ctx, EPPservice, loginid);
 	}
 
 	epp_ctx.pool = c->pool;
