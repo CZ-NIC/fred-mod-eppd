@@ -667,7 +667,8 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 		if (!call_login(epp_ctx, service, cdata, loginid, lang, &cstat))
 			return 0;
 
-		if (cstat == CORBA_OK) {
+		// if logged in successfully and fred-logd service is available
+		if (cstat == CORBA_OK && service_log != NULL) {
 			char *registrar_id;
 
 			registrar_id = ((epps_login*)cdata->data)->clID;
@@ -677,7 +678,8 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
 		epplog(epp_ctx, EPP_DEBUG, "login id after logout command is %d", *loginid);
 
-		if(cstat == CORBA_OK) {
+		// if logged out successfully and fred-logd service is available
+		if(cstat == CORBA_OK && service_log != NULL) {
 			cstat = epp_log_CloseSession(service_log, *session_id, errmsg);
 		}
 	} else {
@@ -710,8 +712,6 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 /**
  * Function generates XML response.
  *
- * @param logger_service
- * 					Logger CORBA object reference.
  * @param epp_ctx   EPP context.
  * @param service   EPP CORBA object reference.
  * @param cdata     Command data.
@@ -723,7 +723,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
  * @param valerr    encountered errors when validating response
  * @return          0 in case of internal error, 1 if ok.
  */
-static int gen_response(service_Logger *logger_service, epp_context *epp_ctx, service_EPP *service,
+static int gen_response(epp_context *epp_ctx, service_EPP *service,
 		epp_command_data *cdata, int validate, void *schema,
 		epp_lang lang, char **response, gen_status *gstat, qhead *valerr)
 {
@@ -1725,7 +1725,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		if (logger_service == NULL) {
 			epplog(epp_ctx, EPP_ERROR, "Could not obtain object reference "
 					"for alias '%s'.", sc->logger_object);
-			return HTTP_INTERNAL_SERVER_ERROR;
+		//  mod-eppd is not currently dependent on fred-logd request logging
+		//	return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
 		/*
@@ -1773,11 +1774,17 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 
 		// if there wasn't anything seriously wrong, log the request
-		act_log_entry_id = log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type, session_id);
+	
+		if(logger_service != NULL) {
+			act_log_entry_id = log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type, session_id);
 
-		if(act_log_entry_id == 0) {
-			epplog(epp_ctx, EPP_WARNING, "Error while logging the request" );
+			if(act_log_entry_id == 0) {
+				epplog(epp_ctx, EPP_WARNING, "Error while logging the request" );
+			}
+		} else {
+			act_log_entry_id = 0;
 		}
+
 
 #ifdef EPP_PERF
 		times[2] = apr_time_now(); /* after logging */
@@ -1856,7 +1863,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			}
 
 			/* generate response */
-			gret = gen_response(logger_service, epp_ctx, EPPservice, cdata,
+			gret = gen_response(epp_ctx, EPPservice, cdata,
 						sc->valid_resp, sc->schema,
 						lang, &response, &gstat, &valerr);
 
@@ -1865,7 +1872,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			 */
 
 			// if we have a valid log_entry id (if not, there was some error
- 			if (act_log_entry_id > 0) {
+ 			if (act_log_entry_id > 0 && logger_service != NULL) {
 				if (pstat == PARSER_CMD_LOGIN) {
 					log_epp_response(logger_service, epp_ctx->conn, gstat, &valerr, response, cdata, session_id, act_log_entry_id);
 				} else {
