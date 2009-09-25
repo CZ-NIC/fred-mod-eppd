@@ -3163,6 +3163,8 @@ epp_parse_command(epp_context *epp_ctx,
 		case 'e':
 			/* It is an <extension> element. */
 			if (!strcmp(elemname, "extension")) {
+				*cmd_type = EPP_RED_EXTCMD;
+				
 				if (!loggedin) {
 					cdata->type = EPP_DUMMY;
 					cdata->rc = 2002;

@@ -1122,7 +1122,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 		PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
 
-		res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, action_type, 0, errmsg);
+		res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, action_type, sessionid, errmsg);
 
 		if(res == CORBA_OK) return log_entry_id;
 		else return LOG_REQ_NOT_SAVED;
@@ -1554,17 +1554,66 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 			PUSH_PROPERTY(c_props, "id", et->id);
 			break;
 
+		case EPP_RED_EXTCMD:
 		default:
+			switch(cdata->type) {
+				case EPP_TEST_NSSET:
+					action_type = nssetTest;
+					break;
+				case EPP_SENDAUTHINFO_CONTACT:
+					action_type = ContactSendAuthInfo;
+					break;
+				case EPP_SENDAUTHINFO_DOMAIN:
+					action_type = DomainSendAuthInfo;
+					break;
+				case EPP_SENDAUTHINFO_NSSET:
+					action_type = NSSetSendAuthInfo;
+					break;
+				case EPP_SENDAUTHINFO_KEYSET:
+					action_type = KeySetSendAuthInfo;
+					break;
+				case EPP_CREDITINFO:
+					action_type = ClientCredit;
+					break;
+				case EPP_INFO_LIST_DOMAINS:
+					action_type = InfoListDomains;
+					break;	
+				case EPP_INFO_LIST_CONTACTS:
+					action_type = InfoListContacts;
+					break;
+				case EPP_INFO_LIST_KEYSETS:
+					action_type = InfoListKeysets;
+					break;
+				case EPP_INFO_LIST_NSSETS:
+					action_type = InfoListNssets;
+					break;
+				case EPP_INFO_DOMAINS_BY_NSSET:
+					action_type = InfoDomainsByNsset;
+					break;
+				case EPP_INFO_DOMAINS_BY_KEYSET:
+					action_type = InfoDomainsByKeyset;
+					break;
+				case EPP_INFO_DOMAINS_BY_CONTACT:
+					action_type = InfoDomainsByContact;
+					break;
+				case EPP_INFO_NSSETS_BY_NS:
+					action_type = InfoNssetsByNs;
+					break;
+				case EPP_INFO_NSSETS_BY_CONTACT:
+					action_type = InfoNssetsByContact;
+					break;
+				case EPP_INFO_GET_RESULTS:
+					action_type = InfoGetResults;
+					break;
+				case EPP_INFO_KEYSETS_BY_CONTACT:
+					action_type = InfoKeysetsByContact;
+					break;
+			}
 			break;
 	}
 
   	PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 	PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
-/*
-	if(sessionid != 0) {
-		PUSH_PROPERTY_INT (c_props, "sessionId", sessionid);
-	}
-*/
 
 	res = epp_log_new_message(service, c->remote_ip, request, c_props, &log_entry_id, action_type, sessionid, errmsg);
 
@@ -1718,6 +1767,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		 * Deliver request to XML parser, the task of parser is
 		 * to fill cdata structure with data.
 		 */
+
+		
 		pstat = epp_parse_command(epp_ctx, (login_id != 0), sc->schema,
 				request, bytes, &cdata, &cmd_type);
 

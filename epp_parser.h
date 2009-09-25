@@ -69,7 +69,8 @@ typedef enum {
 	EPP_RED_CREATE,
 	EPP_RED_DELETE,
 	EPP_RED_RENEW,
-	EPP_RED_UPDATE
+	EPP_RED_UPDATE,
+	EPP_RED_EXTCMD
 }epp_red_command_type;
 
 /**
