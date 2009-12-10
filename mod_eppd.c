@@ -1361,7 +1361,7 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 			PUSH_PROPERTY_INT(c_props, "renewPeriod", er->period);
 			if (er->unit == TIMEUNIT_MONTH) {
 				PUSH_PROPERTY(c_props, "timeunit", "Month");
-			} else if(cd->unit == TIMEUNIT_YEAR) {
+			} else if (er->unit == TIMEUNIT_YEAR) {
 				PUSH_PROPERTY(c_props, "timeunit", "Year");
 			}
 			PUSH_PROPERTY(c_props, "expirationDate", er->exDate);
