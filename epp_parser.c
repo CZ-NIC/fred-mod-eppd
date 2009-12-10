@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <ctype.h>
 
 #include <libxml/parser.h>
 #include <libxml/tree.h>
@@ -88,7 +89,7 @@
 #define TEXT_CONTENT(_xpathObj, _i)	\
 	((char *) ((xmlXPathNodeSetItem((_xpathObj)->nodesetval, (_i))->xmlChildrenNode) ? (xmlXPathNodeSetItem((_xpathObj)->nodesetval, (_i))->xmlChildrenNode)->content : NULL))
 
-int read_epp_ds(void *pool, xmlXPathContextPtr xpathCtx, epp_ds *ds);
+int read_epp_dnskey(void *pool, xmlXPathContextPtr xpathCtx, epp_dnskey *key);
 
 /**
  * This function returns specified attribute value of given node.
@@ -354,6 +355,35 @@ xpath_get_attr(void *pool,
 	xmlXPathFreeObject(obj);
 	return attr_val;
 }
+
+
+/** 
+ * Parse a boolean value entered either
+ * as a number or as a string (true/false)
+ *
+ * @param str  	string to be parsed
+ *
+ * @returns  	0 or 1
+ */
+int parse_boolean(char *str)
+{
+	// this could be also treated as an error
+	if(*str == '\0') return 0;
+
+	switch (tolower(*str)) {
+		case '0':
+		case 'f': 
+			return 0;
+		case '1':
+		case 't': 
+			return 1;	
+
+		default:
+			// also can be an error, lets just return 0	
+			return 0;
+	}
+}
+
 /**
  * @}
  */
@@ -1062,6 +1092,8 @@ parse_create_contact(void *pool,
 
 		str = get_attr(xpathCtx->node, "flag");
 		assert(str != NULL);
+		create_contact->discl.flag = parse_boolean(str);
+
 		if (*str == '0') {
 			create_contact->discl.flag = 0;
 		}
@@ -1250,39 +1282,6 @@ parse_create_keyset(void *pool,
 	/* process "unbounded" number of tech contacts */
 	xpath_getn(pool, &create_keyset->tech, xpathCtx, "keyset:tech", &xerr);
 	CHK_XERR(xerr, error);
-	/* process multiple ds records which have in turn multiple addresses */
-	xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:ds", xpathCtx);
-	if (xpathObj == NULL)
-		goto error;
-
-	for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++) {
-		epp_ds	*ds;
-
-		/* allocate data structures */
-		if ((ds = epp_calloc(pool, sizeof *ds)) == NULL)
-		{
-			xmlXPathFreeObject(xpathObj);
-			goto error;
-		}
-		/* get data */
-		xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
-
-		if (read_epp_ds(pool, xpathCtx, ds) == 0) {
-			xmlXPathFreeObject(xpathObj);
-			goto error;
-		}
-
-		/* enqueue ds record */
-		if (q_add(pool, &create_keyset->ds, ds))
-		{
-			xmlXPathFreeObject(xpathObj);
-			goto error;
-		}
-	}
-
-	xmlXPathFreeObject(xpathObj);
-	xpathCtx->node = par_node;
-
 	/* process multiple DNSKEY reocrds */
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:dnskey", xpathCtx);
 	if (xpathObj == NULL)
@@ -1312,7 +1311,6 @@ parse_create_keyset(void *pool,
 			goto error;
 		}
 	}
-
 	xmlXPathFreeObject(xpathObj);
 	xpathCtx->node = par_node;
 
@@ -1323,48 +1321,6 @@ error:
 	cdata->rc = 2400;
 	cdata->type = EPP_DUMMY;
 }
-
-/**
- * Read Delegation signer information from xml into epp_ds structure
- *
- * @param pool 		Pool for allocating memory
- * @param xpathCtx 	XML parsing context
- * @param ds 		ds record to be filled with data
- * @returns 	1 on success, 0 on failure (goto error in other functions
- */
-int read_epp_ds(void *pool, xmlXPathContextPtr xpathCtx, epp_ds *ds)
-{
-	char *str;
-	int xerr;
-
-	RESET_XERR(xerr);
-
-	str = xpath_get1(pool, xpathCtx, "keyset:keyTag", 1, &xerr);
-	CHK_XERR(xerr, error);
-	ds->keytag = (unsigned short)atoi(str);
-
-	str = xpath_get1(pool, xpathCtx, "keyset:alg", 1, &xerr);
-	CHK_XERR(xerr, error);
-	ds->alg = (unsigned char)atoi(str);
-
-	str = xpath_get1(pool, xpathCtx, "keyset:digestType", 1, &xerr);
-	CHK_XERR(xerr, error);
-	ds->digestType = (unsigned char)atoi(str);
-
-	ds->digest = xpath_get1(pool, xpathCtx, "keyset:digest", 1, &xerr);
-	CHK_XERR(xerr, error);
-
-	str = xpath_get1(pool, xpathCtx, "keyset:maxSigLife", 0, &xerr);
-	CHK_XERR(xerr, error);
-	if(str) {
-		ds->maxSigLife = atoi(str);
-	}
-
-	return 1;
-error:
-	return 0;
-}
-
 
 /**
  * Read DNSKEY information from xml into epp_dnskey structure
@@ -1912,41 +1868,6 @@ parse_update_keyset(void *pool,
 		xpath_getn(pool, &update_keyset->rem_tech, xpathCtx,
 				"keyset:tech", &xerr);
 		CHK_XERR(xerr, error);
-		/* rem Delegation Signer */
-		xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:ds", xpathCtx);
-		if (xpathObj == NULL)
-			goto error;
-
-		/* process all ds records */
-		for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
-				j++)
-		{
-			epp_ds	*ds;
-
-			/* allocate and initialize data structures */
-			if ((ds = epp_calloc(pool, sizeof *ds)) == NULL) {
-				xmlXPathFreeObject(xpathObj);
-				goto error;
-			}
-
-			/* get data */
-			xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
-
-			if (read_epp_ds(pool, xpathCtx, ds) == 0) {
-				xmlXPathFreeObject(xpathObj);
-				goto error;
-			}
-
-			/* enqueue ds record */
-			if (q_add(pool, &update_keyset->rem_ds, ds)) {
-				xmlXPathFreeObject(xpathObj);
-				goto error;
-			}
-		}
-		xmlXPathFreeObject(xpathObj);
-
-		xpathCtx->node = par_node;
-
 		/* rem DNSKEY records */
 		xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:dnskey", xpathCtx);
 		if (xpathObj == NULL)
@@ -1998,41 +1919,6 @@ parse_update_keyset(void *pool,
 		xpath_getn(pool, &update_keyset->add_tech, xpathCtx,
 				"keyset:tech", &xerr);
 		CHK_XERR(xerr, error);
-		/* add Delegation Signer */
-		xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:ds", xpathCtx);
-		if (xpathObj == NULL)
-			goto error;
-
-		/* process all ds records */
-		for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
-				j++)
-		{
-			epp_ds	*ds;
-
-			/* allocate and initialize data structures */
-			if ((ds = epp_calloc(pool, sizeof *ds)) == NULL) {
-				xmlXPathFreeObject(xpathObj);
-				goto error;
-			}
-
-			/* get data */
-			xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, j);
-
-			if (read_epp_ds(pool, xpathCtx, ds) == 0) {
-				xmlXPathFreeObject(xpathObj);
-				goto error;
-			}
-
-			/* enqueue ds record */
-			if (q_add(pool, &update_keyset->add_ds, ds)) {
-				xmlXPathFreeObject(xpathObj);
-				goto error;
-			}
-		}
-		xmlXPathFreeObject(xpathObj);
-
-		xpathCtx->node = par_node;
-
 		/* add DNSKEY record */
 		xpathObj = xmlXPathEvalExpression(BAD_CAST "keyset:dnskey", xpathCtx);
 		if (xpathObj == NULL)
@@ -2562,6 +2448,7 @@ parse_ext_enumval_create(void *pool,
 	epps_create_domain	*create_domain;
 	epp_ext_item	*ext_item;
 	int	 xerr;
+	char *str;
 
 	/* assure we are being called in corect context */
 	if (cdata->type != EPP_CREATE_DOMAIN) {
@@ -2577,8 +2464,18 @@ parse_ext_enumval_create(void *pool,
 
 	RESET_XERR(xerr); /* clear value of errno */
 	ext_item->extType = EPP_EXT_ENUMVAL;
-	ext_item->ext.ext_enumval = xpath_get1(pool, xpathCtx,
+	ext_item->ext.ext_enum.ext_enumval = xpath_get1(pool, xpathCtx,
 			"enumval:valExDate", 1, &xerr);
+
+	CHK_XERR(xerr, error);
+	str = xpath_get1(pool, xpathCtx, "enumval:publish", 0, &xerr);
+	
+	if(str == NULL) {
+		ext_item->ext.ext_enum.publish = -1;
+	} else {
+		ext_item->ext.ext_enum.publish = parse_boolean(str);
+	}
+
 	if (q_add(pool, &create_domain->extensions, ext_item))
 		goto error;
 
@@ -2603,6 +2500,7 @@ parse_ext_enumval_update(void *pool,
 	epps_update_domain	*update_domain;
 	epp_ext_item	*ext_item;
 	int	 xerr;
+	char 	*str;
 
 	/* assure we are being called in corect context */
 	if (cdata->type != EPP_UPDATE_DOMAIN) {
@@ -2618,8 +2516,18 @@ parse_ext_enumval_update(void *pool,
 
 	RESET_XERR(xerr); /* clear value of errno */
 	ext_item->extType = EPP_EXT_ENUMVAL;
-	ext_item->ext.ext_enumval = xpath_get1(pool, xpathCtx,
+	ext_item->ext.ext_enum.ext_enumval = xpath_get1(pool, xpathCtx,
 			"enumval:chg/enumval:valExDate", 1, &xerr);
+	CHK_XERR(xerr, error);
+
+	str = xpath_get1(pool, xpathCtx,
+			"enumval:chg/enumval:publish", 0, &xerr);
+	if(str == NULL) {
+		ext_item->ext.ext_enum.publish = -1;
+	} else {
+		ext_item->ext.ext_enum.publish = parse_boolean(str);     
+	}
+
 	if (q_add(pool, &update_domain->extensions, ext_item))
 		goto error;
 	return;
@@ -2644,6 +2552,7 @@ parse_ext_enumval_renew(void *pool,
 	epps_renew	*renew;
 	epp_ext_item	*ext_item;
 	int	 xerr;
+	char 	*str;
 
 	/* assure we are being called in corect context */
 	if (cdata->type != EPP_RENEW_DOMAIN) {
@@ -2659,8 +2568,18 @@ parse_ext_enumval_renew(void *pool,
 
 	RESET_XERR(xerr); /* clear value of errno */
 	ext_item->extType = EPP_EXT_ENUMVAL;
-	ext_item->ext.ext_enumval = xpath_get1(pool, xpathCtx,
+	ext_item->ext.ext_enum.ext_enumval = xpath_get1(pool, xpathCtx,
 			"enumval:valExDate", 1, &xerr);
+	CHK_XERR(xerr, error);
+
+	str = xpath_get1(pool, xpathCtx, 
+			"enumval:publish", 0, &xerr);
+	if(str == NULL) {
+		ext_item->ext.ext_enum.publish = -1;
+	} else {	
+		ext_item->ext.ext_enum.publish = parse_boolean(str);
+	}
+
 	if (q_add(pool, &renew->extensions, ext_item))
 		goto error;
 	return;

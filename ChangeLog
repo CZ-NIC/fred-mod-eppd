@@ -1,11 +1,21 @@
+2009-11-09 Jiri Sadek, Juraj Vicenik (2.2.0)
+
+	* Functionality for enum dictionary project
+
+	* Removing ds records from keyset
+
+2009-05-19 Jiri Sadek (2.1.1)
+
+	* Added more logging messages for debug purpose
+
 2008-10-18 Jaromir Talir (2.1.0)
 
 	* Adding dnskey list to keysets
 
 2008-09-29 Jaromir Talir (2.0.2)
-	
+
 	* Missing handling of poll delete_keyset message
-	
+
 2008-08-29 Juraj Vicenik (2.0.1)
 
 	* Hello message support keyset version
@@ -37,7 +47,7 @@
 2008-01-12 Jaromir Talir
 
 	* Adding test ssl certificate and updating test configuration
-	
+
 	* RPM support added and other small autotools changes
 
 2008-01-10 Jiri Sadek
@@ -82,7 +92,7 @@
 	* Remove bashism from Makefile (output redirection).
 
 2007-07-26 Jaromir Talir (version 1.4.3)
-	
+
 	* Simple schema change.
 
 2007-07-13 Jan Kryl (version 1.4.2)

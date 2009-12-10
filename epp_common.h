@@ -165,9 +165,6 @@ typedef enum {
 	errspec_nsset_tech_rem,
 	errspec_keyset_handle,
   	errspec_keyset_tech,
-  	errspec_keyset_dsrecord,
- 	errspec_keyset_dsrecord_add,
-  	errspec_keyset_dsrecord_rem,
 	errspec_keyset_dnskey,
 	errspec_keyset_dnskey_add,
 	errspec_keyset_dnskey_rem,
@@ -403,27 +400,6 @@ typedef struct {
 	qhead	 addr; /**< List of ip addresses. */
 }epp_ns;
 
-/**
- * Delegation signer information, together with public key information.
- * For more detailed information about the individual fields see
- * RFC 4310.
- */
-typedef struct {
-	unsigned short	keytag;  	/**< Key tag for DNSKEY RR (RFC 4043 for details) */
-	unsigned char	alg;		/**< Algorithm type */
-	unsigned char	digestType;	/**< Digest type (must be SHA-1) */
-	char	*digest;		/**< Key digest (currently it must a valid SHA-1 */
-
-	int	maxSigLife;		/**< Signature expiration period, zero means that the field is empty */
-	/* optional dns rr (-1 in theese fields means that they are empty) */
-/*
-	unsigned flags;
-	unsigned protocol;
-	unsigned key_alg;
-	char	*pubkey;
-*/
-} epp_ds;
-
 /** DNS Key record - http://rfc-ref.org/RFC-TEXTS/4034/chapter2.html */
 typedef struct {
 	unsigned short flags;		/**< key properties. supported values are 0, 256, 257 */
@@ -467,11 +443,14 @@ typedef struct {
 }epp_ext_domain_upd_dnssec;
 
 typedef struct {
+	char	*ext_enumval; /**< Domain validation.*/
+	int 	publish;      /**< Flag determining if this domain can be published in the ENUM dictionary. 0 for false, 1 for true */
+} epp_ext_enum;	
+
+typedef struct {
 	domain_ext_type extType; /**< Identifier of extension. */
 	union {
-		char	*ext_enumval; /**< Domain validation.*/
-		qhead	 ext_dnssec_cr; /** List of digital sigs for domain. */
-		epp_ext_domain_upd_dnssec ext_dnssec_upd; /**< DNSSEC. */
+		epp_ext_enum ext_enum; /**< Extensions for ENUM */
 	}ext; /**< Extension. */
 }epp_ext_item;
 
@@ -597,7 +576,6 @@ typedef struct {
 	char	*upDate;  /**< Last updated. */
 	char	*trDate;  /**< Last transfered. */
 	char	*authInfo;/**< Authorization information. */
-	qhead	 ds;      /**< List of delegation signers. */
 	qhead 	 keys;	  /**< List of DNS Key records */
 	qhead	 tech;    /**< List of technical contacts for keyset. */
 } epps_info_keyset;
@@ -684,7 +662,6 @@ typedef struct {
 typedef struct {
 	char 	*id;		/**< Id of wanted keyset (input). */
 	char 	*authInfo;	/**< Authorization information. */
-	qhead	ds;		/**< List of delegation signers */
 	qhead   keys;		/**< List of DNS Key records */
 	qhead 	tech;		/**< List of technical contacts for keyset */
 	char 	*crDate;	/**< Creation date of keyset. */
@@ -749,8 +726,6 @@ typedef struct {
 	char	*id;           /**< Id of wanted keyset (input). */
 	qhead	 add_tech;     /**< Technical contacts to be added. */
 	qhead	 rem_tech;     /**< Technical contacts to be removed. */
-	qhead	 add_ds;       /**< Delegation signers to be added. */
-	qhead	 rem_ds;       /**< Delegation signers to be removed. */
 	qhead 	 add_dnskey;   /**< DNSKEYs to be added. */
 	qhead 	 rem_dnskey;   /**< DNSKEYs to be removed. */
 	char	*authInfo;     /**< Authorization information. */

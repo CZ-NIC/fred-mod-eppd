@@ -1,11 +1,28 @@
+2009-11-26 Jiri Sadek (version 2.2.0)
+
+	* update contact.xsd from 1.5 to 1.6
+	   - emailType replaced by emailCommaListType
+	   - emailUpdType replaced by emailUpdCommaListType
+
+	* update keyset.xsd from 1.2 to 1.3
+	   - dsrecords completely removed from keyset schema
+
+	* update enumval.xsd from 1.1 to 1.2
+	   - boolean 'publish` flag added to enumval extension for enum domains
+	     identifying whether or not enum domain should be visible in enum
+	     phone number dictionary
+
+	* update all.xsd from 2.1 to 2.2
+	   - due to changes above
+
 2008-10-19 Jaromir Talir (version 2.1.0)
 
 	* updateded keyset.xsd from 1.1 to 1.2
 	   - new types dnskeyT (DNSKEY RR) and keyT (key data)
 	   - changing structures crType, addType, infDataType to add dnskey
-           - removing lower limits for ds records to allow keyset withou ds
+	   - removing lower limits for ds records to allow keyset withou ds
 	   - adding upper limits to tech contacts
-	
+
 	* update fred.xsd from 1.3 to 1.4
 	   - removing reference to keyset schema (not needed)
 
@@ -28,15 +45,15 @@
 	a set of DS records which can be modified by the update function.
 	In case of deleting DS records the specific records are identified
 	by the entire content (same type as for adding)
-	
+
 	* in contact schema: postalInfoReadType and addrReadType added.
 	postalInfo in infoDataType changed to the type postalInfoReadType.
 	Fields name and addr in response to info_contact command are 
 	not mandatory now.
-	
+
 	* keyset functions added to domain schema: listKeysets, domainsByKeyset, 
 	keysetsByContact, keysetsByDs
-	
+
 	* new command keysetByNs in fred schema	
 
 2006-07-31 Jaromir Talir (version 1.4.2)
@@ -50,7 +67,7 @@
 
 	* New poll message about low credit was added to fred.
 
- 	* Version was bumped up on contact, fred and "all" schemas.
+	* Version was bumped up on contact, fred and "all" schemas.
 
 2006-06-26 Jan Kryl (version 1.4.1)
 

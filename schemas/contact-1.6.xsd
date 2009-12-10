@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/contact-1.5"
-          xmlns:contact="http://www.nic.cz/xml/epp/contact-1.5"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/contact-1.6"
+          xmlns:contact="http://www.nic.cz/xml/epp/contact-1.6"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
           xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
           xmlns="http://www.w3.org/2001/XMLSchema"
@@ -95,6 +95,13 @@
       </restriction>
     </simpleType>
 
+    <simpleType name="emailCommaListType">
+      <restriction base="token">
+          <pattern value="[^@, ]{1,64}@[^@, ]+(,[^@, ]{1,64}@[^@, ]+)*"/>
+        <maxLength value="320"/>
+      </restriction>
+    </simpleType>
+
     <!--
     Child elements of the <create> command.
     -->
@@ -106,7 +113,7 @@
          minOccurs="0"/>
         <element name="fax" type="contact:e164StringType"
          minOccurs="0"/>
-        <element name="email" type="contact:emailType"/>
+        <element name="email" type="contact:emailCommaListType"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
         <element name="disclose" type="contact:discloseType"
@@ -115,7 +122,7 @@
          minOccurs="0"/>
         <element name="ident" type="contact:identT"
          minOccurs="0"/>
-        <element name="notifyEmail" type="contact:emailType"
+        <element name="notifyEmail" type="contact:emailCommaListType"
          minOccurs="0"/>
       </sequence>
     </complexType>
@@ -251,7 +258,7 @@
          minOccurs="0"/>
         <element name="fax" type="contact:e164StringType"
          minOccurs="0"/>
-        <element name="email" type="contact:emailType"
+        <element name="email" type="contact:emailCommaListType"
          minOccurs="0"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
@@ -261,7 +268,7 @@
          minOccurs="0"/>
         <element name="ident" type="contact:identUpdT"
          minOccurs="0"/>
-        <element name="notifyEmail" type="contact:emailUpdType"
+        <element name="notifyEmail" type="contact:emailUpdCommaListType"
          minOccurs="0"/>
       </sequence>
     </complexType>
@@ -288,6 +295,14 @@
     <simpleType name="emailUpdType">
       <restriction base="token">
         <pattern value="([^@]{1,64}@[^@]+)?"/>
+        <maxLength value="320"/>
+        <minLength value="0"/>
+      </restriction>
+    </simpleType>
+
+    <simpleType name="emailUpdCommaListType">
+      <restriction base="token">
+          <pattern value="([^@, ]{1,64}@[^@, ]+(,[^@, ]{1,64}@[^@, ]+)*)?"/>
         <maxLength value="320"/>
         <minLength value="0"/>
       </restriction>
@@ -361,7 +376,7 @@
          minOccurs="0"/>
         <element name="fax" type="contact:e164StringType"
          minOccurs="0"/>
-        <element name="email" type="contact:emailType"
+        <element name="email" type="contact:emailCommaListType"
          minOccurs="0"/>
         <element name="clID" type="eppcom:clIDType"/>
         <element name="crID" type="eppcom:clIDType"/>
@@ -380,7 +395,7 @@
          minOccurs="0"/>
         <element name="ident" type="contact:identT"
          minOccurs="0"/>
-        <element name="notifyEmail" type="contact:emailType"
+        <element name="notifyEmail" type="contact:emailCommaListType"
          minOccurs="0"/>
       </sequence>
     </complexType>

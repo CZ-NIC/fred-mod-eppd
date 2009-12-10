@@ -28,31 +28,31 @@
 /** Standard EPP xml namespace */
 #define NS_EPP	"urn:ietf:params:xml:ns:epp-1.0"
 /** Our custom namespace used for contact object */
-#define NS_CONTACT	"http://www.nic.cz/xml/epp/contact-1.5"
+#define NS_CONTACT	"http://www.nic.cz/xml/epp/contact-1.6"
 /** Our custom namespace used for domain object */
 #define NS_DOMAIN	"http://www.nic.cz/xml/epp/domain-1.4"
 /** Our custom namespace used for nsset object */
 #define NS_NSSET	"http://www.nic.cz/xml/epp/nsset-1.2"
 /** Our custom namespace used for keyset object */
-#define NS_KEYSET	"http://www.nic.cz/xml/epp/keyset-1.2"
+#define NS_KEYSET	"http://www.nic.cz/xml/epp/keyset-1.3"
 /** Our custom namespace used for extensions definition */
 #define NS_FRED		"http://www.nic.cz/xml/epp/fred-1.4"
 /** Our custom namespace used for enum validation extension */
-#define NS_ENUMVAL	"http://www.nic.cz/xml/epp/enumval-1.1"
+#define NS_ENUMVAL	"http://www.nic.cz/xml/epp/enumval-1.2"
 /** Namespace + location of epp xml schema */
 #define LOC_EPP	NS_EPP " epp-1.0.xsd"
 /** Namespace + location of contact xml schema */
-#define LOC_CONTACT	NS_CONTACT " contact-1.5.xsd"
+#define LOC_CONTACT	NS_CONTACT " contact-1.6.xsd"
 /** Namespace + location of domain xml schema */
 #define LOC_DOMAIN	NS_DOMAIN " domain-1.4.xsd"
 /** Namespace + location of nsset xml schema */
 #define LOC_NSSET	NS_NSSET " nsset-1.2.xsd"
 /** Namespace + location of keyset xml schema */
-#define LOC_KEYSET	NS_KEYSET " keyset-1.2.xsd"
+#define LOC_KEYSET	NS_KEYSET " keyset-1.3.xsd"
 /** Namespace + location of fred xml schema */
 #define LOC_FRED	NS_FRED " fred-1.3.xsd"
 /** Namespace + location of enumval xml schema */
-#define LOC_ENUMVAL	NS_ENUMVAL " enumval-1.1.xsd"
+#define LOC_ENUMVAL	NS_ENUMVAL " enumval-1.2.xsd"
 
 /**
  * Enumaration of statuses returned by validator.

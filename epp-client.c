@@ -88,9 +88,6 @@ static int error_translator[][2] =
   {ccReg_nsset_tech_rem,        errspec_nsset_tech_rem},
   {ccReg_keyset_handle,		errspec_keyset_handle},
   {ccReg_keyset_tech,		errspec_keyset_tech},
-  {ccReg_keyset_dsrecord,	errspec_keyset_dsrecord},
-  {ccReg_keyset_dsrecord_add,	errspec_keyset_dsrecord_add},
-  {ccReg_keyset_dsrecord_rem,	errspec_keyset_dsrecord_rem},
   {ccReg_keyset_dnskey,		errspec_keyset_dnskey},
   {ccReg_keyset_dnskey_add,	errspec_keyset_dnskey_add},
   {ccReg_keyset_dnskey_rem,	errspec_keyset_dnskey_rem},
@@ -119,6 +116,9 @@ static int error_translator[][2] =
 
 /** ID of the EPP service according to database table service */
 static const long LC_EPP = 3;
+
+static ccReg_Disclose convDiscl(char flag);
+static char convDisclBack(ccReg_Disclose discl);
 
 /**
  * Translate error code from IDL code to mod_eppd's code.
@@ -667,6 +667,8 @@ epp_call_hello(epp_context *epp_ctx, service_EPP service, char **version,
 	CORBA_char	*c_curdate;
 	int	retr, cerrno;
 
+  epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd hello)");
+
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
 		CORBA_exception_init(ev);
@@ -701,6 +703,8 @@ epp_call_hello(epp_context *epp_ctx, service_EPP service, char **version,
 		return CORBA_INT_ERROR;
 	}
 	CORBA_free(c_curdate);
+
+  epplog(epp_ctx, EPP_DEBUG, "Corba call ok");
 	return CORBA_OK;
 }
 
@@ -1017,6 +1021,7 @@ epp_call_login(epp_context *epp_ctx,
 	int	retr;
 	epps_login	*login;
 
+  epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd login)");
 	cdata->noresdata = 1;
 	login = cdata->data;
 	/*
@@ -1103,6 +1108,7 @@ epp_call_logout(epp_context *epp_ctx,
 	ccReg_Response	*response;
 	int	retr;
 
+  epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd logout)");
 	cdata->noresdata = 1;
 	/*
 	 * Input parameters:
@@ -1484,12 +1490,9 @@ epp_call_info_contact(epp_context *epp_ctx,
 			break;
 	}
 	/* disclose info */
-	if (c_contact->DiscloseFlag == ccReg_DISCL_HIDE)
-		info_contact->discl.flag = 0;
-	else if (c_contact->DiscloseFlag == ccReg_DISCL_DISPLAY)
-		info_contact->discl.flag = 1;
-	else
-		info_contact->discl.flag = -1;
+	
+	c_contact->DiscloseFlag = convDisclBack(info_contact->discl.flag);
+	
 	/* init discl values only if there is exceptional behaviour */
 	if (info_contact->discl.flag != -1) {
 		info_contact->discl.name =
@@ -1680,9 +1683,12 @@ epp_call_info_domain(epp_context *epp_ctx,
 			ext_item = epp_malloc(epp_ctx->pool, sizeof *ext_item);
 			if (ext_item == NULL) goto error;
 			ext_item->extType = EPP_EXT_ENUMVAL;
-			ext_item->ext.ext_enumval = unwrap_str_req(epp_ctx,
+			ext_item->ext.ext_enum.ext_enumval = unwrap_str_req(epp_ctx,
 					c_enumval->valExDate, &cerrno,
 					"valExDate");
+
+			ext_item->ext.ext_enum.publish = convDisclBack(c_enumval->publish);
+
 			if (cerrno != 0) goto error;
 			if (q_add(epp_ctx->pool, &info_domain->extensions,
 						ext_item))
@@ -1972,26 +1978,6 @@ epp_call_info_keyset(epp_context *epp_ctx,
 				"tech");
 		if (cerrno != 0) goto error;
 		if (q_add(epp_ctx->pool, &info_keyset->tech, tech))
-			goto error;
-	}
-	/* initialize required number of ds items */
-	for (i = 0; i < c_keyset->dsrec._length; i++) {
-		epp_ds	*ds_item;
-
-		ds_item = epp_calloc(epp_ctx->pool, sizeof *ds_item);
-		if (ds_item == NULL) goto error;
-
-		/* process of ds item */
-		ds_item->keytag =  c_keyset->dsrec._buffer[i].keyTag;
-		ds_item->alg  = c_keyset->dsrec._buffer[i].alg;
-		ds_item->digestType = c_keyset->dsrec._buffer[i].digestType;
-		ds_item->digest  = unwrap_str_req(epp_ctx, c_keyset->dsrec._buffer[i].digest, &cerrno, "digest");
-		if (cerrno != 0) goto error;
-
-		ds_item->maxSigLife  = c_keyset->dsrec._buffer[i].maxSigLife;
-
-		/* enqueue ds item */
-		if (q_add(epp_ctx->pool, &info_keyset->ds, ds_item))
 			goto error;
 	}
 	/* initialize dnskey items */
@@ -2437,8 +2423,6 @@ epp_call_create_domain(epp_context *epp_ctx,
 	create_domain = cdata->data;
 	input_ok = 0;
 	/* init corba input parameters to NULL, because CORBA_free(NULL) is ok */
-	c_ext_list = NULL;
-	c_admin = NULL;
 	c_authInfo = NULL;
 	c_period = NULL;
 	c_nsset = NULL;
@@ -2509,11 +2493,14 @@ epp_call_create_domain(epp_context *epp_ctx,
 			c_enumval = ccReg_ENUMValidationExtension__alloc();
 			if (c_enumval == NULL) goto error_input;
 			c_enumval->valExDate =
-				wrap_str(ext_item->ext.ext_enumval);
+				wrap_str(ext_item->ext.ext_enum.ext_enumval);
 			if (c_enumval->valExDate == NULL) {
 				CORBA_free(c_enumval);
 				goto error_input;
 			}
+
+			c_enumval->publish = convDiscl(ext_item->ext.ext_enum.publish);
+
 			c_ext_list->_buffer[i]._type =
 				TC_ccReg_ENUMValidationExtension;
 			c_ext_list->_buffer[i]._value = c_enumval;
@@ -2622,6 +2609,18 @@ convDiscl(char flag)
 	}
 	/* never reached */
 	return ccReg_DISCL_EMPTY;
+}
+
+
+
+static char convDisclBack(ccReg_Disclose discl)
+{
+	if (discl == ccReg_DISCL_HIDE)
+		return 0;
+	else if (discl == ccReg_DISCL_DISPLAY)
+		return 1;
+	else
+		return -1;
 }
 
 /**
@@ -3062,47 +3061,16 @@ epp_call_create_keyset(epp_context *epp_ctx,
 		return CORBA_INT_ERROR;
 	}
 
-	/* alloc & init sequence of delegation signer records */
+	/* alloc & init sequence of delegation signer records 
+     * note: dsrecords are obsolete but we didn't changed
+     * interface so we use only empty sequence */
 	c_dsrecord = ccReg_DSRecord__alloc();
 	if (c_dsrecord == NULL) {
 		CORBA_free(c_authInfo);
 		CORBA_free(c_clTRID);
 		return CORBA_INT_ERROR;
 	}
-	len = q_length(create_keyset->ds);
-	c_dsrecord->_buffer = ccReg_DSRecord_allocbuf(len);
-	if (len != 0 && c_dsrecord->_buffer == NULL) {
-		CORBA_free(c_dsrecord);
-		CORBA_free(c_authInfo);
-		CORBA_free(c_clTRID);
-		return CORBA_INT_ERROR;
-	}
-	c_dsrecord->_maximum = c_dsrecord->_length = len;
-	c_dsrecord->_release = CORBA_TRUE;
-	i = 0;
-	q_foreach(&create_keyset->ds) {
-		epp_ds	*ds;
-
-		ds = q_content(&create_keyset->ds);
-
-		c_dsrecord->_buffer[i].keyTag = ds->keytag;
-		c_dsrecord->_buffer[i].alg = ds->alg;
-		c_dsrecord->_buffer[i].digestType = ds->digestType;
-
-		c_dsrecord->_buffer[i].digest = wrap_str(ds->digest);
-		if (c_dsrecord->_buffer[i].digest == NULL) {
-			CORBA_free(c_dsrecord);
-			CORBA_free(c_authInfo);
-			CORBA_free(c_clTRID);
-			return CORBA_INT_ERROR;
-		}
-
-		c_dsrecord->_buffer[i].maxSigLife = ds->maxSigLife;
-
-		i++;
-	}
 	/* alloc & init sequence of DNSKEY records */
-
 	c_dnskey = ccReg_DNSKey__alloc();
 	if (c_dnskey == NULL) {
 		CORBA_free(c_dsrecord);
@@ -3385,11 +3353,13 @@ epp_call_renew_domain(epp_context *epp_ctx,
 			c_enumval = ccReg_ENUMValidationExtension__alloc();
 			if (c_enumval == NULL) goto error_input;
 			c_enumval->valExDate =
-				wrap_str(ext_item->ext.ext_enumval);
+				wrap_str(ext_item->ext.ext_enum.ext_enumval);
 			if (c_enumval->valExDate == NULL) {
 				CORBA_free(c_enumval);
 				goto error_input;
 			}
+			c_enumval->publish = convDiscl(ext_item->ext.ext_enum.publish);
+
 			c_ext_list->_buffer[i]._type =
 				TC_ccReg_ENUMValidationExtension;
 			c_ext_list->_buffer[i]._value = c_enumval;
@@ -3578,8 +3548,11 @@ epp_call_update_domain(epp_context *epp_ctx,
 			c_enumval = ccReg_ENUMValidationExtension__alloc();
 			if (c_enumval == NULL) goto error_input;
 			c_enumval->valExDate =
-				wrap_str(ext_item->ext.ext_enumval);
+				wrap_str(ext_item->ext.ext_enum.ext_enumval);
 			if (c_enumval->valExDate == NULL) goto error_input;
+
+			c_enumval->publish = convDiscl(ext_item->ext.ext_enum.publish);
+
 			c_ext_list->_buffer[i]._type =
 				TC_ccReg_ENUMValidationExtension;
 			c_ext_list->_buffer[i]._value = c_enumval;
@@ -4075,54 +4048,9 @@ epp_call_update_keyset(epp_context *epp_ctx,
 	/* delegation signers add */
 	c_ds_add = ccReg_DSRecord__alloc();
 	if (c_ds_add == NULL) goto error_input;
-	len = q_length(update_keyset->add_ds);
-	c_ds_add->_buffer = ccReg_DSRecord_allocbuf(len);
-	if (len != 0 && c_ds_add->_buffer == NULL) goto error_input;
-	c_ds_add->_maximum = c_ds_add->_length = len;
-	c_ds_add->_release = CORBA_TRUE;
-	i = 0;
-	q_foreach(&update_keyset->add_ds) {
-		epp_ds	*ds;
-		char *digest;
-
-		ds = q_content(&update_keyset->add_ds);
-
-		digest = wrap_str(ds->digest);
-		if (digest==NULL) goto error_input;
-
-		c_ds_add->_buffer[i].keyTag = ds->keytag;
-		c_ds_add->_buffer[i].alg = ds->alg;
-		c_ds_add->_buffer[i].digestType = ds->digestType;
-		c_ds_add->_buffer[i].digest = digest;
-
-		c_ds_add->_buffer[i].maxSigLife = ds->maxSigLife;
-
-		i++;
-	}
-
-	/* name servers rem */
+	/* delegation signers rem */
 	c_ds_rem = ccReg_DSRecord__alloc();
 	if (c_ds_rem == NULL) goto error_input;
-	len = q_length(update_keyset->rem_ds);
-	c_ds_rem->_buffer = ccReg_DSRecord_allocbuf(len);
-	if (len != 0 && c_ds_rem->_buffer == NULL) goto error_input;
-	c_ds_rem->_maximum = c_ds_rem->_length = len;
-	c_ds_rem->_release = CORBA_TRUE;
-	i = 0;
-	q_foreach(&update_keyset->rem_ds) {
-  		epp_ds *ds;
-
-		// ds record is identified by all the required fields
-		ds = q_content(&update_keyset->rem_ds);
-
-		c_ds_rem->_buffer[i].keyTag = ds->keytag;
-		c_ds_rem->_buffer[i].alg = ds->alg;
-		c_ds_rem->_buffer[i].digestType = ds->digestType;
-		c_ds_rem->_buffer[i].maxSigLife = ds->maxSigLife;
-		c_ds_rem->_buffer[i].digest = wrap_str(ds->digest);
-
-		i++;
-	}
 
 	/* DNSKEY records add */
 	c_dnskey_add = ccReg_DNSKey__alloc();
@@ -4882,7 +4810,8 @@ epp_call_cmd(epp_context *epp_ctx,
 		epp_command_data *cdata)
 {
 	corba_status	cstat;
-
+  
+  epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd %d)", cdata->type);
 	switch (cdata->type) {
 		case EPP_DUMMY:
 			cdata->noresdata = 1;

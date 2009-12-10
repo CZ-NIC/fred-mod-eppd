@@ -487,27 +487,6 @@ gen_info_keyset(xmlTextWriterPtr writer, epp_command_data *cdata)
 	WRITE_ELEMENT(writer, simple_err, "keyset:upDate", info_keyset->upDate);
 	WRITE_ELEMENT(writer, simple_err, "keyset:trDate", info_keyset->trDate);
 	WRITE_ELEMENT(writer, simple_err, "keyset:authInfo",info_keyset->authInfo);
-	/* print nameservers */
-	q_foreach(&info_keyset->ds) {
-		epp_ds	*ds;
-		char str[10];
-
-		ds = (epp_ds *) q_content(&info_keyset->ds);
-		START_ELEMENT(writer, simple_err, "keyset:ds");
-		snprintf(str, 9, "%d", ds->keytag);
-		WRITE_ELEMENT(writer, simple_err, "keyset:keyTag", str);
-		snprintf(str, 9, "%d", ds->alg);
-		WRITE_ELEMENT(writer, simple_err, "keyset:alg", str);
-		snprintf(str, 9, "%d", ds->digestType);
-		WRITE_ELEMENT(writer, simple_err, "keyset:digestType", str);
-		WRITE_ELEMENT(writer, simple_err, "keyset:digest", ds->digest);
-		if(ds->maxSigLife) {
-			snprintf(str, 9, "%d", ds->maxSigLife);
-			WRITE_ELEMENT(writer, simple_err, "keyset:maxSigLife", str);
-		}
-
-		END_ELEMENT(writer, simple_err); /* ds */
-	}
 	/* print dnskey records */
 	q_foreach(&info_keyset->keys) {
 		epp_dnskey *key;
@@ -835,15 +814,6 @@ get_bad_xml(void *pool, epp_command_data *cdata, epp_error *e)
 			break;
 		case errspec_keyset_tech:
 			loc_spec = epp_strdup(pool, "//keyset:tech");
-			break;
-		case errspec_keyset_dsrecord_add:
-			loc_spec = epp_strdup(pool, "//keyset:add/keyset:ds");
-			break;
-		case errspec_keyset_dsrecord_rem:
-			loc_spec = epp_strdup(pool, "//keyset:rem/keyset:ds");
-			break;
-		case errspec_keyset_dsrecord:
-			loc_spec = epp_strdup(pool, "//keyset:ds");
 			break;
 		case errspec_keyset_dnskey_add:
 			loc_spec = epp_strdup(pool, "//keyset:add/keyset:dnskey");
@@ -1481,7 +1451,17 @@ epp_gen_response(epp_context *epp_ctx,
 						LOC_ENUMVAL);
 				WRITE_ELEMENT(writer, simple_err,
 						"enumval:valExDate",
-						ext_item->ext.ext_enumval);
+						ext_item->ext.ext_enum.ext_enumval);
+				if(!ext_item->ext.ext_enum.publish) {
+					WRITE_ELEMENT(writer, simple_err,
+						"enumval:publish",
+						"0");
+				} else {
+					WRITE_ELEMENT(writer, simple_err,
+						"enumval:publish",
+						"1");
+				}
+				
 				/* infdata (enumval) */
 				END_ELEMENT(writer, simple_err);
 			}

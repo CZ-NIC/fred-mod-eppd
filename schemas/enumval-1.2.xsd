@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/enumval-1.1"
-        xmlns:enumval="http://www.nic.cz/xml/epp/enumval-1.1"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/enumval-1.2"
+        xmlns:enumval="http://www.nic.cz/xml/epp/enumval-1.2"
         xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
         xmlns="http://www.w3.org/2001/XMLSchema"
         elementFormDefault="qualified">
@@ -29,6 +29,7 @@
     <complexType name="exValType">
       <sequence>
         <element name="valExDate" type="date"/>
+        <element name="publish" type="boolean" default="false" minOccurs="0" maxOccurs="1"/>
       </sequence>
     </complexType>
 

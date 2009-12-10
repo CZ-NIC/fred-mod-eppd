@@ -343,7 +343,7 @@ void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
 				ap_level = APLOG_DEBUG;
 				break;
 		}
-		ap_log_cerror(APLOG_MARK, ap_level, 0, conn, text);
+		ap_log_cerror(APLOG_MARK, ap_level, 0, conn, "%s", text);
 		return;
 	}
 
@@ -411,7 +411,6 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 	apr_bucket_brigade *bb;
 	conn_rec	*conn = epp_ctx->conn;
 	apr_pool_t	*pool = epp_ctx->pool;
-	char buff[120];
 
 	bb = apr_brigade_create(pool, conn->bucket_alloc);
 
@@ -419,6 +418,7 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 	status = ap_get_brigade(conn->input_filters, bb, AP_MODE_READBYTES,
 			APR_BLOCK_READ, EPP_HEADER_LENGTH);
 	if (status != APR_SUCCESS) {
+    char err_msg[256];
 		/*
 		 * this used to be logged at EPP_FATAL level, but later was
 		 * changed to lower priority, because condition above catches
@@ -432,8 +432,7 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 			return 1;
 		}
 		epplog(epp_ctx, EPP_ERROR, "Error when reading epp header "
-				"(%d - %s)", status,
-				apr_strerror(status, buff, sizeof(buff)));
+				"(%d - %s)", status, apr_strerror(status, err_msg, sizeof(err_msg)));
 		return 2;
 	}
 
@@ -702,6 +701,8 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 				"from CORBA server!");
 			break;
 		case CORBA_OK:
+      epplog(epp_ctx, EPP_DEBUG, "Corba call ok");
+      break;
 		default:
 			break;
 	}
@@ -788,66 +789,6 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 	if (strcmp(cdata->svTRID, "DUMMY-SVTRID"))
 		epp_call_save_output_xml(epp_ctx, service, cdata, *response);
 	return 1;
-}
-
-/**
- * Add qhead with ds records to properties
- *
- * @param c_props	log entry properties or a NULL pointer (in which
- * 					case a new data structure is allocated and returned)
- * @param list		list of ds records
- * @param list_name	base name for the inserted properties
- *
- * @returns 		log entry properties or NULL in case of an allocation error
- *
- */
-ccReg_RequestProperties *epp_property_push_ds(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
-{
-	char str[LOG_PROP_NAME_LENGTH]; /* property name */
-
-	epp_ds *value;				/* ds record data structure */
-	ccReg_RequestProperties *ret;	/* return value in case the list is not empty	*/
-
-	if (q_length(*list) > 0) {
-
-		q_foreach(list) {
-			value = (epp_ds*)q_content(list);
-
-			str[0] = '\0';
-			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "keytag");
-			if ((ret = epp_property_push_int(c_props, str, value->keytag, CORBA_FALSE)) == NULL) {
-				return NULL;
-			}
-
-			str[0] = '\0';
-			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "alg");
-			if ((ret = epp_property_push_int(c_props, str, value->alg, CORBA_FALSE)) == NULL) {
-				return NULL;
-			}
-
-			str[0] = '\0';
-			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "digestType");
-			if ((ret = epp_property_push_int(c_props, str, value->digestType, CORBA_FALSE)) == NULL) {
-				return NULL;
-			}
-
-			str[0] = '\0';
-			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "digest");
-			if ((ret = epp_property_push(c_props, str, value->digest, CORBA_FALSE, CORBA_FALSE)) == NULL) {
-				return NULL;
-			}
-
-			str[0] = '\0';
-			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "maxSigLife");
-			if ((ret = epp_property_push_int(c_props, str, value->maxSigLife, CORBA_FALSE)) == NULL) {
-				return NULL;
-			}
-		}
-		return ret;
-	} else {
-		return c_props;
-	}
-
 }
 
 /**
@@ -1378,9 +1319,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 					PUSH_PROPERTY(c_props, "authInfo", ck->authInfo);
 					// COMMON
 
-					if((c_props=epp_property_push_ds(c_props, &ck->ds, "ds")) == NULL) {
-						return LOG_REQ_NOT_SAVED;
-					}
 					if((c_props=epp_property_push_dnskey(c_props, &ck->keys, "keys")) == NULL) {
 						return LOG_REQ_NOT_SAVED;
 					}
@@ -1515,12 +1453,6 @@ static ccReg_TID log_epp_command(service_Logger *service, conn_rec *c, char *req
 
 					PUSH_QHEAD(c_props, &uk->add_tech, "addTech");
 					PUSH_QHEAD(c_props, &uk->rem_tech, "remTech");
-					if((c_props = epp_property_push_ds(c_props, &uk->add_ds, "addDs")) == NULL) {
-						return LOG_REQ_NOT_SAVED;
-					}
-					if((c_props = epp_property_push_ds(c_props, &uk->rem_ds, "remDs")) == NULL) {
-						return LOG_REQ_NOT_SAVED;
-					}
 
 					if((c_props = epp_property_push_dnskey(c_props, &uk->add_dnskey, "addKeys")) == NULL) {
 						return LOG_REQ_NOT_SAVED;
@@ -1959,8 +1891,10 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		if (status != APR_SUCCESS) {
 			/* happens on every greeting when client just tests
 			 * the port. Not severe. */
+      char err_msg[256];
 			epplog(epp_ctx, EPP_INFO,
-					"Error when sending response to client");
+					"Error when sending response to client "
+          "(%d - %s)", status, apr_strerror(status, err_msg, sizeof(err_msg)));
 			return HTTP_INTERNAL_SERVER_ERROR;
 		}
 
@@ -2142,8 +2076,10 @@ static int epp_process_connection(conn_rec *c)
 	apr_brigade_puts(bb, NULL, NULL, response);
 	status = ap_fflush(c->output_filters, bb);
 	if (status != APR_SUCCESS) {
+    char err_msg[256];
 		epplog(&epp_ctx, EPP_FATAL,
-				"Error when sending response to client");
+        "Error when sending response to client "
+        "(%d - %s)", status, apr_strerror(status, err_msg, sizeof(err_msg)));
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 

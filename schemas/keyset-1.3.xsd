@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/keyset-1.2"
-          elementFormDefault="qualified" 
-          xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.2" 
-          xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0" 
-          xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1" 
+  <schema targetNamespace="http://www.nic.cz/xml/epp/keyset-1.3"
+          elementFormDefault="qualified"
+          xmlns:keyset="http://www.nic.cz/xml/epp/keyset-1.3"
+          xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
+          xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
           xmlns="http://www.w3.org/2001/XMLSchema">
 
     <!--
     This schema defines object extension of EPP.
 
-    Keyset encapsulates a set of DS records and this set can be manipulated
+    Keyset encapsulates a set of DNS keys and this set can be manipulated
     as a whole.
     -->
     <import namespace="urn:ietf:params:xml:ns:eppcom-1.0"
@@ -48,8 +48,6 @@
     <complexType name="crType">
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
-        <element name="ds" type="keyset:dsT"
-         minOccurs="0" maxOccurs="10"/>
         <element name="dnskey" type="keyset:dnskeyT"
          minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
@@ -65,23 +63,12 @@
       </restriction>
     </simpleType>
 
-    <complexType name="dsT">
-      <sequence>
-         <element name="keyTag" type="unsignedShort"/>
-         <element name="alg" type="unsignedByte"/>
-         <element name="digestType" type="unsignedByte"/>
-         <element name="digest" type="hexBinary"/>
-         <element name="maxSigLife" type="keyset:maxSigLifeType"
-          minOccurs="0"/>
-      </sequence>
-    </complexType>
-
     <complexType name="dnskeyT">
       <sequence>
          <element name="flags" type="unsignedShort"/>
-    	 <element name="protocol" type="unsignedByte"/>
-    	 <element name="alg" type="unsignedByte"/>
-    	 <element name="pubKey" type="keyset:keyT"/>
+         <element name="protocol" type="unsignedByte"/>
+         <element name="alg" type="unsignedByte"/>
+         <element name="pubKey" type="keyset:keyT"/>
       </sequence>
     </complexType>
 
@@ -137,8 +124,6 @@
 
     <complexType name="addType">
       <sequence>
-        <element name="ds" type="keyset:dsT"
-         minOccurs="0" maxOccurs="10"/>
         <element name="dnskey" type="keyset:dnskeyT"
          minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
@@ -247,10 +232,8 @@
          minOccurs="0"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
-        <element name="ds" type="keyset:dsT" minOccurs="0" 
-	 maxOccurs="10"/>
-	<element name="dnskey" type="keyset:dnskeyT" 
-	 minOccurs="0" maxOccurs="10"/>
+        <element name="dnskey" type="keyset:dnskeyT" 
+         minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"
          maxOccurs="unbounded"/>
       </sequence>
