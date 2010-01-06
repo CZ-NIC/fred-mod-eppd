@@ -1761,9 +1761,11 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		if(logger_service != NULL) {
 			act_log_entry_id = log_epp_command(logger_service, epp_ctx->conn, request, cdata, cmd_type, session_id);
 
+                        /* don't pollute logs in case logd isn't running
 			if(act_log_entry_id == 0) {
 				epplog(epp_ctx, EPP_WARNING, "Error while logging the request" );
 			}
+                         */
 		} else {
 			act_log_entry_id = 0;
 		}
