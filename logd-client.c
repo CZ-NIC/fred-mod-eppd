@@ -1,0 +1,945 @@
+#include <stdio.h>
+#include "logd-client.h"
+#include "epp_parser.h"
+
+
+#define PUSH_PROPERTY(seq, name, value)								\
+	seq = epp_property_push(seq, name, value, CORBA_FALSE, CORBA_FALSE);	\
+	if(seq == NULL) {												\
+		return LOG_REQ_NOT_SAVED;							\
+	}
+
+#define PUSH_PROPERTY_INT(seq, name, value)							\
+	seq = epp_property_push_int(seq, name, value, CORBA_FALSE);		\
+	if(seq == NULL) {												\
+		return LOG_REQ_NOT_SAVED;							\
+	}
+
+#define PUSH_QHEAD(seq, list, name)									\
+	seq = epp_property_push_qhead(seq, list, name, CORBA_FALSE, CORBA_FALSE);	\
+	if(seq == NULL) {												\
+		return LOG_REQ_NOT_SAVED;							\
+	}
+
+
+
+static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_check(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_info(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_poll(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_delete(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_renew(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_transfer(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_default_extcmd(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+
+/** Maximum property name length for fred-logd logging facility */
+static const int LOG_PROP_NAME_LENGTH = 50;
+
+
+/**
+ * ############################
+ * Add qhead with xml errors to properties
+ *
+ * @param c_props	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ * @param list		list of xml elements and error messages
+ * @param list_name	base name for the inserted properties
+ *
+ * @returns 		log entry properties or NULL in case of an allocation error
+ *
+ */
+ccReg_RequestProperties *epp_property_push_valerr(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
+{
+	char str[LOG_PROP_NAME_LENGTH]; /* property name */
+
+	epp_error *value;			/* ds record data structure */
+	ccReg_RequestProperties *ret;	/* return value in case the list is not empty	*/
+
+	if (q_length(*list) > 0) {
+
+		q_foreach(list) {
+			value = (epp_error*)q_content(list);
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "element");
+			if ((ret = epp_property_push(c_props, str, value->value, CORBA_TRUE, CORBA_FALSE)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "reason");
+			if ((ret = epp_property_push(c_props, str, value->reason, CORBA_TRUE, CORBA_FALSE)) == NULL) {
+				return NULL;
+			}
+
+		}
+		return ret;
+	} else {
+		return c_props;
+	}
+
+}
+
+/**
+ * Add qhead with ns records to properties
+ *
+ * @param c_props	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ * @param list		list of ns records
+ * @param list_name	base name for the inserted properties
+ *
+ * @returns 		log entry properties or NULL in case of an allocation error
+ *
+ */
+ccReg_RequestProperties *epp_property_push_nsset(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
+{
+	char str[LOG_PROP_NAME_LENGTH]; /* property name */
+
+	epp_ns *value;				/* ds record data structure */
+	ccReg_RequestProperties *ret;	/* return value in case the list is not empty	*/
+
+	if (q_length(*list) > 0) {
+
+		q_foreach(list) {
+			value = (epp_ns*)q_content(list);
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "name");
+			if ((ret = epp_property_push(c_props, str, value->name, CORBA_FALSE, CORBA_FALSE)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "addr");
+			if ((ret = epp_property_push_qhead(c_props, &value->addr, str, CORBA_FALSE, CORBA_TRUE)) == NULL) {
+				return NULL;
+			}
+		}
+		return ret;
+	} else {
+		return c_props;
+	}
+
+}
+
+/**
+ * Add dnskey list to log item properties
+ *
+ * @param c_props	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ * @param list		list of dnskey records
+ * @param list_name	base name for the inserted properties
+ *
+ * @returns 		log entry properties or NULL in case of an allocation error
+ *
+ */
+ccReg_RequestProperties *epp_property_push_dnskey(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
+{
+	char str[LOG_PROP_NAME_LENGTH];
+	epp_dnskey *value;
+	ccReg_RequestProperties *ret;
+
+	if (q_length(*list) > 0) {
+		q_foreach(list) {
+			value = (epp_dnskey*)q_content(list);
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "flags");
+			if ((ret = epp_property_push_int(c_props, str, value->flags, CORBA_FALSE)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "protocol");
+			if ((ret = epp_property_push_int(c_props, str, value->protocol, CORBA_FALSE)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "alg");
+			if ((ret = epp_property_push_int(c_props, str, value->alg, CORBA_FALSE)) == NULL) {
+				return NULL;
+			}
+
+			str[0] = '\0';
+			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "publicKey");
+			if ((ret = epp_property_push(c_props, str, value->public_key, CORBA_FALSE, CORBA_FALSE)) == NULL) {
+				return NULL;
+			}
+
+		}
+		return ret;
+
+	} else {
+		return c_props;
+	}
+
+}
+
+/**
+ * 	Add postal info to log item properties
+ *  @param 	p 	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ *  @param  pi	postal info
+ *
+ *  @returns 	log entry properties or NULL in case of an allocation error
+ */
+ccReg_RequestProperties *epp_log_postal_info(ccReg_RequestProperties *p, epp_postalInfo *pi)
+{
+	if(pi == NULL) return p;
+
+	p = epp_property_push(p, "pi.name", pi->name, CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "pi.organization", pi->org, CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push_qhead(p, &pi->streets, "pi.street", CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "pi.city", pi->city, CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "pi.state", pi->sp, CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "pi.postalCode", pi->pc, CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "pi.countryCode", pi->cc, CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+
+	return p;
+}
+
+/**
+ * 	Add disclose info to log item properties
+ *  @param 	p 	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ *  @param  ed	disclose info
+ *
+ *  @returns 	log entry properties or NULL in case of an allocation error
+ */
+ccReg_RequestProperties *epp_log_disclose_info(ccReg_RequestProperties *p, epp_discl *ed)
+{
+	if(ed->flag == 1) {
+		p = epp_property_push(p, "discl.policy", "private", CORBA_FALSE, CORBA_FALSE);
+	} else if(ed->flag == 0) {
+		p = epp_property_push(p, "discl.policy", "public", CORBA_FALSE, CORBA_FALSE);
+	} else {
+		p = epp_property_push(p, "discl.policy", "no exceptions", CORBA_FALSE, CORBA_FALSE);
+	}
+
+	if (p == NULL) return p;
+
+	p = epp_property_push(p, "discl.name", ed->name ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "discl.org", ed->org ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "discl.addr", ed->addr ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "discl.voice", ed->voice ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "discl.fax", ed->fax ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "discl.email", ed->email ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "discl.vat", ed->vat ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "discl.ident", ed->ident ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+	p = epp_property_push(p, "discl.notifyEmail", ed->notifyEmail ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	if (p == NULL) return p;
+
+	return p;
+}
+
+static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+{
+    epp_action_type action_type = UnknownAction;
+    epps_login *el;
+
+    if (cdata->type == EPP_LOGIN) {
+        action_type = ClientLogin;
+
+        el = cdata->data;
+
+        PUSH_PROPERTY(*c_props, "registrarId", el->clID);
+        // type epp_lang:
+        if (el->lang == LANG_CS) {
+            PUSH_PROPERTY(*c_props, "lang", "CZ");
+        } else if (el->lang == LANG_EN) {
+            PUSH_PROPERTY(*c_props, "lang", "EN");
+        } else {
+            PUSH_PROPERTY_INT(*c_props, "lang", el->lang);
+        }
+        PUSH_PROPERTY(*c_props, "password", el->pw);
+        PUSH_PROPERTY(*c_props, "newPassword", el->newPW);
+    } else {
+        epps_sendAuthInfo *ai = cdata->data;
+
+        switch (cdata->type) {
+            case EPP_SENDAUTHINFO_CONTACT:
+                action_type = ContactSendAuthInfo;
+                break;
+            case EPP_SENDAUTHINFO_DOMAIN:
+                action_type = DomainSendAuthInfo;
+                break;
+            case EPP_SENDAUTHINFO_NSSET:
+                action_type = NSSetSendAuthInfo;
+                break;
+            case EPP_SENDAUTHINFO_KEYSET:
+                action_type = KeySetSendAuthInfo;
+                break;
+
+            case EPP_CREDITINFO:
+                action_type = ClientCredit;
+                break;
+            case EPP_TEST_NSSET:
+                action_type = nssetTest;
+                break;
+
+            case EPP_INFO_LIST_CONTACTS:
+                action_type = InfoListContacts;
+                break;
+            case EPP_INFO_LIST_DOMAINS:
+                action_type = InfoListDomains;
+                break;
+            case EPP_INFO_LIST_NSSETS:
+                action_type = InfoListNssets;
+                break;
+            case EPP_INFO_LIST_KEYSETS:
+                action_type = InfoListKeysets;
+                break;
+            case EPP_INFO_DOMAINS_BY_NSSET:
+                action_type = InfoDomainsByNsset;
+                break;
+            case EPP_INFO_DOMAINS_BY_KEYSET:
+                action_type = InfoDomainsByKeyset;
+                break;
+            case EPP_INFO_DOMAINS_BY_CONTACT:
+                action_type = InfoDomainsByContact;
+                break;
+            case EPP_INFO_NSSETS_BY_CONTACT:
+                action_type = InfoNssetsByContact;
+                break;
+            case EPP_INFO_NSSETS_BY_NS:
+                action_type = InfoNssetsByNs;
+                break;
+            case EPP_INFO_KEYSETS_BY_CONTACT:
+                action_type = InfoKeysetsByContact;
+                break;
+            case EPP_INFO_GET_RESULTS:
+                action_type = InfoGetResults;
+                break;
+            default:
+                return LOG_REQ_NOT_SAVED;
+        }
+
+        PUSH_PROPERTY(*c_props, "id", ai->id);
+    }
+
+    return action_type;
+}
+
+static epp_action_type log_props_check(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+{
+    epp_action_type action_type = UnknownAction;
+    epps_check *ec;
+
+    switch (cdata->type) {
+        case EPP_CHECK_CONTACT:
+            action_type = ContactCheck;
+            break;
+        case EPP_CHECK_DOMAIN:
+            action_type = DomainCheck;
+            break;
+        case EPP_CHECK_NSSET:
+            action_type = NSsetCheck;
+            break;
+        case EPP_CHECK_KEYSET:
+            action_type = KeysetCheck;
+            break;
+        default:
+            break;
+    }
+    ec = cdata->data;
+    PUSH_QHEAD(*c_props, &ec->ids, "checkId");
+
+    return action_type;
+}
+
+static epp_action_type log_props_info(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+{
+    epp_action_type action_type = UnknownAction;
+
+    switch (cdata->type) {
+        case EPP_LIST_CONTACT:
+            action_type = ListContact;
+            break;
+        case EPP_LIST_KEYSET:
+            action_type = ListKeySet;
+            break;
+        case EPP_LIST_NSSET:
+            action_type = ListNSset;
+            break;
+        case EPP_LIST_DOMAIN:
+            action_type = ListDomain;
+            break;
+
+        case EPP_INFO_CONTACT:
+        {
+            epps_info_contact *i = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "id", i->id)
+            action_type = ContactInfo;
+            break;
+        }
+        case EPP_INFO_KEYSET:
+        {
+            epps_info_keyset *i = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "id", i->id)
+            action_type = KeysetInfo;
+            break;
+        }
+        case EPP_INFO_NSSET:
+        {
+            epps_info_nsset *i = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "id", i->id)
+            action_type = NSsetInfo;
+            break;
+        }
+        case EPP_INFO_DOMAIN:
+        {
+            epps_info_domain *i = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "name", i->name)
+            action_type = DomainInfo;
+            break;
+        }
+        default:
+            break;
+    }
+
+    return action_type;
+}
+
+static epp_action_type log_props_poll(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+{
+    if (cdata->type == EPP_POLL_ACK) {        
+        epps_poll_ack *pa = cdata->data;
+        PUSH_PROPERTY(*c_props, "msgId", pa->msgid);
+        return PollAcknowledgement;
+    } else {
+        return PollResponse;
+    }
+}
+
+static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+{
+    epp_action_type action_type = UnknownAction;
+
+    switch (cdata->type) {
+        case EPP_CREATE_CONTACT:
+            action_type = ContactCreate;
+            epps_create_contact *cc = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "id", cc->id);
+
+            // postal info
+            if ((*c_props = epp_log_postal_info(*c_props, &cc->pi)) == NULL) {
+                return LOG_REQ_NOT_SAVED;
+            }
+
+            PUSH_PROPERTY(*c_props, "voice", cc->voice);
+            PUSH_PROPERTY(*c_props, "fax", cc->fax);
+            PUSH_PROPERTY(*c_props, "email", cc->email);
+            PUSH_PROPERTY(*c_props, "authInfo", cc->authInfo);
+
+            // disclose info
+            if ((*c_props = epp_log_disclose_info(*c_props, &cc->discl)) == NULL) {
+                return LOG_REQ_NOT_SAVED;
+            }
+
+            PUSH_PROPERTY(*c_props, "vat", cc->vat);
+            PUSH_PROPERTY(*c_props, "ident", cc->ident);
+            switch (cc->identtype) {
+                case ident_UNKNOWN: PUSH_PROPERTY(*c_props, "identType", "unknown");
+                    break;
+                case ident_OP: PUSH_PROPERTY(*c_props, "identType", "ID card");
+                    break;
+                case ident_PASSPORT: PUSH_PROPERTY(*c_props, "identType", "passport");
+                    break;
+                case ident_MPSV: PUSH_PROPERTY(*c_props, "identType", "number assinged by ministry");
+                    break;
+                case ident_ICO: PUSH_PROPERTY(*c_props, "identType", "ICO");
+                    break;
+                case ident_BIRTHDAY: PUSH_PROPERTY(*c_props, "identType", "birthdate");
+                    break;
+            }
+            PUSH_PROPERTY(*c_props, "notifyEmail", cc->notify_email);
+            // COMMON
+
+            break;
+
+        case EPP_CREATE_DOMAIN:
+            action_type = DomainCreate;
+            epps_create_domain *cd = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "name", cd->name);
+            PUSH_PROPERTY(*c_props, "registrant", cd->registrant);
+            PUSH_PROPERTY(*c_props, "nsset", cd->nsset);
+            PUSH_PROPERTY(*c_props, "keyset", cd->keyset);
+            // qhead	 extensions;   /**< List of domain extensions.
+            PUSH_PROPERTY(*c_props, "authInfo", cd->authInfo);
+            // COMMON
+
+            PUSH_QHEAD(*c_props, &cd->admin, "admin");
+            PUSH_PROPERTY_INT(*c_props, "period", cd->period);
+            if (cd->unit == TIMEUNIT_MONTH) {
+                PUSH_PROPERTY(*c_props, "timeunit", "Month");
+            } else if (cd->unit == TIMEUNIT_YEAR) {
+                PUSH_PROPERTY(*c_props, "timeunit", "Year");
+            }
+            PUSH_PROPERTY(*c_props, "expirationDate", cd->exDate);
+            break;
+
+        case EPP_CREATE_NSSET:
+            action_type = NSsetCreate;
+            epps_create_nsset *cn = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "id", cn->id);
+            PUSH_PROPERTY(*c_props, "authInfo", cn->authInfo);
+            PUSH_PROPERTY_INT(*c_props, "reportLevel", cn->level);
+            // COMMON
+            if ((*c_props = epp_property_push_nsset(*c_props, &cn->ns, "ns")) == NULL) {
+                return LOG_REQ_NOT_SAVED;
+            }
+            PUSH_QHEAD(*c_props, &cn->tech, "techC");
+
+            break;
+        case EPP_CREATE_KEYSET:
+            action_type = KeysetCreate;
+            epps_create_keyset *ck = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "id", ck->id);
+            PUSH_PROPERTY(*c_props, "authInfo", ck->authInfo);
+            // COMMON
+
+            if ((*c_props = epp_property_push_dnskey(*c_props, &ck->keys, "keys")) == NULL) {
+                return LOG_REQ_NOT_SAVED;
+            }
+
+            PUSH_QHEAD(*c_props, &ck->tech, "techContact");
+            break;
+        default:
+            break;
+    }
+    return action_type;
+}
+
+static epp_action_type log_props_delete(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+{
+    epp_action_type action_type = UnknownAction;
+    epps_delete *ed;
+
+    switch (cdata->type) {
+        case EPP_DELETE_CONTACT:
+            action_type = ContactDelete;
+            break;
+        case EPP_DELETE_DOMAIN:
+            action_type = DomainDelete;
+            break;
+        case EPP_DELETE_NSSET:
+            action_type = NSsetDelete;
+            break;
+        case EPP_DELETE_KEYSET:
+            action_type = KeysetDelete;
+            break;
+        default:
+            break;
+    }
+    ed = cdata->data;
+
+    PUSH_PROPERTY(*c_props, "id", ed->id);
+    return action_type;
+}
+
+static epp_action_type log_props_renew(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+{
+    epp_action_type action_type = UnknownAction;
+    epps_renew *er;
+    action_type = DomainRenew;
+    er = cdata->data;
+
+    PUSH_PROPERTY(*c_props, "name", er->name);
+    PUSH_PROPERTY(*c_props, "curExDate", er->curExDate);
+    PUSH_PROPERTY_INT(*c_props, "renewPeriod", er->period);
+    if (er->unit == TIMEUNIT_MONTH) {
+        PUSH_PROPERTY(*c_props, "timeunit", "Month");
+    } else if (er->unit == TIMEUNIT_YEAR) {
+        PUSH_PROPERTY(*c_props, "timeunit", "Year");
+    }
+    PUSH_PROPERTY(*c_props, "expirationDate", er->exDate);
+
+    return action_type;
+}
+
+static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+{
+    epp_action_type action_type = UnknownAction;
+
+    switch (cdata->type) {
+        case EPP_UPDATE_CONTACT:
+            action_type = ContactUpdate;
+
+            epps_update_contact *uc = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "id", uc->id);
+
+            if ((*c_props = epp_log_postal_info(*c_props, uc->pi)) == NULL) {
+                return LOG_REQ_NOT_SAVED;
+            }
+
+            PUSH_PROPERTY(*c_props, "voice", uc->voice);
+            PUSH_PROPERTY(*c_props, "fax", uc->fax);
+            PUSH_PROPERTY(*c_props, "email", uc->email);
+            PUSH_PROPERTY(*c_props, "authInfo", uc->authInfo);
+
+            if ((*c_props = epp_log_disclose_info(*c_props, &uc->discl)) == NULL) {
+                return LOG_REQ_NOT_SAVED;
+            }
+
+            PUSH_PROPERTY(*c_props, "vat", uc->vat);
+            PUSH_PROPERTY(*c_props, "ident", uc->ident);
+
+            switch (uc->identtype) {
+                case ident_UNKNOWN: PUSH_PROPERTY(*c_props, "identType", "unknown");
+                    break;
+                case ident_OP: PUSH_PROPERTY(*c_props, "identType", "ID card");
+                    break;
+                case ident_PASSPORT: PUSH_PROPERTY(*c_props, "identType", "passport");
+                    break;
+                case ident_MPSV: PUSH_PROPERTY(*c_props, "identType", "number assinged by ministry");
+                    break;
+                case ident_ICO: PUSH_PROPERTY(*c_props, "identType", "ICO");
+                    break;
+                case ident_BIRTHDAY: PUSH_PROPERTY(*c_props, "identType", "birthdate");
+                    break;
+            }
+
+            PUSH_PROPERTY(*c_props, "notifyEmail", uc->notify_email);
+            // COMMON
+            break;
+
+        case EPP_UPDATE_DOMAIN:
+            action_type = DomainUpdate;
+
+            epps_update_domain *ud = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "name", ud->name);
+            PUSH_PROPERTY(*c_props, "registrant", ud->registrant);
+            PUSH_PROPERTY(*c_props, "nsset", ud->nsset);
+            PUSH_PROPERTY(*c_props, "keyset", ud->keyset);
+            // qhead	 extensions;   /**< List of domain extensions.
+            PUSH_PROPERTY(*c_props, "authInfo", ud->authInfo);
+            // COMMONs
+
+            PUSH_QHEAD(*c_props, &ud->add_admin, "addAdmin");
+            PUSH_QHEAD(*c_props, &ud->rem_admin, "remAdmin");
+            PUSH_QHEAD(*c_props, &ud->rem_tmpcontact, "remTmpcontact");
+
+            break;
+
+        case EPP_UPDATE_NSSET:
+            action_type = NSsetUpdate;
+            epps_update_nsset *un = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "id", un->id);
+            PUSH_PROPERTY(*c_props, "authInfo", un->authInfo);
+            PUSH_PROPERTY_INT(*c_props, "reportLevel", un->level);
+            // COMMON
+
+            PUSH_QHEAD(*c_props, &un->add_tech, "addTechC");
+            PUSH_QHEAD(*c_props, &un->rem_tech, "remTechC");
+            if ((*c_props = epp_property_push_nsset(*c_props, &un->add_ns, "addNs")) == NULL) {
+                return LOG_REQ_NOT_SAVED;
+            }
+            PUSH_QHEAD(*c_props, &un->rem_ns, "remNs");
+
+            break;
+
+        case EPP_UPDATE_KEYSET:
+            action_type = KeysetUpdate;
+            epps_update_keyset *uk = cdata->data;
+
+            PUSH_PROPERTY(*c_props, "id", uk->id);
+            PUSH_PROPERTY(*c_props, "authInfo", uk->authInfo);
+            // COMMON
+
+            PUSH_QHEAD(*c_props, &uk->add_tech, "addTech");
+            PUSH_QHEAD(*c_props, &uk->rem_tech, "remTech");
+
+            if ((*c_props = epp_property_push_dnskey(*c_props, &uk->add_dnskey, "addKeys")) == NULL) {
+                return LOG_REQ_NOT_SAVED;
+            }
+            if ((*c_props = epp_property_push_dnskey(*c_props, &uk->rem_dnskey, "remKeys")) == NULL) {
+                return LOG_REQ_NOT_SAVED;
+            }
+
+            break;
+    }
+    return action_type;
+}
+
+static epp_action_type log_props_transfer(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+{
+    epp_action_type action_type = UnknownAction;
+    epps_transfer *et;
+    
+    switch (cdata->type) {
+        case EPP_TRANSFER_CONTACT:
+            action_type = ContactTransfer;
+            break;
+        case EPP_TRANSFER_DOMAIN:
+            action_type = DomainTransfer;
+            break;
+        case EPP_TRANSFER_NSSET:
+            action_type = NSsetTransfer;
+            break;
+        case EPP_TRANSFER_KEYSET:
+            action_type = KeysetTransfer;
+            break;
+    }
+
+    et = cdata->data;
+
+    PUSH_PROPERTY(*c_props, "id", et->id);
+
+    return action_type;
+}
+
+static epp_action_type log_props_default_extcmd(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+{
+    epp_action_type action_type = UnknownAction;
+
+    switch (cdata->type) {
+        case EPP_TEST_NSSET:
+            action_type = nssetTest;
+            break;
+        case EPP_SENDAUTHINFO_CONTACT:
+            action_type = ContactSendAuthInfo;
+            break;
+        case EPP_SENDAUTHINFO_DOMAIN:
+            action_type = DomainSendAuthInfo;
+            break;
+        case EPP_SENDAUTHINFO_NSSET:
+            action_type = NSSetSendAuthInfo;
+            break;
+        case EPP_SENDAUTHINFO_KEYSET:
+            action_type = KeySetSendAuthInfo;
+            break;
+        case EPP_CREDITINFO:
+            action_type = ClientCredit;
+            break;
+        case EPP_INFO_LIST_DOMAINS:
+            action_type = InfoListDomains;
+            break;
+        case EPP_INFO_LIST_CONTACTS:
+            action_type = InfoListContacts;
+            break;
+        case EPP_INFO_LIST_KEYSETS:
+            action_type = InfoListKeysets;
+            break;
+        case EPP_INFO_LIST_NSSETS:
+            action_type = InfoListNssets;
+            break;
+        case EPP_INFO_DOMAINS_BY_NSSET:
+            action_type = InfoDomainsByNsset;
+            break;
+        case EPP_INFO_DOMAINS_BY_KEYSET:
+            action_type = InfoDomainsByKeyset;
+            break;
+        case EPP_INFO_DOMAINS_BY_CONTACT:
+            action_type = InfoDomainsByContact;
+            break;
+        case EPP_INFO_NSSETS_BY_NS:
+            action_type = InfoNssetsByNs;
+            break;
+        case EPP_INFO_NSSETS_BY_CONTACT:
+            action_type = InfoNssetsByContact;
+            break;
+        case EPP_INFO_GET_RESULTS:
+            action_type = InfoGetResults;
+            break;
+        case EPP_INFO_KEYSETS_BY_CONTACT:
+            action_type = InfoKeysetsByContact;
+            break;
+    }
+
+    return action_type;
+}
+
+
+/**
+ * Log an epp command using fred-logd service. Raw content as well as
+ * parsed values inserted as properties are sent to the logging facility
+ *
+ * @param	service 	a reference to the logging service CORBA object
+ * @param	c			connection record
+ * @param	request		raw content of the request
+ * @param 	cdata		command data, parsed content
+ * @param   cmdtype 	command type returned by parse_command function
+ * @param 	sessionid   login id for the session
+ *
+ * @return  database ID of the new logging record or a status code
+ */
+ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *request, epp_command_data *cdata, epp_red_command_type cmdtype, int sessionid)
+{
+	int res;								/* response from corba call wrapper */
+	epp_action_type action_type = UnknownAction;
+	ccReg_TID log_entry_id;
+
+	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
+	ccReg_RequestProperties *c_props = NULL;	/* properties to be sent to the log */	
+	
+								
+	errmsg[0] = '\0';
+	if(cdata->type == EPP_DUMMY) {
+		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
+		PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
+
+		res = epp_log_new_message(service, remote_ip, request, c_props, &log_entry_id, action_type, sessionid, errmsg);
+
+		if(res == CORBA_OK) return log_entry_id;
+		else return LOG_REQ_NOT_SAVED;
+	}
+           
+	switch(cmdtype) {
+		case EPP_RED_LOGIN:
+                    action_type = log_props_login(&c_props, cdata);
+                    break;
+
+		case EPP_RED_LOGOUT:
+                    action_type = ClientLogout;
+                    break;
+
+		case EPP_RED_CHECK:
+                    action_type = log_props_check(&c_props, cdata);
+                    break;
+
+		case EPP_RED_INFO:
+                    action_type = log_props_info(&c_props, cdata);
+                    break;
+
+		case EPP_RED_POLL:
+                    action_type = log_props_poll(&c_props, cdata);
+                    break;
+
+		case EPP_RED_CREATE:
+                    action_type = log_props_create(&c_props, cdata);
+                    break;
+
+		case EPP_RED_DELETE:
+                    action_type = log_props_delete(&c_props, cdata);
+                    break;
+
+		case EPP_RED_RENEW:
+                    action_type = log_props_renew(&c_props, cdata);
+                    break;
+
+		case EPP_RED_UPDATE:
+                    action_type = log_props_update(&c_props, cdata);
+                    break;
+
+		case EPP_RED_TRANSFER:
+                    action_type = log_props_transfer(&c_props, cdata);
+                    break;
+
+		case EPP_RED_EXTCMD:
+		default:
+                    action_type = log_props_default_extcmd(&c_props, cdata);
+                    break;
+	}
+
+  	PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
+	PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
+
+	res = epp_log_new_message(service, remote_ip, request, c_props, &log_entry_id, action_type, sessionid, errmsg);
+
+	if(res == CORBA_OK) return log_entry_id;
+	else return LOG_REQ_NOT_SAVED;
+
+}
+
+#undef PUSH_PROPERTY
+#undef PUSH_PROPERTY_INT
+#undef PUSH_QHEAD
+
+/**
+ * Log an epp response using fred-logd service. Raw content as well as
+ * parsed values inserted as properties are sent to the logging facility
+ *
+ * @param	log_service a reference to the logging service CORBA object
+ * @param	c			connection record
+ * @param 	stat		status returned by epp_gen_response
+ * @param	valerr		list of errors in input xml
+ * @param	response	raw content of the response
+ * @param 	cdata		command data, parsed content
+ * @param 	session_id		Id into the login database table for this session
+ * @param	log_entry_id 	Id of the log_entry record which will be updated by this call. The Id was obtained by log_epp_command()
+ *
+ * @return  status
+ */
+int log_epp_response(service_Logger *log_service, int stat, qhead *valerr, const char *response, const epp_command_data *cdata, int session_id, ccReg_TID log_entry_id)
+{
+	int res;
+
+	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
+	ccReg_RequestProperties *c_props = NULL;	/* properties to be sent to the log */
+
+	// output properties
+	if (cdata != NULL) {
+		c_props = epp_property_push_int(c_props, "rc", cdata->rc, CORBA_TRUE);
+		if (c_props == NULL) {
+			return 0;
+		}
+
+		c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_TRUE, CORBA_FALSE);
+		if (c_props == NULL) {
+			return 0;
+		}
+	}
+
+	// this could be translated to text message
+	c_props = epp_property_push_int(c_props, "genStat", stat, CORBA_TRUE);
+	if (c_props == NULL) {
+		return 0;
+	}
+
+	if (valerr != NULL && (c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL) {
+		return 0;
+	}
+
+	if(cdata->type ==  EPP_CREATE_CONTACT) {
+		epps_create_contact *cc = cdata->data;
+		epp_property_push(c_props, "creationDate", cc->crDate, CORBA_TRUE, CORBA_FALSE);
+
+	} else if(cdata->type ==  EPP_CREATE_DOMAIN) {
+		epps_create_domain *cd = cdata->data;
+		epp_property_push(c_props, "creationDate", cd->crDate, CORBA_TRUE, CORBA_FALSE);
+
+	} else if(cdata->type ==  EPP_CREATE_KEYSET) {
+		epps_create_keyset *ck = cdata->data;
+		epp_property_push(c_props, "creationDate", ck->crDate, CORBA_TRUE, CORBA_FALSE);
+
+	} else if(cdata->type ==  EPP_CREATE_NSSET) {
+		epps_create_nsset *cn = cdata->data;
+		epp_property_push(c_props, "creationDate", cn->crDate, CORBA_TRUE, CORBA_FALSE);
+
+	}
+
+	res = epp_log_close_message(log_service, response, c_props, log_entry_id, session_id, errmsg);
+
+
+	if(res == CORBA_OK) return 1;
+	else return 0;
+}

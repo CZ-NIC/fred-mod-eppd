@@ -32,7 +32,7 @@ libxmleppd_la_SOURCES = epp_gen.c epp_gen.h epp_parser.c epp_parser.h \
 libxmleppd_la_CFLAGS  = ${XML_CPPFLAGS}
 libxmleppd_la_LDFLAGS = ${XML_LIBS}
 
-libmodeppd_la_SOURCES = epp_common.c epp_common.h epp-client.c epp-client.h \
+libmodeppd_la_SOURCES = epp_common.c epp_common.h epp-client.c epp-client.h logd-client.c logd-client.h \
                         mod_eppd.c 
 libmodeppd_la_CFLAGS  = ${INCL} -include ${IDL_H}
 libmodeppd_la_LIBADD  = liborbeppd.la libxmleppd.la
