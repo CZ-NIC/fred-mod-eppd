@@ -697,8 +697,8 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 				"from CORBA server!");
 			break;
 		case CORBA_OK:
-      epplog(epp_ctx, EPP_DEBUG, "Corba call ok");
-      break;
+                        epplog(epp_ctx, EPP_DEBUG, "Corba call ok");
+                        break;
 		default:
 			break;
 	}

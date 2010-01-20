@@ -1,7 +1,38 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include "logd-client.h"
 #include "epp_parser.h"
 
+/* prototypes for functions using CORBA cals or CORBA data structures */
+struct ccReg_RequestProperties;
+
+/** ID of the EPP service according to database table service */
+static const long LC_EPP = 3;
+
+/* functions for filling log properties */
+ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean output, CORBA_boolean child);
+ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child);
+ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value, CORBA_boolean output);
+
+int epp_log_close_message(service_Logger service,
+		const char *content,
+		ccReg_RequestProperties *properties,
+		ccReg_TID log_entry_id,
+		ccReg_TID session_id,
+		char *errmsg);
+
+int epp_log_new_message(service_Logger service,
+		const char *sourceIP,
+		const char *content,
+		ccReg_RequestProperties *properties,
+         	ccReg_TID *log_entry_id,
+         	epp_action_type action_type,
+		ccReg_TID sessionid,
+		char *errmsg);
+
+/* end of prototypes for functions using CORBA cals or CORBA data structures */
 
 #define PUSH_PROPERTY(seq, name, value)								\
 	seq = epp_property_push(seq, name, value, CORBA_FALSE, CORBA_FALSE);	\
@@ -22,7 +53,6 @@
 	}
 
 
-
 static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_command_data *cdata);
 static epp_action_type log_props_check(ccReg_RequestProperties **c_props, epp_command_data *cdata);
 static epp_action_type log_props_info(ccReg_RequestProperties **c_props, epp_command_data *cdata);
@@ -37,6 +67,429 @@ static epp_action_type log_props_default_extcmd(ccReg_RequestProperties **c_prop
 /** Maximum property name length for fred-logd logging facility */
 static const int LOG_PROP_NAME_LENGTH = 50;
 
+/**
+ * Add the content of a qhead linked list to the properties.
+ * The list should contain only strings
+ *
+ * @param c_props	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ * @param list		list of strings
+ * @param list_name	base name for the inserted properties
+ * @param output 	whether the properties are related to output
+ * @param child		true if the items in the list are children of the last property
+ * 					with child = false
+ *
+ * @returns 		log entry properties or NULL in case of an allocation error
+ *
+ */
+
+ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean output, CORBA_boolean child)
+{
+	ccReg_RequestProperties *ret;
+
+	if (list->count == 0) {
+		return c_props;
+	}
+
+	q_foreach(list) {
+		if ((ret = epp_property_push(c_props, list_name, (char*)q_content(list), output, child)) == NULL) {
+			return NULL;
+		}
+	}
+
+	return ret;
+}
+
+#define ALLOC_STEP 4
+
+/**
+ * Add a name, value pair to the properties. Allocate memory and the property list itself
+ * on demand
+ * @param c_props	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ * @param name		property name
+ * @param value		property value
+ * @param output	whether the property is related to output
+ * @param child 	true if the property is child to the last property with child = false
+ *
+ * @returns			NULL in case of an allocation error, modified c_props otherwise
+ */
+ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child)
+{
+    if (c_props == NULL) {
+        c_props = ccReg_RequestProperties__alloc();
+        if (c_props == NULL) {
+            return NULL;
+        }
+        c_props->_maximum = ALLOC_STEP;        
+
+        c_props->_buffer = ccReg_RequestProperties_allocbuf(c_props->_maximum);
+
+        if (c_props->_buffer == NULL) {
+            CORBA_free(c_props);
+            return NULL;
+        }
+        c_props->_length = 0;
+        c_props->_release = CORBA_TRUE;
+    }
+
+    if (value != NULL) {
+        int old_length;
+        ccReg_RequestProperty *new_prop = ccReg_RequestProperty__alloc();
+
+        if(new_prop == NULL) {
+            return NULL;
+        }
+
+        new_prop->name = wrap_str(name);
+        if (new_prop->name == NULL) {
+            CORBA_free(new_prop);
+            return NULL;
+        }
+        new_prop->value = wrap_str(value);
+        if (new_prop->value == NULL) {
+            CORBA_free(new_prop);
+            return NULL;
+        }
+        new_prop->output = output;
+        new_prop->child = child;
+
+        old_length = c_props->_length;
+        // this function already takes care of _length and _maximum, check orbit unittests :)
+        ORBit_sequence_append(c_props, new_prop);
+
+        if (c_props->_length != old_length + 1) {
+            CORBA_free(c_props);
+            return NULL;
+        }
+    }
+
+    return c_props;
+}
+
+/**
+ * Add a name, value pair to the properties, where value is an integer
+ * Allocate buffer on demand.
+ *
+ * @param c_props	log entry properties or a NULL pointer (in which
+ * 					case a new data structure is allocated and returned)
+ * @param name		property name
+ * @param value		property integer value
+ * @param output	true if this property is related to output (response), false otherwise
+ *
+ * @returns			NULL in case of an allocation error, modified c_props otherwise
+ */
+
+ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value, CORBA_boolean output)
+{
+    char str[12];
+    int old_length;
+    ccReg_RequestProperty *new_prop;
+
+    if (c_props == NULL) {
+        c_props = ccReg_RequestProperties__alloc();
+        if (c_props == NULL) {
+            return NULL;
+        }
+        c_props->_maximum = ALLOC_STEP;        
+
+        c_props->_buffer = ccReg_RequestProperties_allocbuf(c_props->_maximum);
+
+        if (c_props->_buffer == NULL) {
+            CORBA_free(c_props);
+            return NULL;
+        }
+        c_props->_length = 0;
+        c_props->_release = CORBA_TRUE;
+    }
+
+    snprintf(str, 12, "%i", value);
+
+    new_prop = ccReg_RequestProperty__alloc();
+
+    if (new_prop == NULL) {
+        return NULL;
+    }
+
+    new_prop->name = wrap_str(name);
+    if (new_prop->name == NULL) {
+        CORBA_free(new_prop);
+        return NULL;
+    }
+    new_prop->value = wrap_str(str);
+    if (new_prop->value == NULL) {
+        CORBA_free(new_prop);
+        return NULL;
+    }
+    new_prop->output = output;
+    new_prop->child = CORBA_FALSE;
+
+    old_length = c_props->_length;
+    // this function already takes care of _length and _maximum, check orbit unittests :)
+    ORBit_sequence_append(c_props, new_prop);
+
+    if (c_props->_length != old_length + 1) {
+        CORBA_free(c_props);
+        return NULL;
+    }
+
+    return c_props;
+
+}
+#undef ALLOC_STEP
+
+/** Log a new session using fred-logd
+ * @param service 	Reference to the CORBA service
+ * @param name		handle of the registrar
+ * @param lang		language (en,cs,...)
+ * @param log_session_id id for log_session table
+ *
+ * @returns		CORBA status code
+ */
+int epp_log_CreateSession(service_Logger service, const char *name, epp_lang lang, ccReg_TID * const log_session_id, char *errmsg)
+{
+	CORBA_Environment ev[1];
+	CORBA_char *c_name;
+	ccReg_Languages c_lang;
+	int retr;
+
+	c_name = wrap_str(name);
+	if(c_name == NULL) {
+		return CORBA_INT_ERROR;
+	}
+
+	c_lang = (lang == LANG_EN) ? ccReg_EN : ccReg_CS;
+
+	/* retry loop */
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev); // valid first time
+		CORBA_exception_init(ev);
+
+		*log_session_id = ccReg_Logger_CreateSession((ccReg_Logger) service, c_lang, c_name, ev);
+
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+
+		usleep(RETR_SLEEP);
+	}
+
+	CORBA_free(c_name);
+
+	if (raised_exception(ev)) {
+		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
+		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
+		CORBA_exception_free(ev);
+		return CORBA_ERROR;
+	}
+	CORBA_exception_free(ev);
+
+	return CORBA_OK;
+}
+
+/** End a log session through fred-logd
+ * @param service 	Reference to the CORBA service
+ * @param log_session_id id for log_session table - session which is to be ended
+ * @param errmsg	error message
+ *
+ * @returns		CORBA status code
+ */
+int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char *errmsg)
+{
+	CORBA_Environment ev[1];
+	CORBA_boolean success;
+	int retr;
+
+	/* retry loop */
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev); /* valid first time */
+		CORBA_exception_init(ev);
+
+		/* call logger method */
+
+		success = ccReg_Logger_CloseSession((ccReg_Logger) service, log_session_id, ev);
+
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+
+		usleep(RETR_SLEEP);
+	}
+
+	if (raised_exception(ev)) {
+		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
+		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
+		CORBA_exception_free(ev);
+		return CORBA_ERROR;
+	}
+	CORBA_exception_free(ev);
+
+	if(success == CORBA_FALSE) {
+		return CORBA_REMOTE_ERROR;
+	} else {
+		return CORBA_OK;
+	}
+}
+
+
+/**
+ * Log a new event using fred-logd
+ *
+ * @param service 		Reference to the CORBA service
+ * @param sourceIP		IP address of the client
+ * @param content		content of the request
+ * @param properties	List of properties (name, value pairs)
+ * @param log_entry_id		output of ID of the new entry in log_entry database table. Id is used in other calls to logging
+ * @param errmsg		Output of a CORBA error message
+ *
+ * @returns				CORBA status code
+ */
+int epp_log_new_message(service_Logger service,
+		const char *sourceIP,
+		const char *content,
+		ccReg_RequestProperties *properties,
+         	ccReg_TID *log_entry_id,
+         	epp_action_type action_type,
+		ccReg_TID sessionid,
+		char *errmsg)
+{
+	CORBA_Environment	 ev[1];
+	CORBA_char *c_sourceIP, *c_content;
+	int	 retr;  /* retry counter */
+	int	 ret;
+
+	c_sourceIP = wrap_str(sourceIP);
+	if(c_sourceIP == NULL) {
+		return CORBA_INT_ERROR;
+	}
+	c_content = wrap_str(content);
+	if(c_content == NULL) {
+		CORBA_free(c_sourceIP);
+		return CORBA_INT_ERROR;
+	}
+	if(properties == NULL) {
+		properties = ccReg_RequestProperties__alloc();
+		if(properties == NULL) {
+			CORBA_free(c_sourceIP);
+			CORBA_free(c_content);
+			return CORBA_INT_ERROR;
+		}
+
+		properties->_maximum = properties->_length = 0;
+	} 
+
+	/* retry loop */
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev); /* valid first time */
+		CORBA_exception_init(ev);
+
+		/* call logger method */
+		*log_entry_id = ccReg_Logger_CreateRequest((ccReg_Logger) service, c_sourceIP,  LC_EPP, c_content, properties, action_type, sessionid, ev);
+
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+
+		usleep(RETR_SLEEP);
+	}
+
+	CORBA_free(c_sourceIP);
+	CORBA_free(c_content);
+	CORBA_free(properties);
+
+	if (raised_exception(ev)) {
+		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
+		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
+		CORBA_exception_free(ev);
+		return CORBA_ERROR;
+	}
+	CORBA_exception_free(ev);
+
+	ret = CORBA_OK;
+	return ret;
+}
+
+/**
+ * Finish a log event
+ *
+ * @param service 		reference to CORBA service
+ * @param content		content of the response
+ * @param properties	list of properties associated with response
+ * @param errmsg		output of CORBA errors
+ * @param log_entry_id		ID of entry to close in log_entry table
+ * @param session_id		A key to session table obtained by a call to CreateSession
+ *
+ * @returns			CORBA status code
+ */
+int epp_log_close_message(service_Logger service,
+		const char *content,
+		ccReg_RequestProperties *properties,
+		ccReg_TID log_entry_id,
+		ccReg_TID session_id,
+		char *errmsg)
+{
+	CORBA_Environment	 ev[1];
+	CORBA_char *c_content;
+	int	 retr;  /* retry counter */
+	int	 ret;
+	CORBA_boolean 		success;
+
+	c_content = wrap_str(content);
+	if(c_content == NULL) {
+		return CORBA_INT_ERROR;
+	}
+
+	if(properties == NULL) {
+		properties = ccReg_RequestProperties__alloc();
+		if(properties == NULL) {
+			CORBA_free(c_content);
+			return CORBA_INT_ERROR;
+		}
+
+		properties->_maximum = properties->_length = 0;
+	}
+
+	/* retry loop */
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev); /* valid first time */
+		CORBA_exception_init(ev);
+
+		/* call logger method */
+
+		if (session_id == 0) {
+			success = ccReg_Logger_CloseRequest((ccReg_Logger) service, log_entry_id, c_content, properties, ev);
+		} else {
+			success = ccReg_Logger_CloseRequestLogin((ccReg_Logger) service, log_entry_id, c_content, properties, session_id, ev);
+		}
+
+		/* if COMM_FAILURE is not raised then quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+
+	CORBA_free(c_content);
+	CORBA_free(properties);
+
+	if (raised_exception(ev)) {
+		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
+		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
+		CORBA_exception_free(ev);
+		return CORBA_ERROR;
+	}
+	CORBA_exception_free(ev);
+
+	if(success == CORBA_FALSE) {
+		ret = CORBA_REMOTE_ERROR;
+	} else {
+		ret = CORBA_OK;
+	}
+	return ret;
+}
+
+
+
+
+
+/* ********** end of functions using CORBA (originaly from *-client.c file
+ */
 
 /**
  * ############################
@@ -772,6 +1225,8 @@ static epp_action_type log_props_default_extcmd(ccReg_RequestProperties **c_prop
             break;
         case EPP_INFO_KEYSETS_BY_CONTACT:
             action_type = InfoKeysetsByContact;
+            break;
+        default:
             break;
     }
 

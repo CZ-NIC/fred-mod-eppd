@@ -26,6 +26,31 @@
 #include "epp_common.h"
 #include "EPP.h"
 
+/**
+ * Maximum number of retries when connection failure occurs before
+ * the failure is announced to a caller.
+ */
+#define MAX_RETRIES	3
+/** Number of microseconds between retries when connection failure occurs. */
+#define RETR_SLEEP  100000
+
+/** Quick test if corba exception was raised. */
+#define raised_exception(ev)	((ev)->_major != CORBA_NO_EXCEPTION)
+
+
+/** Maximal size of property value in database */
+#define DB_FIELD_SIZE 2000
+
+/** True if exception is COMM_FAILURE, which is used in retry loop. */
+#define IS_NOT_COMM_FAILURE_EXCEPTION(_ev)                             \
+	(strcmp((_ev)->_id, "IDL:omg.org/CORBA/COMM_FAILURE:1.0"))
+/** True if exception is EPP_ERROR. */
+#define IS_EPP_ERROR(_ev)                             \
+	(!strcmp((_ev)->_id, "IDL:ccReg/EPP/EppError:1.0"))
+/** True if exception is NO_MESSAGES. */
+#define IS_NO_MESSAGES(_ev)                             \
+	(!strcmp((_ev)->_id, "IDL:ccReg/EPP/NoMessages:1.0"))
+
 /** Possible return values of functions from corba module. */
 typedef enum {
 	CORBA_OK,   /**< No errors. */
@@ -40,6 +65,19 @@ typedef enum {
 typedef void *service_EPP;
 /** Reference to fred-logd CORBA service */
 typedef void *service_Logger;
+
+/**
+ * Function wraps strings passed from XML parser into strings accepted
+ * by CORBA.
+ *
+ * Null strings are transformed to empty strings. The resulting string
+ * must be freed with CORBA_free().
+ *
+ * @param str	Input string.
+ * @return      Output string.
+ */
+char *
+wrap_str(const char *str);
 
 /**
  * Purpose of this function is to get version string of ccReg from
@@ -142,31 +180,6 @@ epp_call_save_output_xml(epp_context *epp_ctx,
 void
 epp_call_CloseSession(epp_context *epp_ctx, service_EPP service,
 		unsigned int loginid);
-
-struct ccReg_RequestProperties;
-
-/* functions for filling log properties */
-ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean output, CORBA_boolean child);
-ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child);
-ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value, CORBA_boolean output);
-
-int epp_log_close_message(service_Logger service,
-		const char *content,
-		ccReg_RequestProperties *properties,
-		ccReg_TID log_entry_id,
-		ccReg_TID session_id,
-		char *errmsg);
-
-int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char *errmsg);
-int epp_log_new_message(service_Logger service,
-		const char *sourceIP,
-		const char *content,
-		ccReg_RequestProperties *properties,
-         	ccReg_TID *log_entry_id,
-         	epp_action_type action_type,
-		ccReg_TID sessionid, 
-		char *errmsg);
-int epp_log_CreateSession(service_Logger service, const char *name, epp_lang lang, ccReg_TID * const log_session_id, char *errmsg);
 
 
 #define MAX_ERROR_MSG_LEN	100
