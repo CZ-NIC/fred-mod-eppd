@@ -138,6 +138,7 @@ ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, con
         ccReg_RequestProperty *new_prop = ccReg_RequestProperty__alloc();
 
         if(new_prop == NULL) {
+            CORBA_free(c_props);
             return NULL;
         }
 
@@ -794,7 +795,6 @@ static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_co
 static epp_action_type log_props_check(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
-    epps_check *ec;
 
     switch (cdata->type) {
         case EPP_CHECK_CONTACT:
@@ -812,10 +812,36 @@ static epp_action_type log_props_check(ccReg_RequestProperties **c_props, epp_co
         default:
             break;
     }
-    ec = cdata->data;
-    PUSH_QHEAD(*c_props, &ec->ids, "checkId");
 
     return action_type;
+}
+
+static void log_props_out_check(ccReg_RequestProperties **c_props, const epp_command_data *cdata)
+{
+    epps_check *ec;
+
+    ec = cdata->data;
+
+    q_reset(&ec->avails);
+    q_reset(&ec->ids);
+
+    q_foreach(&ec->ids) {
+        epp_avail *avail;
+
+        if((ec->avails).cur == NULL) break;
+
+        avail = q_content(&ec->avails);
+
+        *c_props = epp_property_push(*c_props, "checkId", q_content(&ec->ids), CORBA_TRUE, CORBA_FALSE);
+        if(avail->avail) {
+	    *c_props = epp_property_push(*c_props, "available", "true", CORBA_TRUE, CORBA_TRUE);
+        } else {
+	    *c_props = epp_property_push(*c_props, "available", "false", CORBA_TRUE, CORBA_TRUE);
+	    *c_props = epp_property_push(*c_props, "reason", avail->reason, CORBA_TRUE, CORBA_TRUE);
+        }
+        
+        q_next(&ec->avails);
+    }
 }
 
 static epp_action_type log_props_info(ccReg_RequestProperties **c_props, epp_command_data *cdata)
@@ -1139,6 +1165,8 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
             }
 
             break;
+        default:
+            break;
     }
     return action_type;
 }
@@ -1160,6 +1188,8 @@ static epp_action_type log_props_transfer(ccReg_RequestProperties **c_props, epp
             break;
         case EPP_TRANSFER_KEYSET:
             action_type = KeysetTransfer;
+            break;
+        default:
             break;
     }
 
@@ -1335,7 +1365,6 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
  *
  * @param	log_service a reference to the logging service CORBA object
  * @param	c			connection record
- * @param 	stat		status returned by epp_gen_response
  * @param	valerr		list of errors in input xml
  * @param	response	raw content of the response
  * @param 	cdata		command data, parsed content
@@ -1344,7 +1373,7 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
  *
  * @return  status
  */
-int log_epp_response(service_Logger *log_service, int stat, qhead *valerr, const char *response, const epp_command_data *cdata, int session_id, ccReg_TID log_entry_id)
+int log_epp_response(service_Logger *log_service, qhead *valerr, const char *response, const epp_command_data *cdata, int session_id, ccReg_TID log_entry_id)
 {
 	int res;
 
@@ -1364,31 +1393,32 @@ int log_epp_response(service_Logger *log_service, int stat, qhead *valerr, const
 		}
 	}
 
-	// this could be translated to text message
-	c_props = epp_property_push_int(c_props, "genStat", stat, CORBA_TRUE);
-	if (c_props == NULL) {
-		return 0;
-	}
-
 	if (valerr != NULL && (c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL) {
 		return 0;
 	}
 
-	if(cdata->type ==  EPP_CREATE_CONTACT) {
+
+        if(cdata->type == EPP_CHECK_CONTACT || 
+            cdata->type == EPP_CHECK_DOMAIN ||
+            cdata->type == EPP_CHECK_NSSET ||
+            cdata->type == EPP_CHECK_KEYSET) {
+                log_props_out_check(&c_props, cdata);
+
+        } else if(cdata->type ==  EPP_CREATE_CONTACT) {
 		epps_create_contact *cc = cdata->data;
-		epp_property_push(c_props, "creationDate", cc->crDate, CORBA_TRUE, CORBA_FALSE);
+		c_props = epp_property_push(c_props, "creationDate", cc->crDate, CORBA_TRUE, CORBA_FALSE);
 
 	} else if(cdata->type ==  EPP_CREATE_DOMAIN) {
 		epps_create_domain *cd = cdata->data;
-		epp_property_push(c_props, "creationDate", cd->crDate, CORBA_TRUE, CORBA_FALSE);
+		c_props = epp_property_push(c_props, "creationDate", cd->crDate, CORBA_TRUE, CORBA_FALSE);
 
 	} else if(cdata->type ==  EPP_CREATE_KEYSET) {
 		epps_create_keyset *ck = cdata->data;
-		epp_property_push(c_props, "creationDate", ck->crDate, CORBA_TRUE, CORBA_FALSE);
+		c_props = epp_property_push(c_props, "creationDate", ck->crDate, CORBA_TRUE, CORBA_FALSE);
 
 	} else if(cdata->type ==  EPP_CREATE_NSSET) {
 		epps_create_nsset *cn = cdata->data;
-		epp_property_push(c_props, "creationDate", cn->crDate, CORBA_TRUE, CORBA_FALSE);
+		c_props = epp_property_push(c_props, "creationDate", cn->crDate, CORBA_TRUE, CORBA_FALSE);
 
 	}
 

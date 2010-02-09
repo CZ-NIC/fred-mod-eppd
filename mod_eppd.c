@@ -1027,9 +1027,9 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			// if we have a valid log_entry id (if not, there was some error
  			if (act_log_entry_id > 0 && logger_service != NULL) {
 				if (pstat == PARSER_CMD_LOGIN) {
-					log_epp_response(logger_service, gstat, &valerr, response, cdata, session_id, act_log_entry_id);
+					log_epp_response(logger_service, &valerr, response, cdata, session_id, act_log_entry_id);
 				} else {
-					log_epp_response(logger_service, gstat, &valerr, response, cdata, 0, act_log_entry_id);
+					log_epp_response(logger_service, &valerr, response, cdata, 0, act_log_entry_id);
 				}
 			}
 
