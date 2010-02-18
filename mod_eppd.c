@@ -865,6 +865,9 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		pstat = epp_parse_command(epp_ctx, (login_id != 0), sc->schema,
 				request, bytes, &cdata, &cmd_type);
 
+                // this is easy way how to pass this information to fred-logd
+                if(pstat == PARSER_HELLO) cmd_type = EPP_RED_HELLO;
+
 		logger_service = get_corba_service(epp_ctx, sc->logger_object);
 		if (logger_service == NULL) {
 			epplog(epp_ctx, EPP_ERROR, "Could not obtain object reference "
@@ -970,6 +973,11 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 					apr_pstrcat(rpool, sc->servername, " (",
 						version, ")", NULL),
 					curdate, &response);
+
+ 			if (act_log_entry_id > 0 && logger_service != NULL) {
+                                log_epp_response(logger_service, NULL, response, cdata, 0, act_log_entry_id);
+			}
+
 			if (gstat != GEN_OK) {
 				epplog(epp_ctx, EPP_FATAL, "Error when "
 						"creating epp greeting");

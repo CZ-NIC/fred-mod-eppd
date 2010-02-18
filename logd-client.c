@@ -783,7 +783,7 @@ static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_co
                 action_type = InfoGetResults;
                 break;
             default:
-                return LOG_REQ_NOT_SAVED;
+                action_type = UnknownAction;
         }
 
         PUSH_PROPERTY(*c_props, "id", ai->id);
@@ -1299,6 +1299,9 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
 	}
            
 	switch(cmdtype) {
+                case EPP_RED_HELLO:
+                    action_type = ClientGreeting;
+                    break;
 		case EPP_RED_LOGIN:
                     action_type = log_props_login(&c_props, cdata);
                     break;

@@ -225,6 +225,7 @@ typedef struct {
 typedef enum {
      ClientLogin = 100,
      ClientLogout = 101,
+     ClientGreeting = 105,
      PollAcknowledgement = 120,
      PollResponse = 121,
      ContactCheck = 200,
