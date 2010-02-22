@@ -1290,7 +1290,6 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
 	errmsg[0] = '\0';
 	if(cdata->type == EPP_DUMMY) {
 		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
-		PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
 
 		res = epp_log_new_message(service, remote_ip, request, c_props, &log_entry_id, action_type, sessionid, errmsg);
 
@@ -1349,9 +1348,7 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
 	}
 
   	PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
-	PUSH_PROPERTY (c_props, "svTRID", cdata->svTRID);
-
-	res = epp_log_new_message(service, remote_ip, request, c_props, &log_entry_id, action_type, sessionid, errmsg);
+        res = epp_log_new_message(service, remote_ip, request, c_props, &log_entry_id, action_type, sessionid, errmsg);
 
 	if(res == CORBA_OK) return log_entry_id;
 	else return LOG_REQ_NOT_SAVED;
@@ -1385,6 +1382,11 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 
 	// output properties
 	if (cdata != NULL) {
+                c_props = epp_property_push(c_props, "svTRID", cdata->svTRID, CORBA_TRUE, CORBA_FALSE);
+                if (c_props == NULL) {
+                    return 0;
+                }
+
 		c_props = epp_property_push_int(c_props, "rc", cdata->rc, CORBA_TRUE);
 		if (c_props == NULL) {
 			return 0;
