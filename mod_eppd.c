@@ -868,13 +868,18 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
                 // this is easy way how to pass this information to fred-logd
                 if(pstat == PARSER_HELLO) cmd_type = EPP_RED_HELLO;
 
-		logger_service = get_corba_service(epp_ctx, sc->logger_object);
-		if (logger_service == NULL) {
-			epplog(epp_ctx, EPP_ERROR, "Could not obtain object reference "
-					"for alias '%s'.", sc->logger_object);
-		//  mod-eppd is not currently dependent on fred-logd request logging
-		//	return HTTP_INTERNAL_SERVER_ERROR;
-		}
+                if (sc->logger_object == NULL || *sc->logger_object == '\0') {
+			epplog(epp_ctx, EPP_ERROR, "Reference to logger object not set in config");
+                        logger_service = NULL;
+                } else {
+                    logger_service = get_corba_service(epp_ctx, sc->logger_object);
+                    if (logger_service == NULL) {
+                            epplog(epp_ctx, EPP_ERROR, "Could not obtain object reference "
+                                            "for alias '%s'.", sc->logger_object);
+                    //  mod-eppd is not currently dependent on fred-logd request logging
+                    //	return HTTP_INTERNAL_SERVER_ERROR;
+                    }
+                }
 
 		/*
 		 * Register cleanup for cdata structure. The most of the
@@ -1812,7 +1817,7 @@ static const command_rec eppd_cmds[] = {
 			"exported from mod_corba module. Default is \"EPP\"."),
     	AP_INIT_TAKE1("EPPlogdObject", set_logger_object, NULL, RSRC_CONF,
 			"Alias under which is the reference to Logger object "
-			"exported from mod_corba module. Default is \"Logger\"."),
+			"exported from mod_corba module. Default is \"\"."),
 	AP_INIT_TAKE1("EPPdeferErrors", set_defer_errors, NULL, RSRC_CONF,
 			"Integer value representing time value (in miliseconds)"
 			"for deferring error response from Central Registry."
