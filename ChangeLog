@@ -1,3 +1,8 @@
+2010-02-24 Juraj Vicenik (2.3.1)
+
+	* Fixes in Logger int. - Hello command and Svtrid parameter 
+	  was not logged properly
+
 2010-02-16 Juraj Vicenik (2.3.0)
 
 	* Audit (Logger client) component integration
