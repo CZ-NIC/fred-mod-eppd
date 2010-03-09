@@ -1,3 +1,10 @@
+2010-02-24 Juraj Vicenik, Jiri Sadek (2.3.2)
+
+	* Fixing module config to be not dependent on Logger
+
+	* DUMMY-SVTRID response changed code from 2400 to 2500
+	  and will disconnect client from server
+
 2010-02-24 Juraj Vicenik (2.3.1)
 
 	* Fixes in Logger int. - Hello command and Svtrid parameter 
