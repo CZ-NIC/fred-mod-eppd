@@ -296,14 +296,15 @@ create_dummy_answer(epp_context *epp_ctx, epp_command_data *cdata)
 	if (cdata->svTRID == NULL)
 		return CORBA_INT_ERROR;
 
-	cdata->msg = epp_strdup(epp_ctx->pool, "Command failed");
+	cdata->msg = epp_strdup(epp_ctx->pool, "Command failed; "
+            "server closing connection");
 	if (cdata->msg == NULL)
 		return CORBA_INT_ERROR;
 
 	/* this flag is needed for XML generator */
 	cdata->noresdata = 1;
 
-	cdata->rc = 2400;
+	cdata->rc = 2500;
 	cdata->type = EPP_DUMMY;
 	/* reset errors */
 	cdata->errors.count = 0;
