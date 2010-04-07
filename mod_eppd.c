@@ -1041,7 +1041,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 					"successfully, login id is %d",login_id);
 			}
 
-                        epplog(&epp_ctx, EPP_INFO, "Received fred-logd session id: %llu ", session_id);
+                        epplog(epp_ctx, EPP_INFO, "Received fred-logd session id: %llu ", session_id);
 #ifdef EPP_PERF
 			times[3] = apr_time_now(); /* after corba calls */
 #endif
