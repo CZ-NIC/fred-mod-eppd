@@ -118,9 +118,12 @@
  */
 #define MAX_FRAME_LENGTH	16000
 
-/** logging (fred-logd) : error code, it shouldn't collide with database IDs
- *  and also it's an unsigned type
- */
+
+/**
+ * Many errors in logging will be logged to epplog with this severity,
+ * If logging is mandatory, it should be rised much higher than EPP_DEBUG
+*/
+#define EPP_LOGD_ERRLVL EPP_DEBUG
 
 /**
  * eppd_module declaration.
@@ -655,6 +658,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 		unsigned int *loginid, ccReg_TID * const session_id, epp_lang *lang)
 {
 	corba_status	cstat; /* ret code of corba component */
+        corba_status    log_cstat = CORBA_OK; /* ret code of corba for logd create/close session */
 	char errmsg[MAX_ERROR_MSG_LEN];		/* error message returned from corba call */
 
 	errmsg[0] = '\0';
@@ -667,7 +671,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 			char *registrar_id;
 
 			registrar_id = ((epps_login*)cdata->data)->clID;
-			cstat = epp_log_CreateSession(service_log, registrar_id, *lang, session_id, errmsg);
+			log_cstat = epp_log_CreateSession(service_log, registrar_id, *lang, session_id, errmsg);
 		}
 	} else if (pstat == PARSER_CMD_LOGOUT) {
 		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
@@ -675,7 +679,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 
 		// if logged out successfully and fred-logd service is available
 		if(cstat == CORBA_OK && service_log != NULL) {
-			cstat = epp_log_CloseSession(service_log, *session_id, errmsg);
+			log_cstat = epp_log_CloseSession(service_log, *session_id, errmsg);
 		}
 	} else {
 		/* go ahead to generic corba function call */
@@ -683,7 +687,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 	}
 
 	/* catch corba failures */
-	if (cstat == CORBA_INT_ERROR) {
+	if (cstat == CORBA_INT_ERROR || log_cstat == CORBA_INT_ERROR) {
 		epplog(epp_ctx, EPP_FATAL, "Malloc in corba wrapper failed");
 		return 0;
 	}
@@ -702,6 +706,23 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 		default:
 			break;
 	}
+
+        if(service_log != NULL) {
+            switch(log_cstat) {
+                case CORBA_ERROR:
+			epplog(epp_ctx, EPP_LOGD_ERRLVL, "Logd: Corba call failed");
+			break;
+		case CORBA_REMOTE_ERROR:
+			epplog(epp_ctx, EPP_LOGD_ERRLVL, "Logd: Unqualified answer "
+				"from CORBA server!");
+			break;
+		case CORBA_OK:
+                        epplog(epp_ctx, EPP_DEBUG, "Logd: Corba call ok");
+                        break;
+		default:
+			break;
+            }
+        }
 
 	return 1;
 }
@@ -823,7 +844,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 
 	/* initialize variables used inside the loop */
-	*login_id_save = login_id = session_id = 0; /* zero means that client isn't logged in*/
+	*login_id_save = login_id = 0;       /* zero means that client isn't logged in*/
+        session_id = act_log_entry_id = 0;
 	lang = LANG_EN;	/* default language is english */
 
 	/*
@@ -937,6 +959,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
                         }
 			act_log_entry_id = log_epp_command(logger_service, remote_ipaddr, request, cdata, cmd_type, session_id);
 
+                        epplog(epp_ctx, EPP_DEBUG, "Request in fred-logd created, id: %llu ", act_log_entry_id);
                         /* don't pollute logs in case logd isn't running
 			if(act_log_entry_id == 0) {
 				epplog(epp_ctx, EPP_WARNING, "Error while logging the request" );
@@ -1017,6 +1040,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 				epplog(epp_ctx, EPP_INFO, "Logged in "
 					"successfully, login id is %d",login_id);
 			}
+
+                        epplog(&epp_ctx, EPP_INFO, "Received fred-logd session id: %llu ", session_id);
 #ifdef EPP_PERF
 			times[3] = apr_time_now(); /* after corba calls */
 #endif

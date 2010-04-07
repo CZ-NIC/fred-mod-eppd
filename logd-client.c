@@ -1277,7 +1277,7 @@ static epp_action_type log_props_default_extcmd(ccReg_RequestProperties **c_prop
  *
  * @return  database ID of the new logging record or a status code
  */
-ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *request, epp_command_data *cdata, epp_red_command_type cmdtype, int sessionid)
+ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *request, epp_command_data *cdata, epp_red_command_type cmdtype, ccReg_TID sessionid)
 {
 	int res;								/* response from corba call wrapper */
 	epp_action_type action_type = UnknownAction;
@@ -1373,7 +1373,7 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
  *
  * @return  status
  */
-int log_epp_response(service_Logger *log_service, qhead *valerr, const char *response, const epp_command_data *cdata, int session_id, ccReg_TID log_entry_id)
+int log_epp_response(service_Logger *log_service, qhead *valerr, const char *response, const epp_command_data *cdata, ccReg_TID session_id, ccReg_TID log_entry_id)
 {
 	int res;
 
