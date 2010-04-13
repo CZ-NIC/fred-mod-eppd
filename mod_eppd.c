@@ -351,9 +351,11 @@ void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
 	/* get timestamp */
 	current_logtime(timestr, 79);
 	/* make up the whole log record */
-	logline = apr_psprintf(pool, "%s %s [sessionID %d] %s" APR_EOL_STR,
+	logline = apr_psprintf(pool, "%s %s (process:%" APR_PID_T_FMT ") "
+			"[sessionID %d] %s" APR_EOL_STR,
 			timestr,
 			rhost ? rhost : "UNKNOWN-HOST",
+			getpid(),
 			session,
 			text);
 
