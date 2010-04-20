@@ -252,6 +252,7 @@ int epp_log_CreateSession(service_Logger service, const char *name, epp_lang lan
 	CORBA_Environment ev[1];
 	CORBA_char *c_name;
 	ccReg_Languages c_lang;
+	ccReg_TID session_id;
 	int retr;
 
 	c_name = wrap_str(name);
@@ -266,7 +267,7 @@ int epp_log_CreateSession(service_Logger service, const char *name, epp_lang lan
 		if (retr != 0) CORBA_exception_free(ev); // valid first time
 		CORBA_exception_init(ev);
 
-		*log_session_id = ccReg_Logger_CreateSession((ccReg_Logger) service, c_lang, c_name, ev);
+		session_id = ccReg_Logger_CreateSession((ccReg_Logger) service, c_lang, c_name, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
@@ -283,6 +284,9 @@ int epp_log_CreateSession(service_Logger service, const char *name, epp_lang lan
 		return CORBA_ERROR;
 	}
 	CORBA_exception_free(ev);
+
+	/* set session id output param */
+	*log_session_id = session_id;
 
 	return CORBA_OK;
 }
@@ -354,6 +358,7 @@ int epp_log_new_message(service_Logger service,
 {
 	CORBA_Environment	 ev[1];
 	CORBA_char *c_sourceIP, *c_content;
+	ccReg_TID entry_id;
 	int	 retr;  /* retry counter */
 	int	 ret;
 
@@ -383,7 +388,7 @@ int epp_log_new_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		*log_entry_id = ccReg_Logger_CreateRequest((ccReg_Logger) service, c_sourceIP,  LC_EPP, c_content, properties, action_type, sessionid, ev);
+		entry_id = ccReg_Logger_CreateRequest((ccReg_Logger) service, c_sourceIP,  LC_EPP, c_content, properties, action_type, sessionid, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
@@ -402,6 +407,9 @@ int epp_log_new_message(service_Logger service,
 		return CORBA_ERROR;
 	}
 	CORBA_exception_free(ev);
+
+	/* set log entry id output param */
+	*log_entry_id = entry_id;
 
 	ret = CORBA_OK;
 	return ret;
