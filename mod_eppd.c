@@ -657,7 +657,7 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
  */
 static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger *service_log,
 		epp_command_data *cdata, parser_status pstat,
-		unsigned int *loginid, ccReg_TID * const session_id, epp_lang *lang)
+		unsigned int *loginid, ccReg_TID * const session_id, const ccReg_TID log_id, epp_lang *lang)
 {
 	corba_status	cstat; /* ret code of corba component */
         corba_status    log_cstat = CORBA_OK; /* ret code of corba for logd create/close session */
@@ -685,7 +685,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 		}
 	} else {
 		/* go ahead to generic corba function call */
-		cstat = epp_call_cmd(epp_ctx, service, *loginid, cdata);
+		cstat = epp_call_cmd(epp_ctx, service, *loginid, log_id, cdata);
 	}
 
 	/* catch corba failures */
@@ -1028,7 +1028,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 			/* call function from corba backend */
 			if (!call_corba(epp_ctx, EPPservice, logger_service, cdata, pstat,
-						&login_id, &session_id, &lang))
+						&login_id, &session_id, act_log_entry_id, &lang))
 				return HTTP_INTERNAL_SERVER_ERROR;
 			/* did successfull login occured? */
 			epplog(epp_ctx, EPP_DEBUG, "after corba call command "

@@ -593,7 +593,8 @@ int main(int argc, char *argv[])
 		}
 		else if (pstat == PARSER_CMD_OTHER || pstat == PARSER_NOT_VALID) {
 			/* API: corba call */
-			cstat = epp_call_cmd(&epp_ctx, service, loginid, cdata);
+                    // TODO ugly hack - supply a real ID
+			cstat = epp_call_cmd(&epp_ctx, service, loginid, 0, cdata);
 		}
 		else {
 			fputs("XML PARSER error\n", stderr);

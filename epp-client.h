@@ -150,6 +150,7 @@ corba_status
 epp_call_cmd(epp_context *epp_ctx,
 		service_EPP service,
 		unsigned int loginid,
+                const ccReg_TID log_id,
 		epp_command_data *cdata);
 
 /**
