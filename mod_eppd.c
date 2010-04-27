@@ -829,7 +829,6 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	int	 retval;         /* return code of read_request */
 	unsigned int	 login_id;        /* login id of client's session */
 	ccReg_TID 	 session_id;	  /* id for log_session table */
-	ccReg_TID 	 act_log_entry_id;
 	service_Logger   *logger_service;  /* reference to the fred-logd service */
 
 
@@ -847,7 +846,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 	/* initialize variables used inside the loop */
 	*login_id_save = login_id = 0;       /* zero means that client isn't logged in*/
-        session_id = act_log_entry_id = 0;
+    session_id = 0;
 	lang = LANG_EN;	/* default language is english */
 
 	/*
@@ -855,6 +854,8 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	 * error appears.
 	 */
 	while (1) {
+        ccReg_TID act_log_entry_id = 0;
+
 #ifdef EPP_PERF
 		bzero(times, 5 * sizeof(times[0]));
 #endif
