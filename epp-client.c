@@ -2917,8 +2917,8 @@ epp_call_delete(epp_context *epp_ctx,
 static corba_status
 epp_call_renew_domain(epp_context *epp_ctx,
 		service_EPP service,
-                const ccReg_TID log_id, 
 		unsigned int loginid,
+        const ccReg_TID log_id, 
 		epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
