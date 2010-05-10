@@ -362,6 +362,12 @@ int epp_log_new_message(service_Logger service,
 	int	 retr;  /* retry counter */
 	int	 ret;
 
+    /* don't log requests without session (logger restart problem)
+     * will be changed when logging become mandatory */
+    if (action_type != ClientLogin && sessionid == 0) {
+        return CORBA_ERROR;
+    }
+
 	c_sourceIP = wrap_str(sourceIP);
 	if(c_sourceIP == NULL) {
 		return CORBA_INT_ERROR;
