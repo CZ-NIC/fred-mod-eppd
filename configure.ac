@@ -67,7 +67,7 @@ AM_PATH_ORBIT2([2.0.0],[],[AC_MSG_ERROR([missing orbit2 header files.])])
 AX_PATH_ORBIT2_COSNAME()
 
 # Check for openssl library and header files
-AC_CHECK_LIB([ssl], [X509_digest], [], [AC_MSG_ERROR([openssl not found])])
+AC_CHECK_LIB([crypto], [X509_digest], [], [AC_MSG_ERROR([openssl not found])])
 AC_CHECK_HEADER([openssl/ssl.h], [],
 				[AC_MSG_ERROR([missing openssl header files])])
 
