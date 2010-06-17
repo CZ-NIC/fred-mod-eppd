@@ -1,7 +1,13 @@
+2010-06-17 Jiri Sadek (2.3.4)
+
+	* Fixes in Logger - fred-logd restart issues
+
+	* Minor configuration changes (lcrypto)
+
 2010-04-29 Jaromir Talir (2.3.3)
 
 	* Adding missing autotools files
-	
+
 2010-03-09 Juraj Vicenik, Jiri Sadek (2.3.2)
 
 	* Fixing module config to be not dependent on Logger
