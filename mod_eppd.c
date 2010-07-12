@@ -50,6 +50,7 @@
  * 	mod_eppd module can be found in README file.
  */
 
+#include <unistd.h>
 #include "httpd.h"
 #include "http_core.h"
 #include "http_log.h"
