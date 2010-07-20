@@ -1001,7 +1001,10 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
 
             PUSH_PROPERTY(*c_props, "id", cn->id);
             PUSH_PROPERTY(*c_props, "authInfo", cn->authInfo);
-            PUSH_PROPERTY_INT(*c_props, "reportLevel", cn->level);
+            // -1 means unspecified
+            if(cn->level != -1) {
+                PUSH_PROPERTY_INT(*c_props, "reportLevel", cn->level);
+            }
             // COMMON
             if ((*c_props = epp_property_push_nsset(*c_props, &cn->ns, "ns")) == NULL) {
                 return LOG_REQ_NOT_SAVED;
@@ -1148,7 +1151,10 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
 
             PUSH_PROPERTY(*c_props, "id", un->id);
             PUSH_PROPERTY(*c_props, "authInfo", un->authInfo);
-            PUSH_PROPERTY_INT(*c_props, "reportLevel", un->level);
+            // -1 means unspecified
+            if(un->level != -1) {
+                PUSH_PROPERTY_INT(*c_props, "reportLevel", un->level);
+            }
             // COMMON
 
             PUSH_QHEAD(*c_props, &un->add_tech, "addTechC");
