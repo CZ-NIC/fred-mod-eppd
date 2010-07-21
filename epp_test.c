@@ -181,8 +181,9 @@ char *epp_strcat(void *pool, const char *str1, const char *str2)
 	new_str = (char *) epp_alloc(p, len + 1, 0);
 	if (new_str == NULL)
 		return NULL;
-	strcpy(new_str, str1);
-	strcat(new_str, str2);
+	strncpy(new_str, str1, len);
+        new_str[len] = '\0';
+	strncat(new_str, str2, (len-strnlen(new_str, MAX_STR_LEN)-1) );
 	new_str[len] = '\0';
 	return new_str;
 }

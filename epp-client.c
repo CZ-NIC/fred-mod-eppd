@@ -1986,10 +1986,10 @@ epp_call_create_domain(epp_context *epp_ctx,
 	CORBA_char	*c_crDate, *c_exDate;
 	CORBA_char	*c_registrant, *c_nsset, *c_keyset, *c_authInfo;
 	ccReg_Response	*response = NULL;
-	ccReg_AdminContact	*c_admin;
-	ccReg_ExtensionList	*c_ext_list;
-	ccReg_Period_str	*c_period;
-        ccReg_EppParams         *c_params;
+	ccReg_AdminContact	*c_admin = NULL;
+	ccReg_ExtensionList	*c_ext_list = NULL;
+	ccReg_Period_str	*c_period = NULL;
+        ccReg_EppParams         *c_params = NULL;
 	int	len, i, retr, cerrno, input_ok;
 	epps_create_domain	*create_domain;
 

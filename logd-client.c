@@ -85,19 +85,17 @@ static const int LOG_PROP_NAME_LENGTH = 50;
 
 ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean output, CORBA_boolean child)
 {
-	ccReg_RequestProperties *ret;
-
 	if (list->count == 0) {
 		return c_props;
 	}
 
 	q_foreach(list) {
-		if ((ret = epp_property_push(c_props, list_name, (char*)q_content(list), output, child)) == NULL) {
+		if ((c_props = epp_property_push(c_props, list_name, (char*)q_content(list), output, child)) == NULL) {
 			return NULL;
 		}
 	}
 
-	return ret;
+	return c_props;
 }
 
 #define ALLOC_STEP 4
@@ -523,7 +521,6 @@ ccReg_RequestProperties *epp_property_push_valerr(ccReg_RequestProperties *c_pro
 	char str[LOG_PROP_NAME_LENGTH]; /* property name */
 
 	epp_error *value;			/* ds record data structure */
-	ccReg_RequestProperties *ret;	/* return value in case the list is not empty	*/
 
 	if (q_length(*list) > 0) {
 
@@ -532,21 +529,19 @@ ccReg_RequestProperties *epp_property_push_valerr(ccReg_RequestProperties *c_pro
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "element");
-			if ((ret = epp_property_push(c_props, str, value->value, CORBA_TRUE, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push(c_props, str, value->value, CORBA_TRUE, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "reason");
-			if ((ret = epp_property_push(c_props, str, value->reason, CORBA_TRUE, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push(c_props, str, value->reason, CORBA_TRUE, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 		}
-		return ret;
-	} else {
-		return c_props;
-	}
+        }
+        return c_props;
 
 }
 
@@ -566,7 +561,6 @@ ccReg_RequestProperties *epp_property_push_nsset(ccReg_RequestProperties *c_prop
 	char str[LOG_PROP_NAME_LENGTH]; /* property name */
 
 	epp_ns *value;				/* ds record data structure */
-	ccReg_RequestProperties *ret;	/* return value in case the list is not empty	*/
 
 	if (q_length(*list) > 0) {
 
@@ -575,20 +569,18 @@ ccReg_RequestProperties *epp_property_push_nsset(ccReg_RequestProperties *c_prop
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "name");
-			if ((ret = epp_property_push(c_props, str, value->name, CORBA_FALSE, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push(c_props, str, value->name, CORBA_FALSE, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "addr");
-			if ((ret = epp_property_push_qhead(c_props, &value->addr, str, CORBA_FALSE, CORBA_TRUE)) == NULL) {
+			if ((c_props = epp_property_push_qhead(c_props, &value->addr, str, CORBA_FALSE, CORBA_TRUE)) == NULL) {
 				return NULL;
 			}
 		}
-		return ret;
-	} else {
-		return c_props;
-	}
+        }
+        return c_props;
 
 }
 
@@ -607,7 +599,6 @@ ccReg_RequestProperties *epp_property_push_dnskey(ccReg_RequestProperties *c_pro
 {
 	char str[LOG_PROP_NAME_LENGTH];
 	epp_dnskey *value;
-	ccReg_RequestProperties *ret;
 
 	if (q_length(*list) > 0) {
 		q_foreach(list) {
@@ -615,34 +606,31 @@ ccReg_RequestProperties *epp_property_push_dnskey(ccReg_RequestProperties *c_pro
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "flags");
-			if ((ret = epp_property_push_int(c_props, str, value->flags, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push_int(c_props, str, value->flags, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "protocol");
-			if ((ret = epp_property_push_int(c_props, str, value->protocol, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push_int(c_props, str, value->protocol, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "alg");
-			if ((ret = epp_property_push_int(c_props, str, value->alg, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push_int(c_props, str, value->alg, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "publicKey");
-			if ((ret = epp_property_push(c_props, str, value->public_key, CORBA_FALSE, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push(c_props, str, value->public_key, CORBA_FALSE, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 		}
-		return ret;
-
-	} else {
-		return c_props;
-	}
+	} 
+        return c_props;
 
 }
 
@@ -1423,10 +1411,11 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 	}
 
 
-        if(cdata->type == EPP_CHECK_CONTACT || 
-            cdata->type == EPP_CHECK_DOMAIN ||
-            cdata->type == EPP_CHECK_NSSET ||
-            cdata->type == EPP_CHECK_KEYSET) {
+        if(cdata != NULL 
+            && (cdata->type == EPP_CHECK_CONTACT 
+             || cdata->type == EPP_CHECK_DOMAIN 
+             || cdata->type == EPP_CHECK_NSSET 
+             || cdata->type == EPP_CHECK_KEYSET)) {
                 log_props_out_check(&c_props, cdata);
 
         } else if(cdata->type ==  EPP_CREATE_CONTACT) {
