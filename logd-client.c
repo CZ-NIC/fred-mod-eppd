@@ -1410,31 +1410,31 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 		return 0;
 	}
 
-
-        if(cdata != NULL 
-            && (cdata->type == EPP_CHECK_CONTACT 
+        if(cdata != NULL) {
+            if (cdata->type == EPP_CHECK_CONTACT 
              || cdata->type == EPP_CHECK_DOMAIN 
              || cdata->type == EPP_CHECK_NSSET 
-             || cdata->type == EPP_CHECK_KEYSET)) {
+             || cdata->type == EPP_CHECK_KEYSET) {
                 log_props_out_check(&c_props, cdata);
 
-        } else if(cdata->type ==  EPP_CREATE_CONTACT) {
-		epps_create_contact *cc = cdata->data;
-		c_props = epp_property_push(c_props, "creationDate", cc->crDate, CORBA_TRUE, CORBA_FALSE);
+            } else if(cdata->type ==  EPP_CREATE_CONTACT) {
+                    epps_create_contact *cc = cdata->data;
+                    c_props = epp_property_push(c_props, "creationDate", cc->crDate, CORBA_TRUE, CORBA_FALSE);
 
-	} else if(cdata->type ==  EPP_CREATE_DOMAIN) {
-		epps_create_domain *cd = cdata->data;
-		c_props = epp_property_push(c_props, "creationDate", cd->crDate, CORBA_TRUE, CORBA_FALSE);
+            } else if(cdata->type ==  EPP_CREATE_DOMAIN) {
+                    epps_create_domain *cd = cdata->data;
+                    c_props = epp_property_push(c_props, "creationDate", cd->crDate, CORBA_TRUE, CORBA_FALSE);
 
-	} else if(cdata->type ==  EPP_CREATE_KEYSET) {
-		epps_create_keyset *ck = cdata->data;
-		c_props = epp_property_push(c_props, "creationDate", ck->crDate, CORBA_TRUE, CORBA_FALSE);
+            } else if(cdata->type ==  EPP_CREATE_KEYSET) {
+                    epps_create_keyset *ck = cdata->data;
+                    c_props = epp_property_push(c_props, "creationDate", ck->crDate, CORBA_TRUE, CORBA_FALSE);
 
-	} else if(cdata->type ==  EPP_CREATE_NSSET) {
-		epps_create_nsset *cn = cdata->data;
-		c_props = epp_property_push(c_props, "creationDate", cn->crDate, CORBA_TRUE, CORBA_FALSE);
+            } else if(cdata->type ==  EPP_CREATE_NSSET) {
+                    epps_create_nsset *cn = cdata->data;
+                    c_props = epp_property_push(c_props, "creationDate", cn->crDate, CORBA_TRUE, CORBA_FALSE);
 
-	}
+            }
+        }
 
 	res = epp_log_close_message(log_service, response, c_props, log_entry_id, session_id, errmsg);
 
