@@ -788,7 +788,7 @@ static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_co
                 action_type = UnknownAction;
         }
 
-        PUSH_PROPERTY(*c_props, "id", ai->id);
+        PUSH_PROPERTY(*c_props, "handle", ai->id);
     }
 
     return action_type;
@@ -834,7 +834,7 @@ static void log_props_out_check(ccReg_RequestProperties **c_props, const epp_com
 
         avail = q_content(&ec->avails);
 
-        *c_props = epp_property_push(*c_props, "checkId", q_content(&ec->ids), CORBA_TRUE, CORBA_FALSE);
+        *c_props = epp_property_push(*c_props, "name", q_content(&ec->ids), CORBA_TRUE, CORBA_FALSE);
         if(avail->avail) {
 	    *c_props = epp_property_push(*c_props, "available", "true", CORBA_TRUE, CORBA_TRUE);
         } else {
@@ -868,7 +868,7 @@ static epp_action_type log_props_info(ccReg_RequestProperties **c_props, epp_com
         {
             epps_info_contact *i = cdata->data;
 
-            PUSH_PROPERTY(*c_props, "id", i->id)
+            PUSH_PROPERTY(*c_props, "handle", i->id)
             action_type = ContactInfo;
             break;
         }
@@ -876,7 +876,7 @@ static epp_action_type log_props_info(ccReg_RequestProperties **c_props, epp_com
         {
             epps_info_keyset *i = cdata->data;
 
-            PUSH_PROPERTY(*c_props, "id", i->id)
+            PUSH_PROPERTY(*c_props, "handle", i->id)
             action_type = KeysetInfo;
             break;
         }
@@ -884,7 +884,7 @@ static epp_action_type log_props_info(ccReg_RequestProperties **c_props, epp_com
         {
             epps_info_nsset *i = cdata->data;
 
-            PUSH_PROPERTY(*c_props, "id", i->id)
+            PUSH_PROPERTY(*c_props, "handle", i->id)
             action_type = NSsetInfo;
             break;
         }
@@ -923,7 +923,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
             action_type = ContactCreate;
             epps_create_contact *cc = cdata->data;
 
-            PUSH_PROPERTY(*c_props, "id", cc->id);
+            PUSH_PROPERTY(*c_props, "handle", cc->id);
 
             // postal info
             if ((*c_props = epp_log_postal_info(*c_props, &cc->pi)) == NULL) {
@@ -987,7 +987,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
             action_type = NSsetCreate;
             epps_create_nsset *cn = cdata->data;
 
-            PUSH_PROPERTY(*c_props, "id", cn->id);
+            PUSH_PROPERTY(*c_props, "handle", cn->id);
             PUSH_PROPERTY(*c_props, "authInfo", cn->authInfo);
             // -1 means unspecified
             if(cn->level != -1) {
@@ -1004,7 +1004,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
             action_type = KeysetCreate;
             epps_create_keyset *ck = cdata->data;
 
-            PUSH_PROPERTY(*c_props, "id", ck->id);
+            PUSH_PROPERTY(*c_props, "handle", ck->id);
             PUSH_PROPERTY(*c_props, "authInfo", ck->authInfo);
             // COMMON
 
@@ -1043,7 +1043,7 @@ static epp_action_type log_props_delete(ccReg_RequestProperties **c_props, epp_c
     }
     ed = cdata->data;
 
-    PUSH_PROPERTY(*c_props, "id", ed->id);
+    PUSH_PROPERTY(*c_props, "name", ed->id);
     return action_type;
 }
 
@@ -1077,7 +1077,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
 
             epps_update_contact *uc = cdata->data;
 
-            PUSH_PROPERTY(*c_props, "id", uc->id);
+            PUSH_PROPERTY(*c_props, "handle", uc->id);
 
             if ((*c_props = epp_log_postal_info(*c_props, uc->pi)) == NULL) {
                 return LOG_REQ_NOT_SAVED;
@@ -1137,7 +1137,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
             action_type = NSsetUpdate;
             epps_update_nsset *un = cdata->data;
 
-            PUSH_PROPERTY(*c_props, "id", un->id);
+            PUSH_PROPERTY(*c_props, "handle", un->id);
             PUSH_PROPERTY(*c_props, "authInfo", un->authInfo);
             // -1 means unspecified
             if(un->level != -1) {
@@ -1158,7 +1158,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
             action_type = KeysetUpdate;
             epps_update_keyset *uk = cdata->data;
 
-            PUSH_PROPERTY(*c_props, "id", uk->id);
+            PUSH_PROPERTY(*c_props, "handle", uk->id);
             PUSH_PROPERTY(*c_props, "authInfo", uk->authInfo);
             // COMMON
 
@@ -1203,7 +1203,7 @@ static epp_action_type log_props_transfer(ccReg_RequestProperties **c_props, epp
 
     et = cdata->data;
 
-    PUSH_PROPERTY(*c_props, "id", et->id);
+    PUSH_PROPERTY(*c_props, "name", et->id);
 
     return action_type;
 }
