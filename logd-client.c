@@ -1495,8 +1495,6 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 
                 }
 
-                if(c_props == NULL) 
-
                 log_props_default_extcmd_response(&c_props, cdata);
 	}
 
