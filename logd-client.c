@@ -21,6 +21,7 @@ int epp_log_close_message(service_Logger service,
 		ccReg_RequestProperties *properties,
 		ccReg_TID log_entry_id,
 		ccReg_TID session_id,
+        CORBA_long result_code,
 		char *errmsg);
 
 int epp_log_new_message(service_Logger service,
@@ -437,6 +438,7 @@ int epp_log_close_message(service_Logger service,
 		ccReg_RequestProperties *properties,
 		ccReg_TID log_entry_id,
 		ccReg_TID session_id,
+        CORBA_long result_code,
 		char *errmsg)
 {
 	CORBA_Environment	 ev[1];
@@ -468,9 +470,9 @@ int epp_log_close_message(service_Logger service,
 		/* call logger method */
 
 		if (session_id == 0) {
-			success = ccReg_Logger_CloseRequest((ccReg_Logger) service, log_entry_id, c_content, properties, ev);
+			success = ccReg_Logger_CloseRequest((ccReg_Logger) service, log_entry_id, c_content, properties, result_code, ev);
 		} else {
-			success = ccReg_Logger_CloseRequestLogin((ccReg_Logger) service, log_entry_id, c_content, properties, session_id, ev);
+			success = ccReg_Logger_CloseRequestLogin((ccReg_Logger) service, log_entry_id, c_content, properties, session_id, result_code, ev);
 		}
 
 		/* if COMM_FAILURE is not raised then quit retry loop */
@@ -1495,14 +1497,15 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 
                 }
 
-                log_props_default_extcmd_response(&c_props, cdata);
+                if(c_props == NULL) 
+                    log_props_default_extcmd_response(&c_props, cdata);
 	}
 
 	if (valerr != NULL && (c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL) {
 		return LOG_REQ_NOT_SAVED;
 	}
 
-	res = epp_log_close_message(log_service, response, c_props, log_entry_id, session_id, errmsg);
+	res = epp_log_close_message(log_service, response, c_props, log_entry_id, session_id, cdata->rc, errmsg);
 
 	if(res == CORBA_OK) return 1;
 	else return LOG_REQ_NOT_SAVED;
