@@ -1504,7 +1504,11 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 		return LOG_REQ_NOT_SAVED;
 	}
 
-	res = epp_log_close_message(log_service, response, c_props, log_entry_id, session_id, cdata->rc, errmsg);
+        if(cdata != NULL) {
+            res = epp_log_close_message(log_service, response, c_props, log_entry_id, session_id, cdata->rc, errmsg);
+        } else {
+            res = epp_log_close_message(log_service, response, c_props, log_entry_id, session_id, 2400, errmsg);
+        }
 
 	if(res == CORBA_OK) return 1;
 	else return LOG_REQ_NOT_SAVED;
