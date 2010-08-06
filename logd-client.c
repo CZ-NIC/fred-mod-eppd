@@ -1497,8 +1497,7 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 
                 }
 
-                if(c_props == NULL) 
-                    log_props_default_extcmd_response(&c_props, cdata);
+                log_props_default_extcmd_response(&c_props, cdata);
 	}
 
 	if (valerr != NULL && (c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL) {
