@@ -19,17 +19,19 @@ ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props,
 int epp_log_close_message(service_Logger service,
 		const char *content,
 		ccReg_RequestProperties *properties,
+                ccReg_Logger_ObjectReferences *objrefs,
 		ccReg_TID log_entry_id,
 		ccReg_TID session_id,
-        CORBA_long result_code,
+                CORBA_long result_code,
 		char *errmsg);
 
 int epp_log_new_message(service_Logger service,
 		const char *sourceIP,
 		const char *content,
 		ccReg_RequestProperties *properties,
-         	ccReg_TID *log_entry_id,
+                ccReg_Logger_ObjectReferences *objrefs,
          	epp_action_type action_type,
+         	ccReg_TID *log_entry_id,
 		ccReg_TID sessionid,
 		char *errmsg);
 
@@ -247,27 +249,25 @@ ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props,
  *
  * @returns		CORBA status code
  */
-int epp_log_CreateSession(service_Logger service, const char *name, epp_lang lang, ccReg_TID * const log_session_id, char *errmsg)
+int epp_log_CreateSession(service_Logger service, const char *user_name, ccReg_TID user_id, ccReg_TID * const log_session_id, char *errmsg)
 {
 	CORBA_Environment ev[1];
 	CORBA_char *c_name;
-	ccReg_Languages c_lang;
 	ccReg_TID session_id;
 	int retr;
 
-	c_name = wrap_str(name);
+	c_name = wrap_str(user_name);
 	if(c_name == NULL) {
 		return CORBA_INT_ERROR;
 	}
-
-	c_lang = (lang == LANG_EN) ? ccReg_EN : ccReg_CS;
 
 	/* retry loop */
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev); // valid first time
 		CORBA_exception_init(ev);
 
-		session_id = ccReg_Logger_CreateSession((ccReg_Logger) service, c_lang, c_name, ev);
+                // TODO so far using 0 as user ID
+		session_id = ccReg_Logger_createSession((ccReg_Logger) service, user_id, c_name, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
@@ -301,7 +301,6 @@ int epp_log_CreateSession(service_Logger service, const char *name, epp_lang lan
 int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char *errmsg)
 {
 	CORBA_Environment ev[1];
-	CORBA_boolean success;
 	int retr;
 
 	/* retry loop */
@@ -311,7 +310,7 @@ int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char 
 
 		/* call logger method */
 
-		success = ccReg_Logger_CloseSession((ccReg_Logger) service, log_session_id, ev);
+		ccReg_Logger_closeSession((ccReg_Logger) service, log_session_id, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
@@ -319,6 +318,8 @@ int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char 
 		usleep(RETR_SLEEP);
 	}
 
+        // TODO properly handle exceptions
+        // // return CORBA_REMOTE_ERROR;
 	if (raised_exception(ev)) {
 		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
 		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
@@ -327,11 +328,7 @@ int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char 
 	}
 	CORBA_exception_free(ev);
 
-	if(success == CORBA_FALSE) {
-		return CORBA_REMOTE_ERROR;
-	} else {
-		return CORBA_OK;
-	}
+        return CORBA_OK;
 }
 
 
@@ -348,45 +345,58 @@ int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char 
  * @returns				CORBA status code
  */
 int epp_log_new_message(service_Logger service,
-		const char *sourceIP,
+		const char *source_ip,
 		const char *content,
 		ccReg_RequestProperties *properties,
-         	ccReg_TID *log_entry_id,
+                ccReg_Logger_ObjectReferences *objrefs,
          	epp_action_type action_type,
+         	ccReg_TID *log_entry_id,
 		ccReg_TID sessionid,
 		char *errmsg)
 {
 	CORBA_Environment	 ev[1];
-	CORBA_char *c_sourceIP, *c_content;
+	CORBA_char *c_source_ip, *c_content;
 	ccReg_TID entry_id;
 	int	 retr;  /* retry counter */
 	int	 ret;
 
     /* don't log requests without session (logger restart problem)
      * will be changed when logging become mandatory */
-    if (action_type != ClientLogin && sessionid == 0) {
-        return CORBA_ERROR;
-    }
+        if (action_type != ClientLogin && sessionid == 0) {
+            return CORBA_ERROR;
+        }
 
-	c_sourceIP = wrap_str(sourceIP);
-	if(c_sourceIP == NULL) {
+	c_source_ip = wrap_str(source_ip);
+	if(c_source_ip == NULL) {
 		return CORBA_INT_ERROR;
 	}
 	c_content = wrap_str(content);
 	if(c_content == NULL) {
-		CORBA_free(c_sourceIP);
+		CORBA_free(c_source_ip);
 		return CORBA_INT_ERROR;
 	}
 	if(properties == NULL) {
 		properties = ccReg_RequestProperties__alloc();
 		if(properties == NULL) {
-			CORBA_free(c_sourceIP);
+			CORBA_free(c_source_ip);
 			CORBA_free(c_content);
 			return CORBA_INT_ERROR;
 		}
 
 		properties->_maximum = properties->_length = 0;
 	} 
+        if(objrefs == NULL) {
+                objrefs = ccReg_Logger_ObjectReferences__alloc();
+                if(objrefs == NULL) {
+                        CORBA_free(c_source_ip);
+			CORBA_free(c_content);
+                        CORBA_free(properties);
+			return CORBA_INT_ERROR;
+		}
+
+                objrefs->_maximum = objrefs->_length = 0;
+        }
+                        
 
 	/* retry loop */
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
@@ -394,7 +404,7 @@ int epp_log_new_message(service_Logger service,
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-		entry_id = ccReg_Logger_CreateRequest((ccReg_Logger) service, c_sourceIP,  LC_EPP, c_content, properties, action_type, sessionid, ev);
+		entry_id = ccReg_Logger_createRequest((ccReg_Logger) service, c_source_ip,  LC_EPP, c_content, properties, objrefs, action_type, sessionid, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
@@ -402,9 +412,10 @@ int epp_log_new_message(service_Logger service,
 		usleep(RETR_SLEEP);
 	}
 
-	CORBA_free(c_sourceIP);
+	CORBA_free(c_source_ip);
 	CORBA_free(c_content);
 	CORBA_free(properties);
+        CORBA_free(objrefs);
 
 	if (raised_exception(ev)) {
 		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
@@ -436,16 +447,15 @@ int epp_log_new_message(service_Logger service,
 int epp_log_close_message(service_Logger service,
 		const char *content,
 		ccReg_RequestProperties *properties,
+                ccReg_Logger_ObjectReferences *objrefs,
 		ccReg_TID log_entry_id,
 		ccReg_TID session_id,
-        CORBA_long result_code,
+                CORBA_long result_code,
 		char *errmsg)
 {
 	CORBA_Environment	 ev[1];
 	CORBA_char *c_content;
 	int	 retr;  /* retry counter */
-	int	 ret;
-	CORBA_boolean 		success;
 
 	c_content = wrap_str(content);
 	if(c_content == NULL) {
@@ -462,18 +472,25 @@ int epp_log_close_message(service_Logger service,
 		properties->_maximum = properties->_length = 0;
 	}
 
+        if(objrefs == NULL) {
+                objrefs = ccReg_Logger_ObjectReferences__alloc();
+                if(objrefs == NULL) {
+			CORBA_free(c_content);
+                        CORBA_free(properties);
+			return CORBA_INT_ERROR;
+		}
+
+                objrefs->_maximum = objrefs->_length = 0;
+        }
+         
+
 	/* retry loop */
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev); /* valid first time */
 		CORBA_exception_init(ev);
 
 		/* call logger method */
-
-		if (session_id == 0) {
-			success = ccReg_Logger_CloseRequest((ccReg_Logger) service, log_entry_id, c_content, properties, result_code, ev);
-		} else {
-			success = ccReg_Logger_CloseRequestLogin((ccReg_Logger) service, log_entry_id, c_content, properties, session_id, result_code, ev);
-		}
+                ccReg_Logger_closeRequest((ccReg_Logger) service, log_entry_id, c_content, properties, objrefs, result_code, session_id, ev);
 
 		/* if COMM_FAILURE is not raised then quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
@@ -483,7 +500,10 @@ int epp_log_close_message(service_Logger service,
 
 	CORBA_free(c_content);
 	CORBA_free(properties);
+        CORBA_free(objrefs);
 
+        //TODO proper handling of exceptions
+        // ret = CORBA_REMOTE_ERROR;
 	if (raised_exception(ev)) {
 		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
 		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
@@ -492,12 +512,7 @@ int epp_log_close_message(service_Logger service,
 	}
 	CORBA_exception_free(ev);
 
-	if(success == CORBA_FALSE) {
-		ret = CORBA_REMOTE_ERROR;
-	} else {
-		ret = CORBA_OK;
-	}
-	return ret;
+        return CORBA_OK;
 }
 
 
@@ -1367,7 +1382,7 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
 	if(cdata->type == EPP_DUMMY) {
 		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 
-		res = epp_log_new_message(service, remote_ip, request, c_props, &log_entry_id, action_type, sessionid, errmsg);
+		res = epp_log_new_message(service, remote_ip, request, c_props, NULL, action_type, &log_entry_id, sessionid, errmsg);
 
 		if(res == CORBA_OK) return log_entry_id;
 		else return LOG_REQ_NOT_SAVED;
@@ -1424,7 +1439,7 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
 	}
 
   	PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
-        res = epp_log_new_message(service, remote_ip, request, c_props, &log_entry_id, action_type, sessionid, errmsg);
+        res = epp_log_new_message(service, remote_ip, request, c_props, NULL, action_type, &log_entry_id, sessionid, errmsg);
 
 	if(res == CORBA_OK) return log_entry_id;
 	else return LOG_REQ_NOT_SAVED;
@@ -1505,9 +1520,9 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 	}
 
         if(cdata != NULL) {
-            res = epp_log_close_message(log_service, response, c_props, log_entry_id, session_id, cdata->rc, errmsg);
+            res = epp_log_close_message(log_service, response, c_props, NULL, log_entry_id, session_id, cdata->rc, errmsg);
         } else {
-            res = epp_log_close_message(log_service, response, c_props, log_entry_id, session_id, 2400, errmsg);
+            res = epp_log_close_message(log_service, response, c_props, NULL, log_entry_id, session_id, 2400, errmsg);
         }
 
 	if(res == CORBA_OK) return 1;

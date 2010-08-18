@@ -671,10 +671,11 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 
 		// if logged in successfully and fred-logd service is available
 		if (cstat == CORBA_OK && service_log != NULL) {
-			char *registrar_id;
+			char *registrar_name;
 
-			registrar_id = ((epps_login*)cdata->data)->clID;
-			log_cstat = epp_log_CreateSession(service_log, registrar_id, *lang, session_id, errmsg);
+			registrar_name = ((epps_login*)cdata->data)->clID;
+			log_cstat = epp_log_CreateSession(service_log, registrar_name, 0, session_id, errmsg);
+                        
 		}
 	} else if (pstat == PARSER_CMD_LOGOUT) {
 		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
