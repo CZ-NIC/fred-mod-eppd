@@ -19,7 +19,7 @@ ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props,
 int epp_log_close_message(service_Logger service,
 		const char *content,
 		ccReg_RequestProperties *properties,
-                ccReg_Logger_ObjectReferences *objrefs,
+                ccReg_ObjectReferences *objrefs,
 		ccReg_TID log_entry_id,
 		ccReg_TID session_id,
                 CORBA_long result_code,
@@ -29,7 +29,7 @@ int epp_log_new_message(service_Logger service,
 		const char *sourceIP,
 		const char *content,
 		ccReg_RequestProperties *properties,
-                ccReg_Logger_ObjectReferences *objrefs,
+                ccReg_ObjectReferences *objrefs,
          	epp_action_type action_type,
          	ccReg_TID *log_entry_id,
 		ccReg_TID sessionid,
@@ -348,7 +348,7 @@ int epp_log_new_message(service_Logger service,
 		const char *source_ip,
 		const char *content,
 		ccReg_RequestProperties *properties,
-                ccReg_Logger_ObjectReferences *objrefs,
+                ccReg_ObjectReferences *objrefs,
          	epp_action_type action_type,
          	ccReg_TID *log_entry_id,
 		ccReg_TID sessionid,
@@ -386,7 +386,7 @@ int epp_log_new_message(service_Logger service,
 		properties->_maximum = properties->_length = 0;
 	} 
         if(objrefs == NULL) {
-                objrefs = ccReg_Logger_ObjectReferences__alloc();
+                objrefs = ccReg_ObjectReferences__alloc();
                 if(objrefs == NULL) {
                         CORBA_free(c_source_ip);
 			CORBA_free(c_content);
@@ -447,7 +447,7 @@ int epp_log_new_message(service_Logger service,
 int epp_log_close_message(service_Logger service,
 		const char *content,
 		ccReg_RequestProperties *properties,
-                ccReg_Logger_ObjectReferences *objrefs,
+                ccReg_ObjectReferences *objrefs,
 		ccReg_TID log_entry_id,
 		ccReg_TID session_id,
                 CORBA_long result_code,
@@ -473,7 +473,7 @@ int epp_log_close_message(service_Logger service,
 	}
 
         if(objrefs == NULL) {
-                objrefs = ccReg_Logger_ObjectReferences__alloc();
+                objrefs = ccReg_ObjectReferences__alloc();
                 if(objrefs == NULL) {
 			CORBA_free(c_content);
                         CORBA_free(properties);
