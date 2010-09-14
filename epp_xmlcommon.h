@@ -50,7 +50,7 @@
 /** Namespace + location of keyset xml schema */
 #define LOC_KEYSET	NS_KEYSET " keyset-1.3.xsd"
 /** Namespace + location of fred xml schema */
-#define LOC_FRED	NS_FRED " fred-1.3.xsd"
+#define LOC_FRED	NS_FRED " fred-1.4.xsd"
 /** Namespace + location of enumval xml schema */
 #define LOC_ENUMVAL	NS_ENUMVAL " enumval-1.2.xsd"
 
