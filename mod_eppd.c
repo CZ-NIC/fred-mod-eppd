@@ -962,7 +962,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
                         } else {
                             remote_ipaddr = ((conn_rec*)epp_ctx->conn)->remote_ip;
                         }
-			act_log_entry_id = log_epp_command(logger_service, remote_ipaddr, request, cdata, cmd_type, session_id);
+			act_log_entry_id = log_epp_command(logger_service, remote_ipaddr, cdata->xml_in, cdata, cmd_type, session_id);
 
                         epplog(epp_ctx, EPP_DEBUG, "Request in fred-logd created, id: %llu ", act_log_entry_id);
                         /* don't pollute logs in case logd isn't running
