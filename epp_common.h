@@ -781,7 +781,8 @@ typedef struct {
 	char	*svTRID;/**< server's TRID */
 	int	 	rc;    /**< EPP return code defined in standard. */
 	char	*msg;   /**< Text message coresponding to return code. */
-	char	*xml_in;/**< XML as it is received from client. */
+	char	*xml_in;/**< XML as it is received from client. Encoding
+         set by macro XML_IN_ENC*/
 	/* parsed_doc and xpath_ctx are needed for error reporting. */
 	void	*parsed_doc; /**< Parsed XML document tree. */
 	void	*xpath_ctx;  /**< XPath context. */

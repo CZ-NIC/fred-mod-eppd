@@ -530,7 +530,7 @@ epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 
 	epplog(epp_ctx, EPP_DEBUG, "request received (length %u bytes)",
 			hbo_size);
-	epplog(epp_ctx, EPP_DEBUG, "request content: %s", *content);
+	epplog(epp_ctx, EPP_DEBUG, "raw request content: %s", *content);
 
 	apr_brigade_destroy(bb);
 	*bytes = (unsigned) len;

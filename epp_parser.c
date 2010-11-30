@@ -53,6 +53,12 @@
 #define HASH_SIZE_CMD	30
 
 /**
+ * Encoding for input xml in epp_command_data
+ * structure
+ */
+#define XML_IN_ENC "UTF-8"
+
+/**
  * @defgroup xerrors Error codes which signal the cause of an error and
  * macros which make working with error values easier.
  * @{
@@ -2984,7 +2990,7 @@ epp_parse_command(epp_context *epp_ctx,
 		return PARSER_NOT_XML;
 
 	/* Save input xml document */
-	xmlDocDumpMemoryEnc(cdata->parsed_doc, &dumpedXML, &dumpLength,"UTF-8");
+	xmlDocDumpMemoryEnc(cdata->parsed_doc, &dumpedXML, &dumpLength,XML_IN_ENC);
 	if (dumpedXML == NULL || dumpLength <= 0)
 		return PARSER_EINTERNAL;
 	/*
@@ -2996,6 +3002,9 @@ epp_parse_command(epp_context *epp_ctx,
 		return PARSER_EINTERNAL;
 	memcpy(cdata->xml_in, dumpedXML, dumpLength);
 	cdata->xml_in[dumpLength] = '\0';
+
+        epplog(epp_ctx, EPP_DEBUG, "Request content dumped in %s encoding: %s",
+            XML_IN_ENC, cdata->xml_in);
 
 	/* validate the doc */
 	val_ret = validate_doc(epp_ctx->pool, (xmlSchemaPtr) schema,
