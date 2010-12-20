@@ -227,6 +227,42 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
 }
 
 
+ccReg_EppParams *init_epp_params(
+		unsigned int session_id,
+		const ccReg_TID request_id,
+		const char *xml_in,
+		const char *clTRID)
+{
+	ccReg_EppParams *c_params;
+
+	c_params = ccReg_EppParams__alloc();
+	if (c_params == NULL) {
+		return NULL;
+	}
+
+	c_params->sessionID = session_id;
+	c_params->requestID = request_id;
+	c_params->XML = NULL;
+	c_params->clTRID = NULL;
+
+	if(xml_in != NULL && *xml_in != '\0') {
+		c_params->XML = wrap_str(xml_in);
+		if (c_params->XML == NULL) {
+			CORBA_free(c_params);
+			return NULL;
+		}
+	}
+
+	if(clTRID != NULL && *clTRID != '\0') {
+		c_params->clTRID = wrap_str(clTRID);
+		if (c_params->clTRID == NULL) {
+			CORBA_free(c_params);
+			return NULL;
+		}
+	}
+
+	return c_params;
+}
 
 int
 epp_call_hello(epp_context *epp_ctx, service_EPP service, char **version,
@@ -1989,7 +2025,7 @@ epp_call_create_domain(epp_context *epp_ctx,
 	ccReg_AdminContact	*c_admin = NULL;
 	ccReg_ExtensionList	*c_ext_list = NULL;
 	ccReg_Period_str	*c_period = NULL;
-        ccReg_EppParams         *c_params = NULL;
+    ccReg_EppParams     *c_params = NULL;
 	int	len, i, retr, cerrno, input_ok;
 	epps_create_domain	*create_domain;
 
@@ -2001,7 +2037,7 @@ epp_call_create_domain(epp_context *epp_ctx,
 	c_nsset = NULL;
 	c_keyset = NULL;
 	c_registrant = NULL;
-        c_params = NULL;
+    c_params = NULL;
 	/*
 	 * Input parameters:
 	 *    name (a)
@@ -2020,8 +2056,10 @@ epp_call_create_domain(epp_context *epp_ctx,
 	 */
 	assert(create_domain->name);
 	assert(cdata->xml_in);
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) goto error_input;
+
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+    if (c_params == NULL) goto error_input;
+
 	c_registrant = wrap_str(create_domain->registrant);
 	if (c_registrant == NULL) goto error_input;
 	c_nsset = wrap_str(create_domain->nsset);
@@ -2081,17 +2119,6 @@ epp_call_create_domain(epp_context *epp_ctx,
 		}
 		i++;
 	}
-
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-            goto error_input;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if (c_params->clTRID == NULL) {
-            goto error_input;
-        }
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -2356,26 +2383,11 @@ epp_call_create_contact(epp_context *epp_ctx,
 		return CORBA_INT_ERROR;
 	}
 
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) {
-                CORBA_free(c_contact);
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+	if(c_params == NULL) {
+		CORBA_free(c_contact);
 		return CORBA_INT_ERROR;
-        }
-
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-                CORBA_free(c_contact);
-                CORBA_free(c_params);
-                return CORBA_INT_ERROR;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if(c_params->clTRID == NULL) {
-                CORBA_free(c_contact);
-                CORBA_free(c_params);
-                return CORBA_INT_ERROR;
-        }
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -2540,33 +2552,16 @@ epp_call_create_nsset(epp_context *epp_ctx,
 			return CORBA_INT_ERROR;
 		}
 	}
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) {
-                CORBA_free(c_tech);
-		CORBA_free(c_dnshost);
-                CORBA_free(c_authInfo);
-                return CORBA_INT_ERROR;
-        }
-        
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-                CORBA_free(c_tech);
-		CORBA_free(c_dnshost);
-                CORBA_free(c_authInfo);
-                CORBA_free(c_params);
-                return CORBA_INT_ERROR;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if (c_params->clTRID == NULL) {
-                CORBA_free(c_tech);
-		CORBA_free(c_dnshost);
-                CORBA_free(c_authInfo);
-                CORBA_free(c_params);
-                return CORBA_INT_ERROR;
-        }
 
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+
+	if(c_params == NULL) {
+        CORBA_free(c_tech);
+		CORBA_free(c_dnshost);
+		CORBA_free(c_authInfo);
+		return CORBA_INT_ERROR;
+	}
+        
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
 		CORBA_exception_init(ev);
@@ -2734,35 +2729,14 @@ epp_call_create_keyset(epp_context *epp_ctx,
 		}
 	}
 
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) {
-                CORBA_free(c_tech);
-                CORBA_free(c_dnskey);
-                CORBA_free(c_dsrecord);
-                CORBA_free(c_authInfo);
-                return CORBA_INT_ERROR;
-        }
-
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-                CORBA_free(c_tech);
-                CORBA_free(c_dnskey);
-                CORBA_free(c_dsrecord);
-                CORBA_free(c_authInfo);
-                CORBA_free(c_params);
-                return CORBA_INT_ERROR;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if (c_params->clTRID == NULL) {
-                CORBA_free(c_tech);
-                CORBA_free(c_dnskey);
-                CORBA_free(c_dsrecord);
-                CORBA_free(c_authInfo);
-                CORBA_free(c_params);
-                return CORBA_INT_ERROR;
-        }
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+	if (c_params == NULL) {
+		CORBA_free(c_tech);
+		CORBA_free(c_dnskey);
+		CORBA_free(c_dsrecord);
+		CORBA_free(c_authInfo);
+		return CORBA_INT_ERROR;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -2845,23 +2819,10 @@ epp_call_delete(epp_context *epp_ctx,
 	assert(delete->id);
 	assert(cdata->xml_in);
 
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) {
-                return CORBA_INT_ERROR;
-        }
-
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-                CORBA_free(c_params);
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+	if (c_params == NULL) {
 		return CORBA_INT_ERROR;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if (c_params->clTRID == NULL) {
-                CORBA_free(c_params);
-		return CORBA_INT_ERROR;
-        }
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -2869,25 +2830,17 @@ epp_call_delete(epp_context *epp_ctx,
 
 		if (obj == EPP_DOMAIN)
 			response = ccReg_EPP_DomainDelete((ccReg_EPP) service,
-					delete->id,
-                                        c_params,
-					ev);
+					delete->id, c_params, ev);
 		else if (obj == EPP_CONTACT)
 			response = ccReg_EPP_ContactDelete((ccReg_EPP) service,
-					delete->id,
-                                        c_params,
-					ev);
+					delete->id, c_params, ev);
 		else if (obj == EPP_KEYSET)
 			response = ccReg_EPP_KeySetDelete((ccReg_EPP) service,
-					delete->id,
-                                        c_params,
-					ev);
+					delete->id, c_params, ev);
 		else {
 			assert(obj == EPP_NSSET);
 			response = ccReg_EPP_NSSetDelete((ccReg_EPP) service,
-					delete->id,
-                                        c_params,
-					ev);
+					delete->id, c_params, ev);
 		}
 
 		/* if COMM_FAILURE exception is not raised quit retry loop */
@@ -2994,21 +2947,10 @@ epp_call_renew_domain(epp_context *epp_ctx,
 		i++;
 	}
 
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) {
-                goto error_input;
-        }
-
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-                goto error_input;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if (c_params->clTRID == NULL) {
-                goto error_input;
-        }
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+	if (c_params == NULL) {
+			goto error_input;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -3200,22 +3142,10 @@ epp_call_update_domain(epp_context *epp_ctx,
 		i++;
 	}
 
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) {
-                goto error_input;
-        }
-
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-                goto error_input;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if (c_params->clTRID == NULL) {
-                goto error_input;
-        }
-
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+	if (c_params == NULL) {
+		goto error_input;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -3231,7 +3161,7 @@ epp_call_update_domain(epp_context *epp_ctx,
 				c_admin_add,
 				c_admin_rem,
 				c_tmpcontact_rem,
-                                c_params,
+                c_params,
 				c_ext_list,
 				ev);
 
@@ -3386,21 +3316,10 @@ epp_call_update_contact(epp_context *epp_ctx,
 			(update_contact->discl.notifyEmail ? CORBA_TRUE : CORBA_FALSE);
 	}
 
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) {
-                goto error_input;
-        }
-
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-                goto error_input;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if (c_params->clTRID == NULL) {
-                goto error_input;
-        }
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+	if (c_params == NULL) {
+			goto error_input;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -3574,22 +3493,10 @@ epp_call_update_nsset(epp_context *epp_ctx,
 		c_dnshost_rem->_buffer[i++].fqdn = fqdn;
 	}
 
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) { 
-                goto error_input;
-        }
-
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-                goto error_input;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if (c_params->clTRID == NULL) {
-                goto error_input;
-        }
-
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+	if (c_params == NULL) {
+		goto error_input;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -3604,7 +3511,7 @@ epp_call_update_nsset(epp_context *epp_ctx,
 				c_tech_add,
 				c_tech_rem,
 				update_nsset->level,
-                                c_params,
+				c_params,
 				ev);
 
 		/* if COMM_FAILURE exception is not raised quit retry loop */
@@ -3774,22 +3681,10 @@ epp_call_update_keyset(epp_context *epp_ctx,
 		i++;
 	}
 
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) {
-                goto error_input;
-        }
-
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-                goto error_input;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if (c_params->clTRID == NULL) {
-                goto error_input;
-        }
-
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+	if (c_params == NULL) {
+			goto error_input;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -3858,7 +3753,7 @@ epp_call_transfer(epp_context *epp_ctx,
 	CORBA_Environment ev[1];
 	CORBA_char	*c_authInfo;
 	ccReg_Response	*response;
-        ccReg_EppParams *c_params = NULL;
+	ccReg_EppParams *c_params = NULL;
 	int	retr;
 	epps_transfer	*transfer;
 
@@ -3880,26 +3775,11 @@ epp_call_transfer(epp_context *epp_ctx,
 		return CORBA_INT_ERROR;
 	}
 
-        c_params = ccReg_EppParams__alloc();
-        if (c_params == NULL) {
-                CORBA_free(c_authInfo);
-                return CORBA_INT_ERROR;
-        }
-
-        c_params->sessionID = loginid;
-        c_params->requestID = log_id;
-        c_params->XML = wrap_str(cdata->xml_in);;
-        if (c_params->XML == NULL) {
-                CORBA_free(c_authInfo);
-                CORBA_free(c_params);
-                return CORBA_INT_ERROR;
-        }
-        c_params->clTRID = wrap_str(cdata->clTRID);
-        if (c_params->clTRID == NULL) {
-                CORBA_free(c_authInfo);
-                CORBA_free(c_params);
-                return CORBA_INT_ERROR;
-        }
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+	if (c_params == NULL) {
+		CORBA_free(c_authInfo);
+		return CORBA_INT_ERROR;
+	}
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -4074,6 +3954,7 @@ static corba_status
 epp_call_sendauthinfo(epp_context *epp_ctx,
 		service_EPP service,
 		unsigned int loginid,
+                const ccReg_TID log_id, 
 		epp_command_data *cdata,
 		epp_object_type obj)
 {
@@ -4081,6 +3962,7 @@ epp_call_sendauthinfo(epp_context *epp_ctx,
 	CORBA_char	*c_clTRID, *c_handle;
 	ccReg_Response	*response;
 	epps_sendAuthInfo	*sendAuthInfo;
+	ccReg_EppParams *c_params = NULL;
 	int	 retr;
 
 	sendAuthInfo = cdata->data;
@@ -4093,15 +3975,18 @@ epp_call_sendauthinfo(epp_context *epp_ctx,
 	 * Output parameters: none
 	 */
 	assert(cdata->xml_in);
-	c_clTRID = wrap_str(cdata->clTRID);
-	if (c_clTRID == NULL)
+
+	c_params = init_epp_params(loginid, log_id, cdata->xml_in, cdata->clTRID);
+	if(c_params == NULL) {
 		return CORBA_INT_ERROR;
+	}
 
 	c_handle = wrap_str(sendAuthInfo->id);
 	if (c_handle == NULL) {
-		CORBA_free(c_clTRID);
-		return CORBA_INT_ERROR;
+		CORBA_free(c_params);
+                return CORBA_INT_ERROR;
 	}
+        // TODO create a separate function for c_params allocation
 
 	for (retr = 0; retr < MAX_RETRIES; retr++) {
 		if (retr != 0) CORBA_exception_free(ev);
@@ -4111,27 +3996,21 @@ epp_call_sendauthinfo(epp_context *epp_ctx,
 			response = ccReg_EPP_domainSendAuthInfo(
 					(ccReg_EPP) service,
 					c_handle,
-					loginid,
-					c_clTRID,
-					cdata->xml_in,
+                                        c_params,
 					ev);
 		}
 		else if (obj == EPP_CONTACT) {
 			response = ccReg_EPP_contactSendAuthInfo(
 					(ccReg_EPP) service,
 					c_handle,
-					loginid,
-					c_clTRID,
-					cdata->xml_in,
+                                        c_params,
 					ev);
 		}
 		else if (obj == EPP_KEYSET) {
 			response = ccReg_EPP_keysetSendAuthInfo(
 					(ccReg_EPP) service,
 					c_handle,
-					loginid,
-					c_clTRID,
-					cdata->xml_in,
+                                        c_params,
 					ev);
 		}
 		else {
@@ -4139,9 +4018,7 @@ epp_call_sendauthinfo(epp_context *epp_ctx,
 			response = ccReg_EPP_nssetSendAuthInfo(
 					(ccReg_EPP) service,
 					c_handle,
-					loginid,
-					c_clTRID,
-					cdata->xml_in,
+                                        c_params,
 					ev);
 		}
 
@@ -4151,7 +4028,7 @@ epp_call_sendauthinfo(epp_context *epp_ctx,
 		usleep(RETR_SLEEP);
 	}
 	CORBA_free(c_handle);
-	CORBA_free(c_clTRID);
+	CORBA_free(c_params);
 
 	/* if it is exception then return */
 	if (raised_exception(ev))
@@ -4663,22 +4540,22 @@ epp_call_cmd(epp_context *epp_ctx,
 			break;
 		case EPP_SENDAUTHINFO_DOMAIN:
 			cdata->noresdata = 1;
-			cstat = epp_call_sendauthinfo(epp_ctx, service, loginid,
+			cstat = epp_call_sendauthinfo(epp_ctx, service, loginid, log_id,
 					cdata, EPP_DOMAIN);
 			break;
 		case EPP_SENDAUTHINFO_CONTACT:
 			cdata->noresdata = 1;
-			cstat = epp_call_sendauthinfo(epp_ctx, service, loginid,
+			cstat = epp_call_sendauthinfo(epp_ctx, service, loginid, log_id,
 					cdata, EPP_CONTACT);
 			break;
 		case EPP_SENDAUTHINFO_NSSET:
 			cdata->noresdata = 1;
-			cstat = epp_call_sendauthinfo(epp_ctx, service, loginid,
+			cstat = epp_call_sendauthinfo(epp_ctx, service, loginid, log_id,
 					cdata, EPP_NSSET);
 			break;
 		case EPP_SENDAUTHINFO_KEYSET:
 			cdata->noresdata = 1;
-			cstat = epp_call_sendauthinfo(epp_ctx, service, loginid,
+			cstat = epp_call_sendauthinfo(epp_ctx, service, loginid, log_id,
 					cdata, EPP_KEYSET);
 			break;
 
