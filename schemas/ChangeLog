@@ -1,3 +1,9 @@
+2010-12-21 Jiri Sadek (version 2.2.1)
+
+	* update fredcom.xsd from 1.1 to 1.2
+	   - changed objIDType (contact, nsset, keyset handle type)
+	     minimal lenght to 1
+
 2009-11-26 Jiri Sadek (version 2.2.0)
 
 	* update contact.xsd from 1.5 to 1.6

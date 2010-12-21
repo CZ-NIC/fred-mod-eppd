@@ -17,7 +17,7 @@
     -->
     <simpleType name="objIDType">
       <restriction base="token">
-        <minLength value="3"/>
+        <minLength value="1"/>
         <maxLength value="63"/>
       </restriction>
     </simpleType>
