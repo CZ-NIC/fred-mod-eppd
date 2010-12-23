@@ -14,16 +14,17 @@ dist_fredschemas_DATA = ${srcdir}/schemas/*.xsd ${srcdir}/schemas/README \
 			${srcdir}/schemas/ChangeLog
 dist_fredssl_DATA = ${srcdir}/ssl/README ${srcdir}/ssl/*.pem
 EXTRA_DIST = unconfig.h fred-mod-eppd.spec doxy.conf
-BUILT_SOURCES = EPP.h EPP-common.c EPP-stubs.c
+BUILT_SOURCES = ${IDL_C}
 
 INCL       = ${APACHE_CFLAGS} ${APACHE_CPPFLAGS} ${ORBIT_CFLAGS} ${CPPFLAGS} 
 AM_LDFLAGS = ${ORBIT_LIBS} ${LIBS} ${LDFLAGS}
 
 IDL_H   = @IDLPREFIX@.h
-IDL_S   = @IDLPREFIX@-common.c @IDLPREFIX@-stubs.c
-IDL_ALL = ${IDL_S} ${IDL_H}
+IDL_C   = @IDLPREFIX@-common.c
+IDL_S   = @IDLPREFIX@-stubs.c
+IDL_ALL = ${IDL_C} ${IDL_S} ${IDL_H}
 
-liborbeppd_la_SOURCES = ${IDL_S} 
+nodist_liborbeppd_la_SOURCES = ${IDL_ALL}
 liborbeppd_la_CFLAGS  = ${ORBIT_CFLAGS} 
 liborbeppd_la_LDFLAGS = ${ORBIT_LIBS}
 
@@ -57,7 +58,9 @@ uninstall-local:
 mod_eppd.la: libmodeppd.la
 	${APXS} -c -o $@ $< ${APACHE_CFLAGS} ${ORBIT_CFLAGS} ${AM_LDFLAGS}
 
-${IDL_ALL}:
+${IDL_C}: ${IDL} ${IDLDIR}/_EPP.idl ${IDLDIR}/Logger.idl ${IDLDIR}/_Logger.idl \
+ ${IDLDIR}/_Admin.idl ${IDLDIR}/_dataTypes.idl ${IDLDIR}/_Registry.idl \
+ ${IDLDIR}/Filters.idl
 	${ORBIT_IDL} --noskels ${IDL}
 
 
