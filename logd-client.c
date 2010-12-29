@@ -40,19 +40,19 @@ int epp_log_new_message(service_Logger service,
 #define PUSH_PROPERTY(seq, name, value)								\
 	seq = epp_property_push(seq, name, value, CORBA_FALSE, CORBA_FALSE);	\
 	if(seq == NULL) {												\
-		return LOG_REQ_NOT_SAVED;							\
+		return LOG_INTERNAL_ERROR;							\
 	}
 
 #define PUSH_PROPERTY_INT(seq, name, value)							\
 	seq = epp_property_push_int(seq, name, value, CORBA_FALSE);		\
 	if(seq == NULL) {												\
-		return LOG_REQ_NOT_SAVED;							\
+		return LOG_INTERNAL_ERROR;							\
 	}
 
 #define PUSH_QHEAD(seq, list, name)									\
 	seq = epp_property_push_qhead(seq, list, name, CORBA_FALSE, CORBA_FALSE);	\
 	if(seq == NULL) {												\
-		return LOG_REQ_NOT_SAVED;							\
+		return LOG_INTERNAL_ERROR;							\
 	}
 
 
@@ -945,7 +945,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
 
             // postal info
             if ((*c_props = epp_log_postal_info(*c_props, &cc->pi)) == NULL) {
-                return LOG_REQ_NOT_SAVED;
+                return LOG_INTERNAL_ERROR;
             }
 
             PUSH_PROPERTY(*c_props, "voice", cc->voice);
@@ -955,7 +955,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
 
             // disclose info
             if ((*c_props = epp_log_disclose_info(*c_props, &cc->discl)) == NULL) {
-                return LOG_REQ_NOT_SAVED;
+                return LOG_INTERNAL_ERROR;
             }
 
             PUSH_PROPERTY(*c_props, "vat", cc->vat);
@@ -1013,7 +1013,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
             }
             // COMMON
             if ((*c_props = epp_property_push_nsset(*c_props, &cn->ns, "ns")) == NULL) {
-                return LOG_REQ_NOT_SAVED;
+                return LOG_INTERNAL_ERROR;
             }
             PUSH_QHEAD(*c_props, &cn->tech, "techC");
 
@@ -1027,7 +1027,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
             // COMMON
 
             if ((*c_props = epp_property_push_dnskey(*c_props, &ck->keys, "keys")) == NULL) {
-                return LOG_REQ_NOT_SAVED;
+                return LOG_INTERNAL_ERROR;
             }
 
             PUSH_QHEAD(*c_props, &ck->tech, "techContact");
@@ -1098,7 +1098,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
             PUSH_PROPERTY(*c_props, "handle", uc->id);
 
             if ((*c_props = epp_log_postal_info(*c_props, uc->pi)) == NULL) {
-                return LOG_REQ_NOT_SAVED;
+                return LOG_INTERNAL_ERROR;
             }
 
             PUSH_PROPERTY(*c_props, "voice", uc->voice);
@@ -1107,7 +1107,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
             PUSH_PROPERTY(*c_props, "authInfo", uc->authInfo);
 
             if ((*c_props = epp_log_disclose_info(*c_props, &uc->discl)) == NULL) {
-                return LOG_REQ_NOT_SAVED;
+                return LOG_INTERNAL_ERROR;
             }
 
             PUSH_PROPERTY(*c_props, "vat", uc->vat);
@@ -1166,7 +1166,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
             PUSH_QHEAD(*c_props, &un->add_tech, "addTechC");
             PUSH_QHEAD(*c_props, &un->rem_tech, "remTechC");
             if ((*c_props = epp_property_push_nsset(*c_props, &un->add_ns, "addNs")) == NULL) {
-                return LOG_REQ_NOT_SAVED;
+                return LOG_INTERNAL_ERROR;
             }
             PUSH_QHEAD(*c_props, &un->rem_ns, "remNs");
 
@@ -1184,10 +1184,10 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
             PUSH_QHEAD(*c_props, &uk->rem_tech, "remTech");
 
             if ((*c_props = epp_property_push_dnskey(*c_props, &uk->add_dnskey, "addKeys")) == NULL) {
-                return LOG_REQ_NOT_SAVED;
+                return LOG_INTERNAL_ERROR;
             }
             if ((*c_props = epp_property_push_dnskey(*c_props, &uk->rem_dnskey, "remKeys")) == NULL) {
-                return LOG_REQ_NOT_SAVED;
+                return LOG_INTERNAL_ERROR;
             }
 
             break;
@@ -1366,7 +1366,7 @@ static void log_props_default_extcmd_response(ccReg_RequestProperties **c_props,
  * @param   cmdtype 	command type returned by parse_command function
  * @param 	sessionid   login id for the session
  *
- * @return  database ID of the new logging record or a status code
+ * @return  database ID of the new logging record or an error code LOG_INTERNAL_ERROR
  */
 ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *request, epp_command_data *cdata, epp_red_command_type cmdtype, ccReg_TID sessionid)
 {
@@ -1385,7 +1385,7 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
 		res = epp_log_new_message(service, remote_ip, request, c_props, NULL, action_type, &log_entry_id, sessionid, errmsg);
 
 		if(res == CORBA_OK) return log_entry_id;
-		else return LOG_REQ_NOT_SAVED;
+		else return LOG_INTERNAL_ERROR;
 	}
            
 	switch(cmdtype) {
@@ -1442,7 +1442,7 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
         res = epp_log_new_message(service, remote_ip, request, c_props, NULL, action_type, &log_entry_id, sessionid, errmsg);
 
 	if(res == CORBA_OK) return log_entry_id;
-	else return LOG_REQ_NOT_SAVED;
+	else return LOG_INTERNAL_ERROR;
 
 }
 
@@ -1462,7 +1462,7 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
  * @param 	session_id		Id into the login database table for this session
  * @param	log_entry_id 	Id of the log_entry record which will be updated by this call. The Id was obtained by log_epp_command()
  *
- * @return  status
+ * @return  status LOG_INTERNAL_ERROR or LOG_SUCCESS
  */
 int log_epp_response(service_Logger *log_service, qhead *valerr, const char *response, const epp_command_data *cdata, ccReg_TID session_id, ccReg_TID log_entry_id)
 {
@@ -1475,17 +1475,17 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 	if (cdata != NULL) {
                 c_props = epp_property_push(c_props, "svTRID", cdata->svTRID, CORBA_TRUE, CORBA_FALSE);
                 if (c_props == NULL) {
-                    return LOG_REQ_NOT_SAVED;
+                    return LOG_INTERNAL_ERROR;
                 }
 
 		c_props = epp_property_push_int(c_props, "rc", cdata->rc, CORBA_TRUE);
 		if (c_props == NULL) {
-			return LOG_REQ_NOT_SAVED;
+			return LOG_INTERNAL_ERROR;
 		}
 
 		c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_TRUE, CORBA_FALSE);
 		if (c_props == NULL) {
-			return LOG_REQ_NOT_SAVED;
+			return LOG_INTERNAL_ERROR;
 		}
 
                 if (cdata->type == EPP_CHECK_CONTACT 
@@ -1516,7 +1516,7 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 	}
 
 	if (valerr != NULL && (c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL) {
-		return LOG_REQ_NOT_SAVED;
+		return LOG_INTERNAL_ERROR;
 	}
 
         if(cdata != NULL) {
@@ -1525,6 +1525,6 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
             res = epp_log_close_message(log_service, response, c_props, NULL, log_entry_id, session_id, 2400, errmsg);
         }
 
-	if(res == CORBA_OK) return 1;
-	else return LOG_REQ_NOT_SAVED;
+	if(res == CORBA_OK) return LOG_SUCCESS;
+	else return LOG_INTERNAL_ERROR;
 }

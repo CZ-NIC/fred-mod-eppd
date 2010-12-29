@@ -670,7 +670,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 			return 0;
 
 		// if logged in successfully and fred-logd service is available
-		if (cstat == CORBA_OK && service_log != NULL) {
+		if (cstat == CORBA_OK) {
 			char *registrar_name;
 
 			registrar_name = ((epps_login*)cdata->data)->clID;
@@ -816,7 +816,7 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 
 /** Read and process EPP requests waiting in the queue */
 static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
-		service_EPP *EPPservice, eppd_server_conf *sc,
+		service_EPP *EPPservice, service_Logger *logger_service, eppd_server_conf *sc,
 		unsigned int *login_id_save)
 {
 	epp_lang	 lang;   /* session's language */
@@ -831,7 +831,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	int	 retval;         /* return code of read_request */
 	unsigned int	 login_id;        /* login id of client's session */
 	ccReg_TID 	 session_id;	  /* id for log_session table */
-	service_Logger   *logger_service;  /* reference to the fred-logd service */
+        char *remote_ipaddr;
 
 
 #ifdef EPP_PERF
@@ -895,19 +895,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
                 // this is easy way how to pass this information to fred-logd
                 if(pstat == PARSER_HELLO) cmd_type = EPP_RED_HELLO;
 
-                if (sc->logger_object == NULL || *sc->logger_object == '\0') {
-			epplog(epp_ctx, EPP_ERROR, "Reference to logger object not set in config");
-                        logger_service = NULL;
-                } else {
-                    logger_service = get_corba_service(epp_ctx, sc->logger_object);
-                    if (logger_service == NULL) {
-                            epplog(epp_ctx, EPP_ERROR, "Could not obtain object reference "
-                                            "for alias '%s'.", sc->logger_object);
-                    //  mod-eppd is not currently dependent on fred-logd request logging
-                    //	return HTTP_INTERNAL_SERVER_ERROR;
-                    }
-                }
-
+                
 		/*
 		 * Register cleanup for cdata structure. The most of the
 		 * items in this structure are allocated from pool, but
@@ -953,27 +941,19 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 
 		// if there wasn't anything seriously wrong, log the request
-	
-		if(logger_service != NULL) {
-                        char *remote_ipaddr;
+                if(epp_ctx == NULL) {
+                    remote_ipaddr = NULL;
+                } else {
+                    remote_ipaddr = ((conn_rec*)epp_ctx->conn)->remote_ip;
+                }
+                act_log_entry_id = log_epp_command(logger_service, remote_ipaddr, cdata->xml_in, cdata, cmd_type, session_id);
 
-                        if(epp_ctx == NULL) {
-                            remote_ipaddr = NULL;
-                        } else {
-                            remote_ipaddr = ((conn_rec*)epp_ctx->conn)->remote_ip;
-                        }
-			act_log_entry_id = log_epp_command(logger_service, remote_ipaddr, cdata->xml_in, cdata, cmd_type, session_id);
-
+                if(act_log_entry_id == 0) {
+                        epplog(epp_ctx, EPP_LOGD_ERRLVL, "Error while logging the request" );
+                        return HTTP_INTERNAL_SERVER_ERROR;
+                } else {
                         epplog(epp_ctx, EPP_DEBUG, "Request in fred-logd created, id: %llu ", act_log_entry_id);
-                        /* don't pollute logs in case logd isn't running
-			if(act_log_entry_id == 0) {
-				epplog(epp_ctx, EPP_WARNING, "Error while logging the request" );
-			}
-                         */
-		} else {
-			act_log_entry_id = 0;
-		}
-
+                }
 
 #ifdef EPP_PERF
 		times[2] = apr_time_now(); /* after logging */
@@ -1007,9 +987,11 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 						version, ")", NULL),
 					curdate, &response);
 
- 			if (act_log_entry_id > 0 && logger_service != NULL) {
-                                log_epp_response(logger_service, NULL, response, cdata, 0, act_log_entry_id);
-			}
+                        if (log_epp_response(logger_service, NULL, response, cdata, 0, act_log_entry_id) 
+                                == LOG_INTERNAL_ERROR) {
+                                epplog(epp_ctx, EPP_LOGD_ERRLVL, "Could not log EPP hello response in fred-logd");
+                                // TODO cannot return error code - 2-phase commit should be used
+                        }
 
 			if (gstat != GEN_OK) {
 				epplog(epp_ctx, EPP_FATAL, "Error when "
@@ -1022,6 +1004,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			gen_status gstat; /* XML generator return status */
 			qhead valerr;	/* encountered errors when validating response */
 			int gret;     /* return value from XML generator */
+                        int log_ret;    /* return value from fred-logd close request */
 
 			/* log request which doesn't validate */
 			if (pstat == PARSER_NOT_VALID) {
@@ -1067,14 +1050,14 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			 * (i.e. only in case we just logged in)
 			 */
 
-			// if we have a valid log_entry id (if not, there was some error
- 			if (act_log_entry_id > 0 && logger_service != NULL) {
-				if (pstat == PARSER_CMD_LOGIN) {
-					log_epp_response(logger_service, &valerr, response, cdata, session_id, act_log_entry_id);
-				} else {
-					log_epp_response(logger_service, &valerr, response, cdata, 0, act_log_entry_id);
-				}
-			}
+                        log_ret = log_epp_response(logger_service, &valerr, response, cdata, 
+                                pstat == PARSER_CMD_LOGIN ? session_id : 0, 
+                                act_log_entry_id);
+
+                        if (log_ret == LOG_INTERNAL_ERROR) {
+                                epplog(epp_ctx, EPP_LOGD_ERRLVL, "Could not log EPP command response in fred-logd");
+                                // TODO cannot return error code - 2-phase commit should be used
+                        }
 
 			if (!gret) return HTTP_INTERNAL_SERVER_ERROR;
 		}
@@ -1225,7 +1208,8 @@ static int epp_process_connection(conn_rec *c)
 	apr_status_t	 status;/* used to store rc of apr functions */
 	gen_status	 gstat; /* generator's return code */
 	epp_context	 epp_ctx;    /* context (session , connection, pool) */
-	service_EPP	 EPPservice; /* CORBA object reference */
+	service_EPP	 EPPservice; /* CORBA object reference for fred-rifd */
+        service_Logger   logger_service; /* CORBA object reference for fred-logd */
 	apr_bucket_brigade *bb;
 	server_rec	*s = c->base_server;
 	eppd_server_conf *sc = (eppd_server_conf *)
@@ -1250,6 +1234,19 @@ static int epp_process_connection(conn_rec *c)
 				"for alias '%s'.", sc->object);
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
+
+        if (sc->logger_object == NULL || *sc->logger_object == '\0') {
+                epplog(&epp_ctx, EPP_ERROR, "Reference to logger object not set in config");
+                logger_service = NULL;
+                return HTTP_INTERNAL_SERVER_ERROR;
+        } else {
+                logger_service = get_corba_service(&epp_ctx, sc->logger_object);
+                if (logger_service == NULL) {
+                        epplog(&epp_ctx, EPP_ERROR, "Could not obtain object reference "
+                                        "for alias '%s'.", sc->logger_object);
+                	return HTTP_INTERNAL_SERVER_ERROR;
+                }
+        }
 
 	/* update scoreboard's information */
 	ap_update_child_status(c->sbh, SERVER_BUSY_READ, NULL);
@@ -1304,7 +1301,7 @@ static int epp_process_connection(conn_rec *c)
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	ret = epp_request_loop(&epp_ctx, bb, EPPservice, sc, &loginid);
+	ret = epp_request_loop(&epp_ctx, bb, EPPservice, logger_service, sc, &loginid);
 	/* send notification about session end to CR */
 	if (loginid > 0) {
 		epp_call_CloseSession(&epp_ctx, EPPservice, loginid);

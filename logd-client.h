@@ -4,7 +4,8 @@
 #include "epp_parser.h"
 
 
-#define LOG_REQ_NOT_SAVED   0
+#define LOG_INTERNAL_ERROR   0
+#define LOG_SUCCESS 1
 
 /* logd-client.c */
 
