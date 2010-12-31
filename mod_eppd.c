@@ -827,7 +827,7 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 /** Read and process EPP requests waiting in the queue */
 static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		service_EPP *EPPservice, service_Logger *logger_service, eppd_server_conf *sc,
-		unsigned int *login_id_save)
+		unsigned int *login_id_save, ccReg_TID *session_id_save)
 {
 	epp_lang	 lang;   /* session's language */
 	apr_pool_t	*rpool;  /* connection memory pool */
@@ -858,7 +858,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 	/* initialize variables used inside the loop */
 	*login_id_save = login_id = 0;       /* zero means that client isn't logged in*/
-    session_id = 0;
+    *session_id_save = session_id = 0;
 	lang = LANG_EN;	/* default language is english */
 
 	/*
@@ -1028,7 +1028,10 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			epplog(epp_ctx, EPP_DEBUG, "after corba call command "
 				"saved login id is %d, login id is %d", *login_id_save, login_id);
 			if (*login_id_save == 0 && login_id != 0) {
+			    // login_id and session_id must be both set or not set
+			    // at the same time
 				*login_id_save = login_id;
+				*session_id_save = session_id;
 				/*
 				 * this event should be logged explicitly if
 				 * login was successfull
@@ -1208,6 +1211,7 @@ static void *get_corba_service(epp_context *epp_ctx, char *name)
 static int epp_process_connection(conn_rec *c)
 {
 	unsigned int	 loginid; /* login id of client */
+	ccReg_TID        sessionid; /* session id from fred-logd */
 	int	 rc;      /* corba ret code */
 	int	 ret;     /* command loop return code */
 	char	*version; /* version of fred_rifd */
@@ -1309,12 +1313,32 @@ static int epp_process_connection(conn_rec *c)
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	ret = epp_request_loop(&epp_ctx, bb, EPPservice, logger_service, sc, &loginid);
+	ret = epp_request_loop(&epp_ctx, bb, EPPservice, logger_service, sc, &loginid, &sessionid);
 	/* send notification about session end to CR */
 	if (loginid > 0) {
 		epp_call_CloseSession(&epp_ctx, EPPservice, loginid);
 
-		// TODO log end of session via logd
+		if (sessionid != 0) {
+            corba_status log_cstat;
+            char errmsg[MAX_ERROR_MSG_LEN];
+
+            epplog(&epp_ctx, EPP_INFO, "EPP session terminated, calling CloseSession in logd");
+            log_cstat = epp_log_CloseSession(logger_service, sessionid, errmsg);
+
+            switch(log_cstat) {
+                case CORBA_ERROR:
+                    epplog(&epp_ctx, EPP_LOGD_ERRLVL, "Logd: Corba call failed");
+                    break;
+                case CORBA_REMOTE_ERROR:
+                    epplog(&epp_ctx, EPP_LOGD_ERRLVL, "Logd: Unqualified answer from CORBA server!");
+                    break;
+                case CORBA_OK:
+                    epplog(&epp_ctx, EPP_DEBUG, "Logd: Corba call ok");
+                    break;
+                default:
+                    break;
+            }
+		}
 	}
 
 	epp_ctx.pool = c->pool;
