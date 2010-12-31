@@ -124,7 +124,7 @@
  * Many errors in logging will be logged to epplog with this severity,
  * If logging is mandatory, it should be rised much higher than EPP_DEBUG
 */
-#define EPP_LOGD_ERRLVL EPP_DEBUG
+#define EPP_LOGD_ERRLVL EPP_ERROR
 
 /**
  * eppd_module declaration.
@@ -648,6 +648,10 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
 /**
  * Function calls command from corba backend.
  *
+ * Return 0 only in case of a serious error.
+ *
+ *
+ *
  * @param epp_ctx   EPP context.
  * @param service   CORBA object reference.
  * @param cdata     EPP data.
@@ -675,7 +679,15 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 
 			registrar_name = ((epps_login*)cdata->data)->clID;
 			log_cstat = epp_log_CreateSession(service_log, registrar_name, 0, session_id, errmsg);
-                        
+
+			if(log_cstat == CORBA_ERROR || log_cstat == CORBA_REMOTE_ERROR) {
+			    epplog(epp_ctx, EPP_ERROR, "Fatal error when logging CreateSession.");
+			    if(loginid != 0) {
+			        epplog(epp_ctx, EPP_ERROR, "Terminating session because of logging failure.");
+			        epp_call_CloseSession(epp_ctx, service, *loginid);
+			    }
+			    return 0;
+			}
 		}
 	} else if (pstat == PARSER_CMD_LOGOUT) {
 		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
@@ -711,8 +723,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 			break;
 	}
 
-        if(service_log != NULL) {
-            switch(log_cstat) {
+        switch(log_cstat) {
                 case CORBA_ERROR:
 			epplog(epp_ctx, EPP_LOGD_ERRLVL, "Logd: Corba call failed");
 			break;
@@ -725,7 +736,6 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
                         break;
 		default:
 			break;
-            }
         }
 
 	return 1;
@@ -892,9 +902,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		pstat = epp_parse_command(epp_ctx, (login_id != 0), sc->schema,
 				request, bytes, &cdata, &cmd_type);
 
-                // this is easy way how to pass this information to fred-logd
                 if(pstat == PARSER_HELLO) cmd_type = EPP_RED_HELLO;
-
                 
 		/*
 		 * Register cleanup for cdata structure. The most of the
@@ -1305,6 +1313,8 @@ static int epp_process_connection(conn_rec *c)
 	/* send notification about session end to CR */
 	if (loginid > 0) {
 		epp_call_CloseSession(&epp_ctx, EPPservice, loginid);
+
+		// TODO log end of session via logd
 	}
 
 	epp_ctx.pool = c->pool;
