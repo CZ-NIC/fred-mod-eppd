@@ -28,6 +28,7 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    EPPprotocol       On
    EPPobject         EPP_alias
    EPPlogdObject	 Logger_alias
+   EPPlogdMandatory  On
    EPPschema         "@DATAROOTDIR@/@PACKAGE@/schemas/all.xsd"
    EPPservername     "EPP server"
    EPPlog            "@LOCALSTATEDIR@/log/fred-eppd.log"

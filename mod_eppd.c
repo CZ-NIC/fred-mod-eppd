@@ -152,6 +152,7 @@ typedef struct {
 	char	*ns_loc;    /**< Location of CORBA nameservice. */
 	char	*object;    	   /**< Name under which the object is known. */
 	char	*logger_object;    /**< Name of fred-logd object */
+	int logd_mandatory;        /**< Whether fred-logd failure is fatal to EPP */
 	void	*schema;    /**< URL of EPP schema (use just path). */
 	int	valid_resp; /**< Validate response before sending it to client.*/
 	char	*epplog;    /**< Epp log filename. */
@@ -662,7 +663,8 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
  */
 static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger *service_log,
 		epp_command_data *cdata, parser_status pstat,
-		unsigned int *loginid, ccReg_TID * const session_id, const ccReg_TID log_id, epp_lang *lang)
+		unsigned int *loginid, ccReg_TID * const session_id, const ccReg_TID log_id, epp_lang *lang,
+		unsigned int logd_mandatory)
 {
 	corba_status	cstat; /* ret code of corba component */
         corba_status    log_cstat = CORBA_OK; /* ret code of corba for logd create/close session */
@@ -670,24 +672,29 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 
 	errmsg[0] = '\0';
 	if (pstat == PARSER_CMD_LOGIN) {
-		if (!call_login(epp_ctx, service, cdata, loginid, lang, &cstat))
+		if (!call_login(epp_ctx, service, cdata, loginid, lang, &cstat)) {
 			return 0;
+		}
 
 		// if logged in successfully and fred-logd service is available
 		if (cstat == CORBA_OK) {
 			char *registrar_name;
 
-			registrar_name = ((epps_login*)cdata->data)->clID;
-			log_cstat = epp_log_CreateSession(service_log, registrar_name, 0, session_id, errmsg);
-
-			if(log_cstat == CORBA_ERROR || log_cstat == CORBA_REMOTE_ERROR) {
-			    epplog(epp_ctx, EPP_ERROR, "Fatal error when logging CreateSession.");
-			    if(loginid != 0) {
-			        epplog(epp_ctx, EPP_ERROR, "Terminating session because of logging failure.");
-			        epp_call_CloseSession(epp_ctx, service, *loginid);
-			    }
-			    return 0;
+			if(service_log != NULL) {
+                registrar_name = ((epps_login*)cdata->data)->clID;
+                log_cstat = epp_log_CreateSession(service_log, registrar_name, 0, session_id, errmsg);
 			}
+
+            if(log_cstat == CORBA_ERROR || log_cstat == CORBA_REMOTE_ERROR) {
+                epplog(epp_ctx, EPP_ERROR, "Fatal error when logging CreateSession.");
+                if (logd_mandatory) {
+                    if(loginid != 0) {
+                        epplog(epp_ctx, EPP_ERROR, "Terminating session because of logging failure.");
+                        epp_call_CloseSession(epp_ctx, service, *loginid);
+                    }
+                    return 0;
+                }
+            }
 		}
 	} else if (pstat == PARSER_CMD_LOGOUT) {
 		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
@@ -949,19 +956,28 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 
 		// if there wasn't anything seriously wrong, log the request
-                if(epp_ctx == NULL) {
-                    remote_ipaddr = NULL;
-                } else {
-                    remote_ipaddr = ((conn_rec*)epp_ctx->conn)->remote_ip;
-                }
-                act_log_entry_id = log_epp_command(logger_service, remote_ipaddr, cdata->xml_in, cdata, cmd_type, session_id);
+        if (epp_ctx == NULL) {
+            remote_ipaddr = NULL;
+        } else {
+            remote_ipaddr = ((conn_rec*) epp_ctx->conn)->remote_ip;
+        }
 
-                if(act_log_entry_id == 0) {
-                        epplog(epp_ctx, EPP_LOGD_ERRLVL, "Error while logging the request" );
-                        return HTTP_INTERNAL_SERVER_ERROR;
-                } else {
-                        epplog(epp_ctx, EPP_DEBUG, "Request in fred-logd created, id: %llu ", act_log_entry_id);
+        if (logger_service != NULL) {
+            act_log_entry_id = log_epp_command(logger_service, remote_ipaddr,
+                    cdata->xml_in, cdata, cmd_type, session_id);
+
+            if (act_log_entry_id == 0) {
+                epplog(epp_ctx, EPP_LOGD_ERRLVL,
+                        "Error while logging the request");
+                if (sc->logd_mandatory) {
+                    return HTTP_INTERNAL_SERVER_ERROR;
                 }
+            } else {
+                epplog(epp_ctx, EPP_DEBUG,
+                        "Request in fred-logd created, id: %llu ",
+                        act_log_entry_id);
+            }
+        }
 
 #ifdef EPP_PERF
 		times[2] = apr_time_now(); /* after logging */
@@ -995,11 +1011,12 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 						version, ")", NULL),
 					curdate, &response);
 
-                        if (log_epp_response(logger_service, NULL, response, cdata, 0, act_log_entry_id) 
-                                == LOG_INTERNAL_ERROR) {
-                                epplog(epp_ctx, EPP_LOGD_ERRLVL, "Could not log EPP hello response in fred-logd");
-                                // TODO cannot return error code - 2-phase commit should be used
-                        }
+            if (logger_service != NULL
+                && log_epp_response(logger_service, NULL, response, cdata, 0, act_log_entry_id)
+                    == LOG_INTERNAL_ERROR) {
+                    epplog(epp_ctx, EPP_LOGD_ERRLVL, "Could not log EPP hello response in fred-logd");
+                    // TODO cannot return error code - 2-phase commit should be used
+            }
 
 			if (gstat != GEN_OK) {
 				epplog(epp_ctx, EPP_FATAL, "Error when "
@@ -1022,7 +1039,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 			/* call function from corba backend */
 			if (!call_corba(epp_ctx, EPPservice, logger_service, cdata, pstat,
-						&login_id, &session_id, act_log_entry_id, &lang))
+						&login_id, &session_id, act_log_entry_id, &lang, sc->logd_mandatory))
 				return HTTP_INTERNAL_SERVER_ERROR;
 			/* did successfull login occured? */
 			epplog(epp_ctx, EPP_DEBUG, "after corba call command "
@@ -1061,14 +1078,16 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			 * (i.e. only in case we just logged in)
 			 */
 
-                        log_ret = log_epp_response(logger_service, &valerr, response, cdata, 
-                                pstat == PARSER_CMD_LOGIN ? session_id : 0, 
-                                act_log_entry_id);
+			if(logger_service) {
+                log_ret = log_epp_response(logger_service, &valerr, response, cdata,
+                        pstat == PARSER_CMD_LOGIN ? session_id : 0,
+                        act_log_entry_id);
 
-                        if (log_ret == LOG_INTERNAL_ERROR) {
-                                epplog(epp_ctx, EPP_LOGD_ERRLVL, "Could not log EPP command response in fred-logd");
-                                // TODO cannot return error code - 2-phase commit should be used
-                        }
+                if (log_ret == LOG_INTERNAL_ERROR) {
+                    epplog(epp_ctx, EPP_LOGD_ERRLVL, "Could not log EPP command response in fred-logd");
+                        // TODO cannot return error code - 2-phase commit should be used
+                }
+			}
 
 			if (!gret) return HTTP_INTERNAL_SERVER_ERROR;
 		}
@@ -1247,18 +1266,24 @@ static int epp_process_connection(conn_rec *c)
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-        if (sc->logger_object == NULL || *sc->logger_object == '\0') {
-                epplog(&epp_ctx, EPP_ERROR, "Reference to logger object not set in config");
-                logger_service = NULL;
-                return HTTP_INTERNAL_SERVER_ERROR;
-        } else {
-                logger_service = get_corba_service(&epp_ctx, sc->logger_object);
-                if (logger_service == NULL) {
-                        epplog(&epp_ctx, EPP_ERROR, "Could not obtain object reference "
-                                        "for alias '%s'.", sc->logger_object);
-                	return HTTP_INTERNAL_SERVER_ERROR;
-                }
+    if (sc->logger_object == NULL || *sc->logger_object == '\0') {
+        // TODO maybe change loglevel depending on sc->logd_mandatory flag
+        epplog(&epp_ctx, EPP_ERROR,
+                "Reference to logger object not set in config");
+        logger_service = NULL;
+        if (sc->logd_mandatory) {
+            return HTTP_INTERNAL_SERVER_ERROR;
         }
+    } else {
+        logger_service = get_corba_service(&epp_ctx, sc->logger_object);
+        if (logger_service == NULL) {
+            epplog(&epp_ctx, EPP_ERROR, "Could not obtain object reference "
+                "for alias '%s'.", sc->logger_object);
+            if (sc->logd_mandatory) {
+                return HTTP_INTERNAL_SERVER_ERROR;
+            }
+        }
+    }
 
 	/* update scoreboard's information */
 	ap_update_child_status(c->sbh, SERVER_BUSY_READ, NULL);
@@ -1322,8 +1347,10 @@ static int epp_process_connection(conn_rec *c)
             corba_status log_cstat;
             char errmsg[MAX_ERROR_MSG_LEN];
 
-            epplog(&epp_ctx, EPP_INFO, "EPP session terminated, calling CloseSession in logd");
-            log_cstat = epp_log_CloseSession(logger_service, sessionid, errmsg);
+            if(logger_service != NULL) {
+                epplog(&epp_ctx, EPP_INFO, "EPP session terminated, calling CloseSession in logd");
+                log_cstat = epp_log_CloseSession(logger_service, sessionid, errmsg);
+            }
 
             switch(log_cstat) {
                 case CORBA_ERROR:
@@ -1553,6 +1580,21 @@ static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
 	sc->epp_enabled = flag;
 	return NULL;
 }
+
+static const char *set_epp_logd_mandatory(cmd_parms *cmd, void *dummy, int flag)
+{
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)
+            ap_get_module_config(s->module_config, &eppd_module);
+
+    const char *err = ap_check_cmd_context(cmd,
+            NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    if(err) return err;
+
+    sc->logd_mandatory = flag;
+    return NULL;
+}
+
 
 /**
  * Handler for apache's configuration directive "EPPObject".
@@ -1869,6 +1911,8 @@ static const command_rec eppd_cmds[] = {
 	AP_INIT_TAKE1("EPPloglevel", set_loglevel, NULL, RSRC_CONF,
 			"Log level setting for epp log (fatal, error, warning, "
 			"info, debug)"),
+    AP_INIT_FLAG("EPPlogdMandatory", set_epp_logd_mandatory, NULL, RSRC_CONF,
+            "Whether fred-logd failure is fatal to EPP"),
 	AP_INIT_FLAG("EPPvalidResponse", set_valid_resp, NULL, RSRC_CONF,
 			"Set to on, to validate every outcomming response."
 			"This will slow down the server and should be used "
