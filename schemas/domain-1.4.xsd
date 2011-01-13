@@ -3,7 +3,7 @@
   <schema targetNamespace="http://www.nic.cz/xml/epp/domain-1.4"
           xmlns:domain="http://www.nic.cz/xml/epp/domain-1.4"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
-          xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.1"
+          xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.2"
           xmlns="http://www.w3.org/2001/XMLSchema"
           elementFormDefault="qualified">
 
@@ -15,8 +15,8 @@
     -->
     <import namespace="urn:ietf:params:xml:ns:eppcom-1.0"
             schemaLocation="eppcom-1.0.xsd"/>
-    <import namespace="http://www.nic.cz/xml/epp/fredcom-1.1"
-            schemaLocation="fredcom-1.1.xsd"/>
+    <import namespace="http://www.nic.cz/xml/epp/fredcom-1.2"
+            schemaLocation="fredcom-1.2.xsd"/>
 
     <annotation>
       <documentation>
