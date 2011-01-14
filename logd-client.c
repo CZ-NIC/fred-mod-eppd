@@ -253,7 +253,7 @@ int epp_log_CreateSession(service_Logger service, const char *user_name, ccReg_T
 {
 	CORBA_Environment ev[1];
 	CORBA_char *c_name;
-	ccReg_TID session_id;
+	ccReg_TID session_id = 0;
 	int retr;
 
 	c_name = wrap_str(user_name);
@@ -266,7 +266,7 @@ int epp_log_CreateSession(service_Logger service, const char *user_name, ccReg_T
 		if (retr != 0) CORBA_exception_free(ev); // valid first time
 		CORBA_exception_init(ev);
 
-                // TODO so far using 0 as user ID
+        // TODO so far using 0 as user ID
 		session_id = ccReg_Logger_createSession((ccReg_Logger) service, user_id, c_name, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
@@ -281,10 +281,11 @@ int epp_log_CreateSession(service_Logger service, const char *user_name, ccReg_T
 		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
 		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
 		CORBA_exception_free(ev);
+        *log_session_id = 0;
 		return CORBA_ERROR;
 	}
-	CORBA_exception_free(ev);
 
+	CORBA_exception_free(ev);
 	/* set session id output param */
 	*log_session_id = session_id;
 
@@ -356,7 +357,7 @@ int epp_log_new_message(service_Logger service,
 {
 	CORBA_Environment	 ev[1];
 	CORBA_char *c_source_ip, *c_content;
-	ccReg_TID entry_id;
+	ccReg_TID entry_id = 0;
 	int	 retr;  /* retry counter */
 	int	 ret;
 
@@ -421,6 +422,7 @@ int epp_log_new_message(service_Logger service,
 		strncpy(errmsg, ev->_id, MAX_ERROR_MSG_LEN - 1);
 		errmsg[MAX_ERROR_MSG_LEN - 1] = '\0';
 		CORBA_exception_free(ev);
+        *log_entry_id = 0;
 		return CORBA_ERROR;
 	}
 	CORBA_exception_free(ev);
