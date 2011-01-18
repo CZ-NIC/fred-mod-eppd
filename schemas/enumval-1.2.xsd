@@ -28,7 +28,7 @@
 
     <complexType name="exValType">
       <sequence>
-        <element name="valExDate" type="date"/>
+        <element name="valExDate" type="date" minOccurs="0" maxOccurs="1"/>
         <element name="publish" type="boolean" default="false" minOccurs="0" maxOccurs="1"/>
       </sequence>
     </complexType>
