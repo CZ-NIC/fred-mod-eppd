@@ -31,7 +31,7 @@
 
 #include "epp_common.h"
 #include "epp-client.h"
-#include "EPP.h"
+#include "ModEPP.h"
 
 #define MAX_LENGTH	10000
 #define MAX_FILE_NAME   256

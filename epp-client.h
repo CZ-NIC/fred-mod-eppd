@@ -24,7 +24,7 @@
 #define EPP_CLIENT_H
 
 #include "epp_common.h"
-#include "EPP.h"
+#include "ModEPP.h"
 
 /**
  * Maximum number of retries when connection failure occurs before
