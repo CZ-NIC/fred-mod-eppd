@@ -132,9 +132,9 @@ AC_ARG_WITH([idldir], [AS_HELP_STRING([--with-idldir],
 
 # check IDL file
 AC_ARG_WITH([idl], [AS_HELP_STRING([--with-idl],
-                        [location of idl file containing EPP interface [IDLDIR/EPP.idl]])],
+                        [location of idl file containing EPP interface [IDLDIR/ModEPP.idl]])],
                         [AC_SUBST([IDL], [$withval])],
-                        [AC_SUBST([IDL], [$IDLDIR/EPP.idl])])
+                        [AC_SUBST([IDL], [$IDLDIR/ModEPP.idl])])
 AC_CHECK_FILE([$IDL], [], [AC_MSG_ERROR(
                            [idl file "$IDL" does not exist (use --with-idl)])])
 
