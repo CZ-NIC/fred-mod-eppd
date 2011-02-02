@@ -58,7 +58,7 @@ uninstall-local:
 mod_eppd.la: libmodeppd.la
 	${APXS} -c -o $@ $< ${APACHE_CFLAGS} ${ORBIT_CFLAGS} ${AM_LDFLAGS}
 
-${IDL_C}: ${IDL} ${IDLDIR}/_EPP.idl ${IDLDIR}/Logger.idl \
+${IDL_C}: ${IDL} ${IDLDIR}/EPP.idl ${IDLDIR}/Logger.idl \
  ${IDLDIR}/Admin.idl ${IDLDIR}/_dataTypes.idl ${IDLDIR}/_Registry.idl \
  ${IDLDIR}/Filters.idl
 	${ORBIT_IDL} --noskels ${IDL}
