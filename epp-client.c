@@ -228,7 +228,7 @@ unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno,
 
 
 ccReg_EppParams *init_epp_params(
-		unsigned int session_id,
+		const ccReg_TID session_id,
 		const ccReg_TID request_id,
 		const char *xml_in,
 		const char *clTRID)
