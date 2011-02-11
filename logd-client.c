@@ -25,7 +25,8 @@ int epp_log_close_message(service_Logger service,
                 CORBA_long result_code,
 		char *errmsg);
 
-int epp_log_new_message(service_Logger service,
+int epp_log_new_message(epp_context *epp_ctx,
+        service_Logger service,
 		const char *sourceIP,
 		const char *content,
 		ccReg_RequestProperties *properties,
@@ -249,7 +250,7 @@ ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props,
  *
  * @returns		CORBA status code
  */
-int epp_log_CreateSession(service_Logger service, const char *user_name, ccReg_TID user_id, ccReg_TID * const log_session_id, char *errmsg)
+int epp_log_CreateSession(epp_context *epp_ctx, service_Logger service, const char *user_name, ccReg_TID user_id, ccReg_TID * const log_session_id, char *errmsg)
 {
 	CORBA_Environment ev[1];
 	CORBA_char *c_name;
@@ -266,11 +267,13 @@ int epp_log_CreateSession(service_Logger service, const char *user_name, ccReg_T
 		if (retr != 0) CORBA_exception_free(ev); // valid first time
 		CORBA_exception_init(ev);
 
-        // TODO so far using 0 as user ID
 		session_id = ccReg_Logger_createSession((ccReg_Logger) service, user_id, c_name, ev);
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
+
+		epplog(epp_ctx, EPP_WARNING, "Retry occured in CreateSession");
+		// TODO everywhere
 
 		usleep(RETR_SLEEP);
 	}
@@ -345,7 +348,8 @@ int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char 
  *
  * @returns				CORBA status code
  */
-int epp_log_new_message(service_Logger service,
+int epp_log_new_message(epp_context *epp_ctx,
+        service_Logger service,
 		const char *source_ip,
 		const char *content,
 		ccReg_RequestProperties *properties,
@@ -409,6 +413,9 @@ int epp_log_new_message(service_Logger service,
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
+
+		epplog(epp_ctx, EPP_WARNING, "Retrying call: createRequest");
+		        // TODO everywhere
 
 		usleep(RETR_SLEEP);
 	}
@@ -1370,7 +1377,7 @@ static void log_props_default_extcmd_response(ccReg_RequestProperties **c_props,
  *
  * @return  database ID of the new logging record or an error code LOG_INTERNAL_ERROR
  */
-ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *request, epp_command_data *cdata, epp_red_command_type cmdtype, ccReg_TID sessionid)
+ccReg_TID log_epp_command(epp_context *epp_ctx, service_Logger *service, char *remote_ip, char *request, epp_command_data *cdata, epp_red_command_type cmdtype, ccReg_TID sessionid)
 {
 	int res;								/* response from corba call wrapper */
 	epp_action_type action_type = UnknownAction;
@@ -1384,7 +1391,7 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
 	if(cdata->type == EPP_DUMMY) {
 		PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
 
-		res = epp_log_new_message(service, remote_ip, request, c_props, NULL, action_type, &log_entry_id, sessionid, errmsg);
+		res = epp_log_new_message(epp_ctx, service, remote_ip, request, c_props, NULL, action_type, &log_entry_id, sessionid, errmsg);
 
 		if(res == CORBA_OK) return log_entry_id;
 		else return LOG_INTERNAL_ERROR;
@@ -1441,7 +1448,7 @@ ccReg_TID log_epp_command(service_Logger *service, char *remote_ip, char *reques
 	}
 
   	PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
-        res = epp_log_new_message(service, remote_ip, request, c_props, NULL, action_type, &log_entry_id, sessionid, errmsg);
+        res = epp_log_new_message(epp_ctx, service, remote_ip, request, c_props, NULL, action_type, &log_entry_id, sessionid, errmsg);
 
 	if(res == CORBA_OK) return log_entry_id;
 	else return LOG_INTERNAL_ERROR;

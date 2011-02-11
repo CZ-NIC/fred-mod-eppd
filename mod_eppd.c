@@ -682,7 +682,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 
 			if(service_log != NULL) {
                 registrar_name = ((epps_login*)cdata->data)->clID;
-                log_cstat = epp_log_CreateSession(service_log, registrar_name, 0, session_id, errmsg);
+                log_cstat = epp_log_CreateSession(epp_ctx, service_log, registrar_name, 0, session_id, errmsg);
 			}
 
             if(log_cstat == CORBA_ERROR || log_cstat == CORBA_REMOTE_ERROR) {
@@ -963,7 +963,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
         }
 
         if (logger_service != NULL) {
-            act_log_entry_id = log_epp_command(logger_service, remote_ipaddr,
+            act_log_entry_id = log_epp_command(epp_ctx, logger_service, remote_ipaddr,
                     cdata->xml_in, cdata, cmd_type, session_id);
 
             if (act_log_entry_id == 0) {
