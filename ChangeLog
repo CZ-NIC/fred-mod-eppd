@@ -1,3 +1,11 @@
+2011-02-24 Juraj Vicenik, Jiri Sadek (2.3.9)
+
+	* Enhanced error logging
+
+	* Option EPPlogdMandatory to enabe semi-mandatory fred-logd in EPP
+
+	* Variables missing initialization fixes
+
 2010-12-13 Juraj Vicenik (2.3.8)
 	
 	* Fixed incorrect logging of UTF-16 via fred-logd
