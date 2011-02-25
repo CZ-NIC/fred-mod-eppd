@@ -2471,7 +2471,7 @@ parse_ext_enumval_create(void *pool,
 	RESET_XERR(xerr); /* clear value of errno */
 	ext_item->extType = EPP_EXT_ENUMVAL;
 	ext_item->ext.ext_enum.ext_enumval = xpath_get1(pool, xpathCtx,
-			"enumval:valExDate", 1, &xerr);
+			"enumval:valExDate", 0, &xerr);
 
 	CHK_XERR(xerr, error);
 	str = xpath_get1(pool, xpathCtx, "enumval:publish", 0, &xerr);
@@ -2523,7 +2523,7 @@ parse_ext_enumval_update(void *pool,
 	RESET_XERR(xerr); /* clear value of errno */
 	ext_item->extType = EPP_EXT_ENUMVAL;
 	ext_item->ext.ext_enum.ext_enumval = xpath_get1(pool, xpathCtx,
-			"enumval:chg/enumval:valExDate", 1, &xerr);
+			"enumval:chg/enumval:valExDate", 0, &xerr);
 	CHK_XERR(xerr, error);
 
 	str = xpath_get1(pool, xpathCtx,
@@ -2575,7 +2575,7 @@ parse_ext_enumval_renew(void *pool,
 	RESET_XERR(xerr); /* clear value of errno */
 	ext_item->extType = EPP_EXT_ENUMVAL;
 	ext_item->ext.ext_enum.ext_enumval = xpath_get1(pool, xpathCtx,
-			"enumval:valExDate", 1, &xerr);
+			"enumval:valExDate", 0, &xerr);
 	CHK_XERR(xerr, error);
 
 	str = xpath_get1(pool, xpathCtx, 
