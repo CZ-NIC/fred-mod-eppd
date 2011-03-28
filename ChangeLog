@@ -1,3 +1,20 @@
+2011-03-23 Jiri Sadek (2.4.4)
+
+	* fix segfault on requests without clTRID element specified
+
+2011-03-14 Jiri Sadek (2.4.3)
+
+	* fix missing files
+
+2011-03-14 Jiri Sadek (2.4.2)
+
+	* fix build - schema version
+
+2011-03-14 Jiri Sadek (2.4.1)
+
+	* Reverted changes to schemas - we don't want them in release (packaging
+	  troubles)
+
 2011-02-24 Juraj Vicenik, Jiri Sadek (2.4.0)
 
 	* Enhanced error logging

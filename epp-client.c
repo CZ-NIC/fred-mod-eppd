@@ -245,20 +245,16 @@ ccReg_EppParams *init_epp_params(
 	c_params->XML = NULL;
 	c_params->clTRID = NULL;
 
-	if(xml_in != NULL && *xml_in != '\0') {
-		c_params->XML = wrap_str(xml_in);
-		if (c_params->XML == NULL) {
-			CORBA_free(c_params);
-			return NULL;
-		}
+	c_params->XML = wrap_str(xml_in);
+	if (c_params->XML == NULL) {
+		CORBA_free(c_params);
+		return NULL;
 	}
 
-	if(clTRID != NULL && *clTRID != '\0') {
-		c_params->clTRID = wrap_str(clTRID);
-		if (c_params->clTRID == NULL) {
-			CORBA_free(c_params);
-			return NULL;
-		}
+	c_params->clTRID = wrap_str(clTRID);
+	if (c_params->clTRID == NULL) {
+		CORBA_free(c_params);
+		return NULL;
 	}
 
 	return c_params;
