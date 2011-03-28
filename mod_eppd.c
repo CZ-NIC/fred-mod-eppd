@@ -1012,6 +1012,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 					curdate, &response);
 
             if (logger_service != NULL
+                && act_log_entry_id != 0
                 && log_epp_response(logger_service, NULL, response, cdata, 0, act_log_entry_id)
                     == LOG_INTERNAL_ERROR) {
                     epplog(epp_ctx, EPP_LOGD_ERRLVL, "Could not log EPP hello response in fred-logd");
@@ -1078,7 +1079,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			 * (i.e. only in case we just logged in)
 			 */
 
-			if(logger_service) {
+			if(logger_service != NULL && act_log_entry_id != 0) {
                 log_ret = log_epp_response(logger_service, &valerr, response, cdata,
                         pstat == PARSER_CMD_LOGIN ? session_id : 0,
                         act_log_entry_id);
