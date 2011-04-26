@@ -1011,6 +1011,10 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 						version, ")", NULL),
 					curdate, &response);
 
+			// hello doesn't fill any return data into cdata,
+			// so we have to use a little hack like this for logger:
+			cdata->rc = 1000;
+
             if (logger_service != NULL
                 && act_log_entry_id != 0
                 && log_epp_response(logger_service, NULL, response, cdata, 0, act_log_entry_id)
