@@ -887,15 +887,33 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 		/* read request */
 		retval = epp_read_request(epp_ctx, &request, &bytes);
-		if (retval == 1)
-			/*
-			 * epp_read_request red EOF, this results in OK status
-			 * being returned from connection handler, since it's
-			 * not counted as an error, if client ends connection
-			 * without proper logout.
-			 */
-			break;
-		else if (retval == 2)
+		if (retval == 1) {
+            /*
+             * epp_read_request red EOF, this results in OK status
+             * being returned from connection handler, since it's
+             * not counted as an error, if client ends connection
+             * without proper logout.
+             */
+            corba_status log_cstat;
+            char errmsg[MAX_ERROR_MSG_LEN];
+
+            // if logged out successfully and fred-logd service is available
+            if(session_id != 0 && logger_service != NULL) {
+                log_cstat = epp_log_CloseSession(logger_service, session_id, errmsg);
+
+                session_id = 0;
+
+                switch(log_cstat) {
+                    case CORBA_ERROR:
+                        epplog(epp_ctx, EPP_LOGD_ERRLVL, "Logd: Corba call failed");
+                        break;
+                    case CORBA_REMOTE_ERROR:
+                        epplog(epp_ctx, EPP_LOGD_ERRLVL, "Logd: Unqualified answer from CORBA server!");
+                        break;
+                }
+            }
+
+		} else if (retval == 2)
 			return HTTP_INTERNAL_SERVER_ERROR;
 #ifdef EPP_PERF
 		times[0] = apr_time_now(); /* before parsing */
