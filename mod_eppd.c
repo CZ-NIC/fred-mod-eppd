@@ -702,7 +702,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 
 		// if logged out successfully and fred-logd service is available
 		if(cstat == CORBA_OK && service_log != NULL) {
-			log_cstat = epp_log_CloseSession(service_log, *session_id, errmsg);
+			log_cstat = epp_log_CloseSession(epp_ctx, service_log, *session_id, errmsg);
 		}
 	} else {
 		/* go ahead to generic corba function call */
@@ -899,7 +899,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
             // if logged out successfully and fred-logd service is available
             if(session_id != 0 && logger_service != NULL) {
-                log_cstat = epp_log_CloseSession(logger_service, session_id, errmsg);
+                log_cstat = epp_log_CloseSession(epp_ctx, logger_service, session_id, errmsg);
 
                 session_id = 0;
 
@@ -1034,11 +1034,15 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			cdata->rc = 1000;
 
             if (logger_service != NULL
-                && act_log_entry_id != 0
-                && log_epp_response(logger_service, NULL, response, cdata, 0, act_log_entry_id)
-                    == LOG_INTERNAL_ERROR) {
-                    epplog(epp_ctx, EPP_LOGD_ERRLVL, "Could not log EPP hello response in fred-logd");
-                    // TODO cannot return error code - 2-phase commit should be used
+                && act_log_entry_id != 0) {
+
+                    epplog(epp_ctx, EPP_DEBUG, "Closing logging request with requestID: %llu", act_log_entry_id);
+                    if(log_epp_response(epp_ctx, logger_service, NULL, response, cdata, 0, act_log_entry_id)
+                            == LOG_INTERNAL_ERROR) {
+
+                        epplog(epp_ctx, EPP_LOGD_ERRLVL, "Could not log EPP hello response in fred-logd");
+                        // TODO cannot return error code - 2-phase commit should be used
+                    }
             }
 
 			if (gstat != GEN_OK) {
@@ -1102,7 +1106,9 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			 */
 
 			if(logger_service != NULL && act_log_entry_id != 0) {
-                log_ret = log_epp_response(logger_service, &valerr, response, cdata,
+			    epplog(epp_ctx, EPP_DEBUG, "Closing logging request with requestID: %llu", act_log_entry_id);
+
+                log_ret = log_epp_response(epp_ctx, logger_service, &valerr, response, cdata,
                         pstat == PARSER_CMD_LOGIN ? session_id : 0,
                         act_log_entry_id);
 
@@ -1372,7 +1378,7 @@ static int epp_process_connection(conn_rec *c)
 
             if(logger_service != NULL) {
                 epplog(&epp_ctx, EPP_INFO, "EPP session terminated, calling CloseSession in logd");
-                log_cstat = epp_log_CloseSession(logger_service, sessionid, errmsg);
+                log_cstat = epp_log_CloseSession(&epp_ctx, logger_service, sessionid, errmsg);
             }
 
             switch(log_cstat) {

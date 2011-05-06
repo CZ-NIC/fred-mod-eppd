@@ -16,7 +16,8 @@ ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_prop
 ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child);
 ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value, CORBA_boolean output);
 
-int epp_log_close_message(service_Logger service,
+int epp_log_close_message(epp_context *epp_ctx,
+        service_Logger service,
 		const char *content,
 		ccReg_RequestProperties *properties,
                 ccReg_ObjectReferences *objrefs,
@@ -302,7 +303,7 @@ int epp_log_CreateSession(epp_context *epp_ctx, service_Logger service, const ch
  *
  * @returns		CORBA status code
  */
-int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char *errmsg)
+int epp_log_CloseSession(epp_context *epp_ctx, service_Logger service, ccReg_TID log_session_id, char *errmsg)
 {
 	CORBA_Environment ev[1];
 	int retr;
@@ -318,6 +319,8 @@ int epp_log_CloseSession(service_Logger service, ccReg_TID log_session_id, char 
 
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
+
+		epplog(epp_ctx, EPP_WARNING, "Retrying call: closeSession");
 
 		usleep(RETR_SLEEP);
 	}
@@ -415,7 +418,6 @@ int epp_log_new_message(epp_context *epp_ctx,
 			break;
 
 		epplog(epp_ctx, EPP_WARNING, "Retrying call: createRequest");
-		        // TODO everywhere
 
 		usleep(RETR_SLEEP);
 	}
@@ -453,7 +455,7 @@ int epp_log_new_message(epp_context *epp_ctx,
  *
  * @returns			CORBA status code
  */
-int epp_log_close_message(service_Logger service,
+int epp_log_close_message(epp_context *epp_ctx, service_Logger service,
 		const char *content,
 		ccReg_RequestProperties *properties,
                 ccReg_ObjectReferences *objrefs,
@@ -504,6 +506,9 @@ int epp_log_close_message(service_Logger service,
 		/* if COMM_FAILURE is not raised then quit retry loop */
 		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
 			break;
+
+		epplog(epp_ctx, EPP_WARNING, "Retrying call: closeRequest");
+
 		usleep(RETR_SLEEP);
 	}
 
@@ -1473,7 +1478,7 @@ ccReg_TID log_epp_command(epp_context *epp_ctx, service_Logger *service, char *r
  *
  * @return  status LOG_INTERNAL_ERROR or LOG_SUCCESS
  */
-int log_epp_response(service_Logger *log_service, qhead *valerr, const char *response, const epp_command_data *cdata, ccReg_TID session_id, ccReg_TID log_entry_id)
+int log_epp_response(epp_context *epp_ctx, service_Logger *log_service, qhead *valerr, const char *response, const epp_command_data *cdata, ccReg_TID session_id, ccReg_TID log_entry_id)
 {
 	int res;
 
@@ -1529,9 +1534,9 @@ int log_epp_response(service_Logger *log_service, qhead *valerr, const char *res
 	}
 
         if(cdata != NULL) {
-            res = epp_log_close_message(log_service, response, c_props, NULL, log_entry_id, session_id, cdata->rc, errmsg);
+            res = epp_log_close_message(epp_ctx, log_service, response, c_props, NULL, log_entry_id, session_id, cdata->rc, errmsg);
         } else {
-            res = epp_log_close_message(log_service, response, c_props, NULL, log_entry_id, session_id, 2400, errmsg);
+            res = epp_log_close_message(epp_ctx, log_service, response, c_props, NULL, log_entry_id, session_id, 2400, errmsg);
         }
 
 	if(res == CORBA_OK) return LOG_SUCCESS;
