@@ -1,3 +1,10 @@
+2011-05-20 Juraj Vicenik (2.5.0)
+
+	* Logger - hello command result code logging fix,
+	  closing session in logger on not proper client logout
+
+	* detailed error logging
+
 2011-03-23 Jiri Sadek (2.4.4)
 
 	* fix segfault on requests without clTRID element specified
