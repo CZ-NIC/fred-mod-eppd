@@ -30,8 +30,8 @@
     <import namespace="http://www.nic.cz/xml/epp/nsset-1.2"
       schemaLocation="nsset-1.2.xsd"/>
     <!-- EPP protocol extensions -->
-    <import namespace="http://www.nic.cz/xml/epp/fred-1.4"
-      schemaLocation="fred-1.4.xsd"/>
+    <import namespace="http://www.nic.cz/xml/epp/fred-1.5"
+      schemaLocation="fred-1.5.xsd"/>
     <!-- extension of domain object -->
     <import namespace="http://www.nic.cz/xml/epp/enumval-1.2"
       schemaLocation="enumval-1.2.xsd"/>

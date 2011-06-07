@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-  <schema targetNamespace="http://www.nic.cz/xml/epp/fred-1.4"
-          xmlns:fred="http://www.nic.cz/xml/epp/fred-1.4"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/fred-1.5"
+          xmlns:fred="http://www.nic.cz/xml/epp/fred-1.5"
           xmlns:eppcom="urn:ietf:params:xml:ns:eppcom-1.0"
           xmlns:fredcom="http://www.nic.cz/xml/epp/fredcom-1.2"
           xmlns="http://www.w3.org/2001/XMLSchema"
@@ -148,5 +148,22 @@
       </sequence>
     </complexType>
 
+    <element name="requestFeeInfoData" type="fred:requestFeeInfoDataT"/>
 
-  </schema>
+    <complexType name="requestFeeInfoDataT">
+      <sequence>
+        <!-- timestamp of period begining -->
+        <element name="periodFrom" type="dateTime"/>
+        <!-- timesatamp of usedCount computation -->
+        <element name="periodTo" type="dateTime"/>
+        <!-- count of total charge free requests -->
+        <element name="totalFreeCount" type="unsignedLong"/>
+        <!-- count of used requests within periodFrom, periodTo interval -->
+        <element name="usedCount" type="unsignedLong"/>
+        <!-- price to be paid for request over totalFreeCount -->
+        <element name="price" type="fred:amountType"/>
+      </sequence>
+    </complexType>
+
+</schema>
+
