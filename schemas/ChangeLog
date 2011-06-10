@@ -7,6 +7,8 @@
 	   - changed objIDType (contact, nsset, keyset handle type)
 	     minimal lenght to 1
 
+	* valExDate element is optional in enumval extension
+
 	* update all.xsd from 2.2 to 2.3
 
 2009-11-26 Jiri Sadek (version 2.2.0)
