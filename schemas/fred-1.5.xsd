@@ -148,6 +148,11 @@
       </sequence>
     </complexType>
 
+
+    <!--
+      information about requests counts and price
+    -->
+
     <element name="requestFeeInfoData" type="fred:requestFeeInfoDataT"/>
 
     <complexType name="requestFeeInfoDataT">
