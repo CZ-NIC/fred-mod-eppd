@@ -913,6 +913,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
                 }
             }
 
+            break;
 		} else if (retval == 2)
 			return HTTP_INTERNAL_SERVER_ERROR;
 #ifdef EPP_PERF
