@@ -469,6 +469,7 @@ typedef enum {
 	pt_outzone,          /**< Domain was outaged from zone. */
 	pt_delete_domain,    /**< Domain was deleted. */
 	pt_lowcredit,        /**< Credit of registrator is low. */
+    pt_request_fee_info  /**< Requests price/count info */
 }epp_pollType;
 
 /** Structure containing result of one technical test. */
@@ -605,6 +606,13 @@ typedef struct {
 			unsigned long limit;
 			unsigned long credit;
 		}lc; /**< Low credit structure. */
+        struct {
+            char *period_from;
+            char *period_to;
+            unsigned long long total_free_count;
+            unsigned long long used_count;
+            char *price;
+        }rfi; /**< Request fee info structure */
 	}msg; 	/**< Message data. */
 }epps_poll_req;
 

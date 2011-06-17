@@ -752,6 +752,28 @@ gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
 			END_ELEMENT(writer, simple_err); /* lowCreditData */
 			break;
 			}
+        case pt_request_fee_info:
+            {
+            char number[50];
+
+            START_ELEMENT(writer, simple_err, "fred:requestFeeInfoData");
+            WRITE_ATTRIBUTE(writer, simple_err, "xmlns:fred",
+                    NS_FRED);
+            WRITE_ELEMENT(writer, simple_err, "fred:periodFrom",
+                    msgdata->msg.rfi.period_from);
+            WRITE_ELEMENT(writer, simple_err, "fred:periodTo",
+                    msgdata->msg.rfi.period_to);
+            snprintf(number, 49, "%llu", msgdata->msg.rfi.total_free_count);
+            WRITE_ELEMENT(writer, simple_err, "fred:totalFreeCount",
+                    number);
+            snprintf(number, 49, "%llu", msgdata->msg.rfi.used_count);
+            WRITE_ELEMENT(writer, simple_err, "fred:usedCount",
+                    number);
+            WRITE_ELEMENT(writer, simple_err, "fred:price",
+                    msgdata->msg.rfi.price);
+            END_ELEMENT(writer, simple_err);
+            break;
+            }
 		default:
 			START_ELEMENT(writer, simple_err, "fred:lowCreditData");
 			break;

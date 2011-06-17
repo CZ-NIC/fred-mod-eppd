@@ -1899,6 +1899,24 @@ epp_call_poll_req(epp_context *epp_ctx,
 			poll_req->msg.lc.credit = lc->credit;
 			break;
 			}
+        case ccReg_polltype_request_fee_info:
+            {
+            ccReg_PollMsg_RequestFeeInfo *rfi =
+                (ccReg_PollMsg_RequestFeeInfo *) c_mesg->_value;
+            poll_req->type = pt_request_fee_info;
+            poll_req->msg.rfi.period_from = unwrap_str(epp_ctx->pool,
+                    rfi->periodFrom, &cerrno);
+            if (cerrno != 0) goto error;
+            poll_req->msg.rfi.period_to = unwrap_str(epp_ctx->pool,
+                    rfi->periodTo, &cerrno);
+            if (cerrno != 0) goto error;
+            poll_req->msg.rfi.total_free_count = rfi->totalFreeCount;
+            poll_req->msg.rfi.used_count = rfi->usedCount;
+            poll_req->msg.rfi.price = unwrap_str(epp_ctx->pool,
+                    rfi->price, &cerrno);
+            if (cerrno != 0) goto error;
+            break;
+            }
 		default:
 			epplog(epp_ctx, EPP_ERROR, "Unexpected type of poll "
 					"message.");
