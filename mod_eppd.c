@@ -686,7 +686,15 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 			}
 
             if(log_cstat == CORBA_ERROR || log_cstat == CORBA_REMOTE_ERROR) {
-                epplog(epp_ctx, EPP_ERROR, "Fatal error when logging CreateSession.");
+
+                if (errmsg[0] != '\0') {
+                    epplog(epp_ctx, EPP_ERROR, "Fatal error when logging CreateSession: %s ", errmsg);
+                } else {
+                    epplog(epp_ctx, EPP_ERROR, "Fatal error when logging CreateSession.");
+                }
+
+
+
                 if (logd_mandatory) {
                     if(loginid != 0) {
                         epplog(epp_ctx, EPP_ERROR, "Terminating session because of logging failure.");

@@ -1399,7 +1399,12 @@ ccReg_TID log_epp_command(epp_context *epp_ctx, service_Logger *service, char *r
 		res = epp_log_new_message(epp_ctx, service, remote_ip, request, c_props, NULL, action_type, &log_entry_id, sessionid, errmsg);
 
 		if(res == CORBA_OK) return log_entry_id;
-		else return LOG_INTERNAL_ERROR;
+		else {
+            if(errmsg[0] != '\0') {
+                epplog(epp_ctx, EPP_ERROR, "fred-logd EPP_DUMMY logging error: %s", errmsg);
+            }
+            return LOG_INTERNAL_ERROR;
+        }
 	}
            
 	switch(cmdtype) {
@@ -1455,8 +1460,15 @@ ccReg_TID log_epp_command(epp_context *epp_ctx, service_Logger *service, char *r
   	PUSH_PROPERTY (c_props, "clTRID", cdata->clTRID);
         res = epp_log_new_message(epp_ctx, service, remote_ip, request, c_props, NULL, action_type, &log_entry_id, sessionid, errmsg);
 
-	if(res == CORBA_OK) return log_entry_id;
-	else return LOG_INTERNAL_ERROR;
+	if(res == CORBA_OK) {
+        return log_entry_id;
+    } else {
+        if(errmsg[0] != '\0') {
+            epplog(epp_ctx, EPP_ERROR, "fred-logd createRequest logging error: %s", errmsg);
+        }
+
+        return LOG_INTERNAL_ERROR;
+    }
 
 }
 
@@ -1485,6 +1497,7 @@ int log_epp_response(epp_context *epp_ctx, service_Logger *log_service, qhead *v
 	char errmsg[MAX_ERROR_MSG_LEN];			/* error message returned from corba call */
 	ccReg_RequestProperties *c_props = NULL;	/* properties to be sent to the log */
 
+	errmsg[0] = '\0';
 	// output properties
 	if (cdata != NULL) {
                 c_props = epp_property_push(c_props, "svTRID", cdata->svTRID, CORBA_TRUE, CORBA_FALSE);
@@ -1540,5 +1553,10 @@ int log_epp_response(epp_context *epp_ctx, service_Logger *log_service, qhead *v
         }
 
 	if(res == CORBA_OK) return LOG_SUCCESS;
-	else return LOG_INTERNAL_ERROR;
+	else {
+        if(errmsg[0] != '\0') {
+            epplog(epp_ctx, EPP_ERROR, "fred-logd logging error: %s", errmsg);
+        }
+        return LOG_INTERNAL_ERROR;
+    }
 }
