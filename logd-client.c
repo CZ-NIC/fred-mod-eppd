@@ -292,6 +292,7 @@ int epp_log_CreateSession(epp_context *epp_ctx, service_Logger service, const ch
 	CORBA_exception_free(ev);
 	/* set session id output param */
 	*log_session_id = session_id;
+	epplog(epp_ctx, EPP_INFO, "Created session in fred-logd with id: %llu ", *log_session_id);
 
 	return CORBA_OK;
 }
