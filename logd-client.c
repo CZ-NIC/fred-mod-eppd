@@ -371,7 +371,7 @@ int epp_log_new_message(epp_context *epp_ctx,
 
     /* don't log requests without session (logger restart problem)
      * will be changed when logging become mandatory */
-        if (action_type != ClientLogin && sessionid == 0) {
+        if (action_type != ClientLogin && action_type != ClientGreeting && sessionid == 0) {
             return CORBA_ERROR;
         }
 
