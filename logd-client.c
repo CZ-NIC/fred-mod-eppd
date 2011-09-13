@@ -1343,12 +1343,8 @@ static void log_props_default_extcmd_response(ccReg_RequestProperties **c_props,
                     epp_zonecredit *zonecredit;
 
                     zonecredit = q_content(&credit_info->zonecredits);
-                    snprintf(credit, 49, "%lu.%02lu",
-                                    zonecredit->credit / 100,
-                                    zonecredit->credit % 100);
-
                     *c_props = epp_property_push(*c_props, "zone", zonecredit->zone, CORBA_TRUE, CORBA_FALSE);
-                    *c_props = epp_property_push(*c_props, "credit", credit, CORBA_TRUE, CORBA_TRUE);
+                    *c_props = epp_property_push(*c_props, "credit", zonecredit->credit, CORBA_TRUE, CORBA_TRUE);
             }
             
             break;

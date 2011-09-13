@@ -430,7 +430,7 @@ typedef struct {
 /** Structure holding answer to EPP creditInfo command. */
 typedef struct {
 	char	*zone;   /**< True if object is available, false otherwise. */
-	unsigned long credit; /**< Credit in cents. */
+	char    *credit; /**< Credit */
 }epp_zonecredit;
 
 /** DNSSEC extension used for updates. */

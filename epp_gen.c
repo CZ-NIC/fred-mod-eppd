@@ -1388,13 +1388,10 @@ epp_gen_response(epp_context *epp_ctx,
 				START_ELEMENT(writer, simple_err,
 						"fred:zoneCredit");
 				zonecredit = q_content(&creditInfo->zonecredits);
-				snprintf(credit, 49, "%lu.%02lu",
-						zonecredit->credit / 100,
-						zonecredit->credit % 100);
 				WRITE_ELEMENT(writer, simple_err,
 						"fred:zone", zonecredit->zone);
 				WRITE_ELEMENT(writer, simple_err,
-						"fred:credit", credit);
+						"fred:credit", zonecredit->credit);
 				END_ELEMENT(writer, simple_err); /* zoneCredit */
 			}
 			END_ELEMENT(writer, simple_err); /* resCreditInfo */

@@ -4121,7 +4121,11 @@ epp_call_creditinfo(epp_context *epp_ctx,
 				c_zoneCredit->_buffer[i].zone_fqdn, &cerrno);
 		if (cerrno != 0)
 			break;
-		zonecredit->credit = c_zoneCredit->_buffer[i].price;
+		zonecredit->credit = unwrap_str(epp_ctx->pool,
+                c_zoneCredit->_buffer[i].price, &cerrno);
+        if (cerrno != 0)
+            break;
+
 		if (q_add(epp_ctx->pool, &creditInfo->zonecredits, zonecredit))
 			break;
 	}
