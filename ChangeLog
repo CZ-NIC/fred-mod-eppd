@@ -1,10 +1,14 @@
-2011-10-17 Jiri Sadek, Juraj Vicenik (2.6.0)
+2011-10-17 Jiri Sadek, Juraj Vicenik (2.7.0)
 
 	* credit amount in credit info command is now passed as string data type
 
 	* more detailed apache module logging (mainly logger client)
 
 	* logging greeting without session
+
+2011-07-04 Jiri Sadek (2.6.0)
+
+	* new poll message for request charging impl.
 
 2011-06-15 Jiri Sadek (2.5.1)
 
