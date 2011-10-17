@@ -1,3 +1,11 @@
+2011-10-17 Jiri Sadek, Juraj Vicenik (2.6.0)
+
+	* credit amount in credit info command is now passed as string data type
+
+	* more detailed apache module logging (mainly logger client)
+
+	* logging greeting without session
+
 2011-06-15 Jiri Sadek (2.5.1)
 
 	* bugfix - missing break in evaluation of epp_read_request(...) return code
