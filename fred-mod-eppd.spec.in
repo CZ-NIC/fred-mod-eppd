@@ -7,7 +7,7 @@ License:        GPL
 URL:            http://fred.nic.cz
 Source:         %{name}-%{version}.tar.gz
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-BuildRequires:  apr-devel, httpd-devel, libxml2-devel, openssl-devel
+BuildRequires:  apr-devel, httpd-devel, libxml2-devel, openssl-devel, ORBit2-devel
 Requires: httpd, libxml2, openssl, fred-mod-corba, mod_ssl
 
 %description
