@@ -1381,14 +1381,11 @@ static int epp_process_connection(conn_rec *c)
 	if (loginid > 0) {
 		epp_call_CloseSession(&epp_ctx, EPPservice, loginid);
 
-		if (sessionid != 0) {
-            corba_status log_cstat;
+		if (sessionid != 0 && logger_service != NULL) {
             char errmsg[MAX_ERROR_MSG_LEN];
 
-            if(logger_service != NULL) {
-                epplog(&epp_ctx, EPP_INFO, "EPP session terminated, calling CloseSession in logd");
-                log_cstat = epp_log_CloseSession(&epp_ctx, logger_service, sessionid, errmsg);
-            }
+            epplog(&epp_ctx, EPP_INFO, "EPP session terminated, calling CloseSession in logd");
+            corba_status log_cstat = epp_log_CloseSession(&epp_ctx, logger_service, sessionid, errmsg);
 
             switch(log_cstat) {
                 case CORBA_ERROR:
