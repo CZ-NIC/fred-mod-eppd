@@ -56,4 +56,5 @@ Admin.h
 Admin-stubs.c
 Admin-common.c
 tags
+.gitignore.swp
 
