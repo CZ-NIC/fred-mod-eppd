@@ -1339,7 +1339,6 @@ static void log_props_default_extcmd_response(ccReg_RequestProperties **c_props,
             credit_info = cdata->data;
 
             q_foreach(&credit_info->zonecredits) {
-                    char credit[49];
                     epp_zonecredit *zonecredit;
 
                     zonecredit = q_content(&credit_info->zonecredits);

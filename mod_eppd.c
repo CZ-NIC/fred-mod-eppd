@@ -602,12 +602,13 @@ static int get_md5(char *cert_md5, char *pem)
  * @param service   CORBA object reference.
  * @param cdata     EPP data.
  * @param loginid   Login id assigned by fred_rifd.
+ * @param request_id      fred-logd request ID
  * @param lang      Language selected by client.
  * @param cstat     Corba status.
  * @return          0 in case of internal error, 1 if ok.
  */
 static int call_login(epp_context *epp_ctx, service_EPP *service,
-		epp_command_data *cdata, unsigned int *loginid,
+		epp_command_data *cdata, unsigned long long *loginid, const ccReg_TID request_id,
 		epp_lang *lang, corba_status *cstat)
 {
 	char	 cert_md5[80];/* should be enough for md5 hash of cert */
@@ -641,7 +642,7 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
 	 *     side of central repository. The identifing parameter
 	 *     is md5 digest of client's certificate.
 	 */
-	*cstat = epp_call_login(epp_ctx, service, loginid, lang, cert_md5,
+	*cstat = epp_call_login(epp_ctx, service, loginid, request_id, lang, cert_md5,
 			cdata);
 	return 1;
 }
@@ -654,16 +655,20 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
  *
  *
  * @param epp_ctx   EPP context.
- * @param service   CORBA object reference.
+ * @param service   CORBA object reference - rifd.
+ * @param service_log CORBA object reference - logd
  * @param cdata     EPP data.
  * @param pstat     Parser return status.
  * @param loginid   Login id assigned by fred_rifd.
+ * @param session_id  output - fred-logd session ID
+ * @param request_id  fred-logd request ID
  * @param lang      Language selected by client.
+ * @param logd_mandatory nonzero if all logd related errors are fatal
  * @return          0 in case of internal error, 1 if ok.
  */
 static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger *service_log,
 		epp_command_data *cdata, parser_status pstat,
-		unsigned int *loginid, ccReg_TID * const session_id, const ccReg_TID log_id, epp_lang *lang,
+		unsigned long long *loginid, ccReg_TID * const session_id, const ccReg_TID request_id, epp_lang *lang,
 		unsigned int logd_mandatory)
 {
 	corba_status	cstat; /* ret code of corba component */
@@ -672,7 +677,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 
 	errmsg[0] = '\0';
 	if (pstat == PARSER_CMD_LOGIN) {
-		if (!call_login(epp_ctx, service, cdata, loginid, lang, &cstat)) {
+		if (!call_login(epp_ctx, service, cdata, loginid, request_id, lang, &cstat)) {
 			return 0;
 		}
 
@@ -705,8 +710,8 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
             }
 		}
 	} else if (pstat == PARSER_CMD_LOGOUT) {
-		cstat = epp_call_logout(epp_ctx, service, loginid, cdata);
-		epplog(epp_ctx, EPP_DEBUG, "login id after logout command is %d", *loginid);
+		cstat = epp_call_logout(epp_ctx, service, loginid, request_id, cdata);
+		epplog(epp_ctx, EPP_DEBUG, "login id after logout command is %lld", *loginid);
 
 		// if logged out successfully and fred-logd service is available
 		if(cstat == CORBA_OK && service_log != NULL) {
@@ -714,7 +719,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 		}
 	} else {
 		/* go ahead to generic corba function call */
-		cstat = epp_call_cmd(epp_ctx, service, *loginid, log_id, cdata);
+		cstat = epp_call_cmd(epp_ctx, service, *loginid, request_id, cdata);
 	}
 
 	/* catch corba failures */
@@ -831,9 +836,6 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 			break;
 	}
 
-	/* XXX ugly hack */
-	if (strcmp(cdata->svTRID, "DUMMY-SVTRID"))
-		epp_call_save_output_xml(epp_ctx, service, cdata, *response);
 	return 1;
 }
 
@@ -842,7 +844,7 @@ static int gen_response(epp_context *epp_ctx, service_EPP *service,
 /** Read and process EPP requests waiting in the queue */
 static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 		service_EPP *EPPservice, service_Logger *logger_service, eppd_server_conf *sc,
-		unsigned int *login_id_save, ccReg_TID *session_id_save)
+		unsigned long long *login_id_save, ccReg_TID *session_id_save)
 {
 	epp_lang	 lang;   /* session's language */
 	apr_pool_t	*rpool;  /* connection memory pool */
@@ -854,7 +856,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 	char	*request;        /* raw request read from socket */
 	char	*response;       /* generated XML answer to client */
 	int	 retval;         /* return code of read_request */
-	unsigned int	 login_id;        /* login id of client's session */
+	unsigned long long     login_id;        /* login id of client's session */
 	ccReg_TID 	 session_id;	  /* id for log_session table */
         char *remote_ipaddr;
 
@@ -1079,7 +1081,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 				return HTTP_INTERNAL_SERVER_ERROR;
 			/* did successfull login occured? */
 			epplog(epp_ctx, EPP_DEBUG, "after corba call command "
-				"saved login id is %d, login id is %d", *login_id_save, login_id);
+				"saved login id is %lld, login id is %d", *login_id_save, login_id);
 			if (*login_id_save == 0 && login_id != 0) {
 			    // login_id and session_id must be both set or not set
 			    // at the same time
@@ -1090,7 +1092,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 				 * login was successfull
 				 */
 				epplog(epp_ctx, EPP_INFO, "Logged in "
-					"successfully, login id is %d",login_id);
+					"successfully, login id is %lld",login_id);
 			}
 
                         epplog(epp_ctx, EPP_INFO, "using fred-logd session id: %llu ", session_id);
@@ -1267,7 +1269,7 @@ static void *get_corba_service(epp_context *epp_ctx, char *name)
  */
 static int epp_process_connection(conn_rec *c)
 {
-	unsigned int	 loginid; /* login id of client */
+	unsigned long long	     loginid; /* login id of client */
 	ccReg_TID        sessionid; /* session id from fred-logd */
 	int	 rc;      /* corba ret code */
 	int	 ret;     /* command loop return code */
@@ -1381,12 +1383,12 @@ static int epp_process_connection(conn_rec *c)
 	if (loginid > 0) {
 		epp_call_CloseSession(&epp_ctx, EPPservice, loginid);
 
-		epplog(&epp_ctx, EPP_INFO, "EPP session terminated, calling CloseSession in logd");
-
 		if (sessionid != 0 && logger_service != NULL) {
+            corba_status log_cstat = CORBA_OK;
             char errmsg[MAX_ERROR_MSG_LEN];
 
-            corba_status log_cstat = epp_log_CloseSession(&epp_ctx, logger_service, sessionid, errmsg);
+            epplog(&epp_ctx, EPP_INFO, "EPP session terminated, calling CloseSession in logd");
+            log_cstat = epp_log_CloseSession(&epp_ctx, logger_service, sessionid, errmsg);
 
             switch(log_cstat) {
                 case CORBA_ERROR:

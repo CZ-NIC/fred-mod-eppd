@@ -103,6 +103,7 @@ epp_call_hello(epp_context *epp_ctx,
  * @param service     EPP service.
  * @param loginid     If successfully logged in, the session identifier assigned
  *                    by server will be stored in this parameter.
+ * @param request_id      fred-logd request ID
  * @param lang        If successfully logged in, the selected language will be
  *                    stored in this parameter.
  * @param fingerprint Fingerprint of client's certificate.
@@ -112,7 +113,8 @@ epp_call_hello(epp_context *epp_ctx,
 corba_status
 epp_call_login(epp_context *epp_ctx,
 		service_EPP service,
-		unsigned int *loginid,
+		unsigned long long *loginid,
+		const ccReg_TID request_id,
 		epp_lang *lang,
 		const char *fingerprint,
 		epp_command_data *cdata);
@@ -123,13 +125,15 @@ epp_call_login(epp_context *epp_ctx,
  * @param epp_ctx     Epp context (pool, connection and session id).
  * @param service     EPP service.
  * @param loginid     Session identifier (may change inside).
+ * @param request_id      fred-logd request ID
  * @param cdata       Data from parsed xml command.
  * @return            Status.
  */
 corba_status
 epp_call_logout(epp_context *epp_ctx,
 		service_EPP service,
-		unsigned int *loginid,
+		unsigned long long *loginid,
+        const ccReg_TID request_id,
 		epp_command_data *cdata);
 
 /**
@@ -143,14 +147,15 @@ epp_call_logout(epp_context *epp_ctx,
  * @param epp_ctx     Epp context (pool, connection and session id).
  * @param service     EPP service.
  * @param loginid     Session identifier
+ * @param request_id      fred-logd request ID
  * @param cdata       Data from parsed xml command.
  * @return            Status.
  */
 corba_status
 epp_call_cmd(epp_context *epp_ctx,
 		service_EPP service,
-		unsigned int loginid,
-                const ccReg_TID log_id,
+		unsigned long long loginid,
+                const ccReg_TID request_id,
 		epp_command_data *cdata);
 
 /**
@@ -180,7 +185,7 @@ epp_call_save_output_xml(epp_context *epp_ctx,
  */
 void
 epp_call_CloseSession(epp_context *epp_ctx, service_EPP service,
-		unsigned int loginid);
+		unsigned long long loginid);
 
 
 #define MAX_ERROR_MSG_LEN	100

@@ -389,7 +389,7 @@ int main(int argc, char *argv[])
 	ccReg_EPP	service;
 	CORBA_ORB	orb;
 	char	*greeting;
-	unsigned int	loginid;
+	unsigned long long	loginid;
 	epp_lang	lang;
 	epp_command_data *cdata;
 	char text[MAX_LENGTH];
@@ -586,11 +586,12 @@ int main(int argc, char *argv[])
 		}
 		else if (pstat == PARSER_CMD_LOGOUT) {
 			/* API: corba call */
-			cstat = epp_call_logout(&epp_ctx, service, &loginid, cdata);
-		}
-		else if (pstat == PARSER_CMD_LOGIN) {
+		    ccReg_TID request_id = 0;
+			cstat = epp_call_logout(&epp_ctx, service, &loginid, request_id, cdata);
+		} else if (pstat == PARSER_CMD_LOGIN) {
 			/* API: corba call */
-			cstat = epp_call_login(&epp_ctx, service, &loginid, &lang, fp, cdata);
+		    ccReg_TID request_id = 0;
+			cstat = epp_call_login(&epp_ctx, service, &loginid, request_id, &lang, fp, cdata);
 		}
 		else if (pstat == PARSER_CMD_OTHER || pstat == PARSER_NOT_VALID) {
 			/* API: corba call */

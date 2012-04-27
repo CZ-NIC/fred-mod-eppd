@@ -1,3 +1,7 @@
+2012-04-27 Jiri Sadek, Juraj Vicenik (2.8.0)
+
+	* epp action removed from fred
+
 2011-10-17 Jiri Sadek, Juraj Vicenik (2.7.0)
 
 	* credit amount in credit info command is now passed as string data type
