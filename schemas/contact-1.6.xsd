@@ -439,6 +439,8 @@
         <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
         <enumeration value="deleteCandidate"/>
+        <enumeration value="conditionallyIdentifiedContact"/>
+        <enumeration value="identifiedContact"/>
       </restriction>
     </simpleType>
 
