@@ -265,6 +265,7 @@
         <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
+        <enumeration value="deleteCandidate"/>
       </restriction>
     </simpleType>
 

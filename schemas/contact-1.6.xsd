@@ -422,6 +422,7 @@
         <enumeration value="serverTransferProhibited"/>
         <enumeration value="serverDeleteProhibited"/>
         <enumeration value="serverUpdateProhibited"/>
+        <enumeration value="deleteCandidate"/>
       </restriction>
     </simpleType>
 

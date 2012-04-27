@@ -315,6 +315,7 @@
         <enumeration value="expired"/>
         <enumeration value="outzone"/>
         <enumeration value="notValidated"/>
+        <enumeration value="deleteCandidate"/>
       </restriction>
     </simpleType>
 
