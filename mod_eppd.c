@@ -1003,7 +1003,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
                 }
             } else {
                 epplog(epp_ctx, EPP_DEBUG,
-                        "Request in fred-logd created, id: %llu ",
+                        "Request in fred-logd created, id: %" APR_UINT64_T_FMT,
                         act_log_entry_id);
             }
         }
@@ -1047,7 +1047,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
             if (logger_service != NULL
                 && act_log_entry_id != 0) {
 
-                    epplog(epp_ctx, EPP_DEBUG, "Closing logging request with requestID: %llu", act_log_entry_id);
+                    epplog(epp_ctx, EPP_DEBUG, "Closing logging request with requestID: %" APR_UINT64_T_FMT, act_log_entry_id);
                     if(log_epp_response(epp_ctx, logger_service, NULL, response, cdata, 0, act_log_entry_id)
                             == LOG_INTERNAL_ERROR) {
 
@@ -1095,7 +1095,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 					"successfully, login id is %lld",login_id);
 			}
 
-                        epplog(epp_ctx, EPP_INFO, "using fred-logd session id: %llu ", session_id);
+                        epplog(epp_ctx, EPP_INFO, "using fred-logd session id: %" APR_UINT64_T_FMT, session_id);
 #ifdef EPP_PERF
 			times[3] = apr_time_now(); /* after corba calls */
 #endif
@@ -1117,7 +1117,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 			 */
 
 			if(logger_service != NULL && act_log_entry_id != 0) {
-			    epplog(epp_ctx, EPP_DEBUG, "Closing logging request with requestID: %llu", act_log_entry_id);
+			    epplog(epp_ctx, EPP_DEBUG, "Closing logging request with requestID: %" APR_UINT64_T_FMT, act_log_entry_id);
 
                 log_ret = log_epp_response(epp_ctx, logger_service, &valerr, response, cdata,
                         pstat == PARSER_CMD_LOGIN ? session_id : 0,
