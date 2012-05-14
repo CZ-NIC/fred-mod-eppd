@@ -1,3 +1,9 @@
+2012-05-11 Juraj Vicenik (2.9.0)
+
+	* fix - %llu format string in epp log
+
+	* schema changes (see standalone ChangeLog)
+
 2012-04-27 Jiri Sadek, Juraj Vicenik (2.8.0)
 
 	* epp action removed from fred
