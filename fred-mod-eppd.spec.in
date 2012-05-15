@@ -7,7 +7,7 @@ License:        GPL
 URL:            http://fred.nic.cz
 Source:         %{name}-%{version}.tar.gz
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-BuildRequires:  apr-devel, httpd-devel, libxml2-devel, openssl-devel, ORBit2-devel
+BuildRequires:  gcc, apr-devel, httpd-devel, libxml2-devel, openssl-devel, ORBit2-devel, fred-idl
 Requires: httpd, libxml2, openssl, fred-mod-corba, mod_ssl
 
 %description
@@ -31,6 +31,7 @@ find ${RPM_BUILD_ROOT}/usr/share/doc/ | cut -c$(echo -n "${RPM_BUILD_ROOT} " | w
 
 %post
 test -f /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf || ln -s /usr/share/fred-mod-eppd/02-fred-mod-eppd-apache.conf /etc/httpd/conf.d/
+/usr/sbin/semanage port -a -t http_port_t -p tcp 700
 
 %preun
 test ! -f /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf || rm /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf
