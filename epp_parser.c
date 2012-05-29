@@ -3002,6 +3002,7 @@ epp_parse_command(epp_context *epp_ctx,
 		return PARSER_EINTERNAL;
 	memcpy(cdata->xml_in, dumpedXML, dumpLength);
 	cdata->xml_in[dumpLength] = '\0';
+	xmlFree(dumpedXML);
 
         epplog(epp_ctx, EPP_DEBUG, "Request content dumped in %s encoding: %s",
             XML_IN_ENC, cdata->xml_in);
