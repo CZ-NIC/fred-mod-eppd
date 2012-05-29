@@ -141,29 +141,16 @@ ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, con
 
     if (value != NULL) {
         int old_length;
-        ccReg_RequestProperty *new_prop = ccReg_RequestProperty__alloc();
+        ccReg_RequestProperty new_prop;
 
-        if(new_prop == NULL) {
-            CORBA_free(c_props);
-            return NULL;
-        }
-
-        new_prop->name = wrap_str(name);
-        if (new_prop->name == NULL) {
-            CORBA_free(new_prop);
-            return NULL;
-        }
-        new_prop->value = wrap_str(value);
-        if (new_prop->value == NULL) {
-            CORBA_free(new_prop);
-            return NULL;
-        }
-        new_prop->output = output;
-        new_prop->child = child;
+        new_prop.name = name;
+        new_prop.value = value;
+        new_prop.output = output;
+        new_prop.child = child;
 
         old_length = c_props->_length;
         // this function already takes care of _length and _maximum, check orbit unittests :)
-        ORBit_sequence_append(c_props, new_prop);
+        ORBit_sequence_append(c_props, &new_prop);
 
         if (c_props->_length != old_length + 1) {
             CORBA_free(c_props);
@@ -191,7 +178,7 @@ ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props,
 {
     char str[12];
     int old_length;
-    ccReg_RequestProperty *new_prop;
+    ccReg_RequestProperty new_prop;
 
     if (c_props == NULL) {
         c_props = ccReg_RequestProperties__alloc();
@@ -212,28 +199,14 @@ ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props,
 
     snprintf(str, 12, "%i", value);
 
-    new_prop = ccReg_RequestProperty__alloc();
-
-    if (new_prop == NULL) {
-        return NULL;
-    }
-
-    new_prop->name = wrap_str(name);
-    if (new_prop->name == NULL) {
-        CORBA_free(new_prop);
-        return NULL;
-    }
-    new_prop->value = wrap_str(str);
-    if (new_prop->value == NULL) {
-        CORBA_free(new_prop);
-        return NULL;
-    }
-    new_prop->output = output;
-    new_prop->child = CORBA_FALSE;
+    new_prop.name = name;
+    new_prop.value = str;
+    new_prop.output = output;
+    new_prop.child = CORBA_FALSE;
 
     old_length = c_props->_length;
     // this function already takes care of _length and _maximum, check orbit unittests :)
-    ORBit_sequence_append(c_props, new_prop);
+    ORBit_sequence_append(c_props, &new_prop);
 
     if (c_props->_length != old_length + 1) {
         CORBA_free(c_props);
