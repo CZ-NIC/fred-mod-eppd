@@ -14,9 +14,9 @@ struct ccReg_RequestProperties;
 static const long LC_EPP = 3;
 
 /* functions for filling log properties */
-ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean output, CORBA_boolean child);
-ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child);
-ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value, CORBA_boolean output);
+ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean child);
+ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean child);
+ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value);
 
 int epp_log_close_message(epp_context *epp_ctx,
         service_Logger service,
@@ -42,19 +42,19 @@ int epp_log_new_message(epp_context *epp_ctx,
 /* end of prototypes for functions using CORBA cals or CORBA data structures */
 
 #define PUSH_PROPERTY(seq, name, value)								\
-	seq = epp_property_push(seq, name, value, CORBA_FALSE, CORBA_FALSE);	\
+	seq = epp_property_push(seq, name, value, CORBA_FALSE);	\
 	if(seq == NULL) {												\
 		return LOG_INTERNAL_ERROR;							\
 	}
 
 #define PUSH_PROPERTY_INT(seq, name, value)							\
-	seq = epp_property_push_int(seq, name, value, CORBA_FALSE);		\
+	seq = epp_property_push_int(seq, name, value);		\
 	if(seq == NULL) {												\
 		return LOG_INTERNAL_ERROR;							\
 	}
 
 #define PUSH_QHEAD(seq, list, name)									\
-	seq = epp_property_push_qhead(seq, list, name, CORBA_FALSE, CORBA_FALSE);	\
+	seq = epp_property_push_qhead(seq, list, name, CORBA_FALSE);	\
 	if(seq == NULL) {												\
 		return LOG_INTERNAL_ERROR;							\
 	}
@@ -83,7 +83,6 @@ static const int LOG_PROP_NAME_LENGTH = 50;
  * 					case a new data structure is allocated and returned)
  * @param list		list of strings
  * @param list_name	base name for the inserted properties
- * @param output 	whether the properties are related to output
  * @param child		true if the items in the list are children of the last property
  * 					with child = false
  *
@@ -91,14 +90,14 @@ static const int LOG_PROP_NAME_LENGTH = 50;
  *
  */
 
-ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean output, CORBA_boolean child)
+ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean child)
 {
 	if (list->count == 0) {
 		return c_props;
 	}
 
 	q_foreach(list) {
-		if ((c_props = epp_property_push(c_props, list_name, (char*)q_content(list), output, child)) == NULL) {
+		if ((c_props = epp_property_push(c_props, list_name, (char*)q_content(list), child)) == NULL) {
 			return NULL;
 		}
 	}
@@ -115,12 +114,11 @@ ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_prop
  * 					case a new data structure is allocated and returned)
  * @param name		property name
  * @param value		property value
- * @param output	whether the property is related to output
  * @param child 	true if the property is child to the last property with child = false
  *
  * @returns			NULL in case of an allocation error, modified c_props otherwise
  */
-ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean output, CORBA_boolean child)
+ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean child)
 {
     if (c_props == NULL) {
         c_props = ccReg_RequestProperties__alloc();
@@ -145,7 +143,6 @@ ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, con
 
         new_prop.name = name;
         new_prop.value = value;
-        new_prop.output = output;
         new_prop.child = child;
 
         old_length = c_props->_length;
@@ -169,12 +166,11 @@ ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, con
  * 					case a new data structure is allocated and returned)
  * @param name		property name
  * @param value		property integer value
- * @param output	true if this property is related to output (response), false otherwise
  *
  * @returns			NULL in case of an allocation error, modified c_props otherwise
  */
 
-ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value, CORBA_boolean output)
+ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value)
 {
     char str[12];
     int old_length;
@@ -201,7 +197,7 @@ ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props,
 
     new_prop.name = name;
     new_prop.value = str;
-    new_prop.output = output;
+
     new_prop.child = CORBA_FALSE;
 
     old_length = c_props->_length;
@@ -537,13 +533,13 @@ ccReg_RequestProperties *epp_property_push_valerr(ccReg_RequestProperties *c_pro
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "element");
-			if ((c_props = epp_property_push(c_props, str, value->value, CORBA_TRUE, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push(c_props, str, value->value, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "reason");
-			if ((c_props = epp_property_push(c_props, str, value->reason, CORBA_TRUE, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push(c_props, str, value->reason, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
@@ -577,13 +573,13 @@ ccReg_RequestProperties *epp_property_push_nsset(ccReg_RequestProperties *c_prop
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "name");
-			if ((c_props = epp_property_push(c_props, str, value->name, CORBA_FALSE, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push(c_props, str, value->name, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "addr");
-			if ((c_props = epp_property_push_qhead(c_props, &value->addr, str, CORBA_FALSE, CORBA_TRUE)) == NULL) {
+			if ((c_props = epp_property_push_qhead(c_props, &value->addr, str, CORBA_TRUE)) == NULL) {
 				return NULL;
 			}
 		}
@@ -614,25 +610,25 @@ ccReg_RequestProperties *epp_property_push_dnskey(ccReg_RequestProperties *c_pro
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "flags");
-			if ((c_props = epp_property_push_int(c_props, str, value->flags, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push_int(c_props, str, value->flags)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "protocol");
-			if ((c_props = epp_property_push_int(c_props, str, value->protocol, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push_int(c_props, str, value->protocol)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "alg");
-			if ((c_props = epp_property_push_int(c_props, str, value->alg, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push_int(c_props, str, value->alg)) == NULL) {
 				return NULL;
 			}
 
 			str[0] = '\0';
 			snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "publicKey");
-			if ((c_props = epp_property_push(c_props, str, value->public_key, CORBA_FALSE, CORBA_FALSE)) == NULL) {
+			if ((c_props = epp_property_push(c_props, str, value->public_key, CORBA_FALSE)) == NULL) {
 				return NULL;
 			}
 
@@ -654,19 +650,19 @@ ccReg_RequestProperties *epp_log_postal_info(ccReg_RequestProperties *p, epp_pos
 {
 	if(pi == NULL) return p;
 
-	p = epp_property_push(p, "pi.name", pi->name, CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "pi.name", pi->name, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.organization", pi->org, CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "pi.organization", pi->org, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push_qhead(p, &pi->streets, "pi.street", CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push_qhead(p, &pi->streets, "pi.street", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.city", pi->city, CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "pi.city", pi->city, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.state", pi->sp, CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "pi.state", pi->sp, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.postalCode", pi->pc, CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "pi.postalCode", pi->pc, CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "pi.countryCode", pi->cc, CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "pi.countryCode", pi->cc, CORBA_FALSE);
 	if (p == NULL) return p;
 
 	return p;
@@ -683,32 +679,32 @@ ccReg_RequestProperties *epp_log_postal_info(ccReg_RequestProperties *p, epp_pos
 ccReg_RequestProperties *epp_log_disclose_info(ccReg_RequestProperties *p, epp_discl *ed)
 {
 	if(ed->flag == 1) {
-		p = epp_property_push(p, "discl.policy", "private", CORBA_FALSE, CORBA_FALSE);
+		p = epp_property_push(p, "discl.policy", "private", CORBA_FALSE);
 	} else if(ed->flag == 0) {
-		p = epp_property_push(p, "discl.policy", "public", CORBA_FALSE, CORBA_FALSE);
+		p = epp_property_push(p, "discl.policy", "public", CORBA_FALSE);
 	} else {
-		p = epp_property_push(p, "discl.policy", "no exceptions", CORBA_FALSE, CORBA_FALSE);
+		p = epp_property_push(p, "discl.policy", "no exceptions", CORBA_FALSE);
 	}
 
 	if (p == NULL) return p;
 
-	p = epp_property_push(p, "discl.name", ed->name ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "discl.name", ed->name ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.org", ed->org ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "discl.org", ed->org ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.addr", ed->addr ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "discl.addr", ed->addr ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.voice", ed->voice ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "discl.voice", ed->voice ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.fax", ed->fax ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "discl.fax", ed->fax ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.email", ed->email ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "discl.email", ed->email ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.vat", ed->vat ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "discl.vat", ed->vat ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.ident", ed->ident ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "discl.ident", ed->ident ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
-	p = epp_property_push(p, "discl.notifyEmail", ed->notifyEmail ? "true" : "false", CORBA_FALSE, CORBA_FALSE);
+	p = epp_property_push(p, "discl.notifyEmail", ed->notifyEmail ? "true" : "false", CORBA_FALSE);
 	if (p == NULL) return p;
 
 	return p;
@@ -842,12 +838,12 @@ static void log_props_out_check(ccReg_RequestProperties **c_props, const epp_com
 
         avail = q_content(&ec->avails);
 
-        *c_props = epp_property_push(*c_props, "handle", q_content(&ec->ids), CORBA_TRUE, CORBA_FALSE);
+        *c_props = epp_property_push(*c_props, "handle", q_content(&ec->ids), CORBA_FALSE);
         if(avail->avail) {
-	    *c_props = epp_property_push(*c_props, "available", "true", CORBA_TRUE, CORBA_TRUE);
+	    *c_props = epp_property_push(*c_props, "available", "true", CORBA_TRUE);
         } else {
-	    *c_props = epp_property_push(*c_props, "available", "false", CORBA_TRUE, CORBA_TRUE);
-	    *c_props = epp_property_push(*c_props, "reason", avail->reason, CORBA_TRUE, CORBA_TRUE);
+	    *c_props = epp_property_push(*c_props, "available", "false", CORBA_TRUE);
+	    *c_props = epp_property_push(*c_props, "reason", avail->reason, CORBA_TRUE);
         }
         
         q_next(&ec->avails);
@@ -1317,8 +1313,8 @@ static void log_props_default_extcmd_response(ccReg_RequestProperties **c_props,
                     epp_zonecredit *zonecredit;
 
                     zonecredit = q_content(&credit_info->zonecredits);
-                    *c_props = epp_property_push(*c_props, "zone", zonecredit->zone, CORBA_TRUE, CORBA_FALSE);
-                    *c_props = epp_property_push(*c_props, "credit", zonecredit->credit, CORBA_TRUE, CORBA_TRUE);
+                    *c_props = epp_property_push(*c_props, "zone", zonecredit->zone, CORBA_FALSE);
+                    *c_props = epp_property_push(*c_props, "credit", zonecredit->credit, CORBA_TRUE);
             }
             
             break;
@@ -1330,8 +1326,8 @@ static void log_props_default_extcmd_response(ccReg_RequestProperties **c_props,
         case EPP_INFO_KEYSETS_BY_CONTACT:
             result = cdata->data;
 
-            *c_props = epp_property_push(*c_props, "handle", result->handle, CORBA_TRUE, CORBA_FALSE);
-            *c_props = epp_property_push_int(*c_props, "count", result->count, CORBA_TRUE);
+            *c_props = epp_property_push(*c_props, "handle", result->handle, CORBA_FALSE);
+            *c_props = epp_property_push_int(*c_props, "count", result->count);
             break;
         default:
             // other values were handled in log_props_default_extcmd
@@ -1471,17 +1467,17 @@ int log_epp_response(epp_context *epp_ctx, service_Logger *log_service, qhead *v
 	errmsg[0] = '\0';
 	// output properties
 	if (cdata != NULL) {
-                c_props = epp_property_push(c_props, "svTRID", cdata->svTRID, CORBA_TRUE, CORBA_FALSE);
+                c_props = epp_property_push(c_props, "svTRID", cdata->svTRID, CORBA_FALSE);
                 if (c_props == NULL) {
                     return LOG_INTERNAL_ERROR;
                 }
 
-		c_props = epp_property_push_int(c_props, "rc", cdata->rc, CORBA_TRUE);
+		c_props = epp_property_push_int(c_props, "rc", cdata->rc);
 		if (c_props == NULL) {
 			return LOG_INTERNAL_ERROR;
 		}
 
-		c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_TRUE, CORBA_FALSE);
+		c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_FALSE);
 		if (c_props == NULL) {
 			return LOG_INTERNAL_ERROR;
 		}
@@ -1494,19 +1490,19 @@ int log_epp_response(epp_context *epp_ctx, service_Logger *log_service, qhead *v
 
                 } else if(cdata->type ==  EPP_CREATE_CONTACT) {
                         epps_create_contact *cc = cdata->data;
-                        c_props = epp_property_push(c_props, "creationDate", cc->crDate, CORBA_TRUE, CORBA_FALSE);
+                        c_props = epp_property_push(c_props, "creationDate", cc->crDate, CORBA_FALSE);
 
                 } else if(cdata->type ==  EPP_CREATE_DOMAIN) {
                         epps_create_domain *cd = cdata->data;
-                        c_props = epp_property_push(c_props, "creationDate", cd->crDate, CORBA_TRUE, CORBA_FALSE);
+                        c_props = epp_property_push(c_props, "creationDate", cd->crDate, CORBA_FALSE);
 
                 } else if(cdata->type ==  EPP_CREATE_KEYSET) {
                         epps_create_keyset *ck = cdata->data;
-                        c_props = epp_property_push(c_props, "creationDate", ck->crDate, CORBA_TRUE, CORBA_FALSE);
+                        c_props = epp_property_push(c_props, "creationDate", ck->crDate, CORBA_FALSE);
 
                 } else if(cdata->type ==  EPP_CREATE_NSSET) {
                         epps_create_nsset *cn = cdata->data;
-                        c_props = epp_property_push(c_props, "creationDate", cn->crDate, CORBA_TRUE, CORBA_FALSE);
+                        c_props = epp_property_push(c_props, "creationDate", cn->crDate, CORBA_FALSE);
 
                 }
 
