@@ -48,6 +48,9 @@ DX_INIT_DOXYGEN(fred-mod-eppd, doxy.conf, [doc])
 # init automake
 AM_INIT_AUTOMAKE([-Wall -Werror])
 
+# fix automake 1.12 moan
+m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
+
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL
