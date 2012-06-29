@@ -1906,8 +1906,8 @@ epp_call_poll_req(epp_context *epp_ctx,
 			poll_req->msg.lc.zone = unwrap_str(epp_ctx->pool,
 					lc->zone, &cerrno);
 			if (cerrno != 0) goto error;
-			poll_req->msg.lc.limit = lc->limit;
-			poll_req->msg.lc.credit = lc->credit;
+			poll_req->msg.lc.limit = unwrap_str(epp_ctx->pool, lc->limit, &cerrno);
+			poll_req->msg.lc.credit = unwrap_str(epp_ctx->pool, lc->credit, &cerrno);
 			break;
 			}
         case ccReg_polltype_request_fee_info:

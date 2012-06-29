@@ -603,8 +603,8 @@ typedef struct {
 		}tc; /**< Structure with results of technical tests. */
 		struct {
 			char	*zone;
-			unsigned long limit;
-			unsigned long credit;
+			char    *limit;
+			char    *credit;
 		}lc; /**< Low credit structure. */
         struct {
             char *period_from;

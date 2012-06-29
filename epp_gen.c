@@ -719,7 +719,6 @@ gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
 			break;
 		case pt_lowcredit:
 			{
-			char	price[50];
 
 			START_ELEMENT(writer, simple_err, "fred:lowCreditData");
 			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:fred",
@@ -736,18 +735,14 @@ gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
 			START_ELEMENT(writer, simple_err, "fred:limit");
 			WRITE_ELEMENT(writer, simple_err, "fred:zone",
 					msgdata->msg.lc.zone);
-			snprintf(price, 49, "%lu.%02lu",
-					msgdata->msg.lc.limit / 100,
-					msgdata->msg.lc.limit % 100);
-			WRITE_ELEMENT(writer, simple_err, "fred:credit", price);
+
+			WRITE_ELEMENT(writer, simple_err, "fred:credit", msgdata->msg.lc.limit);
 			END_ELEMENT(writer, simple_err); /* limit */
 			START_ELEMENT(writer, simple_err, "fred:credit");
 			WRITE_ELEMENT(writer, simple_err, "fred:zone",
 					msgdata->msg.lc.zone);
-			snprintf(price, 49, "%lu.%02lu",
-					msgdata->msg.lc.credit / 100,
-					msgdata->msg.lc.credit % 100);
-			WRITE_ELEMENT(writer, simple_err, "fred:credit", price);
+
+			WRITE_ELEMENT(writer, simple_err, "fred:credit", msgdata->msg.lc.credit);
 			END_ELEMENT(writer, simple_err); /* credit */
 			END_ELEMENT(writer, simple_err); /* lowCreditData */
 			break;
