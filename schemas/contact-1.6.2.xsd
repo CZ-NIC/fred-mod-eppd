@@ -386,7 +386,7 @@
         <element name="id" type="fredcom:objIDType"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="contact:statusType"
-         minOccurs="0" maxOccurs="4"/>
+         minOccurs="0" maxOccurs="10"/>
         <element name="postalInfo" type="contact:postalInfoReadType"/>
         <element name="voice" type="contact:e164StringType"
          minOccurs="0"/>
@@ -431,6 +431,10 @@
       </simpleContent>
     </complexType>
 
+    <!--
+    Do not forget update maxOccurs attribute in status element in infDataType
+    when making changes.
+    -->
     <simpleType name="statusValueType">
       <restriction base="token">
         <enumeration value="ok"/>
@@ -441,6 +445,8 @@
         <enumeration value="deleteCandidate"/>
         <enumeration value="conditionallyIdentifiedContact"/>
         <enumeration value="identifiedContact"/>
+        <enumeration value="validatedContact"/>
+        <enumeration value="mojeidContact"/>
       </restriction>
     </simpleType>
 
