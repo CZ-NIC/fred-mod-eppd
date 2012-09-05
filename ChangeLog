@@ -1,3 +1,10 @@
+2012-09-06 Juraj Vicenik (2.10.0)
+
+	* logger - removed output flag from properties interface
+
+	* low credit poll message - credit and creditlimit are now passed as
+	  strings
+
 2012-05-11 Juraj Vicenik (2.9.0)
 
 	* fix - %llu format string in epp log
