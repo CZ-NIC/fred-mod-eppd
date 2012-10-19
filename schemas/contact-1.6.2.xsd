@@ -464,6 +464,7 @@
     -->
     <element name="trnData" type="contact:handleDateT"/>
     <element name="idleDelData" type="contact:idleDelDataT"/>
+    <element name="updateData" type="contact:updateDataT"/>
 
     <complexType name="handleDateT">
       <sequence>
@@ -476,6 +477,21 @@
     <complexType name="idleDelDataT">
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
+      </sequence>
+    </complexType>
+
+    <simpleType name="trIDStringType">
+      <restriction base="token">
+        <minLength value="3"/>
+        <maxLength value="64"/>
+      </restriction>
+    </simpleType>
+
+    <complexType name="updateDataT">
+      <sequence>
+        <element name="opTRID" type="contact:trIDStringType"/>
+        <element name="oldData" type="contact:infDataType"/>
+        <element name="newData" type="contact:infDataType"/>
       </sequence>
     </complexType>
 

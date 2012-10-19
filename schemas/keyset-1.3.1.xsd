@@ -281,6 +281,7 @@
     <element name="trnData" type="keyset:handleDateT"/>
     <element name="idleDelData" type="keyset:idleDelDataT"/>
     <element name="testData" type="keyset:testDataT"/>
+    <element name="updateData" type="keyset:updateDataT"/>
 
     <complexType name="handleDateT">
       <sequence>
@@ -323,5 +324,13 @@
         <maxLength value="64"/>
       </restriction>
     </simpleType>
+
+    <complexType name="updateDataT">
+      <sequence>
+        <element name="opTRID" type="keyset:trIDStringType"/>
+        <element name="oldData" type="keyset:infDataType"/>
+        <element name="newData" type="keyset:infDataType"/>
+      </sequence>
+    </complexType>
 
   </schema>

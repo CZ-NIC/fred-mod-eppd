@@ -285,6 +285,7 @@
     <element name="trnData" type="nsset:handleDateT"/>
     <element name="idleDelData" type="nsset:idleDelDataT"/>
     <element name="testData" type="nsset:testDataT"/>
+    <element name="updateData" type="nsset:updateDataT"/>
 
     <complexType name="handleDateT">
       <sequence>
@@ -327,5 +328,13 @@
         <maxLength value="64"/>
       </restriction>
     </simpleType>
+
+    <complexType name="updateDataT">
+      <sequence>
+        <element name="opTRID" type="nsset:trIDStringType"/>
+        <element name="oldData" type="nsset:infDataType"/>
+        <element name="newData" type="nsset:infDataType"/>
+      </sequence>
+    </complexType>
 
   </schema>

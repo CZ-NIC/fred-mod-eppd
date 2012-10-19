@@ -350,6 +350,7 @@
     <element name="expData" type="domain:expDataT"/>
     <element name="dnsOutageData" type="domain:dnsOutageDataT"/>
     <element name="delData" type="domain:delDataT"/>
+    <element name="updateData" type="domain:updateDataT"/>
 
     <complexType name="handleDateT">
       <sequence>
@@ -384,6 +385,21 @@
       <sequence>
         <element name="name" type="eppcom:labelType"/>
         <element name="exDate" type="date"/>
+      </sequence>
+    </complexType>
+
+    <simpleType name="trIDStringType">
+      <restriction base="token">
+        <minLength value="3"/>
+        <maxLength value="64"/>
+      </restriction>
+    </simpleType>
+
+    <complexType name="updateDataT">
+      <sequence>
+        <element name="opTRID" type="domain:trIDStringType"/>
+        <element name="oldData" type="domain:infDataType"/>
+        <element name="newData" type="domain:infDataType"/>
       </sequence>
     </complexType>
 
