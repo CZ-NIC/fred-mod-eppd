@@ -190,9 +190,9 @@
     </complexType>
 
     <!--
-    XXX: temporarily we will have different discloseType for info command result
+      dislose type for info and update commands - allow disclose address
     -->
-    <complexType name="infDiscloseType">
+    <complexType name="infupdDiscloseType">
       <sequence>
         <element name="addr" minOccurs="0"/>
         <element name="voice" minOccurs="0"/>
@@ -278,7 +278,7 @@
          minOccurs="0"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
-        <element name="disclose" type="contact:discloseType"
+        <element name="disclose" type="contact:infupdDiscloseType"
          minOccurs="0"/>
         <element name="vat" type="contact:vatT"
          minOccurs="0"/>
@@ -405,7 +405,7 @@
          minOccurs="0"/>
         <element name="authInfo" type="fredcom:authInfoType"
          minOccurs="0"/>
-        <element name="disclose" type="contact:infDiscloseType"
+        <element name="disclose" type="contact:infupdDiscloseType"
          minOccurs="0"/>
         <element name="vat" type="contact:vatT"
          minOccurs="0"/>
