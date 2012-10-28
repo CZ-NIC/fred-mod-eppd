@@ -47,7 +47,7 @@
     -->
     <complexType name="crType">
       <sequence>
-        <element name="id" type="fredcom:objIDType"/>
+        <element name="id" type="fredcom:objIDCreateType"/>
         <element name="dnskey" type="keyset:dnskeyT"
          minOccurs="0" maxOccurs="10"/>
         <element name="tech" type="fredcom:objIDType"

@@ -107,7 +107,7 @@
     -->
     <complexType name="createType">
       <sequence>
-        <element name="id" type="fredcom:objIDType"/>
+        <element name="id" type="fredcom:objIDCreateType"/>
         <element name="postalInfo" type="contact:postalInfoType"/>
         <element name="voice" type="contact:e164StringType"
          minOccurs="0"/>

@@ -29,6 +29,14 @@
       </restriction>
     </simpleType>
 
+    <simpleType name="objIDCreateType">
+      <restriction base="token">
+        <pattern value="[a-zA-Z0-9](-?[a-zA-Z0-9])*"/>
+        <minLength value="1"/>
+        <maxLength value="30"/>
+        </restriction>
+    </simpleType>
+
     <!--
     Message of unbounded length (now used only in check-reason)
     -->
