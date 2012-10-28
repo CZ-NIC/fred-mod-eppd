@@ -1,3 +1,11 @@
+2012-10-28 Jiri Sadek (version 2.4.0)
+
+	* update contact.xsd, domain.xsd, nsset.xsd, keyset.xsd
+	  - add poll message about object update (info data about
+		new and old object)
+	  - new state can appear in info result:
+	     - validatedContact
+
 2012-04-30 Jiri Sadek (version 2.3.1)
 
 	* update contact.xsd
