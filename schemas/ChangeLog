@@ -3,8 +3,15 @@
 	* update contact.xsd, domain.xsd, nsset.xsd, keyset.xsd
 	  - add poll message about object update (info data about
 		new and old object)
+
+	* update contact.xsd, nsset.xsd, keyset.xsd
+	  - new object handles restricted by type objIDCreateType
+
+	* update contact.xsd
 	  - new state can appear in info result:
 	     - validatedContact
+	  - disclose address change enabled in update contact command
+	     - more checks done in registry
 
 2012-04-30 Jiri Sadek (version 2.3.1)
 
