@@ -3,6 +3,7 @@
 	* update contact.xsd, domain.xsd, nsset.xsd, keyset.xsd
 	  - add poll message about object update (info data about
 		new and old object)
+	  - fix number of visible states
 
 	* update contact.xsd, nsset.xsd, keyset.xsd
 	  - new object handles restricted by type objIDCreateType
