@@ -1,4 +1,4 @@
-2012-10-28 Jiri Sadek (version 2.4.0)
+2012-10-28 Jiri Sadek (version 2.3.2)
 
 	* update contact.xsd, domain.xsd, nsset.xsd, keyset.xsd
 	  - add poll message about object update (info data about

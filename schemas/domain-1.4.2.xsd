@@ -16,7 +16,7 @@
     <import namespace="urn:ietf:params:xml:ns:eppcom-1.0"
             schemaLocation="eppcom-1.0.xsd"/>
     <import namespace="http://www.nic.cz/xml/epp/fredcom-1.2"
-            schemaLocation="fredcom-1.2.0.xsd"/>
+            schemaLocation="fredcom-1.2.1.xsd"/>
 
     <annotation>
       <documentation>
