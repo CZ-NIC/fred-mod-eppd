@@ -253,7 +253,7 @@
         <element name="name" type="eppcom:labelType"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="domain:statusType"
-         minOccurs="0" maxOccurs="9"/>
+         minOccurs="0" maxOccurs="13"/>
         <!--
         Optional registrant is a hack used to hide indentity of ENUM domain
         holder.

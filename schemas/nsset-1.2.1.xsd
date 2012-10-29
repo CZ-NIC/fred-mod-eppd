@@ -222,7 +222,7 @@
         <element name="id" type="fredcom:objIDType"/>
         <element name="roid" type="eppcom:roidType"/>
         <element name="status" type="nsset:statusType"
-         minOccurs="0" maxOccurs="4"/>
+         minOccurs="0" maxOccurs="6"/>
         <element name="clID" type="eppcom:clIDType"/>
         <element name="crID" type="eppcom:clIDType"
          minOccurs="0"/>
