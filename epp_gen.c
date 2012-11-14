@@ -336,12 +336,8 @@ simple_err:
  * @return         1 if OK, 0 in case of failure.
  */
 static char
-gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
+gen_info_domain(xmlTextWriterPtr writer, epps_info_domain *info_domain)
 {
-	epps_info_domain	*info_domain;
-
-	info_domain = cdata->data;
-
 	START_ELEMENT(writer, simple_err, "domain:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_DOMAIN);
@@ -769,6 +765,26 @@ gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
             END_ELEMENT(writer, simple_err);
             break;
             }
+		case pt_update_domain:
+			{
+			START_ELEMENT(writer, simple_err, "domain:updateData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain",
+					NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:opTRID",
+					msgdata->msg.upd.optrid);
+			START_ELEMENT(writer, simple_err, "domain:oldData");
+			if (!gen_info_domain(writer, &msgdata->msg.upd.old_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			START_ELEMENT(writer, simple_err, "domain:newData");
+			if (!gen_info_domain(writer, &msgdata->msg.upd.new_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			END_ELEMENT(writer, simple_err);
+			break;
+			}
 		default:
 			START_ELEMENT(writer, simple_err, "fred:lowCreditData");
 			break;
@@ -1198,7 +1214,8 @@ epp_gen_response(epp_context *epp_ctx,
 			break;
 		}
 		case EPP_INFO_DOMAIN:
-			if (!gen_info_domain(writer, cdata)) goto simple_err;
+			if (!gen_info_domain(writer, (epps_info_domain*)cdata->data))
+                                goto simple_err;
 			break;
 		case EPP_INFO_CONTACT:
 			if (!gen_info_contact(writer, cdata)) goto simple_err;
