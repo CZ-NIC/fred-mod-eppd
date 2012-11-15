@@ -452,12 +452,8 @@ simple_err:
  * @return         1 if OK, 0 in case of failure.
  */
 static char
-gen_info_keyset(xmlTextWriterPtr writer, epp_command_data *cdata)
+gen_info_keyset(xmlTextWriterPtr writer, epps_info_keyset *info_keyset)
 {
-	epps_info_keyset	*info_keyset;
-
-	info_keyset = cdata->data;
-
 	START_ELEMENT(writer, simple_err, "keyset:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:keyset", NS_KEYSET);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_KEYSET);
@@ -797,6 +793,26 @@ gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
 			END_ELEMENT(writer, simple_err);
 			START_ELEMENT(writer, simple_err, "nsset:newData");
 			if (!gen_info_nsset(writer, &msgdata->msg.upn.new_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			END_ELEMENT(writer, simple_err);
+			break;
+			}
+		case pt_update_keyset:
+			{
+			START_ELEMENT(writer, simple_err, "keyset:updateData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:keyset",
+					NS_KEYSET);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_KEYSET);
+			WRITE_ELEMENT(writer, simple_err, "keyset:opTRID",
+					msgdata->msg.upk.optrid);
+			START_ELEMENT(writer, simple_err, "keyset:oldData");
+			if (!gen_info_keyset(writer, &msgdata->msg.upk.old_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			START_ELEMENT(writer, simple_err, "keyset:newData");
+			if (!gen_info_keyset(writer, &msgdata->msg.upk.new_data))
 				goto simple_err;
 			END_ELEMENT(writer, simple_err);
 			END_ELEMENT(writer, simple_err);
@@ -1242,7 +1258,8 @@ epp_gen_response(epp_context *epp_ctx,
                                 goto simple_err;
 			break;
 		case EPP_INFO_KEYSET:
-			if (!gen_info_keyset(writer, cdata)) goto simple_err;
+			if (!gen_info_keyset(writer, (epps_info_keyset*)cdata->data))
+                                goto simple_err;
 			break;
 
 		/* transform commands with <resData> element */
