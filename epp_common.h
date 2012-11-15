@@ -470,7 +470,8 @@ typedef enum {
 	pt_delete_domain,    /**< Domain was deleted. */
 	pt_lowcredit,        /**< Credit of registrator is low. */
 	pt_request_fee_info, /**< Requests price/count info */
-	pt_update_domain     /**< Domain changed */
+	pt_update_domain,    /**< Domain changed */
+	pt_update_nsset      /**< NSSet changed */
 }epp_pollType;
 
 /** Structure containing result of one technical test. */
@@ -620,6 +621,12 @@ typedef struct {
 			epps_info_domain old_data;
 			epps_info_domain new_data;
 		}upd; /**< Update domain info */
+		struct {
+			char *optrid;
+			unsigned long long pollid;
+			epps_info_nsset old_data;
+			epps_info_nsset new_data;
+		}upn; /**< Update nsset info */
 	}msg; 	/**< Message data. */
 }epps_poll_req;
 

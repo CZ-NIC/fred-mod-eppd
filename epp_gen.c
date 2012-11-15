@@ -389,12 +389,9 @@ simple_err:
  * @return         1 if OK, 0 in case of failure.
  */
 static char
-gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
+gen_info_nsset(xmlTextWriterPtr writer, epps_info_nsset *info_nsset)
 {
-	epps_info_nsset	*info_nsset;
 	char	level[3]; /* sufficient for reportlevel */
-
-	info_nsset = cdata->data;
 
 	START_ELEMENT(writer, simple_err, "nsset:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
@@ -780,6 +777,26 @@ gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
 			END_ELEMENT(writer, simple_err);
 			START_ELEMENT(writer, simple_err, "domain:newData");
 			if (!gen_info_domain(writer, &msgdata->msg.upd.new_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			END_ELEMENT(writer, simple_err);
+			break;
+			}
+		case pt_update_nsset:
+			{
+			START_ELEMENT(writer, simple_err, "nsset:updateData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset",
+					NS_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_NSSET);
+			WRITE_ELEMENT(writer, simple_err, "nsset:opTRID",
+					msgdata->msg.upn.optrid);
+			START_ELEMENT(writer, simple_err, "nsset:oldData");
+			if (!gen_info_nsset(writer, &msgdata->msg.upn.old_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			START_ELEMENT(writer, simple_err, "nsset:newData");
+			if (!gen_info_nsset(writer, &msgdata->msg.upn.new_data))
 				goto simple_err;
 			END_ELEMENT(writer, simple_err);
 			END_ELEMENT(writer, simple_err);
@@ -1221,7 +1238,8 @@ epp_gen_response(epp_context *epp_ctx,
 			if (!gen_info_contact(writer, cdata)) goto simple_err;
 			break;
 		case EPP_INFO_NSSET:
-			if (!gen_info_nsset(writer, cdata)) goto simple_err;
+			if (!gen_info_nsset(writer, (epps_info_nsset*)cdata->data))
+                                goto simple_err;
 			break;
 		case EPP_INFO_KEYSET:
 			if (!gen_info_keyset(writer, cdata)) goto simple_err;

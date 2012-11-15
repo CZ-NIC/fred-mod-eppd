@@ -1341,68 +1341,23 @@ epp_call_info_domain(epp_context *epp_ctx,
 	}
 }
 
+
 /**
- * EPP info nsset.
+ * Helper function for copy nsset data from corba to internal structure
  *
- * @param epp_ctx Epp context.
- * @param service EPP service.
- * @param loginid Session identifier.
- * @param request_id  fred-logd request ID
- * @param cdata   Data from xml request.
- * @return        Status.
+ * @param epp_ctx     Epp context
+ * @param info_domain Destination nsset data structure
+ * @param c_domain    Source nsset data structure
+ * @param ev          Corba exception
+ *
  */
-static corba_status
-epp_call_info_nsset(epp_context *epp_ctx,
-		service_EPP service,
-		unsigned long long loginid,
-		const ccReg_TID request_id,
-		epp_command_data *cdata)
+int info_nsset_data_copy(
+		epp_context *epp_ctx,
+		epps_info_nsset *info_nsset,
+		ccReg_NSSet *c_nsset,
+		CORBA_Environment *ev)
 {
-	CORBA_Environment ev[1];
-	ccReg_EppParams *c_params = NULL;
-	ccReg_NSSet	*c_nsset;
-	ccReg_Response	*response;
-	epps_info_nsset	*info_nsset;
-	int	i, retr, cerrno;
-
-	info_nsset = cdata->data;
-	/*
-	 * Input parameters:
-	 *    id (a)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_contact (*)
-	 */
-	assert(info_nsset->id);
-	assert(cdata->xml_in);
-	c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
-	if(c_params == NULL) {
-	    return CORBA_INT_ERROR;
-	}
-
-	for (retr = 0; retr < MAX_RETRIES; retr++) {
-		if (retr != 0) CORBA_exception_free(ev);
-		CORBA_exception_init(ev);
-
-		/* get information about nsset */
-		response = ccReg_EPP_NSSetInfo((ccReg_EPP) service,
-				info_nsset->id,
-				&c_nsset,
-				c_params,
-				ev);
-
-		/* if COMM_FAILURE exception is not raised quit retry loop */
-		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
-			break;
-		usleep(RETR_SLEEP);
-	}
-	CORBA_free(c_params);
-
-	/* if it is exception then return */
-	if (raised_exception(ev))
-		return handle_exception(epp_ctx, cdata, ev);
+	int i, cerrno;
 
 	CLEAR_CERRNO(cerrno);
 
@@ -1489,13 +1444,87 @@ epp_call_info_nsset(epp_context *epp_ctx,
 			goto error;
 	}
 
-	CORBA_free(c_nsset);
-	return epilog_success(epp_ctx, cdata, response);
+	return 1;
 
 error:
-	CORBA_free(c_nsset);
-	CORBA_free(response);
-	return CORBA_INT_ERROR;
+	return 0;
+}
+
+
+/**
+ * EPP info nsset.
+ *
+ * @param epp_ctx Epp context.
+ * @param service EPP service.
+ * @param loginid Session identifier.
+ * @param request_id  fred-logd request ID
+ * @param cdata   Data from xml request.
+ * @return        Status.
+ */
+static corba_status
+epp_call_info_nsset(epp_context *epp_ctx,
+		service_EPP service,
+		unsigned long long loginid,
+		const ccReg_TID request_id,
+		epp_command_data *cdata)
+{
+	CORBA_Environment ev[1];
+	ccReg_EppParams *c_params = NULL;
+	ccReg_NSSet	*c_nsset;
+	ccReg_Response	*response;
+	epps_info_nsset	*info_nsset;
+	int	i, retr, cerrno;
+
+	info_nsset = cdata->data;
+	/*
+	 * Input parameters:
+	 *    id (a)
+	 *    loginid
+	 *    c_clTRID (*)
+	 *    xml_in (a)
+	 * Output parameters:
+	 *    c_contact (*)
+	 */
+	assert(info_nsset->id);
+	assert(cdata->xml_in);
+	c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
+	if(c_params == NULL) {
+	    return CORBA_INT_ERROR;
+	}
+
+	for (retr = 0; retr < MAX_RETRIES; retr++) {
+		if (retr != 0) CORBA_exception_free(ev);
+		CORBA_exception_init(ev);
+
+		/* get information about nsset */
+		response = ccReg_EPP_NSSetInfo((ccReg_EPP) service,
+				info_nsset->id,
+				&c_nsset,
+				c_params,
+				ev);
+
+		/* if COMM_FAILURE exception is not raised quit retry loop */
+		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+			break;
+		usleep(RETR_SLEEP);
+	}
+	CORBA_free(c_params);
+
+	/* if it is exception then return */
+	if (raised_exception(ev))
+		return handle_exception(epp_ctx, cdata, ev);
+
+	if (info_nsset_data_copy(epp_ctx, info_nsset, c_nsset, ev) == 1)
+	{
+		CORBA_free(c_nsset);
+		return epilog_success(epp_ctx, cdata, response);
+	}
+	else
+	{
+		CORBA_free(c_nsset);
+		CORBA_free(response);
+		return CORBA_INT_ERROR;
+	}
 }
 
 /**
@@ -1987,6 +2016,49 @@ epp_call_poll_req(epp_context *epp_ctx,
 				goto error;
 			}
 			if (info_domain_data_copy(epp_ctx, &poll_req->msg.upd.new_data,
+						c_new_data, ev) != 1)
+			{
+				CORBA_free(c_old_data);
+				CORBA_free(c_new_data);
+				goto error;
+			}
+
+			CORBA_free(c_old_data);
+			CORBA_free(c_new_data);
+			break;
+			}
+		case ccReg_polltype_update_nsset:
+			{
+			ccReg_NSSet *c_old_data, *c_new_data;
+
+			ccReg_PollMsg_Update *up =
+				(ccReg_PollMsg_Update *) c_mesg->_value;
+			poll_req->type = pt_update_nsset;
+			poll_req->msg.upn.optrid = unwrap_str(epp_ctx->pool,
+					up->opTRID, &cerrno);
+			if (cerrno != 0) goto error;
+			poll_req->msg.upn.pollid = up->pollID;
+
+			/* another corba call for domain data details */
+			CORBA_exception_init(ev);
+			c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
+
+			ccReg_EPP_PollRequestGetUpdateNSSetDetails((ccReg_EPP) service,
+					up->pollID, &c_old_data, &c_new_data, c_params, ev);
+
+			CORBA_free(c_params);
+			if (raised_exception(ev))
+				return handle_exception(epp_ctx, cdata, ev);
+			/* end of corba call */
+
+			if (info_nsset_data_copy(epp_ctx, &poll_req->msg.upn.old_data,
+						c_old_data, ev) != 1)
+			{
+				CORBA_free(c_old_data);
+				CORBA_free(c_new_data);
+				goto error;
+			}
+			if (info_nsset_data_copy(epp_ctx, &poll_req->msg.upn.new_data,
 						c_new_data, ev) != 1)
 			{
 				CORBA_free(c_old_data);
