@@ -336,12 +336,8 @@ simple_err:
  * @return         1 if OK, 0 in case of failure.
  */
 static char
-gen_info_domain(xmlTextWriterPtr writer, epp_command_data *cdata)
+gen_info_domain(xmlTextWriterPtr writer, epps_info_domain *info_domain)
 {
-	epps_info_domain	*info_domain;
-
-	info_domain = cdata->data;
-
 	START_ELEMENT(writer, simple_err, "domain:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_DOMAIN);
@@ -393,12 +389,9 @@ simple_err:
  * @return         1 if OK, 0 in case of failure.
  */
 static char
-gen_info_nsset(xmlTextWriterPtr writer, epp_command_data *cdata)
+gen_info_nsset(xmlTextWriterPtr writer, epps_info_nsset *info_nsset)
 {
-	epps_info_nsset	*info_nsset;
 	char	level[3]; /* sufficient for reportlevel */
-
-	info_nsset = cdata->data;
 
 	START_ELEMENT(writer, simple_err, "nsset:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset", NS_NSSET);
@@ -459,12 +452,8 @@ simple_err:
  * @return         1 if OK, 0 in case of failure.
  */
 static char
-gen_info_keyset(xmlTextWriterPtr writer, epp_command_data *cdata)
+gen_info_keyset(xmlTextWriterPtr writer, epps_info_keyset *info_keyset)
 {
-	epps_info_keyset	*info_keyset;
-
-	info_keyset = cdata->data;
-
 	START_ELEMENT(writer, simple_err, "keyset:infData");
 	WRITE_ATTRIBUTE(writer, simple_err, "xmlns:keyset", NS_KEYSET);
 	WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_KEYSET);
@@ -769,6 +758,66 @@ gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
             END_ELEMENT(writer, simple_err);
             break;
             }
+		case pt_update_domain:
+			{
+			START_ELEMENT(writer, simple_err, "domain:updateData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain",
+					NS_DOMAIN);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_DOMAIN);
+			WRITE_ELEMENT(writer, simple_err, "domain:opTRID",
+					msgdata->msg.upd.optrid);
+			START_ELEMENT(writer, simple_err, "domain:oldData");
+			if (!gen_info_domain(writer, &msgdata->msg.upd.old_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			START_ELEMENT(writer, simple_err, "domain:newData");
+			if (!gen_info_domain(writer, &msgdata->msg.upd.new_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			END_ELEMENT(writer, simple_err);
+			break;
+			}
+		case pt_update_nsset:
+			{
+			START_ELEMENT(writer, simple_err, "nsset:updateData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:nsset",
+					NS_NSSET);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_NSSET);
+			WRITE_ELEMENT(writer, simple_err, "nsset:opTRID",
+					msgdata->msg.upn.optrid);
+			START_ELEMENT(writer, simple_err, "nsset:oldData");
+			if (!gen_info_nsset(writer, &msgdata->msg.upn.old_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			START_ELEMENT(writer, simple_err, "nsset:newData");
+			if (!gen_info_nsset(writer, &msgdata->msg.upn.new_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			END_ELEMENT(writer, simple_err);
+			break;
+			}
+		case pt_update_keyset:
+			{
+			START_ELEMENT(writer, simple_err, "keyset:updateData");
+			WRITE_ATTRIBUTE(writer, simple_err, "xmlns:keyset",
+					NS_KEYSET);
+			WRITE_ATTRIBUTE(writer, simple_err,"xsi:schemaLocation",
+					LOC_KEYSET);
+			WRITE_ELEMENT(writer, simple_err, "keyset:opTRID",
+					msgdata->msg.upk.optrid);
+			START_ELEMENT(writer, simple_err, "keyset:oldData");
+			if (!gen_info_keyset(writer, &msgdata->msg.upk.old_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			START_ELEMENT(writer, simple_err, "keyset:newData");
+			if (!gen_info_keyset(writer, &msgdata->msg.upk.new_data))
+				goto simple_err;
+			END_ELEMENT(writer, simple_err);
+			END_ELEMENT(writer, simple_err);
+			break;
+			}
 		default:
 			START_ELEMENT(writer, simple_err, "fred:lowCreditData");
 			break;
@@ -1198,16 +1247,19 @@ epp_gen_response(epp_context *epp_ctx,
 			break;
 		}
 		case EPP_INFO_DOMAIN:
-			if (!gen_info_domain(writer, cdata)) goto simple_err;
+			if (!gen_info_domain(writer, (epps_info_domain*)cdata->data))
+                                goto simple_err;
 			break;
 		case EPP_INFO_CONTACT:
 			if (!gen_info_contact(writer, cdata)) goto simple_err;
 			break;
 		case EPP_INFO_NSSET:
-			if (!gen_info_nsset(writer, cdata)) goto simple_err;
+			if (!gen_info_nsset(writer, (epps_info_nsset*)cdata->data))
+                                goto simple_err;
 			break;
 		case EPP_INFO_KEYSET:
-			if (!gen_info_keyset(writer, cdata)) goto simple_err;
+			if (!gen_info_keyset(writer, (epps_info_keyset*)cdata->data))
+                                goto simple_err;
 			break;
 
 		/* transform commands with <resData> element */
