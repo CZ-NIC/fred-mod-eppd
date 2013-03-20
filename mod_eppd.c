@@ -93,6 +93,17 @@
 #include <openssl/x509.h>
 
 /*
+ * apache 2.2 -> 2.4 changes
+ */
+#if MODULE_MAGIC_NUMBER_MAJOR >= 20100606
+/* 2.4.x or later */
+#define client_ip(r) ((r)->client_ip)
+#else
+#define client_ip(r) ((r)->remote_ip)
+#define ap_unixd_set_global_mutex_perms unixd_set_global_mutex_perms
+#endif
+
+/*
  * our header files
  */
 #include "epp_common.h"
@@ -988,7 +999,7 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
         if (epp_ctx == NULL) {
             remote_ipaddr = NULL;
         } else {
-            remote_ipaddr = ((conn_rec*) epp_ctx->conn)->remote_ip;
+            remote_ipaddr = client_ip((conn_rec*) epp_ctx->conn);
         }
 
         if (logger_service != NULL) {
@@ -1525,7 +1536,7 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog,
 	}
 
 //#ifdef AP_NEED_SET_MUTEX_PERMS
-	rv = unixd_set_global_mutex_perms(epp_log_lock);
+	rv = ap_unixd_set_global_mutex_perms(epp_log_lock);
 	if (rv != APR_SUCCESS) {
 		ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
 				"mod_eppd: Could not set permissions on "
