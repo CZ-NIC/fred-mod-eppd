@@ -1,3 +1,9 @@
+2013-04-02 Jiri Sadek (2.12.0)
+
+	* appropriate impl. changes for update object poll messages
+
+	* allow compilation with both apache 2.2 and 2.4
+
 2012-11-21 Jiri Sadek, Juraj Vicenik (2.11.0)
 
 	* schema changes (see standalone ChangeLog)
