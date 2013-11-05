@@ -7,6 +7,7 @@ CLEANFILES = .libs/libmodeppd *~ mod_eppd.la conf/02-fred-mod-eppd-apache.conf \
     Filters.h Filters-common.c Filters-stubs.c \
     EPP.h EPP-common.c EPP-stubs.c \
     Logger.h Logger-common.c Logger-stubs.c \
+    DateTime.h DateTime-common.c DateTime-stubs.c \
     _dataTypes.h _dataTypes-common.c _dataTypes-stubs.c \
     Registry.h Registry-common.c Registry-stubs.c
 
@@ -25,13 +26,13 @@ dist_fredschemas_DATA = ${srcdir}/schemas/*.xsd ${srcdir}/schemas/README \
 			${srcdir}/schemas/ChangeLog
 dist_fredssl_DATA = ${srcdir}/ssl/README ${srcdir}/ssl/*.pem
 EXTRA_DIST = unconfig.h fred-mod-eppd.spec doxy.conf
-BUILT_SOURCES = _dataTypes-common.c Registry-common.c Whois-common.c \
+BUILT_SOURCES = DateTime-common.c _dataTypes-common.c Registry-common.c Whois-common.c \
     EPP-common.c Logger-common.c Filters-common.c Admin-common.c
 
 INCL       = ${APACHE_CFLAGS} ${APACHE_CPPFLAGS} ${ORBIT_CFLAGS} ${CPPFLAGS} 
 AM_LDFLAGS = ${ORBIT_LIBS} ${LIBS} ${LDFLAGS}
 
-nodist_libcorbadatatypes_la_SOURCES = _dataTypes.h _dataTypes-common.c _dataTypes-stubs.c 
+nodist_libcorbadatatypes_la_SOURCES = DateTime.h DateTime-common.c DateTime-stubs.c _dataTypes.h _dataTypes-common.c _dataTypes-stubs.c 
 libcorbadatatypes_la_CFLAGS  = ${ORBIT_CFLAGS} 
 libcorbadatatypes_la_LDFLAGS = ${ORBIT_LIBS}
 
@@ -67,7 +68,7 @@ libxmleppd_la_LDFLAGS = ${XML_LIBS}
 libmodeppd_la_SOURCES = epp_common.c epp_common.h epp-client.c epp-client.h \
     logd-client.c logd-client.h mod_eppd.c 
 libmodeppd_la_CFLAGS  = ${INCL} -include EPP.h -include Logger.h \
-    -include _dataTypes.h -include Registry.h -include Admin.h \
+    -include DateTime.h -include _dataTypes.h -include Registry.h -include Admin.h \
     -include Filters.h -include Whois.h
 libmodeppd_la_LIBADD  = libcorbadatatypes.la libcorbaregistry.la \
     libcorbalogger.la libcorbaepp.la libcorbaadmin.la libcorbafilters.la \
@@ -93,6 +94,9 @@ uninstall-local:
 mod_eppd.la: libmodeppd.la
 	${APXS} -c -o $@ $< ${APACHE_CFLAGS} ${ORBIT_CFLAGS} ${AM_LDFLAGS}
 
+DateTime-common.c : $(IDLDIR)/DateTime.idl
+	$(ORBIT_IDL) --onlytop --noskels $(IDLDIR)/DateTime.idl
+	
 _dataTypes-common.c : $(IDLDIR)/_dataTypes.idl
 	$(ORBIT_IDL) --onlytop --noskels $(IDLDIR)/_dataTypes.idl
 
