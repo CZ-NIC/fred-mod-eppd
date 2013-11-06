@@ -640,7 +640,7 @@ typedef struct {
 /** Poll acknoledge parameters. */
 typedef struct {
 	char	*msgid;   /**< ID of acknoledged message. */
-	int	 count;   /**< Count of waiting messages. */
+	unsigned long long	 count;   /**< Count of waiting messages. */
 	char	*newmsgid;/**< ID of first message in a queue. */
 }epps_poll_ack;
 
