@@ -1034,7 +1034,7 @@ epp_gen_response(epp_context *epp_ctx,
 		poll_req = cdata->data;
 		if (poll_req->count > 0) {
 			START_ELEMENT(writer, simple_err, "msgQ");
-			snprintf(strbuf, 25, "%d", poll_req->count);
+			snprintf(strbuf, 25, "%llu", poll_req->count);
 			WRITE_ATTRIBUTE(writer, simple_err, "count", strbuf);
 			WRITE_ATTRIBUTE(writer, simple_err, "id",
 					poll_req->msgid);
@@ -1054,7 +1054,7 @@ epp_gen_response(epp_context *epp_ctx,
 		poll_ack = cdata->data;
 		if (poll_ack->count > 0) {
 			START_ELEMENT(writer, simple_err, "msgQ");
-			snprintf(strbuf, 25, "%d", poll_ack->count);
+			snprintf(strbuf, 25, "%llu", poll_ack->count);
 			WRITE_ATTRIBUTE(writer, simple_err, "count", strbuf);
 			WRITE_ATTRIBUTE(writer, simple_err, "id",
 					poll_ack->newmsgid);

@@ -584,7 +584,7 @@ typedef struct {
 
 /** Poll request parameters. */
 typedef struct {
-	int	 count;    /**< Count of waiting messages. */
+    unsigned long long	 count;    /**< Count of waiting messages. */
 	char	*msgid;    /**< ID of next message in a queue. */
 	char	*qdate;    /**< Date of message submission. */
 	epp_pollType type; /**< Type of poll message. */
@@ -640,7 +640,7 @@ typedef struct {
 /** Poll acknoledge parameters. */
 typedef struct {
 	char	*msgid;   /**< ID of acknoledged message. */
-	int	 count;   /**< Count of waiting messages. */
+	unsigned long long	 count;   /**< Count of waiting messages. */
 	char	*newmsgid;/**< ID of first message in a queue. */
 }epps_poll_ack;
 

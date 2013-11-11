@@ -1727,7 +1727,7 @@ epp_call_poll_req(epp_context *epp_ctx,
 	ccReg_PollType	 c_polltype;
 	CORBA_any	*c_mesg;
 	CORBA_Environment	ev[1];
-	CORBA_short	 c_count;
+	CORBA_unsigned_long_long	 c_count;
 	CORBA_char	*c_qdate, *c_msgID;
 	ccReg_EppParams *c_params = NULL;
 	epps_poll_req	*poll_req;
@@ -2180,7 +2180,7 @@ epp_call_poll_ack(epp_context *epp_ctx,
 {
 	CORBA_Environment ev[1];
 	CORBA_char	*c_msgID;
-	CORBA_short	 c_count;
+	CORBA_unsigned_long_long	 c_count;
 	ccReg_EppParams *c_params = NULL;
 	ccReg_Response	*response;
 	int	retr, cerrno;
