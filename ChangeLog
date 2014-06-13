@@ -1,3 +1,7 @@
+2014-06-12 Jan Korous (2.14.0)
+
+	* build adapted to idl changes (separation of common types)
+
 2013-11-11 Jan Zima (2.13.0)
 
 	* fix epp poll req/ack commands - overflow of count values
