@@ -1,43 +1,35 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
-     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0
-     epp-1.0.xsd">
+<epp xmlns="urn:ietf:params:xml:ns:epp-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0      epp-1.0.xsd">
   <command>
     <update>
-      <contact:update
-       xmlns:contact="http://www.nic.cz/xml/epp/contact-1.3"
-       xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.3
-       contact-1.3.xsd">
-		<contact:id>CID:FEELA</contact:id>
-		<contact:chg>
-		  <contact:postalInfo>
-			<contact:name>John Doe</contact:name>
-			<contact:org>Example Inc.</contact:org>
-			<contact:addr>
-			  <contact:street>123 Example Dr.</contact:street>
-			  <contact:street>Suite 100</contact:street>
-			  <contact:street>jeste neco</contact:street>
-			  <contact:city>Dulles</contact:city>
-			  <contact:sp>VA</contact:sp>
-			  <contact:pc>20166-6503</contact:pc>
-			  <contact:cc>US</contact:cc> 
-			</contact:addr>
-		  </contact:postalInfo>
-		  <contact:voice>+1.9999999999</contact:voice>
-		  <contact:fax>+1.9999999999</contact:fax>
-		  <contact:email>novyjouda@example.com</contact:email>
-		  <contact:disclose flag="0">
-			  <contact:name />
-			  <contact:addr />
-			  <contact:email />
-		  </contact:disclose>
-		  <contact:vat>7035555556</contact:vat>
-		  <contact:ident type="birthday">24.11.1981</contact:ident>
-		  <contact:notifyEmail>novyjouda@example.com</contact:notifyEmail>
-		</contact:chg>
-	  </contact:update>
+      <contact:update xmlns:contact="http://www.nic.cz/xml/epp/contact-1.6" xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.6 contact-1.6.xsd">
+        <contact:id>ABC</contact:id>
+        <contact:chg>
+          <contact:postalInfo>
+            <contact:name>John Doe</contact:name>
+            <contact:org>Example Inc.</contact:org>
+            <contact:addr>
+              <contact:street>123 Example Dr.</contact:street>
+              <contact:street>Suite 100</contact:street>
+              <contact:street>jeste neco</contact:street>
+              <contact:city>Dulles</contact:city>
+              <contact:sp>VA</contact:sp>
+              <contact:pc>20166-6503</contact:pc>
+              <contact:cc>US</contact:cc>
+            </contact:addr>
+          </contact:postalInfo>
+          <contact:voice>+1.9999999999</contact:voice>
+          <contact:fax>+1.9999999999</contact:fax>
+          <contact:email>novyjouda@example.com</contact:email>
+          <contact:disclose flag="0">
+            <contact:email/>
+          </contact:disclose>
+          <contact:vat>7035555556</contact:vat>
+          <contact:ident type="birthday">24.11.1981</contact:ident>
+          <contact:notifyEmail>novyjouda@example.com</contact:notifyEmail>
+        </contact:chg>
+      </contact:update>
     </update>
     <clTRID>ABC-12345</clTRID>
-  </command> 
+  </command>
 </epp>

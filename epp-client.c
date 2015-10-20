@@ -2524,7 +2524,7 @@ epp_call_create_contact(epp_context *epp_ctx,
 {
 	CORBA_Environment ev[1];
 	CORBA_char	*c_crDate;
-	ccReg_ContactChange	*c_contact;
+	ccReg_ContactData	*c_contact;
 	ccReg_Response *response;
         ccReg_EppParams *c_params = NULL;
 	int	retr, cerrno, len, i;
