@@ -434,13 +434,6 @@ typedef struct {
 	char    *credit; /**< Credit */
 }epp_zonecredit;
 
-/** DNSSEC extension used for updates. */
-typedef struct {
-	qhead	chg_ds; /**< Signatures to be changed. */
-	qhead	add_ds; /**< Signatures to be added. */
-	qhead	rem_ds; /**< Signatures to be removed. */
-}epp_ext_domain_upd_dnssec;
-
 typedef struct {
 	char	*ext_enumval; /**< Domain validation.*/
 	int 	publish;      /**< Flag determining if this domain can be published in the ENUM dictionary. 0 for false, 1 for true */
