@@ -1536,6 +1536,68 @@ epp_gen_response(epp_context *epp_ctx,
 			END_ELEMENT(writer, simple_err); /* extension */
 
 	}/* ... broken indentation */
+
+    /* optional contact info extensions */
+    if (cdata->type == EPP_INFO_CONTACT) {
+        epps_info_contact    *info_contact = cdata->data;
+        int  print_ext = 0;
+
+        q_foreach(&info_contact->extensions) {
+            epp_ext_item * ext_item = q_content(&info_contact->extensions);
+
+            if (!print_ext) {
+                START_ELEMENT(writer, simple_err, "extension");
+                print_ext = 1;
+            }
+
+            if(ext_item->extType == EPP_EXT_MAILING_ADDR) {
+
+                START_ELEMENT(writer, simple_err,  "extra-addr:infData");
+                {
+                    WRITE_ATTRIBUTE(writer, simple_err, "xmlns:extra-addr", NS_EXTRAADDR);
+                    WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EXTRAADDR);
+                }
+                START_ELEMENT(writer, simple_err, "extra-addr:mailing");
+                START_ELEMENT(writer, simple_err, "extra-addr:addr");
+                {
+                    int any_nonempty_street = 0;
+                    if(ext_item->ext.ext_mailing_addr.data.info.Street1 && strlen(ext_item->ext.ext_mailing_addr.data.info.Street1) > 0) {
+                        WRITE_ELEMENT(writer, simple_err, "extra-addr:street", ext_item->ext.ext_mailing_addr.data.info.Street1);
+                        any_nonempty_street = 1;
+                    }
+                    if(ext_item->ext.ext_mailing_addr.data.info.Street2 && strlen(ext_item->ext.ext_mailing_addr.data.info.Street2) > 0) {
+                        WRITE_ELEMENT(writer, simple_err, "extra-addr:street", ext_item->ext.ext_mailing_addr.data.info.Street2);
+                        any_nonempty_street = 1;
+                    }
+                    if(ext_item->ext.ext_mailing_addr.data.info.Street3 && strlen(ext_item->ext.ext_mailing_addr.data.info.Street3) > 0) {
+                        WRITE_ELEMENT(writer, simple_err, "extra-addr:street", ext_item->ext.ext_mailing_addr.data.info.Street3);
+                        any_nonempty_street = 1;
+                    }
+
+                    /* when the streets are empty... and you need a fix... */
+                    if(any_nonempty_street == 0) {
+                        WRITE_ELEMENT(writer, simple_err, "extra-addr:street", "");
+                    }
+
+                    WRITE_ELEMENT(writer, simple_err, "extra-addr:city",    ext_item->ext.ext_mailing_addr.data.info.City);
+                    WRITE_ELEMENT(writer, simple_err, "extra-addr:sp",      ext_item->ext.ext_mailing_addr.data.info.StateOrProvince);
+                    WRITE_ELEMENT(writer, simple_err, "extra-addr:pc",      ext_item->ext.ext_mailing_addr.data.info.PostalCode);
+                    WRITE_ELEMENT(writer, simple_err, "extra-addr:cc",      ext_item->ext.ext_mailing_addr.data.info.CountryCode);
+                }
+                END_ELEMENT(writer, simple_err);
+                END_ELEMENT(writer, simple_err);
+                END_ELEMENT(writer, simple_err);
+            } else {
+                /* unknown extension type */
+                goto simple_err;
+            }
+        }
+        if (print_ext) {
+            END_ELEMENT(writer, simple_err); /* </extension> */
+        }
+
+    }
+
 	} /* if resdata section */
 
 	/* epp epilog */

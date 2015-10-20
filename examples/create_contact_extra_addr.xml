@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<epp xmlns="urn:ietf:params:xml:ns:epp-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
+  <command>
+    <create>
+      <contact:create xmlns:contact="http://www.nic.cz/xml/epp/contact-1.6" xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.6 contact-1.6.xsd">
+        <contact:id>CONTACTEXTRAADDR</contact:id>
+        <contact:postalInfo>
+          <contact:name>Foo Bar</contact:name>
+          <contact:addr>
+            <contact:street>Kratka 42</contact:street>
+            <contact:city>Praha</contact:city>
+            <contact:pc>11150</contact:pc>
+            <contact:cc>CZ</contact:cc>
+          </contact:addr>
+        </contact:postalInfo>
+        <contact:email>foobar@nic.cz</contact:email>
+      </contact:create>
+    </create>
+    <extension>
+      <extra-addr:create xmlns:extra-addr="http://www.nic.cz/xml/epp/extra-addr-1.0" xsi:schemaLocation="http://www.nic.cz/xml/epp/extra-addr-1.0 extra-addr-1.0.xsd">
+        <extra-addr:mailing>
+          <extra-addr:addr>
+            <extra-addr:street>Dlouha 24</extra-addr:street>
+            <extra-addr:city>Lysa nad Labem</extra-addr:city>
+            <extra-addr:pc>28922</extra-addr:pc>
+            <extra-addr:cc>CZ</extra-addr:cc>
+          </extra-addr:addr>
+        </extra-addr:mailing>
+      </extra-addr:create>
+    </extension>
+    <clTRID>hehr010#15-08-25at17:03:10</clTRID>
+  </command>
+</epp>

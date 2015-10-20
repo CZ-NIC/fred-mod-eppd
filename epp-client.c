@@ -1122,6 +1122,37 @@ epp_call_info_contact(epp_context *epp_ctx,
 			(c_contact->DiscloseNotifyEmail == CORBA_TRUE) ? 1 : 0;
 	}
 
+    /* mailing address info */
+    if (c_contact->MailingAddress.is_set) {
+
+        epp_ext_item    *ext_item;
+        ext_item = epp_malloc(epp_ctx->pool, sizeof *ext_item);
+        if (ext_item == NULL) goto error;
+
+        ext_item->extType = EPP_EXT_MAILING_ADDR;
+        ext_item->ext.ext_mailing_addr.command = mailing_addr_info;
+
+        ext_item->ext.ext_mailing_addr.data.info.Street1         = unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.Street1,           &cerrno, "street1");
+        if (cerrno != 0) goto error;
+        ext_item->ext.ext_mailing_addr.data.info.Street2         = unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.Street2,           &cerrno, "street2");
+        if (cerrno != 0) goto error;
+        ext_item->ext.ext_mailing_addr.data.info.Street3         = unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.Street3,           &cerrno, "street3");
+        if (cerrno != 0) goto error;
+        ext_item->ext.ext_mailing_addr.data.info.City            = unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.City,              &cerrno, "city");
+        if (cerrno != 0) goto error;
+        ext_item->ext.ext_mailing_addr.data.info.StateOrProvince = unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.StateOrProvince,   &cerrno, "stateorprovince");
+        if (cerrno != 0) goto error;
+        ext_item->ext.ext_mailing_addr.data.info.PostalCode      = unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.PostalCode,        &cerrno, "postalcode");
+        if (cerrno != 0) goto error;
+        ext_item->ext.ext_mailing_addr.data.info.CountryCode     = unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.CountryCode,       &cerrno, "countrycode");
+        if (cerrno != 0) goto error;
+
+        if (q_add(epp_ctx->pool, &info_contact->extensions, ext_item)) {
+            goto error;
+        }
+
+    }
+
 	CORBA_free(c_contact);
 	return epilog_success(epp_ctx, cdata, response);
 
@@ -2626,6 +2657,67 @@ epp_call_create_contact(epp_context *epp_ctx,
 		return CORBA_INT_ERROR;
 	}
 
+	c_contact->MailingAddress.data.Street1 = wrap_str(NULL);
+	c_contact->MailingAddress.data.Street2 = wrap_str(NULL);
+	c_contact->MailingAddress.data.Street3 = wrap_str(NULL);
+	c_contact->MailingAddress.data.City = wrap_str(NULL);
+    c_contact->MailingAddress.data.StateOrProvince = wrap_str(NULL);
+    c_contact->MailingAddress.data.PostalCode = wrap_str(NULL);
+    c_contact->MailingAddress.data.CountryCode = wrap_str(NULL);
+
+	q_foreach(&create_contact->extensions) {
+	    epp_ext_item    *ext_item;
+
+	    ext_item = q_content(&create_contact->extensions);
+	    if (ext_item->extType == EPP_EXT_MAILING_ADDR) {
+	        if(ext_item->ext.ext_mailing_addr.command != mailing_addr_set) {
+	            CORBA_free(c_contact);
+	            return CORBA_REMOTE_ERROR;
+	        }
+
+	        epp_ext_mailingAddr_set* data = &ext_item->ext.ext_mailing_addr.data.set;
+
+	        c_contact->MailingAddress.is_set = 1;
+
+	        c_contact->MailingAddress.data.Street1 = wrap_str(data->Street1);
+	        if (c_contact->MailingAddress.data.Street1 == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.Street2 = wrap_str(data->Street2);
+	        if (c_contact->MailingAddress.data.Street2 == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.Street3 = wrap_str(data->Street3);
+	        if (c_contact->MailingAddress.data.Street3 == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.City = wrap_str(data->City);
+	        if (c_contact->MailingAddress.data.City == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.StateOrProvince = wrap_str(data->StateOrProvince);
+	        if (c_contact->MailingAddress.data.StateOrProvince == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.PostalCode = wrap_str(data->PostalCode);
+	        if (c_contact->MailingAddress.data.PostalCode == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.CountryCode = wrap_str(data->CountryCode);
+	        if (c_contact->MailingAddress.data.CountryCode == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	    }
+	    i++;
+	}
+
 	c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
 	if(c_params == NULL) {
 		CORBA_free(c_contact);
@@ -3564,6 +3656,57 @@ epp_call_update_contact(epp_context *epp_ctx,
 		c_contact->DiscloseNotifyEmail =
 			(update_contact->discl.notifyEmail ? CORBA_TRUE : CORBA_FALSE);
 	}
+
+	/* default */
+	c_contact->MailingAddress.action = ccReg_no_change;
+    c_contact->MailingAddress.data.Street1 = wrap_str(NULL);
+    c_contact->MailingAddress.data.Street2 = wrap_str(NULL);
+    c_contact->MailingAddress.data.Street3 = wrap_str(NULL);
+    c_contact->MailingAddress.data.City = wrap_str(NULL);
+    c_contact->MailingAddress.data.StateOrProvince = wrap_str(NULL);
+    c_contact->MailingAddress.data.PostalCode = wrap_str(NULL);
+    c_contact->MailingAddress.data.CountryCode = wrap_str(NULL);
+
+    q_foreach(&update_contact->extensions) {
+        epp_ext_item    *ext_item;
+
+        ext_item = q_content(&update_contact->extensions);
+        if (ext_item->extType == EPP_EXT_MAILING_ADDR) {
+            if( ext_item->ext.ext_mailing_addr.command != mailing_addr_set
+                &&
+                ext_item->ext.ext_mailing_addr.command != mailing_addr_rem
+            ) {
+                goto error_input;
+            }
+
+            if( ext_item->ext.ext_mailing_addr.command == mailing_addr_set ) {
+                epp_ext_mailingAddr_set* data = &ext_item->ext.ext_mailing_addr.data.set;
+
+                c_contact->MailingAddress.action = ccReg_set;
+
+                c_contact->MailingAddress.data.Street1          = wrap_str(data->Street1);
+                c_contact->MailingAddress.data.Street2          = wrap_str(data->Street2);
+                c_contact->MailingAddress.data.Street3          = wrap_str(data->Street3);
+                c_contact->MailingAddress.data.City             = wrap_str(data->City);
+                c_contact->MailingAddress.data.StateOrProvince  = wrap_str(data->StateOrProvince);
+                c_contact->MailingAddress.data.PostalCode       = wrap_str(data->PostalCode);
+                c_contact->MailingAddress.data.CountryCode      = wrap_str(data->CountryCode);
+
+                if (   c_contact->MailingAddress.data.Street1 == NULL
+                    || c_contact->MailingAddress.data.Street2 == NULL
+                    || c_contact->MailingAddress.data.Street3 == NULL
+                    || c_contact->MailingAddress.data.City == NULL
+                    || c_contact->MailingAddress.data.StateOrProvince == NULL
+                    || c_contact->MailingAddress.data.PostalCode == NULL
+                    || c_contact->MailingAddress.data.CountryCode == NULL
+                ) {
+                    goto error_input;
+                }
+            } else if( ext_item->ext.ext_mailing_addr.command == mailing_addr_rem ) {
+                c_contact->MailingAddress.action = ccReg_rem;
+            }
+        }
+    }
 
 	c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
 	if (c_params == NULL) {
