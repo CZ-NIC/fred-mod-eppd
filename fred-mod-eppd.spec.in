@@ -8,7 +8,7 @@ URL:            http://fred.nic.cz
 Source:         %{name}-%{version}.tar.gz
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires:  gcc, apr-devel, httpd-devel, libxml2-devel, openssl-devel, ORBit2-devel, fred-idl
-Requires: httpd, libxml2, openssl, fred-mod-corba, mod_ssl
+Requires: httpd, libxml2, openssl, fred-mod-corba, mod_ssl, policycoreutils-python
 
 %description
 FRED (Free Registry for Enum and Domain) is free registry system for 
