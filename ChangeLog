@@ -1,3 +1,7 @@
+2016-03-21 Jaromir Talir (2.14.1)
+
+	* Fix rpm build
+
 2014-06-12 Jan Korous (2.14.0)
 
 	* build adapted to idl changes (separation of common types)
