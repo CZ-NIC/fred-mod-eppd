@@ -51,10 +51,16 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    EPPvalidResponse  Off
 
    # SSL configuration
+   # Activate SSL module
    SSLEngine on
+   # Cipher specifications the client is permitted to negotiate during handshake
    SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP
+   # Certificate verification level
    SSLVerifyClient       require
+   # File with certificate data in PEM format (leaf or intermediate)
    SSLCertificateFile    @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
+   # PEM-encoded private key file for the server
    SSLCertificateKeyFile @DATAROOTDIR@/@PACKAGE@/ssl/test-key.pem
+   # All-in-one file with the Certificates of Certification Authorities (CA)
    SSLCACertificateFile  @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
 </VirtualHost>
