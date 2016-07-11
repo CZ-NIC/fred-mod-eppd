@@ -17,8 +17,8 @@ Listen @PORT@
 LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
 
 <VirtualHost *:@PORT@>
-   # mod_corba configuration, mod_corba module must be already installed
-   # Activate CORBA module
+   ### mod_corba configuration, mod_corba module must be already installed
+   # Activate the CORBA module
    CorbaEnable       On
    # Locate CORBA name server (host[:port])
    CorbaNameservice  @NSHOST@
@@ -29,38 +29,42 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    # Export the Logger object
    CorbaObject       @LOGGER_OBJECTNAME@ Logger_alias
 
-   # mod_eppd configuration
-   # Activate EPP module
+   ### mod_eppd configuration
+   # Activate the EPP module
    EPPprotocol       On
    # EPP object reference (use the alias exported in mod_corba configuration)
    EPPobject         EPP_alias
    # Logger object reference (use the alias exported in mod_corba configuration)
    EPPlogdObject     Logger_alias
-   # Logd mandatory // ???
+   # Mandatory logging via the Logger
+   # On - if the logging of an EPP request fails, the request is not performed
+   # Off - an EPP request is performed regardless of the logging result
    EPPlogdMandatory  Off
-   # Location of the EPP schema
+   # Location of the EPP schema (file path)
    EPPschema         "@DATAROOTDIR@/@PACKAGE@/schemas/all.xsd"
    # Name of the server used in the EPP greeting frame
    EPPservername     "EPP server"
-   # Location of the log file of the mod_eppd module
-   # (If not set, messages are logged to Apache's error log.)
+   # Location of the log file of the mod_eppd module (file path)
+   #    (If not set, messages are logged to Apache's error log.)
    EPPlog            "@LOCALSTATEDIR@/log/fred-eppd.log"
    # EPP log verbosity (fatal, error, warning, info, debug)
    EPPloglevel       info
-   # Validate responses from the mod_eppd
+   # Validate responses from the mod_eppd (Turning it on can cause a slowdown.)
    EPPvalidResponse  Off
 
-   # SSL configuration
-   # Activate SSL module
+   ### SSL configuration
+   # Activate the SSL module - this must always be on!
    SSLEngine on
    # Cipher specifications the client is permitted to negotiate during handshake
    SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP
-   # Certificate verification level
+   # Certificate verification level - must always be ``require``!
    SSLVerifyClient       require
    # File with certificate data in PEM format (leaf or intermediate)
+   #    for the EPP-server SSL certificate
    SSLCertificateFile    @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
-   # PEM-encoded private key file for the server
+   # PEM-encoded private key file for the EPP-server SSL certificate
    SSLCertificateKeyFile @DATAROOTDIR@/@PACKAGE@/ssl/test-key.pem
    # All-in-one file with the Certificates of Certification Authorities (CA)
+   # All client certificates of registrars must be issued by any CA in this file
    SSLCACertificateFile  @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
 </VirtualHost>
