@@ -1,13 +1,16 @@
-#
+###############################################################################
+#              FRED EPP Apache Module Configuration File                      #
+###############################################################################
 # This is the default configuration file for mod_eppd Apache module.
 # See mod_eppd's documentation for description of configuration directives.
+#
 # Include this file in the main httpd.conf configuration file or
 # copy the contents of this file to httpd.conf.
 #
-# The preferred method is to put EPP in a virtual host.
+# The preferred method of configuration is to put EPP in a virtual host.
 # Thus, you can continue to run http as usual and additionally, if
-# somebody connects to the port @PORT@ on @NSHOST@, EPP protocol is activated
-# for that connection.
+# somebody connects to the port @PORT@ on @NSHOST@, the EPP protocol
+# is activated for that connection.
 #
 
 # EPP port, assigned by IANA
@@ -17,7 +20,8 @@ Listen @PORT@
 LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
 
 <VirtualHost *:@PORT@>
-   ### mod_corba configuration, mod_corba module must be already installed
+   ### CORBA Configuration
+   # Note: The mod_corba module must be already installed!
    # Activate the CORBA module
    CorbaEnable       On
    # Locate CORBA name server (host[:port])
@@ -29,12 +33,12 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    # Export the Logger object
    CorbaObject       @LOGGER_OBJECTNAME@ Logger_alias
 
-   ### mod_eppd configuration
+   ### EPP Configuration
    # Activate the EPP module
    EPPprotocol       On
-   # EPP object reference (use the alias exported in mod_corba configuration)
+   # EPP object reference (use the alias exported in the CORBA configuration)
    EPPobject         EPP_alias
-   # Logger object reference (use the alias exported in mod_corba configuration)
+   # Logger object reference (use the alias exported in the CORBA configuration)
    EPPlogdObject     Logger_alias
    # Mandatory logging via the Logger
    # On - if the logging of an EPP request fails, the request is not performed
@@ -52,10 +56,10 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    # Validate responses from the mod_eppd (Turning it on can cause a slowdown.)
    EPPvalidResponse  Off
 
-   ### SSL configuration
+   ### SSL Configuration
    # Activate the SSL module - this must always be on!
    SSLEngine on
-   # Cipher specifications the client is permitted to negotiate during handshake
+   # Cipher specifications a client is permitted to negotiate during handshake
    SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP
    # Certificate verification level - must always be ``require``!
    SSLVerifyClient       require
@@ -64,7 +68,7 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    SSLCertificateFile    @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
    # PEM-encoded private key file for the EPP-server SSL certificate
    SSLCertificateKeyFile @DATAROOTDIR@/@PACKAGE@/ssl/test-key.pem
-   # All-in-one file with the Certificates of Certification Authorities (CA)
+   # File with the Certificates of recognized Certification Authorities (CA)
    # All client certificates of registrars must be issued by any CA in this file
    SSLCACertificateFile  @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
 </VirtualHost>
