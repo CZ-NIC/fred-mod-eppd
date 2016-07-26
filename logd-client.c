@@ -15,8 +15,8 @@ static const long LC_EPP = 3;
 
 /* functions for filling log properties */
 ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean child);
-ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean child);
-ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value);
+ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, char *name, char *value, CORBA_boolean child);
+ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, char *name, int value);
 
 int epp_log_close_message(epp_context *epp_ctx,
         service_Logger service,
@@ -118,7 +118,7 @@ ccReg_RequestProperties *epp_property_push_qhead(ccReg_RequestProperties *c_prop
  *
  * @returns			NULL in case of an allocation error, modified c_props otherwise
  */
-ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, const char *name, const char *value, CORBA_boolean child)
+ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, char *name, char *value, CORBA_boolean child)
 {
     if (c_props == NULL) {
         c_props = ccReg_RequestProperties__alloc();
@@ -170,7 +170,7 @@ ccReg_RequestProperties *epp_property_push(ccReg_RequestProperties *c_props, con
  * @returns			NULL in case of an allocation error, modified c_props otherwise
  */
 
-ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, const char *name, int value)
+ccReg_RequestProperties *epp_property_push_int(ccReg_RequestProperties *c_props, char *name, int value)
 {
     char str[12];
     int old_length;
