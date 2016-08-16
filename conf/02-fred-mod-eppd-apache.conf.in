@@ -1,15 +1,16 @@
-#
-# The default configuration file for mod_eppd apache module.
+###############################################################################
+#              FRED EPP Apache Module Configuration File                      #
+###############################################################################
+# This is the default configuration file for mod_eppd Apache module.
 # See mod_eppd's documentation for description of configuration directives.
-# Include this file in main httpd.conf configuration file or copy the content
-# of this file to httpd.conf.
 #
-
+# Include this file in the main httpd.conf configuration file or
+# copy the contents of this file to httpd.conf.
 #
-# The most preferred way of configuration is to put epp in virtual host.
-# This way you can continue to run http in normal way and besides that, if
-# somebody connects to port @PORT@ on @NSHOST@, EPP protocol will be activated
-# for that connection.
+# The preferred method of configuration is to put EPP in a virtual host.
+# Thus, you can continue to run http as usual and additionally, if
+# somebody connects to the port @PORT@ on @NSHOST@, the EPP protocol
+# is activated for that connection.
 #
 
 # EPP port, assigned by IANA
@@ -19,28 +20,55 @@ Listen @PORT@
 LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
 
 <VirtualHost *:@PORT@>
-   # mod_corba's configuration, you have to have installed mod_corba module
+   ### CORBA Configuration
+   # Note: The mod_corba module must be already installed!
+   # Activate the CORBA module
    CorbaEnable       On
+   # Locate CORBA name server (host[:port])
    CorbaNameservice  @NSHOST@
+   # Export CORBA objects under aliases for use by other modules
+   # e.g. CorbaObject [contextName.]ObjectName alias_string
+   # Export the EPP object
    CorbaObject       @OBJECTNAME@ EPP_alias
-   CorbaObject		 @LOGGER_OBJECTNAME@ Logger_alias
+   # Export the Logger object
+   CorbaObject       @LOGGER_OBJECTNAME@ Logger_alias
 
+   ### EPP Configuration
+   # Activate the EPP module
    EPPprotocol       On
+   # EPP object reference (use the alias exported in the CORBA configuration)
    EPPobject         EPP_alias
-   EPPlogdObject	 Logger_alias
+   # Logger object reference (use the alias exported in the CORBA configuration)
+   EPPlogdObject     Logger_alias
+   # Mandatory logging via the Logger
+   # On - if the logging of an EPP request fails, the request is not performed
+   # Off - an EPP request is performed regardless of the logging result
    EPPlogdMandatory  Off
+   # Location of the EPP schema (file path)
    EPPschema         "@DATAROOTDIR@/@PACKAGE@/schemas/all.xsd"
+   # Name of the server used in the EPP greeting frame
    EPPservername     "EPP server"
+   # Location of the log file of the mod_eppd module (file path)
+   #    (If not set, messages are logged to Apache's error log.)
    EPPlog            "@LOCALSTATEDIR@/log/fred-eppd.log"
+   # EPP log verbosity (fatal, error, warning, info, debug)
    EPPloglevel       info
+   # Validate responses from the mod_eppd (Turning it on can cause a slowdown.)
    EPPvalidResponse  Off
- 
-   # SSL configuration
+
+   ### SSL Configuration
+   # Activate the SSL module - this must always be on!
    SSLEngine on
+   # Cipher specifications a client is permitted to negotiate during handshake
    SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP
+   # Certificate verification level - must always be ``require``!
    SSLVerifyClient       require
+   # File with certificate data in PEM format (leaf or intermediate)
+   #    for the EPP-server SSL certificate
    SSLCertificateFile    @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
+   # PEM-encoded private key file for the EPP-server SSL certificate
    SSLCertificateKeyFile @DATAROOTDIR@/@PACKAGE@/ssl/test-key.pem
+   # File with the Certificates of recognized Certification Authorities (CA)
+   # All client certificates of registrars must be issued by any CA in this file
    SSLCACertificateFile  @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
 </VirtualHost>
-
