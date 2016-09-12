@@ -1,3 +1,9 @@
+2016-09-12 Jan Zima, Zuzana Ansorgova (2.14.2)
+
+	* Build fix (gcc 6.1.1)
+
+	* Configuration documentation
+
 2016-03-21 Jaromir Talir (2.14.1)
 
 	* Fix rpm build
