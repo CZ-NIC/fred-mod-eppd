@@ -950,18 +950,17 @@ get_bad_xml(void *pool, epp_command_data *cdata, epp_error *e)
 
 gen_status
 epp_gen_response(epp_context *epp_ctx,
-		int validate,
-		void *schema,
-		epp_lang lang,
-		epp_command_data *cdata,
-		char **response,
-		qhead *valerr)
+        int validate,
+        void *schema,
+        epp_lang lang,
+        epp_command_data *cdata,
+        char **response,
+        qhead *valerr)
 {
-	xmlTextWriterPtr	writer;
-	xmlBufferPtr	buf;
-	char	res_code[5];
-	char	error_seen = 1;
-	gen_status	ret;
+	xmlTextWriterPtr writer;
+	xmlBufferPtr buf;
+	char res_code[5];
+	char error_seen = 1;
 
 	assert(epp_ctx != NULL);
 	assert(schema != NULL);
@@ -1532,64 +1531,73 @@ epp_gen_response(epp_context *epp_ctx,
 				END_ELEMENT(writer, simple_err);
 			}
 		}
-		if (print_ext)
+		if (print_ext) {
 			END_ELEMENT(writer, simple_err); /* extension */
-
+		}
 	}/* ... broken indentation */
 
     /* optional contact info extensions */
     if (cdata->type == EPP_INFO_CONTACT) {
-        epps_info_contact    *info_contact = cdata->data;
-        int  print_ext = 0;
+        epps_info_contact *info_contact = cdata->data;
+        int print_ext = 0;
 
         q_foreach(&info_contact->extensions) {
-            epp_ext_item * ext_item = q_content(&info_contact->extensions);
+            epp_ext_item *ext_item = q_content(&info_contact->extensions);
 
             if (!print_ext) {
                 START_ELEMENT(writer, simple_err, "extension");
                 print_ext = 1;
             }
 
-            if(ext_item->extType == EPP_EXT_MAILING_ADDR) {
-
-                START_ELEMENT(writer, simple_err,  "extra-addr:infData");
+            switch (ext_item->extType)
+            {
+                case EPP_EXT_MAILING_ADDR:
                 {
-                    WRITE_ATTRIBUTE(writer, simple_err, "xmlns:extra-addr", NS_EXTRAADDR);
-                    WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EXTRAADDR);
+                    START_ELEMENT(writer, simple_err,  "extra-addr:infData");
+                    {
+                        WRITE_ATTRIBUTE(writer, simple_err, "xmlns:extra-addr", NS_EXTRAADDR);
+                        WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_EXTRAADDR);
+                    }
+                    START_ELEMENT(writer, simple_err, "extra-addr:mailing");
+                    START_ELEMENT(writer, simple_err, "extra-addr:addr");
+                    {
+                        int any_nonempty_street = 0;
+                        if (ext_item->ext.ext_mailing_addr.data.info.Street1 &&
+                            (strlen(ext_item->ext.ext_mailing_addr.data.info.Street1) > 0))
+                        {
+                            WRITE_ELEMENT(writer, simple_err, "extra-addr:street", ext_item->ext.ext_mailing_addr.data.info.Street1);
+                            any_nonempty_street = 1;
+                        }
+                        if (ext_item->ext.ext_mailing_addr.data.info.Street2 &&
+                            (strlen(ext_item->ext.ext_mailing_addr.data.info.Street2) > 0))
+                        {
+                            WRITE_ELEMENT(writer, simple_err, "extra-addr:street", ext_item->ext.ext_mailing_addr.data.info.Street2);
+                            any_nonempty_street = 1;
+                        }
+                        if (ext_item->ext.ext_mailing_addr.data.info.Street3 &&
+                            (strlen(ext_item->ext.ext_mailing_addr.data.info.Street3) > 0))
+                        {
+                            WRITE_ELEMENT(writer, simple_err, "extra-addr:street", ext_item->ext.ext_mailing_addr.data.info.Street3);
+                            any_nonempty_street = 1;
+                        }
+    
+                        /* when the streets are empty... and you need a fix... */
+                        if (any_nonempty_street == 0) {
+                            WRITE_ELEMENT(writer, simple_err, "extra-addr:street", "");
+                        }
+    
+                        WRITE_ELEMENT(writer, simple_err, "extra-addr:city", ext_item->ext.ext_mailing_addr.data.info.City);
+                        WRITE_ELEMENT(writer, simple_err, "extra-addr:sp", ext_item->ext.ext_mailing_addr.data.info.StateOrProvince);
+                        WRITE_ELEMENT(writer, simple_err, "extra-addr:pc", ext_item->ext.ext_mailing_addr.data.info.PostalCode);
+                        WRITE_ELEMENT(writer, simple_err, "extra-addr:cc", ext_item->ext.ext_mailing_addr.data.info.CountryCode);
+                    }
+                    END_ELEMENT(writer, simple_err);
+                    END_ELEMENT(writer, simple_err);
+                    END_ELEMENT(writer, simple_err);
+                    break;
                 }
-                START_ELEMENT(writer, simple_err, "extra-addr:mailing");
-                START_ELEMENT(writer, simple_err, "extra-addr:addr");
-                {
-                    int any_nonempty_street = 0;
-                    if(ext_item->ext.ext_mailing_addr.data.info.Street1 && strlen(ext_item->ext.ext_mailing_addr.data.info.Street1) > 0) {
-                        WRITE_ELEMENT(writer, simple_err, "extra-addr:street", ext_item->ext.ext_mailing_addr.data.info.Street1);
-                        any_nonempty_street = 1;
-                    }
-                    if(ext_item->ext.ext_mailing_addr.data.info.Street2 && strlen(ext_item->ext.ext_mailing_addr.data.info.Street2) > 0) {
-                        WRITE_ELEMENT(writer, simple_err, "extra-addr:street", ext_item->ext.ext_mailing_addr.data.info.Street2);
-                        any_nonempty_street = 1;
-                    }
-                    if(ext_item->ext.ext_mailing_addr.data.info.Street3 && strlen(ext_item->ext.ext_mailing_addr.data.info.Street3) > 0) {
-                        WRITE_ELEMENT(writer, simple_err, "extra-addr:street", ext_item->ext.ext_mailing_addr.data.info.Street3);
-                        any_nonempty_street = 1;
-                    }
-
-                    /* when the streets are empty... and you need a fix... */
-                    if(any_nonempty_street == 0) {
-                        WRITE_ELEMENT(writer, simple_err, "extra-addr:street", "");
-                    }
-
-                    WRITE_ELEMENT(writer, simple_err, "extra-addr:city",    ext_item->ext.ext_mailing_addr.data.info.City);
-                    WRITE_ELEMENT(writer, simple_err, "extra-addr:sp",      ext_item->ext.ext_mailing_addr.data.info.StateOrProvince);
-                    WRITE_ELEMENT(writer, simple_err, "extra-addr:pc",      ext_item->ext.ext_mailing_addr.data.info.PostalCode);
-                    WRITE_ELEMENT(writer, simple_err, "extra-addr:cc",      ext_item->ext.ext_mailing_addr.data.info.CountryCode);
-                }
-                END_ELEMENT(writer, simple_err);
-                END_ELEMENT(writer, simple_err);
-                END_ELEMENT(writer, simple_err);
-            } else {
                 /* unknown extension type */
-                goto simple_err;
+                default: goto simple_err;
             }
         }
         if (print_ext) {
@@ -1606,10 +1614,9 @@ epp_gen_response(epp_context *epp_ctx,
 	WRITE_ELEMENT(writer, simple_err, "svTRID", cdata->svTRID);
 
 	/* this has side effect of flushing document to buffer */
-	if (xmlTextWriterEndDocument(writer) < 0)  goto simple_err;
-
-	error_seen = 0;
-
+	if (0 <= xmlTextWriterEndDocument(writer)) {
+	    error_seen = 0;
+	}
 simple_err:
 	xmlFreeTextWriter(writer);
 	if (error_seen) {
@@ -1623,39 +1630,21 @@ simple_err:
 		return GEN_EBUILD;
 	}
 
-	ret = GEN_OK;
-
 	/* optional add on - response validation */
 	if (validate) {
-		xmlDocPtr	doc;
-		valid_status	val_ret;
-
 		/* parse xml request */
-		doc = xmlParseMemory(*response, strlen(*response));
-		if (doc == NULL) return GEN_NOT_XML;
-
-		val_ret = validate_doc(epp_ctx->pool, (xmlSchemaPtr) schema,
-				doc, valerr);
+		xmlDocPtr doc = xmlParseMemory(*response, strlen(*response));
+		if (doc == NULL) { return GEN_NOT_XML; }
+		const valid_status val_ret = validate_doc(epp_ctx->pool, (xmlSchemaPtr)schema, doc, valerr);
+        xmlFreeDoc(doc);
 		switch (val_ret) {
-			case VAL_OK:
-				ret = GEN_OK;
-				break;
-			case VAL_NOT_VALID:
-				ret = GEN_NOT_VALID;
-				break;
-			case VAL_ESCHEMA:
-				ret = GEN_ESCHEMA;
-				break;
-			case VAL_EINTERNAL:
-				ret = GEN_EINTERNAL;
-				break;
+			case VAL_OK: return GEN_OK;
+			case VAL_NOT_VALID: return GEN_NOT_VALID;
+			case VAL_ESCHEMA: return GEN_ESCHEMA;
+			case VAL_EINTERNAL: return GEN_EINTERNAL;
 			default:
-				ret = GEN_EINTERNAL;
-				break;
+				return GEN_EINTERNAL;
 		}
-		xmlFreeDoc(doc);
 	}
-	return ret;
+	return GEN_OK;
 }
-
-/* vim: set ts=8 sw=8: */

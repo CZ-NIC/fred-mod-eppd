@@ -452,19 +452,19 @@ typedef struct {
 typedef enum {
     mailing_addr_info,
     mailing_addr_set,
-    mailing_addr_rem
+    mailing_addr_remove
 } epp_mailingAddrCommand;
 
 typedef epp_mailingAddr epp_ext_mailingAddr_set;
 typedef epp_mailingAddr epp_ext_mailingAddr_info;
-typedef struct {} epp_ext_mailingAddr_rem;
+typedef struct {} epp_ext_mailingAddr_remove;
 
 typedef struct {
     epp_mailingAddrCommand command;
     union {
-        epp_ext_mailingAddr_info    info;
-        epp_ext_mailingAddr_set     set;
-        epp_ext_mailingAddr_rem     rem;
+        epp_ext_mailingAddr_info   info;
+        epp_ext_mailingAddr_set    set;
+        epp_ext_mailingAddr_remove remove;
     } data;
 } epp_ext_mailingAddr;
 
