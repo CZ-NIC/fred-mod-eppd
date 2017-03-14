@@ -158,18 +158,19 @@ static APR_OPTIONAL_FN_TYPE(ssl_var_lookup) *epp_ssl_lookup = NULL;
  * Configuration structure of eppd module.
  */
 typedef struct {
-	int	epp_enabled;/**< Decides whether mod_eppd is enabled for host.*/
-	char	*servername;/**< Epp server name used in <greeting> frame. */
-	char	*ns_loc;    /**< Location of CORBA nameservice. */
-	char	*object;    	   /**< Name under which the object is known. */
-	char	*logger_object;    /**< Name of fred-logd object */
-	int logd_mandatory;        /**< Whether fred-logd failure is fatal to EPP */
-	void	*schema;    /**< URL of EPP schema (use just path). */
-	int	valid_resp; /**< Validate response before sending it to client.*/
-	char	*epplog;    /**< Epp log filename. */
-	apr_file_t	*epplogfp; /**< File descriptor of epp log file. */
-	epp_loglevel	loglevel;  /**< Epp log level. */
-	int	defer_err;  /**< Time value for deferring error response. */
+    int epp_enabled; /**< Decides whether mod_eppd is enabled for host.*/
+    char* servername; /**< Epp server name used in <greeting> frame. */
+    char* ns_loc; /**< Location of CORBA nameservice. */
+    char* object; /**< Name under which the object is known. */
+    char* logger_object; /**< Name of fred-logd object */
+    int logd_mandatory; /**< Whether fred-logd failure is fatal to EPP */
+    void* schema; /**< URL of EPP schema (use just path). */
+    int valid_resp; /**< Validate response before sending it to client.*/
+    char* epplog; /**< Epp log filename. */
+    apr_file_t* epplogfp; /**< File descriptor of epp log file. */
+    epp_loglevel loglevel; /**< Epp log level. */
+    int defer_err; /**< Time value for deferring error response. */
+    int has_contact_mailing_address_extension; /**< Contacts feature mailing address extension. */
 } eppd_server_conf;
 
 /** Used for access serialization to epp log file. */
@@ -678,9 +679,9 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
  * @return          0 in case of internal error, 1 if ok.
  */
 static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger *service_log,
-		epp_command_data *cdata, parser_status pstat,
-		unsigned long long *loginid, ccReg_TID * const session_id, const ccReg_TID request_id, epp_lang *lang,
-		unsigned int logd_mandatory)
+        epp_command_data *cdata, parser_status pstat,
+        unsigned long long *loginid, ccReg_TID * const session_id, const ccReg_TID request_id, epp_lang *lang,
+        unsigned int logd_mandatory, int has_contact_mailing_address_extension)
 {
 	corba_status	cstat; /* ret code of corba component */
         corba_status    log_cstat = CORBA_OK; /* ret code of corba for logd create/close session */
@@ -730,7 +731,7 @@ static int call_corba(epp_context *epp_ctx, service_EPP *service, service_Logger
 		}
 	} else {
 		/* go ahead to generic corba function call */
-		cstat = epp_call_cmd(epp_ctx, service, *loginid, request_id, cdata);
+		cstat = epp_call_cmd(epp_ctx, service, *loginid, request_id, has_contact_mailing_address_extension, cdata);
 	}
 
 	/* catch corba failures */
@@ -1088,8 +1089,10 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 
 			/* call function from corba backend */
 			if (!call_corba(epp_ctx, EPPservice, logger_service, cdata, pstat,
-						&login_id, &session_id, act_log_entry_id, &lang, sc->logd_mandatory))
+						&login_id, &session_id, act_log_entry_id, &lang, sc->logd_mandatory,
+						sc->has_contact_mailing_address_extension)) {
 				return HTTP_INTERNAL_SERVER_ERROR;
+			}
 			/* did successfull login occured? */
 			epplog(epp_ctx, EPP_DEBUG, "after corba call command "
 				"saved login id is %lld, login id is %d", *login_id_save, login_id);
@@ -1945,6 +1948,30 @@ static const char *set_defer_errors(cmd_parms *cmd, void *dummy,
 }
 
 /**
+ * Handler for apache's configuration directive "EPPcontactMailingAddressExtension".
+ *
+ * @param cmd     Command structure.
+ * @param dummy   Not used parameter.
+ * @param flag    1 if contacts feature mailing address extension, otherwise 0.
+ * @return        Error string in case of failure otherwise NULL.
+ */
+static const char *set_contact_mailing_address_extension(cmd_parms *cmd, void *dummy, int flag)
+{
+    server_rec* const s = cmd->server;
+    eppd_server_conf* const sc = (eppd_server_conf*)
+        ap_get_module_config(s->module_config, &eppd_module);
+
+    const char * const err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    if (err != NULL)
+    {
+        return err;
+    }
+
+    sc->has_contact_mailing_address_extension = flag;
+    return NULL;
+}
+
+/**
  * Structure containing mod_eppd's configuration directives and their
  * handler references.
  */
@@ -1969,13 +1996,15 @@ static const command_rec eppd_cmds[] = {
 	AP_INIT_TAKE1("EPPobject", set_epp_object, NULL, RSRC_CONF,
 			"Alias under which is the reference to EPP object "
 			"exported from mod_corba module. Default is \"EPP\"."),
-    	AP_INIT_TAKE1("EPPlogdObject", set_logger_object, NULL, RSRC_CONF,
+    AP_INIT_TAKE1("EPPlogdObject", set_logger_object, NULL, RSRC_CONF,
 			"Alias under which is the reference to Logger object "
 			"exported from mod_corba module. Default is \"\"."),
 	AP_INIT_TAKE1("EPPdeferErrors", set_defer_errors, NULL, RSRC_CONF,
 			"Integer value representing time value (in miliseconds)"
 			"for deferring error response from Central Registry."
 			"Default is 0 (zero)."),
+    AP_INIT_FLAG("EPPcontactMailingAddressExtension", set_contact_mailing_address_extension, NULL, RSRC_CONF,
+            "Whether contacts feature mailing address extension."),
 
 	{ NULL }
 };
@@ -1985,7 +2014,8 @@ static const command_rec eppd_cmds[] = {
  */
 static void *create_eppd_config(apr_pool_t *p, server_rec *s)
 {
-	eppd_server_conf *sc = (eppd_server_conf *) apr_pcalloc(p, sizeof(*sc));
+	eppd_server_conf* const sc = (eppd_server_conf*) apr_pcalloc(p, sizeof(*sc));
+	sc->has_contact_mailing_address_extension = 0;//default value means that contacts do not feature mailing address extension
 	return sc;
 }
 

@@ -930,10 +930,11 @@ epp_call_check(epp_context *epp_ctx,
  */
 static corba_status
 epp_call_info_contact(epp_context *epp_ctx,
-		service_EPP service,
-		unsigned long long loginid,
-		const ccReg_TID request_id,
-		epp_command_data *cdata)
+        service_EPP service,
+        unsigned long long loginid,
+        const ccReg_TID request_id,
+        int has_contact_mailing_address_extension,
+        epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_EppParams *c_params = NULL;
@@ -1123,8 +1124,8 @@ epp_call_info_contact(epp_context *epp_ctx,
 	}
 
     /* mailing address info */
-    if (c_contact->MailingAddress.is_set) {
-        epp_ext_item *ext_item = epp_malloc(epp_ctx->pool, sizeof *ext_item);
+    if (has_contact_mailing_address_extension && c_contact->MailingAddress.is_set) {
+        epp_ext_item* const ext_item = epp_malloc(epp_ctx->pool, sizeof *ext_item);
         if (ext_item == NULL) {
             goto error;
         }
@@ -2521,6 +2522,7 @@ epp_call_create_contact(epp_context *epp_ctx,
         service_EPP service,
         unsigned long long loginid,
         ccReg_TID request_id,
+        int has_contact_mailing_address_extension,
         epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
@@ -2656,7 +2658,8 @@ epp_call_create_contact(epp_context *epp_ctx,
     q_foreach(&create_contact->extensions) {
         epp_ext_item *ext_item = q_content(&create_contact->extensions);
 	    if (ext_item->extType == EPP_EXT_MAILING_ADDR) {
-	        if(ext_item->ext.ext_mailing_addr.command != mailing_addr_set) {
+	        if (!has_contact_mailing_address_extension ||
+                (ext_item->ext.ext_mailing_addr.command != mailing_addr_set)) {
 	            CORBA_free(c_contact);
 	            return CORBA_REMOTE_ERROR;
 	        }
@@ -3544,6 +3547,7 @@ epp_call_update_contact(epp_context *epp_ctx,
         service_EPP service,
         unsigned long long loginid,
         const ccReg_TID request_id,
+        int has_contact_mailing_address_extension,
         epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
@@ -3659,8 +3663,11 @@ epp_call_update_contact(epp_context *epp_ctx,
     c_contact->MailingAddress.data.CountryCode = wrap_str(NULL);
 
     q_foreach(&update_contact->extensions) {
-        epp_ext_item *ext_item = q_content(&update_contact->extensions);
+        epp_ext_item* const ext_item = q_content(&update_contact->extensions);
         if (ext_item->extType == EPP_EXT_MAILING_ADDR) {
+            if (!has_contact_mailing_address_extension) {
+                goto error_input;
+            }
             switch (ext_item->ext.ext_mailing_addr.command)
             {
                 case mailing_addr_set:
@@ -4789,14 +4796,15 @@ epp_call_getInfoResults(epp_context *epp_ctx,
 
 corba_status
 epp_call_cmd(epp_context *epp_ctx,
-		service_EPP service,
-		unsigned long long loginid,
-                const ccReg_TID request_id,
-		epp_command_data *cdata)
+        service_EPP service,
+        unsigned long long loginid,
+        const ccReg_TID request_id,
+        int has_contact_mailing_address_extension,
+        epp_command_data *cdata)
 {
-	corba_status	cstat;
+    corba_status cstat;
   
-        epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd %d)", cdata->type);
+    epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd %d)", cdata->type);
 	switch (cdata->type) {
 		case EPP_DUMMY:
 			cdata->noresdata = 1;
@@ -4820,7 +4828,7 @@ epp_call_cmd(epp_context *epp_ctx,
 			break;
 		case EPP_INFO_CONTACT:
 			cstat = epp_call_info_contact(epp_ctx, service, loginid, request_id,
-					cdata);
+                    has_contact_mailing_address_extension, cdata);
 			break;
 		case EPP_INFO_DOMAIN:
 			cstat = epp_call_info_domain(epp_ctx, service, loginid, request_id,
@@ -4862,7 +4870,7 @@ epp_call_cmd(epp_context *epp_ctx,
 			break;
 		case EPP_CREATE_CONTACT:
 			cstat = epp_call_create_contact(epp_ctx, service,loginid, request_id,
-					cdata);
+                    has_contact_mailing_address_extension, cdata);
 			break;
 		case EPP_CREATE_DOMAIN:
 			cstat = epp_call_create_domain(epp_ctx, service, loginid, request_id,
@@ -4908,7 +4916,7 @@ epp_call_cmd(epp_context *epp_ctx,
 		case EPP_UPDATE_CONTACT:
 			cdata->noresdata = 1;
 			cstat = epp_call_update_contact(epp_ctx, service,loginid, request_id,
-					cdata);
+                    has_contact_mailing_address_extension, cdata);
 			break;
 		case EPP_UPDATE_NSSET:
 			cdata->noresdata = 1;
