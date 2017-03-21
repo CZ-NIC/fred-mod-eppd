@@ -925,6 +925,7 @@ epp_call_check(epp_context *epp_ctx,
  * @param service EPP service.
  * @param loginid Session identifier.
  * @param request_id  fred-logd request ID
+ * @param has_contact_mailing_address_extension has to return information about mailing address of contact
  * @param cdata   Data from xml request.
  * @return        Status.
  */
@@ -2514,6 +2515,7 @@ static char convDisclBack(ccReg_Disclose discl)
  * @param service EPP service.
  * @param loginid Session identifier.
  * @param request_id  fred-logd request ID
+ * @param has_contact_mailing_address_extension has to check presence of contact's mailing address
  * @param cdata   Data from xml request.
  * @return        Status.
  */
@@ -3539,6 +3541,7 @@ error_input:
  * @param service EPP service.
  * @param loginid Session identifier.
  * @param request_id  fred-logd request ID
+ * @param has_contact_mailing_address_extension has to check presence of contact's mailing address
  * @param cdata   Data from xml request.
  * @return        Status.
  */
