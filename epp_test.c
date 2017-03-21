@@ -597,7 +597,7 @@ int main(int argc, char *argv[])
 			/* API: corba call */
 		    const int has_contact_mailing_address_extension = 0;
             // TODO ugly hack - supply a real ID
-			cstat = epp_call_cmd(&epp_ctx, service, loginid, 0, cdata, has_contact_mailing_address_extension);
+			cstat = epp_call_cmd(&epp_ctx, service, loginid, 0, has_contact_mailing_address_extension, cdata);
 		}
 		else {
 			fputs("XML PARSER error\n", stderr);
