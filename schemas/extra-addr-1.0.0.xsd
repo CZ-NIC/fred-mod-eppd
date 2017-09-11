@@ -43,11 +43,17 @@
     <!-- address type -->
     <complexType name="addrType">
         <sequence>
-            <element name="street" type="extra-addr:postalLineType" minOccurs="1" maxOccurs="3"/>
-            <element name="city" type="extra-addr:postalLineType"/>
-            <element name="sp" type="extra-addr:postalLineType" minOccurs="0"/>
-            <element name="pc" type="extra-addr:pcType"/>
-            <element name="cc" type="extra-addr:ccType"/>
+            <element name="addr">
+                <complexType>
+                    <sequence>
+                        <element name="street" type="extra-addr:postalLineType" minOccurs="1" maxOccurs="3"/>
+                        <element name="city" type="extra-addr:postalLineType"/>
+                        <element name="sp" type="extra-addr:postalLineType" minOccurs="0"/>
+                        <element name="pc" type="extra-addr:pcType"/>
+                        <element name="cc" type="extra-addr:ccType"/>
+                    </sequence>
+                </complexType>
+            </element>
         </sequence>
     </complexType>
 
