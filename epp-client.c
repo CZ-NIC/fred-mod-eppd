@@ -143,9 +143,9 @@ err_epp2idl(int eppcode)
 char *
 wrap_str(const char *str)
 {
-	if (str == NULL)
+	if (str == NULL) {
 		return CORBA_string_dup("");
-
+	}
 	return CORBA_string_dup(str);
 }
 
@@ -925,15 +925,17 @@ epp_call_check(epp_context *epp_ctx,
  * @param service EPP service.
  * @param loginid Session identifier.
  * @param request_id  fred-logd request ID
+ * @param has_contact_mailing_address_extension has to return information about mailing address of contact
  * @param cdata   Data from xml request.
  * @return        Status.
  */
 static corba_status
 epp_call_info_contact(epp_context *epp_ctx,
-		service_EPP service,
-		unsigned long long loginid,
-		const ccReg_TID request_id,
-		epp_command_data *cdata)
+        service_EPP service,
+        unsigned long long loginid,
+        const ccReg_TID request_id,
+        int has_contact_mailing_address_extension,
+        epp_command_data *cdata)
 {
 	CORBA_Environment ev[1];
 	ccReg_EppParams *c_params = NULL;
@@ -1121,6 +1123,41 @@ epp_call_info_contact(epp_context *epp_ctx,
 		info_contact->discl.notifyEmail =
 			(c_contact->DiscloseNotifyEmail == CORBA_TRUE) ? 1 : 0;
 	}
+
+    /* mailing address info */
+    if (has_contact_mailing_address_extension && c_contact->MailingAddress.is_set) {
+        epp_ext_item* const ext_item = epp_malloc(epp_ctx->pool, sizeof *ext_item);
+        if (ext_item == NULL) {
+            goto error;
+        }
+
+        ext_item->extType = EPP_EXT_MAILING_ADDR;
+        ext_item->ext.ext_mailing_addr.command = mailing_addr_info;
+
+        ext_item->ext.ext_mailing_addr.data.info.Street1 =
+                unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.Street1, &cerrno, "street1");
+        if (cerrno != 0) { goto error; }
+        ext_item->ext.ext_mailing_addr.data.info.Street2 =
+                unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.Street2, &cerrno, "street2");
+        if (cerrno != 0) { goto error; }
+        ext_item->ext.ext_mailing_addr.data.info.Street3 =
+                unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.Street3, &cerrno, "street3");
+        if (cerrno != 0) { goto error; }
+        ext_item->ext.ext_mailing_addr.data.info.City =
+                unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.City, &cerrno, "city");
+        if (cerrno != 0) { goto error; }
+        ext_item->ext.ext_mailing_addr.data.info.StateOrProvince =
+                unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.StateOrProvince, &cerrno, "stateorprovince");
+        if (cerrno != 0) { goto error; }
+        ext_item->ext.ext_mailing_addr.data.info.PostalCode =
+                unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.PostalCode, &cerrno, "postalcode");
+        if (cerrno != 0) { goto error; }
+        ext_item->ext.ext_mailing_addr.data.info.CountryCode =
+                unwrap_str_req(epp_ctx, c_contact->MailingAddress.data.CountryCode, &cerrno, "countrycode");
+        if (cerrno != 0) { goto error; }
+
+        if (q_add(epp_ctx->pool, &info_contact->extensions, ext_item)) { goto error; }
+    }
 
 	CORBA_free(c_contact);
 	return epilog_success(epp_ctx, cdata, response);
@@ -2452,26 +2489,23 @@ convIdentType(epp_identType our_ident)
 static ccReg_Disclose
 convDiscl(char flag)
 {
-	switch (flag) {
-		case  1: return ccReg_DISCL_DISPLAY; break;
-		case  0: return ccReg_DISCL_HIDE; break;
-		case -1: return ccReg_DISCL_EMPTY; break;
-		default: assert(0); break;
-	}
-	/* never reached */
-	return ccReg_DISCL_EMPTY;
+    switch (flag)
+    {
+        case  1: return ccReg_DISCL_DISPLAY;
+        case  0: return ccReg_DISCL_HIDE;
+        case -1: return ccReg_DISCL_EMPTY;
+        default: assert(0);
+    }
 }
-
-
 
 static char convDisclBack(ccReg_Disclose discl)
 {
-	if (discl == ccReg_DISCL_HIDE)
-		return 0;
-	else if (discl == ccReg_DISCL_DISPLAY)
-		return 1;
-	else
-		return -1;
+    switch (discl)
+    {
+        case ccReg_DISCL_HIDE: return 0;
+        case ccReg_DISCL_DISPLAY: return 1;
+        default: return -1;
+    }
 }
 
 /**
@@ -2481,25 +2515,23 @@ static char convDisclBack(ccReg_Disclose discl)
  * @param service EPP service.
  * @param loginid Session identifier.
  * @param request_id  fred-logd request ID
+ * @param has_contact_mailing_address_extension has to check presence of contact's mailing address
  * @param cdata   Data from xml request.
  * @return        Status.
  */
 static corba_status
 epp_call_create_contact(epp_context *epp_ctx,
-		service_EPP service,
-		unsigned long long loginid,
-                const ccReg_TID request_id,
-		epp_command_data *cdata)
+        service_EPP service,
+        unsigned long long loginid,
+        ccReg_TID request_id,
+        int has_contact_mailing_address_extension,
+        epp_command_data *cdata)
 {
-	CORBA_Environment ev[1];
-	CORBA_char	*c_crDate;
-	ccReg_ContactChange	*c_contact;
-	ccReg_Response *response;
-        ccReg_EppParams *c_params = NULL;
-	int	retr, cerrno, len, i;
-	epps_create_contact	*create_contact;
-
-	create_contact = cdata->data;
+    CORBA_Environment ev[1];
+    CORBA_char *c_crDate;
+    ccReg_Response *response;
+    int retr, cerrno, len;
+    epps_create_contact *create_contact = cdata->data;
 	/*
 	 * Input parameters:
 	 *    id        (a)
@@ -2513,9 +2545,8 @@ epp_call_create_contact(epp_context *epp_ctx,
 	assert(cdata->xml_in);
 
 	/* fill in corba input values */
-	c_contact = ccReg_ContactChange__alloc();
+	ccReg_ContactData *c_contact = ccReg_ContactChange__alloc();
 	if (c_contact == NULL) {
-		
 		return CORBA_INT_ERROR;
 	}
 	c_contact->AuthInfoPw = wrap_str(create_contact->authInfo);
@@ -2596,14 +2627,14 @@ epp_call_create_contact(epp_context *epp_ctx,
 	}
 	c_contact->Streets._maximum = c_contact->Streets._length = len;
 	c_contact->Streets._release = CORBA_TRUE;
-	i = 0;
+	int idx = 0;
 	q_foreach(&create_contact->pi.streets) {
-		c_contact->Streets._buffer[i] =
-			wrap_str(q_content(&create_contact->pi.streets));
-		if (c_contact->Streets._buffer[i++] == NULL) {
+		c_contact->Streets._buffer[idx] = wrap_str(q_content(&create_contact->pi.streets));
+		if (c_contact->Streets._buffer[idx] == NULL) {
 			CORBA_free(c_contact);
 			return CORBA_INT_ERROR;
 		}
+		++idx;
 	}
 	c_contact->City = wrap_str(create_contact->pi.city);
 	if (c_contact->City == NULL) {
@@ -2626,48 +2657,111 @@ epp_call_create_contact(epp_context *epp_ctx,
 		return CORBA_INT_ERROR;
 	}
 
-	c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
-	if(c_params == NULL) {
-		CORBA_free(c_contact);
-		return CORBA_INT_ERROR;
+    q_foreach(&create_contact->extensions) {
+        epp_ext_item *ext_item = q_content(&create_contact->extensions);
+	    if (ext_item->extType == EPP_EXT_MAILING_ADDR) {
+	        if (!has_contact_mailing_address_extension ||
+                (ext_item->ext.ext_mailing_addr.command != mailing_addr_set)) {
+	            CORBA_free(c_contact);
+	            return CORBA_REMOTE_ERROR;
+	        }
+
+	        epp_ext_mailingAddr_set* data = &ext_item->ext.ext_mailing_addr.data.set;
+
+	        c_contact->MailingAddress.is_set = 1;
+
+	        c_contact->MailingAddress.data.Street1 = wrap_str(data->Street1);
+	        if (c_contact->MailingAddress.data.Street1 == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.Street2 = wrap_str(data->Street2);
+	        if (c_contact->MailingAddress.data.Street2 == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.Street3 = wrap_str(data->Street3);
+	        if (c_contact->MailingAddress.data.Street3 == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.City = wrap_str(data->City);
+	        if (c_contact->MailingAddress.data.City == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.StateOrProvince = wrap_str(data->StateOrProvince);
+	        if (c_contact->MailingAddress.data.StateOrProvince == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.PostalCode = wrap_str(data->PostalCode);
+	        if (c_contact->MailingAddress.data.PostalCode == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	        c_contact->MailingAddress.data.CountryCode = wrap_str(data->CountryCode);
+	        if (c_contact->MailingAddress.data.CountryCode == NULL) {
+	            CORBA_free(c_contact);
+	            return CORBA_INT_ERROR;
+	        }
+	    }
 	}
 
-	for (retr = 0; retr < MAX_RETRIES; retr++) {
-		if (retr != 0) CORBA_exception_free(ev);
-		CORBA_exception_init(ev);
-
-		/* send new contact in repository */
-		response = ccReg_EPP_ContactCreate((ccReg_EPP) service,
-				create_contact->id,
-				c_contact,
-				&c_crDate,
-                                c_params,
-				ev);
-
-		/* if COMM_FAILURE exception is not raised quit retry loop */
-		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
-			break;
-		usleep(RETR_SLEEP);
-	}
-	CORBA_free(c_contact);
-        CORBA_free(c_params);
-
-	/* if it is exception then return */
-	if (raised_exception(ev))
-		return handle_exception(epp_ctx, cdata, ev);
-
-	CLEAR_CERRNO(cerrno);
-
-	create_contact->crDate = unwrap_str_req(epp_ctx, c_crDate, &cerrno,
-			"crDate");
-	if (cerrno != 0) {
-		CORBA_free(c_crDate);
-		CORBA_free(response);
-		return CORBA_INT_ERROR;
-	}
-
-	CORBA_free(c_crDate);
-	return epilog_success(epp_ctx, cdata, response);
+    if (c_contact->MailingAddress.data.Street1 == NULL) {
+        c_contact->MailingAddress.data.Street1 = wrap_str(NULL);
+        c_contact->MailingAddress.data.Street2 = wrap_str(NULL);
+        c_contact->MailingAddress.data.Street3 = wrap_str(NULL);
+        c_contact->MailingAddress.data.City = wrap_str(NULL);
+        c_contact->MailingAddress.data.StateOrProvince = wrap_str(NULL);
+        c_contact->MailingAddress.data.PostalCode = wrap_str(NULL);
+        c_contact->MailingAddress.data.CountryCode = wrap_str(NULL);
+    }
+    
+    ccReg_EppParams *c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
+    if (c_params == NULL) {
+        CORBA_free(c_contact);
+        return CORBA_INT_ERROR;
+    }
+    
+    for (retr = 0; retr < MAX_RETRIES; retr++) {
+        if (retr != 0) {
+            CORBA_exception_free(ev);
+        }
+        CORBA_exception_init(ev);
+    
+        /* send new contact in repository */
+        response = ccReg_EPP_ContactCreate((ccReg_EPP) service,
+                create_contact->id,
+                c_contact,
+                &c_crDate,
+                c_params,
+                ev);
+    
+        /* if COMM_FAILURE exception is not raised quit retry loop */
+        if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev)) {
+            break;
+        }
+        usleep(RETR_SLEEP);
+    }
+    CORBA_free(c_contact);
+    CORBA_free(c_params);
+    
+    /* if it is exception then return */
+    if (raised_exception(ev)) {
+        return handle_exception(epp_ctx, cdata, ev);
+    }
+    CLEAR_CERRNO(cerrno);
+    
+    create_contact->crDate = unwrap_str_req(epp_ctx, c_crDate, &cerrno, "crDate");
+    if (cerrno != 0) {
+        CORBA_free(c_crDate);
+        CORBA_free(response);
+        return CORBA_INT_ERROR;
+    }
+    
+    CORBA_free(c_crDate);
+    return epilog_success(epp_ctx, cdata, response);
 }
 
 /**
@@ -3447,27 +3541,23 @@ error_input:
  * @param service EPP service.
  * @param loginid Session identifier.
  * @param request_id  fred-logd request ID
+ * @param has_contact_mailing_address_extension has to check presence of contact's mailing address
  * @param cdata   Data from xml request.
  * @return        Status.
  */
 static corba_status
 epp_call_update_contact(epp_context *epp_ctx,
-		service_EPP service,
-		unsigned long long loginid,
-                const ccReg_TID request_id,
-		epp_command_data *cdata)
+        service_EPP service,
+        unsigned long long loginid,
+        const ccReg_TID request_id,
+        int has_contact_mailing_address_extension,
+        epp_command_data *cdata)
 {
-	CORBA_Environment ev[1];
-	ccReg_Response	*response;
-	ccReg_ContactChange	*c_contact;
-        ccReg_EppParams         *c_params;
-	int	retr, len, i, input_ok;
-	epps_update_contact	*update_contact;
-
-	input_ok = 0;
-	update_contact = cdata->data;
-	c_contact    = NULL;
-	c_params     = NULL;
+    CORBA_Environment ev[1];
+    ccReg_Response *response = NULL;
+    int input_ok = 0;
+    epps_update_contact *update_contact = cdata->data;
+    ccReg_EppParams *c_params = NULL;
 	/*
 	 * Input parameters:
 	 *    id (a)
@@ -3481,34 +3571,33 @@ epp_call_update_contact(epp_context *epp_ctx,
 	assert(cdata->xml_in);
 
 	/* c_contact */
-	c_contact = ccReg_ContactChange__alloc();
-	if (c_contact == NULL) goto error_input;
+	ccReg_ContactChange *c_contact = ccReg_ContactChange__alloc();
+	if (c_contact == NULL) { goto error_input; }
 	/*
 	 * Here we will change allocation schema: first do all allocs and then
 	 * check success.
 	 */
 	if (update_contact->pi != NULL) {
-		c_contact->Name    = wrap_str(update_contact->pi->name);
+		c_contact->Name = wrap_str(update_contact->pi->name);
 		c_contact->Organization = wrap_str_upd(update_contact->pi->org);
 
-		len = q_length(update_contact->pi->streets);
+		int len = q_length(update_contact->pi->streets);
 		c_contact->Streets._buffer = ccReg_Lists_allocbuf(len);
-		if (len != 0 && c_contact->Streets._buffer == NULL)
-			goto error_input;
+		if ((len != 0) && (c_contact->Streets._buffer == NULL)) { goto error_input; }
 		c_contact->Streets._maximum = c_contact->Streets._length = len;
 		c_contact->Streets._release = CORBA_TRUE;
-		i = 0;
+		int i = 0;
 		q_foreach(&update_contact->pi->streets) {
 			c_contact->Streets._buffer[i] = wrap_str(
 					q_content(&update_contact->pi->streets));
-			if (c_contact->Streets._buffer[i++] == NULL)
-				goto error_input;
+			if (c_contact->Streets._buffer[i] == NULL) { goto error_input; }
+			++i;
 		}
 
-		c_contact->City    = wrap_str_upd(update_contact->pi->city);
-		c_contact->StateOrProvince =wrap_str_upd(update_contact->pi->sp);
+		c_contact->City = wrap_str_upd(update_contact->pi->city);
+		c_contact->StateOrProvince = wrap_str_upd(update_contact->pi->sp);
 		c_contact->PostalCode = wrap_str_upd(update_contact->pi->pc);
-		c_contact->CC      = wrap_str_upd(update_contact->pi->cc);
+		c_contact->CC = wrap_str_upd(update_contact->pi->cc);
 	}
 	else {
 		c_contact->Name = wrap_str(NULL);
@@ -3519,14 +3608,15 @@ epp_call_update_contact(epp_context *epp_ctx,
 		c_contact->PostalCode = wrap_str(NULL);
 		c_contact->CC = wrap_str(NULL);
 	}
-	if (c_contact->Name == NULL ||
-	    c_contact->Organization == NULL ||
-	    c_contact->City == NULL ||
-	    c_contact->StateOrProvince == NULL ||
-	    c_contact->PostalCode == NULL ||
-	    c_contact->CC == NULL)
+	if ((c_contact->Name == NULL) ||
+	    (c_contact->Organization == NULL) ||
+	    (c_contact->City == NULL) ||
+	    (c_contact->StateOrProvince == NULL) ||
+	    (c_contact->PostalCode == NULL) ||
+	    (c_contact->CC == NULL))
+	{
 		goto error_input;
-
+	}
 	c_contact->AuthInfoPw = wrap_str_upd(update_contact->authInfo);
 	if (c_contact->AuthInfoPw == NULL) goto error_input;
 	c_contact->Telephone = wrap_str_upd(update_contact->voice);
@@ -3565,39 +3655,102 @@ epp_call_update_contact(epp_context *epp_ctx,
 			(update_contact->discl.notifyEmail ? CORBA_TRUE : CORBA_FALSE);
 	}
 
+	/* default */
+	c_contact->MailingAddress.action = ccReg_no_change;
+    c_contact->MailingAddress.data.Street1 = wrap_str(NULL);
+    c_contact->MailingAddress.data.Street2 = wrap_str(NULL);
+    c_contact->MailingAddress.data.Street3 = wrap_str(NULL);
+    c_contact->MailingAddress.data.City = wrap_str(NULL);
+    c_contact->MailingAddress.data.StateOrProvince = wrap_str(NULL);
+    c_contact->MailingAddress.data.PostalCode = wrap_str(NULL);
+    c_contact->MailingAddress.data.CountryCode = wrap_str(NULL);
+
+    q_foreach(&update_contact->extensions) {
+        epp_ext_item* const ext_item = q_content(&update_contact->extensions);
+        if (ext_item->extType == EPP_EXT_MAILING_ADDR) {
+            if (!has_contact_mailing_address_extension) {
+                goto error_input;
+            }
+            switch (ext_item->ext.ext_mailing_addr.command)
+            {
+                case mailing_addr_set:
+                {
+                    epp_ext_mailingAddr_set* data = &ext_item->ext.ext_mailing_addr.data.set;
+    
+                    c_contact->MailingAddress.action = ccReg_set;
+
+                    CORBA_free(c_contact->MailingAddress.data.Street1);
+                    CORBA_free(c_contact->MailingAddress.data.Street2);
+                    CORBA_free(c_contact->MailingAddress.data.Street3);
+                    CORBA_free(c_contact->MailingAddress.data.City);
+                    CORBA_free(c_contact->MailingAddress.data.StateOrProvince);
+                    CORBA_free(c_contact->MailingAddress.data.PostalCode);
+                    CORBA_free(c_contact->MailingAddress.data.CountryCode);
+                    c_contact->MailingAddress.data.Street1 = wrap_str(data->Street1);
+                    c_contact->MailingAddress.data.Street2 = wrap_str(data->Street2);
+                    c_contact->MailingAddress.data.Street3 = wrap_str(data->Street3);
+                    c_contact->MailingAddress.data.City = wrap_str(data->City);
+                    c_contact->MailingAddress.data.StateOrProvince = wrap_str(data->StateOrProvince);
+                    c_contact->MailingAddress.data.PostalCode = wrap_str(data->PostalCode);
+                    c_contact->MailingAddress.data.CountryCode = wrap_str(data->CountryCode);
+    
+                    if ((c_contact->MailingAddress.data.Street1 == NULL) ||
+                        (c_contact->MailingAddress.data.Street2 == NULL) ||
+                        (c_contact->MailingAddress.data.Street3 == NULL) ||
+                        (c_contact->MailingAddress.data.City == NULL) ||
+                        (c_contact->MailingAddress.data.StateOrProvince == NULL) ||
+                        (c_contact->MailingAddress.data.PostalCode == NULL) ||
+                        (c_contact->MailingAddress.data.CountryCode == NULL))
+                    {
+                        goto error_input;
+                    }
+                    break;
+                }
+                case mailing_addr_remove:
+                {
+                    c_contact->MailingAddress.action = ccReg_remove;
+                    break;
+                }
+                default:
+                    goto error_input;
+            }
+        }
+    }
+
 	c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
 	if (c_params == NULL) {
 			goto error_input;
 	}
 
-	for (retr = 0; retr < MAX_RETRIES; retr++) {
-		if (retr != 0) CORBA_exception_free(ev);
-		CORBA_exception_init(ev);
-
-		/* send the updates to repository */
-		response = ccReg_EPP_ContactUpdate((ccReg_EPP) service,
-				update_contact->id,
-				c_contact,
-                                c_params,
-				ev);
-
-		/* if COMM_FAILURE exception is not raised quit retry loop */
-		if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
-			break;
-		usleep(RETR_SLEEP);
-	}
-	input_ok = 1;
+    for (int retr = 0; retr < MAX_RETRIES; ++retr) {
+        if (retr != 0) {
+            CORBA_exception_free(ev);
+        }
+        CORBA_exception_init(ev);
+    
+        /* send the updates to repository */
+        response = ccReg_EPP_ContactUpdate((ccReg_EPP) service,
+                update_contact->id,
+                c_contact,
+                c_params,
+                ev);
+    
+        /* if COMM_FAILURE exception is not raised quit retry loop */
+        if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev)) { break; }
+        usleep(RETR_SLEEP);
+    }
+    input_ok = 1;
 
 error_input:
 	CORBA_free(c_contact);
 	CORBA_free(c_params);
-	if (!input_ok)
+	if (!input_ok) {
 		return CORBA_INT_ERROR;
-
+	}
 	/* if it is exception then return */
-	if (raised_exception(ev))
+	if (raised_exception(ev)) {
 		return handle_exception(epp_ctx, cdata, ev);
-
+    }
 	return epilog_success(epp_ctx, cdata, response);
 }
 
@@ -4646,14 +4799,15 @@ epp_call_getInfoResults(epp_context *epp_ctx,
 
 corba_status
 epp_call_cmd(epp_context *epp_ctx,
-		service_EPP service,
-		unsigned long long loginid,
-                const ccReg_TID request_id,
-		epp_command_data *cdata)
+        service_EPP service,
+        unsigned long long loginid,
+        const ccReg_TID request_id,
+        int has_contact_mailing_address_extension,
+        epp_command_data *cdata)
 {
-	corba_status	cstat;
+    corba_status cstat;
   
-        epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd %d)", cdata->type);
+    epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd %d)", cdata->type);
 	switch (cdata->type) {
 		case EPP_DUMMY:
 			cdata->noresdata = 1;
@@ -4677,7 +4831,7 @@ epp_call_cmd(epp_context *epp_ctx,
 			break;
 		case EPP_INFO_CONTACT:
 			cstat = epp_call_info_contact(epp_ctx, service, loginid, request_id,
-					cdata);
+                    has_contact_mailing_address_extension, cdata);
 			break;
 		case EPP_INFO_DOMAIN:
 			cstat = epp_call_info_domain(epp_ctx, service, loginid, request_id,
@@ -4719,7 +4873,7 @@ epp_call_cmd(epp_context *epp_ctx,
 			break;
 		case EPP_CREATE_CONTACT:
 			cstat = epp_call_create_contact(epp_ctx, service,loginid, request_id,
-					cdata);
+                    has_contact_mailing_address_extension, cdata);
 			break;
 		case EPP_CREATE_DOMAIN:
 			cstat = epp_call_create_domain(epp_ctx, service, loginid, request_id,
@@ -4765,7 +4919,7 @@ epp_call_cmd(epp_context *epp_ctx,
 		case EPP_UPDATE_CONTACT:
 			cdata->noresdata = 1;
 			cstat = epp_call_update_contact(epp_ctx, service,loginid, request_id,
-					cdata);
+                    has_contact_mailing_address_extension, cdata);
 			break;
 		case EPP_UPDATE_NSSET:
 			cdata->noresdata = 1;

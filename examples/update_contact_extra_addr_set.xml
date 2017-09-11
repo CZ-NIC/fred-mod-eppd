@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<epp xmlns="urn:ietf:params:xml:ns:epp-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0 epp-1.0.xsd">
+    <command>
+        <update>
+            <contact:update xmlns:contact="http://www.nic.cz/xml/epp/contact-1.6" xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.6 contact-1.6.xsd">
+                <contact:id>CONTACTEXTRAADDR</contact:id>
+                <contact:chg>
+                    <contact:voice>+420.000000001</contact:voice>
+                    <contact:notifyEmail>foobar-notify@nic.cz</contact:notifyEmail>
+                </contact:chg>
+            </contact:update>
+        </update>
+        <extension>
+            <extra-addr:update xmlns:extra-addr="http://www.nic.cz/xml/epp/extra-addr-1.0" xsi:schemaLocation="http://www.nic.cz/xml/epp/extra-addr-1.0 extra-addr-1.0.xsd">
+                <extra-addr:mailing>
+                    <extra-addr:set>
+                        <extra-addr:addr>
+                            <extra-addr:street>Dlouha 24</extra-addr:street>
+                            <extra-addr:city>Lysa nad Labem</extra-addr:city>
+                            <extra-addr:pc>28922</extra-addr:pc>
+                            <extra-addr:cc>CZ</extra-addr:cc>
+                        </extra-addr:addr>
+                    </extra-addr:set>
+                </extra-addr:mailing>
+            </extra-addr:update>
+        </extension>
+        <clTRID>zbab002#15-08-25at17:37:28</clTRID>
+    </command>
+</epp>

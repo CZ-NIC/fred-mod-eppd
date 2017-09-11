@@ -147,16 +147,18 @@ epp_call_logout(epp_context *epp_ctx,
  * @param epp_ctx     Epp context (pool, connection and session id).
  * @param service     EPP service.
  * @param loginid     Session identifier
- * @param request_id      fred-logd request ID
+ * @param request_id  fred-logd request ID
+ * @param has_contact_mailing_address_extension given capability is enabled
  * @param cdata       Data from parsed xml command.
  * @return            Status.
  */
 corba_status
 epp_call_cmd(epp_context *epp_ctx,
-		service_EPP service,
-		unsigned long long loginid,
-                const ccReg_TID request_id,
-		epp_command_data *cdata);
+        service_EPP service,
+        unsigned long long loginid,
+        const ccReg_TID request_id,
+        int has_contact_mailing_address_extension,
+        epp_command_data *cdata);
 
 /**
  * This function calls corba function which saves generated XML in database.

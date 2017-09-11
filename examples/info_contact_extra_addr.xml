@@ -3,7 +3,7 @@
   <command>
     <info>
       <contact:info xmlns:contact="http://www.nic.cz/xml/epp/contact-1.6" xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.6 contact-1.6.xsd">
-        <contact:id>ABC</contact:id>
+        <contact:id>CONTACTEXTRAADDR</contact:id>
       </contact:info>
     </info>
     <clTRID>ABC-12346</clTRID>

@@ -39,6 +39,10 @@
 #define NS_FRED		"http://www.nic.cz/xml/epp/fred-1.5"
 /** Our custom namespace used for enum validation extension */
 #define NS_ENUMVAL	"http://www.nic.cz/xml/epp/enumval-1.2"
+/** Our custom namespace used for extra contact address extension */
+#define NS_EXTRAADDR  "http://www.nic.cz/xml/epp/extra-addr-1.0"
+
+
 /** Namespace + location of epp xml schema */
 #define LOC_EPP	NS_EPP " epp-1.0.xsd"
 /** Namespace + location of contact xml schema */
@@ -53,6 +57,8 @@
 #define LOC_FRED	NS_FRED " fred-1.5.0.xsd"
 /** Namespace + location of enumval xml schema */
 #define LOC_ENUMVAL	NS_ENUMVAL " enumval-1.2.0.xsd"
+/** Namespace + location of extraaddr xml schema */
+#define LOC_EXTRAADDR NS_EXTRAADDR " extra-addr-1.0.xsd"
 
 /**
  * Enumaration of statuses returned by validator.

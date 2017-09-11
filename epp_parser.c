@@ -2580,20 +2580,180 @@ parse_ext_enumval_renew(void *pool,
 
 	str = xpath_get1(pool, xpathCtx, 
 			"enumval:publish", 0, &xerr);
-	if(str == NULL) {
+	if (str == NULL) {
 		ext_item->ext.ext_enum.publish = -1;
-	} else {	
+	}
+	else {	
 		ext_item->ext.ext_enum.publish = parse_boolean(str);
 	}
 
-	if (q_add(pool, &renew->extensions, ext_item))
-		goto error;
-	return;
-
+	if (!q_add(pool, &renew->extensions, ext_item)) {
+	    return;
+	}
 error:
 	cdata->rc = 2400;
 	cdata->type = EPP_DUMMY;
 }
+
+/**
+ * Parser of extraaddr extension in context of create contact command.
+ *
+ * @param pool      Pool for memory allocations.
+ * @param xpathCtx  XPath context.
+ * @param cdata     Output of parsing stage.
+ */
+static void parse_ext_extraaddr_create(
+    void *pool,
+    xmlXPathContextPtr xpathCtx,
+    epp_command_data *cdata)
+{
+    epps_create_contact *create_contact = cdata->data;
+    int xerr = -1;
+
+    /* assure we are being called in corect context */
+    if (cdata->type != EPP_CREATE_CONTACT)
+    {
+        cdata->rc = 2002;
+        cdata->type = EPP_DUMMY;
+        return;
+    }
+
+    RESET_XERR(xerr);
+
+    epp_ext_item *ext_item = epp_calloc(pool, sizeof *ext_item);
+    if (ext_item == NULL) {
+        goto error;
+    }
+    ext_item->extType = EPP_EXT_MAILING_ADDR;
+
+    xpath_chroot(xpathCtx, "//extra-addr:create/extra-addr:mailing/extra-addr:addr", 0, &xerr);
+    if (xerr == XERR_LIBXML) {
+        goto error;
+    }
+    if (xerr != XERR_OK) {
+        /* unexpected object type or missing node */
+        cdata->rc = 2000;
+        cdata->type = EPP_DUMMY;
+        return;
+    }
+    ext_item->ext.ext_mailing_addr.command = mailing_addr_set;
+    ext_item->ext.ext_mailing_addr.data.set.Street1 = xpath_get1(pool, xpathCtx, "extra-addr:street[1]", 0, &xerr);
+    CHK_XERR(xerr, error);
+    ext_item->ext.ext_mailing_addr.data.set.Street2 = xpath_get1(pool, xpathCtx, "extra-addr:street[2]", 0, &xerr);
+    CHK_XERR(xerr, error);
+    ext_item->ext.ext_mailing_addr.data.set.Street3 = xpath_get1(pool, xpathCtx, "extra-addr:street[3]", 0, &xerr);
+    CHK_XERR(xerr, error);
+    ext_item->ext.ext_mailing_addr.data.set.City = xpath_get1(pool, xpathCtx, "extra-addr:city", 0, &xerr);
+    CHK_XERR(xerr, error);
+    ext_item->ext.ext_mailing_addr.data.set.PostalCode = xpath_get1(pool, xpathCtx, "extra-addr:pc", 0, &xerr);
+    CHK_XERR(xerr, error);
+    ext_item->ext.ext_mailing_addr.data.set.StateOrProvince = xpath_get1(pool, xpathCtx, "extra-addr:sp", 0, &xerr);
+    CHK_XERR(xerr, error);
+    ext_item->ext.ext_mailing_addr.data.set.CountryCode = xpath_get1(pool, xpathCtx, "extra-addr:cc", 0, &xerr);
+    CHK_XERR(xerr, error);
+
+    if (!q_add(pool, &create_contact->extensions, ext_item)) {
+        return;
+    }
+
+error:
+    cdata->rc = 2400;
+    cdata->type = EPP_DUMMY;
+}
+
+/**
+ * Parser of extraaddr extension in context of update contact command.
+ *
+ * @param pool      Pool for memory allocations.
+ * @param xpathCtx  XPath context.
+ * @param cdata     Output of parsing stage.
+ */
+static void parse_ext_extraaddr_update(
+    void *pool,
+    xmlXPathContextPtr xpathCtx,
+    epp_command_data *cdata)
+{
+    epps_update_contact *update_contact = cdata->data;
+
+    /* assure we are being called in corect context */
+    if (cdata->type != EPP_UPDATE_CONTACT)
+    {
+        cdata->rc = 2002;
+        cdata->type = EPP_DUMMY;
+        return;
+    }
+
+    epp_ext_item *ext_item = epp_calloc(pool, sizeof *ext_item);
+    int xerr = -1;
+    if (ext_item == NULL) {
+        goto error;
+    }
+
+    RESET_XERR(xerr);
+
+    xpath_chroot(xpathCtx, "//extra-addr:update/extra-addr:mailing", 0, &xerr);
+    if (xerr == XERR_LIBXML) {
+        goto error;
+    }
+    if (xerr != XERR_OK) {
+        /* unexpected object type or missing node */
+        cdata->rc = 2000;
+        cdata->type = EPP_DUMMY;
+        return;
+    }
+    CHK_XERR(xerr, error);
+
+    ext_item->extType = EPP_EXT_MAILING_ADDR;
+
+    if (xpath_get1(pool, xpathCtx, "extra-addr:rem", 0, &xerr) != NULL) {
+        ext_item->ext.ext_mailing_addr.command = mailing_addr_remove;
+    }
+    else if (xpath_get1(pool, xpathCtx, "extra-addr:set/extra-addr:addr", 0, &xerr) != NULL) {
+        ext_item->ext.ext_mailing_addr.command = mailing_addr_set;
+
+        xpath_chroot(xpathCtx, "//extra-addr:update/extra-addr:mailing/extra-addr:set/extra-addr:addr", 0, &xerr);
+        if (xerr == XERR_LIBXML) {
+            goto error;
+        }
+        if (xerr != XERR_OK) {
+            /* unexpected object type or missing node */
+            cdata->rc = 2000;
+            cdata->type = EPP_DUMMY;
+            return;
+        }
+        CHK_XERR(xerr, error);
+
+        ext_item->ext.ext_mailing_addr.data.set.Street1         = xpath_get1(pool, xpathCtx, "extra-addr:street[1]", 0, &xerr);
+        CHK_XERR(xerr, error);
+        ext_item->ext.ext_mailing_addr.data.set.Street2         = xpath_get1(pool, xpathCtx, "extra-addr:street[2]", 0, &xerr);
+        CHK_XERR(xerr, error);
+        ext_item->ext.ext_mailing_addr.data.set.Street3         = xpath_get1(pool, xpathCtx, "extra-addr:street[3]", 0, &xerr);
+        CHK_XERR(xerr, error);
+        ext_item->ext.ext_mailing_addr.data.set.City            = xpath_get1(pool, xpathCtx, "extra-addr:city", 0, &xerr);
+        CHK_XERR(xerr, error);
+        ext_item->ext.ext_mailing_addr.data.set.PostalCode      = xpath_get1(pool, xpathCtx, "extra-addr:pc", 0, &xerr);
+        CHK_XERR(xerr, error);
+        ext_item->ext.ext_mailing_addr.data.set.StateOrProvince = xpath_get1(pool, xpathCtx, "extra-addr:sp", 0, &xerr);
+        CHK_XERR(xerr, error);
+        ext_item->ext.ext_mailing_addr.data.set.CountryCode     = xpath_get1(pool, xpathCtx, "extra-addr:cc", 0, &xerr);
+        CHK_XERR(xerr, error);
+
+    }
+    else {
+        /* unexpected extraaddr command */
+        cdata->rc = 2000;
+        cdata->type = EPP_DUMMY;
+        return;
+    }
+
+    if (!q_add(pool, &update_contact->extensions, ext_item)) {
+        return;
+    }
+error:
+    cdata->rc = 2400;
+    cdata->type = EPP_DUMMY;
+}
+
 
 /**
  * Generic parser of EPP command section.
@@ -2696,8 +2856,6 @@ parse_command(void *pool,
 
 	/* parse command extensions only if error did not occur */
 	if (cdata->type != EPP_DUMMY) {
-		int	i;
-
 		/* restore relative root */
 		xpathCtx->node = node;
 
@@ -2707,44 +2865,57 @@ parse_command(void *pool,
 			return PARSER_EINTERNAL;
 		}
 		/* iterate through extensions */
-		for (i = 0; i < xmlXPathNodeSetGetLength(xpathObj->nodesetval);
-				i++)
-		{
-			const char	*ext_name;
-			const char	*ext_ns;
-			xmlNodePtr	 ext_node;
+        for (int i = 0; i < xmlXPathNodeSetGetLength(xpathObj->nodesetval); ++i)
+        {
+            const xmlNodePtr ext_node = xmlXPathNodeSetItem(xpathObj->nodesetval, i);
+            xpathCtx->node = ext_node;
+            const char *const ext_ns = (ext_node->ns) ? (char *)ext_node->ns->href
+                                    : NULL;
+            if (ext_ns == NULL) { continue; }
+            if (!strcmp(ext_ns, NS_ENUMVAL)) {
+                const char *const ext_name = (char *)ext_node->name;
+                if (!strcmp(ext_name, "create")) {
+                    parse_ext_enumval_create(pool, xpathCtx, cdata);
+                }
+                else if (!strcmp(ext_name, "update")) {
+                    parse_ext_enumval_update(pool, xpathCtx, cdata);
+                }
+                else if (!strcmp(ext_name, "renew")) {
+                    parse_ext_enumval_renew(pool, xpathCtx, cdata);
+                }
+                else {
+                    /* unknown enumval command */
+                    cdata->rc = 2000; /* "Unknown command" */
+                    cdata->type = EPP_DUMMY;
+                    break;
+                }
+            }
+            else if (!strcmp(ext_ns, NS_EXTRAADDR)) {
+                const char *const ext_name = (char *)ext_node->name;
 
-			ext_node = xmlXPathNodeSetItem(xpathObj->nodesetval, i);
-			xpathCtx->node = ext_node;
-			ext_ns   = (ext_node->ns) ?
-				(char *) ext_node->ns->href : NULL;
-			if (ext_ns == NULL)
-				continue;
-			if (!strcmp(ext_ns, NS_ENUMVAL)) {
-				ext_name = (char *) ext_node->name;
-				if (!strcmp(ext_name, "create"))
-					parse_ext_enumval_create(pool, xpathCtx,
-							cdata);
-				else if (!strcmp(ext_name, "update"))
-					parse_ext_enumval_update(pool, xpathCtx,
-							cdata);
-				else if (!strcmp(ext_name, "renew"))
-					parse_ext_enumval_renew(pool, xpathCtx,
-							cdata);
-				else {
-					/* unknown enumval command */
-					cdata->rc = 2000; /* "Unknown command" */
-					cdata->type = EPP_DUMMY;
-					break;
-				}
-			}
-			else {
-				/* unknown extension */
-				cdata->rc = 2000; /* "Unknown command" */
-				cdata->type = EPP_DUMMY;
-				break;
-			}
-		}
+                /* restore relative root */
+                xpathCtx->node = node;
+    
+                if (!strcmp(ext_name, "create")) {
+                    parse_ext_extraaddr_create(pool, xpathCtx, cdata);
+                }
+                else if (!strcmp(ext_name, "update")) {
+                    parse_ext_extraaddr_update(pool, xpathCtx, cdata);
+                }
+                else {
+                    /* unknown extraaddr command */
+                    cdata->rc = 2000; /* "Unknown command" */
+                    cdata->type = EPP_DUMMY;
+                    break;
+                }
+            }
+            else {
+                /* unknown extension */
+                cdata->rc = 2000; /* "Unknown command" */
+                cdata->type = EPP_DUMMY;
+                break;
+            }
+        }
 		xmlXPathFreeObject(xpathObj);
 	}
 
@@ -2758,12 +2929,12 @@ parse_command(void *pool,
 	}
 
 	/* return code corection */
-	if (cdata->type == EPP_LOGIN)
-		return PARSER_CMD_LOGIN;
-	else if (cdata->type == EPP_LOGOUT)
-		return PARSER_CMD_LOGOUT;
-
-	return PARSER_CMD_OTHER;
+	switch (cdata->type)
+	{
+	    case EPP_LOGIN: return PARSER_CMD_LOGIN;
+	    case EPP_LOGOUT: return PARSER_CMD_LOGOUT;
+	    default: return PARSER_CMD_OTHER;
+	}
 }
 
 /**
@@ -3038,31 +3209,25 @@ epp_parse_command(epp_context *epp_ctx,
 	 * Error handling is same for all xmlXPathRegisterNs calls.
 	 */
 	if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "epp", BAD_CAST NS_EPP) ||
-		xmlXPathRegisterNs(xpathCtx, BAD_CAST "contact",
-			BAD_CAST NS_CONTACT) ||
-		xmlXPathRegisterNs(xpathCtx, BAD_CAST "domain",
-			BAD_CAST NS_DOMAIN) ||
-		xmlXPathRegisterNs(xpathCtx, BAD_CAST "nsset",
-			BAD_CAST NS_NSSET) ||
-		xmlXPathRegisterNs(xpathCtx, BAD_CAST "keyset",
-			BAD_CAST NS_KEYSET) ||
-		xmlXPathRegisterNs(xpathCtx, BAD_CAST "fred",
-			BAD_CAST NS_FRED) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "contact", BAD_CAST NS_CONTACT) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "domain", BAD_CAST NS_DOMAIN) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "nsset", BAD_CAST NS_NSSET) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "keyset", BAD_CAST NS_KEYSET) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "fred", BAD_CAST NS_FRED) ||
 #ifdef SECDNS_ENABLE
 #error "It is a terible error to enable SECDNS before code correction!"
-		xmlXPathRegisterNs(xpathCtx, BAD_CAST "secdns",
-			BAD_CAST NS_SECDNS) ||
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "secdns", BAD_CAST NS_SECDNS) ||
 #endif
-		xmlXPathRegisterNs(xpathCtx, BAD_CAST "enumval",
-			BAD_CAST NS_ENUMVAL))
+		xmlXPathRegisterNs(xpathCtx, BAD_CAST "enumval", BAD_CAST NS_ENUMVAL) ||
+        xmlXPathRegisterNs(xpathCtx, BAD_CAST "extra-addr", BAD_CAST NS_EXTRAADDR))
 	{
 		return PARSER_EINTERNAL;
 	}
 
 	xpathObj = xmlXPathEvalExpression(BAD_CAST "/epp:epp/epp:*", xpathCtx);
-	if (xpathObj == NULL)
+	if (xpathObj == NULL) {
 		return PARSER_EINTERNAL;
-
+	}
 	assert(xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1);
 	xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
 	xmlXPathFreeObject(xpathObj);
@@ -3076,46 +3241,28 @@ epp_parse_command(epp_context *epp_ctx,
 	switch (elemname[0]) {
 		case 'h':
 			/* It is a <hello> element. */
-			if (!strcmp(elemname, "hello")) {
-				ret = PARSER_HELLO;
-				break;
-			}
-			/* fall through if not matched */
+			if (!strcmp(elemname, "hello")) { return PARSER_HELLO; }
+            return PARSER_NOT_COMMAND;
 		case 'c':
 			/* It is a <command> element. */
 			if (!strcmp(elemname, "command")) {
-				ret = parse_command(epp_ctx->pool, loggedin,
-						cdata, cmd_type, xpathCtx);
-				break;
+				return parse_command(epp_ctx->pool, loggedin, cdata, cmd_type, xpathCtx);
 			}
-			/* fall through if not matched */
+            return PARSER_NOT_COMMAND;
 		case 'e':
 			/* It is an <extension> element. */
 			if (!strcmp(elemname, "extension")) {
 				*cmd_type = EPP_RED_EXTCMD;
-				
 				if (!loggedin) {
 					cdata->type = EPP_DUMMY;
 					cdata->rc = 2002;
-					ret = PARSER_CMD_OTHER;
+					return PARSER_CMD_OTHER;
 				}
-				else {
-					ret = parse_extension(epp_ctx->pool,
-							cdata, xpathCtx);
-				}
-				break;
+                return parse_extension(epp_ctx->pool, cdata, xpathCtx);
 			}
-			/* fall through if not matched */
+            return PARSER_NOT_COMMAND;
 		default:
-			/*
-			 * not all documents which are valid are commands
-			 * (e.g. greeting and response). EPP standard does
-			 * not describe any error which should be returned in
-			 * that case. Therefore we will silently close
-			 * connection in that case.
-			 */
-			ret = PARSER_NOT_COMMAND;
-			break;
+            return PARSER_NOT_COMMAND;
 	}
 
 	return ret;

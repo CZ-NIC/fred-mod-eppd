@@ -1,15 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<epp xmlns="urn:ietf:params:xml:ns:epp-1.0"
-     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0
-     epp-1.0.xsd">
+<epp xmlns="urn:ietf:params:xml:ns:epp-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:ietf:params:xml:ns:epp-1.0      epp-1.0.xsd">
   <command>
     <create>
-      <contact:create
-       xmlns:contact="http://www.nic.cz/xml/epp/contact-1.3"
-       xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.3
-       contact-1.3.xsd">
-        <contact:id>cid:debil</contact:id>
+      <contact:create xmlns:contact="http://www.nic.cz/xml/epp/contact-1.6" xsi:schemaLocation="http://www.nic.cz/xml/epp/contact-1.6 contact-1.6.xsd">
+        <contact:id>IJK</contact:id>
         <contact:postalInfo>
           <contact:name>John Doe</contact:name>
           <contact:org>Example Inc.</contact:org>
@@ -19,13 +13,13 @@
             <contact:city>Dulles</contact:city>
             <contact:sp>VA</contact:sp>
             <contact:pc>20166-6503</contact:pc>
-            <contact:cc>US</contact:cc> 
+            <contact:cc>US</contact:cc>
           </contact:addr>
         </contact:postalInfo>
-	<contact:voice>+1.7035555555</contact:voice>
+        <contact:voice>+1.7035555555</contact:voice>
         <contact:fax>+1.7035555556</contact:fax>
-        <contact:email>jdoe@example.com</contact:email>   
-	<contact:authInfo>hloupeAuthinfo</contact:authInfo>   
+        <contact:email>jdoe@example.com</contact:email>
+        <contact:authInfo>hloupeAuthinfo</contact:authInfo>
         <contact:disclose flag="0">
           <contact:voice/>
           <contact:email/>
@@ -34,5 +28,5 @@
       </contact:create>
     </create>
     <clTRID>ABC-12345</clTRID>
-  </command> 
+  </command>
 </epp>

@@ -119,8 +119,9 @@ typedef enum {
  * Enumeration of implemented extensions.
  */
 typedef enum {
-	EPP_EXT_ENUMVAL
-}domain_ext_type;
+    EPP_EXT_ENUMVAL,
+    EPP_EXT_MAILING_ADDR
+}epp_ext_type;
 
 /**
  * Enumeration of EPP objects which this server operates on.
@@ -433,23 +434,47 @@ typedef struct {
 	char    *credit; /**< Credit */
 }epp_zonecredit;
 
-/** DNSSEC extension used for updates. */
-typedef struct {
-	qhead	chg_ds; /**< Signatures to be changed. */
-	qhead	add_ds; /**< Signatures to be added. */
-	qhead	rem_ds; /**< Signatures to be removed. */
-}epp_ext_domain_upd_dnssec;
-
 typedef struct {
 	char	*ext_enumval; /**< Domain validation.*/
 	int 	publish;      /**< Flag determining if this domain can be published in the ENUM dictionary. 0 for false, 1 for true */
 } epp_ext_enum;	
 
 typedef struct {
-	domain_ext_type extType; /**< Identifier of extension. */
+    char * Street1; ///< street - line #1
+    char * Street2; ///< street - line #2
+    char * Street3; ///< street - line #3
+    char * City; ///< city
+    char * StateOrProvince; ///< state or province
+    char * PostalCode; ///< postal code
+    char * CountryCode; ///< country code - 2 char ISO country code
+} epp_mailingAddr;
+
+typedef enum {
+    mailing_addr_info,
+    mailing_addr_set,
+    mailing_addr_remove
+} epp_mailingAddrCommand;
+
+typedef epp_mailingAddr epp_ext_mailingAddr_set;
+typedef epp_mailingAddr epp_ext_mailingAddr_info;
+typedef struct {} epp_ext_mailingAddr_remove;
+
+typedef struct {
+    epp_mailingAddrCommand command;
+    union {
+        epp_ext_mailingAddr_info   info;
+        epp_ext_mailingAddr_set    set;
+        epp_ext_mailingAddr_remove remove;
+    } data;
+} epp_ext_mailingAddr;
+
+
+typedef struct {
+	epp_ext_type extType; /**< Identifier of extension. */
 	union {
-		epp_ext_enum ext_enum; /**< Extensions for ENUM */
-	}ext; /**< Extension. */
+        epp_ext_enum        ext_enum;           /**< Extensions for ENUM */
+        epp_ext_mailingAddr ext_mailing_addr;   /**< Extensions for mailing contact addresses */
+	} ext; /**< Extension. */
 }epp_ext_item;
 
 /** Type of poll message. */
@@ -523,6 +548,7 @@ typedef struct {
 	char	*ident;      /**< Contact's unique ident. */
 	epp_identType identtype;   /**< Type of unique ident. */
 	char	*notify_email; /**< Notification email. */
+    qhead    extensions; /**< List of extensions. */
 }epps_info_contact;
 
 /** Info domain parameters. */
@@ -658,6 +684,7 @@ typedef struct {
 	epp_identType identtype;/**< Type of unique ident. */
 	char	*notify_email;  /**< Notification email. */
 	char	*crDate;   /**< Creation date of contact. */
+    qhead    extensions; /**< List of extensions. */
 }epps_create_contact;
 
 /** Create domain parameters. */
@@ -722,6 +749,7 @@ typedef struct {
 	char	*ident;         /**< Contact's unique ident. */
 	epp_identType identtype;/**< Type of unique ident. */
 	char	*notify_email;  /**< Notification email. */
+    qhead    extensions;    /**< List of extensions. */
 }epps_update_contact;
 
 /** Update domain parameters. */

@@ -595,8 +595,9 @@ int main(int argc, char *argv[])
 		}
 		else if (pstat == PARSER_CMD_OTHER || pstat == PARSER_NOT_VALID) {
 			/* API: corba call */
-                    // TODO ugly hack - supply a real ID
-			cstat = epp_call_cmd(&epp_ctx, service, loginid, 0, cdata);
+		    const int has_contact_mailing_address_extension = 0;
+            // TODO ugly hack - supply a real ID
+			cstat = epp_call_cmd(&epp_ctx, service, loginid, 0, has_contact_mailing_address_extension, cdata);
 		}
 		else {
 			fputs("XML PARSER error\n", stderr);
