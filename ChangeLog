@@ -1,3 +1,7 @@
+2017-09-12 (2.15.0)
+
+	* Add contact extension to support additional addreses (mailing address implemented)
+
 2016-09-12 Jan Zima, Zuzana Ansorgova (2.14.2)
 
 	* Build fix (gcc 6.1.1)

@@ -3,7 +3,7 @@
 # vim: set ts=4 sw=4:
 
 AC_PREREQ(2.59)
-AC_INIT([fred-mod-eppd], [2.14.2], [], [fred-mod-eppd])
+AC_INIT([fred-mod-eppd], [2.15.0], [], [fred-mod-eppd])
 AC_CONFIG_SRCDIR([mod_eppd.c])
 AC_CONFIG_MACRO_DIR([m4])
 
