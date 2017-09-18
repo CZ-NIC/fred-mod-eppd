@@ -2778,6 +2778,7 @@ parse_command(void *pool,
 	xmlXPathObjectPtr	 xpathObj;
 	xmlNodePtr	 node;
 	int	 xerr;
+	int i;
 
 	/* backup relative root for later processing of clTRID and extensions */
 	node = xpathCtx->node;
@@ -2865,7 +2866,7 @@ parse_command(void *pool,
 			return PARSER_EINTERNAL;
 		}
 		/* iterate through extensions */
-        for (int i = 0; i < xmlXPathNodeSetGetLength(xpathObj->nodesetval); ++i)
+        for (i = 0; i < xmlXPathNodeSetGetLength(xpathObj->nodesetval); ++i)
         {
             const xmlNodePtr ext_node = xmlXPathNodeSetItem(xpathObj->nodesetval, i);
             xpathCtx->node = ext_node;
