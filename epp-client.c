@@ -1383,8 +1383,8 @@ epp_call_info_domain(epp_context *epp_ctx,
  * Helper function for copy nsset data from corba to internal structure
  *
  * @param epp_ctx     Epp context
- * @param info_domain Destination nsset data structure
- * @param c_domain    Source nsset data structure
+ * @param info_nsset  Destination nsset data structure
+ * @param c_nsset     Source nsset data structure
  * @param ev          Corba exception
  *
  */
@@ -1569,8 +1569,8 @@ epp_call_info_nsset(epp_context *epp_ctx,
  * Helper function for copy keyset data from corba to internal structure
  *
  * @param epp_ctx     Epp context
- * @param info_domain Destination keyset data structure
- * @param c_domain    Source keyset data structure
+ * @param info_keyset Destination keyset data structure
+ * @param c_keyset    Source keyset data structure
  * @param ev          Corba exception
  *
  */
@@ -3722,7 +3722,8 @@ epp_call_update_contact(epp_context *epp_ctx,
 			goto error_input;
 	}
 
-    for (int retr = 0; retr < MAX_RETRIES; ++retr) {
+    int retr;
+    for (retr = 0; retr < MAX_RETRIES; ++retr) {
         if (retr != 0) {
             CORBA_exception_free(ev);
         }
