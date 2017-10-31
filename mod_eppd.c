@@ -660,6 +660,36 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
 }
 
 /**
+ * Analyze parsed request data if contains extra address extension
+ *
+ * @param cdata  EPP data
+ * @return       1 in case of extension is found, 0 otherwise
+ */
+static int epp_request_contains_extra_addr_extension(epp_command_data *cdata)
+{
+	qhead *extension_list = 0;
+
+	if (cdata->type == EPP_CREATE_CONTACT) {
+		epps_create_contact *create_contact = cdata->data;
+		extension_list = &create_contact->extensions;
+	}
+	else if (cdata->type == EPP_UPDATE_CONTACT) {
+		epps_update_contact *update_contact = cdata->data;
+		extension_list = &update_contact->extensions;
+	}
+
+	if (extension_list) {
+		q_foreach(extension_list) {
+		   epp_ext_item *ext_item = q_content(extension_list);
+		   if (ext_item->extType == EPP_EXT_MAILING_ADDR) {
+			   return 1;
+		   }
+		}
+	}
+	return 0;
+}
+
+/**
  * Function calls command from corba backend.
  *
  * Return 0 only in case of a serious error.
@@ -1087,11 +1117,20 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 						"Request does not validate");
 			}
 
-			/* call function from corba backend */
-			if (!call_corba(epp_ctx, EPPservice, logger_service, cdata, pstat,
+			if (!sc->has_contact_mailing_address_extension && epp_request_contains_extra_addr_extension(cdata)) {
+				/* request contains disabled extension so we return the most appropriate response code */
+				cdata->rc = 2103;
+				cdata->msg = epp_strdup(epp_ctx->pool, "Unimplemented extension");
+				cdata->svTRID = epp_strdup(epp_ctx->pool, "DUMMY-SVTRID");
+				cdata->noresdata = 1;
+			}
+			else {
+				/* call function from corba backend */
+				if (!call_corba(epp_ctx, EPPservice, logger_service, cdata, pstat,
 						&login_id, &session_id, act_log_entry_id, &lang, sc->logd_mandatory,
 						sc->has_contact_mailing_address_extension)) {
 				return HTTP_INTERNAL_SERVER_ERROR;
+				}
 			}
 			/* did successfull login occured? */
 			epplog(epp_ctx, EPP_DEBUG, "after corba call command "
