@@ -667,7 +667,7 @@ static int call_login(epp_context *epp_ctx, service_EPP *service,
  */
 static int epp_request_contains_extra_addr_extension(epp_command_data *cdata)
 {
-	qhead *extension_list = 0;
+	qhead *extension_list = NULL;
 
 	if (cdata->type == EPP_CREATE_CONTACT) {
 		epps_create_contact *create_contact = cdata->data;
