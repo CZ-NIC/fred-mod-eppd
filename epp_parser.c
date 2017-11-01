@@ -2691,7 +2691,7 @@ static void parse_ext_extraaddr_update(
 
     RESET_XERR(xerr);
 
-    xpath_chroot(xpathCtx, "//extra-addr:update/extra-addr:mailing", 0, &xerr);
+    xpath_chroot(xpathCtx, "//extra-addr:update", 0, &xerr);
     if (xerr == XERR_LIBXML) {
         goto error;
     }
@@ -2704,14 +2704,13 @@ static void parse_ext_extraaddr_update(
     CHK_XERR(xerr, error);
 
     ext_item->extType = EPP_EXT_MAILING_ADDR;
-
-    if (xpath_get1(pool, xpathCtx, "extra-addr:rem", 0, &xerr) != NULL) {
+    if (xpath_get1(pool, xpathCtx, "extra-addr:rem/extra-addr:mailing", 0, &xerr) != NULL) {
         ext_item->ext.ext_mailing_addr.command = mailing_addr_remove;
     }
-    else if (xpath_get1(pool, xpathCtx, "extra-addr:set/extra-addr:addr", 0, &xerr) != NULL) {
+    else if (xpath_get1(pool, xpathCtx, "extra-addr:set/extra-addr:mailing/extra-addr:addr", 0, &xerr) != NULL) {
         ext_item->ext.ext_mailing_addr.command = mailing_addr_set;
 
-        xpath_chroot(xpathCtx, "//extra-addr:update/extra-addr:mailing/extra-addr:set/extra-addr:addr", 0, &xerr);
+        xpath_chroot(xpathCtx, "//extra-addr:update/extra-addr:set/extra-addr:mailing/extra-addr:addr", 0, &xerr);
         if (xerr == XERR_LIBXML) {
             goto error;
         }
@@ -2737,7 +2736,6 @@ static void parse_ext_extraaddr_update(
         CHK_XERR(xerr, error);
         ext_item->ext.ext_mailing_addr.data.set.CountryCode     = xpath_get1(pool, xpathCtx, "extra-addr:cc", 0, &xerr);
         CHK_XERR(xerr, error);
-
     }
     else {
         /* unexpected extraaddr command */
