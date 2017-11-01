@@ -1124,14 +1124,13 @@ static int epp_request_loop(epp_context *epp_ctx, apr_bucket_brigade *bb,
 				cdata->svTRID = epp_strdup(epp_ctx->pool, "DUMMY-SVTRID");
 				cdata->noresdata = 1;
 			}
-			else {
-				/* call function from corba backend */
-				if (!call_corba(epp_ctx, EPPservice, logger_service, cdata, pstat,
-						&login_id, &session_id, act_log_entry_id, &lang, sc->logd_mandatory,
-						sc->has_contact_mailing_address_extension)) {
+                        /* call function from corba backend */
+			else if (!call_corba(epp_ctx, EPPservice, logger_service, cdata, pstat,
+					&login_id, &session_id, act_log_entry_id, &lang, sc->logd_mandatory,
+					sc->has_contact_mailing_address_extension)) {
 				return HTTP_INTERNAL_SERVER_ERROR;
-				}
 			}
+
 			/* did successfull login occured? */
 			epplog(epp_ctx, EPP_DEBUG, "after corba call command "
 				"saved login id is %lld, login id is %d", *login_id_save, login_id);
