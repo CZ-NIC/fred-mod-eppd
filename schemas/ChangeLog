@@ -1,3 +1,12 @@
+2017-11-09 Jiri Sadek (version 2.4.0)
+
+	* add extra address extension to support additional contact
+	  address types (for now it's just mailing address)
+	  - can be used / appear in following operations:
+	    - create contact
+	    - update contact (set/remove)
+	    - response of info contact request
+
 2012-10-28 Jiri Sadek (version 2.3.2)
 
 	* update contact.xsd, domain.xsd, nsset.xsd, keyset.xsd

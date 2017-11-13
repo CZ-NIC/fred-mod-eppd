@@ -4,8 +4,8 @@
   This schema does not define anything, it just imports other schemas
   and makes the usage of EPP schemas more convenient.
   -->
-  <schema targetNamespace="http://www.nic.cz/xml/epp/all-2.3"
-          xmlns:all="http://www.nic.cz/xml/epp/all-2.3"
+  <schema targetNamespace="http://www.nic.cz/xml/epp/all-2.4"
+          xmlns:all="http://www.nic.cz/xml/epp/all-2.4"
           xmlns="http://www.w3.org/2001/XMLSchema"
           elementFormDefault="qualified">
 
