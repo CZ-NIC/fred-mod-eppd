@@ -71,4 +71,6 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    # File with the Certificates of recognized Certification Authorities (CA)
    # All client certificates of registrars must be issued by any CA in this file
    SSLCACertificateFile  @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
+   # Enable / Disable mailing address extension
+   EPPcontactMailingAddressExtension Off
 </VirtualHost>
