@@ -1587,7 +1587,11 @@ epp_gen_response(epp_context *epp_ctx,
                         }
     
                         WRITE_ELEMENT(writer, simple_err, "extra-addr:city", ext_item->ext.ext_mailing_addr.data.info.City);
-                        WRITE_ELEMENT(writer, simple_err, "extra-addr:sp", ext_item->ext.ext_mailing_addr.data.info.StateOrProvince);
+                        if (ext_item->ext.ext_mailing_addr.data.info.StateOrProvince &&
+                            (ext_item->ext.ext_mailing_addr.data.info.StateOrProvince[0] != '\0'))
+                        {
+                            WRITE_ELEMENT(writer, simple_err, "extra-addr:sp", ext_item->ext.ext_mailing_addr.data.info.StateOrProvince);
+                        }
                         WRITE_ELEMENT(writer, simple_err, "extra-addr:pc", ext_item->ext.ext_mailing_addr.data.info.PostalCode);
                         WRITE_ELEMENT(writer, simple_err, "extra-addr:cc", ext_item->ext.ext_mailing_addr.data.info.CountryCode);
                     }
