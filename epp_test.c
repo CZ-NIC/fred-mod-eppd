@@ -665,19 +665,19 @@ int main(int argc, char* argv[])
             switch (gstat)
             {
                 /*
-				 * following errors are serious and response cannot be sent
-				 * to client when any of them appears
-				 */
+                 * following errors are serious and response cannot be sent
+                 * to client when any of them appears
+                 */
                 case GEN_EBUFFER:
                 case GEN_EWRITER:
                 case GEN_EBUILD:
                     fputs("XML Generator failed - terminating session\n", stderr);
                     break;
                 /*
-				 * following errors are only informative though serious.
-				 * The connection persists and response is sent back to
-				 * client.
-				 */
+                 * following errors are only informative though serious.
+                 * The connection persists and response is sent back to
+                 * client.
+                 */
                 case GEN_NOT_XML:
                     fputs("Response is not XML!!\n", stderr);
                     puts(response);

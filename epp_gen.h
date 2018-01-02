@@ -39,8 +39,8 @@ typedef enum {
     GEN_EWRITER, /**< Could not create xml writer. */
     GEN_EBUILD, /**< Error when building xml document. */
     /*
-	 * following errors may appear only if response validation is turned on
-	 */
+     * following errors may appear only if response validation is turned on
+     */
     GEN_NOT_XML, /**< Something what is not xml was generated. */
     GEN_EINTERNAL, /**< Malloc failure during response validation. */
     GEN_ESCHEMA, /**< Error when parsing xml schema used for validation. */

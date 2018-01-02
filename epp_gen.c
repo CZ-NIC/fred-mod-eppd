@@ -331,9 +331,9 @@ static char gen_info_contact(xmlTextWriterPtr writer, epp_command_data* cdata)
                 break;
             default:
                 /*
-				 * what should we do? We will create
-				 * nonvalidating document.
-				 */
+                 * what should we do? We will create
+                 * nonvalidating document.
+                 */
                 snprintf(type, 15, "%s", "unknown");
                 break;
         }
@@ -676,10 +676,10 @@ static char gen_poll_message(xmlTextWriterPtr writer, epps_poll_req* msgdata)
             WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_FRED);
             WRITE_ELEMENT(writer, simple_err, "fred:zone", msgdata->msg.lc.zone);
             /*
-			 * XXX
-			 * this stupid code will be simplified after the
-			 * schemas will be corrected.
-			 */
+             * XXX
+             * this stupid code will be simplified after the
+             * schemas will be corrected.
+             */
             START_ELEMENT(writer, simple_err, "fred:limit");
             WRITE_ELEMENT(writer, simple_err, "fred:zone", msgdata->msg.lc.zone);
 
@@ -946,10 +946,10 @@ gen_status epp_gen_response(
         e = (epp_error*)q_content(&cdata->errors);
         START_ELEMENT(writer, simple_err, "extValue");
         /*
-		 * we cannot use standard macro WRITE_ELEMENT because we want
-		 * to preserve <,> chars, otherwise they would be substituted
-		 * by &lt;, &gt; respectively.
-		 */
+         * we cannot use standard macro WRITE_ELEMENT because we want
+         * to preserve <,> chars, otherwise they would be substituted
+         * by &lt;, &gt; respectively.
+         */
         START_ELEMENT(writer, simple_err, "value");
         if (e->spec != errspec_not_valid)
             e->value = get_bad_xml(epp_ctx->pool, cdata, e);
@@ -1009,10 +1009,10 @@ gen_status epp_gen_response(
         /* beware - the indentation is broken here */
 
         /*
-	 * Here is handler for each kind of response
-	 * Short reponses are coded directly into switch, long responses
-	 * are coded into separate functions called within the switch.
-	 */
+         * Here is handler for each kind of response
+         * Short reponses are coded directly into switch, long responses
+         * are coded into separate functions called within the switch.
+         */
         switch (cdata->type)
         {
             /* commands with no <resData> element */

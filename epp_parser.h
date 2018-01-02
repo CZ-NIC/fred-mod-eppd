@@ -40,8 +40,8 @@ typedef enum {
 	 */
     PARSER_HELLO,
     /*
-	 * when following status values are returned, connection is closed
-	 */
+     * when following status values are returned, connection is closed
+     */
     PARSER_NOT_COMMAND, /**< Request is not a command nor hello frame. */
     PARSER_NOT_XML, /**< Request is not xml. */
     PARSER_ESCHEMA, /**< Error when parsing xml schema. */

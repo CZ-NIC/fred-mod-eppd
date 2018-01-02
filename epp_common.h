@@ -55,9 +55,9 @@ typedef struct
 typedef enum {
     EPP_UNKNOWN_CMD = 0,
     /*
-	 * 'dummy' is not a command from point of view of epp client, but is
-	 * command from central repository's point of view
-	 */
+     * 'dummy' is not a command from point of view of epp client, but is
+     * command from central repository's point of view
+     */
     EPP_DUMMY,
     /* session commands */
     EPP_LOGIN,
