@@ -818,8 +818,8 @@ static epp_action_type log_props_login(ccReg_RequestProperties** c_props, epp_co
         {
             PUSH_PROPERTY_INT(*c_props, "lang", el->lang);
         }
-        PUSH_PROPERTY(*c_props, "password", el->pw);
-        PUSH_PROPERTY(*c_props, "newPassword", el->newPW);
+        PUSH_PROPERTY(*c_props, "password", "VALUE-NOT-LOGGED");
+        PUSH_PROPERTY(*c_props, "newPassword", "VALUE-NOT-LOGGED");
     }
     else
     {
@@ -1591,7 +1591,7 @@ ccReg_TID log_epp_command(
             epp_ctx,
             service,
             remote_ip,
-            request,
+            action_type != ClientLogin ? request : "VALUE-NOT-LOGGED",
             c_props,
             NULL,
             action_type,
