@@ -1,7 +1,6 @@
-2018-01-08 Michal Strnad, Miroslav Franc (2.16.0)
+2018-01-08 Michal Strnad (2.16.0)
 
-    * Fix dereferncing of released pointer
-    * Compile with -std=c++14
+    * Hide registrars plaintext passwords
 
 2017-09-12 (2.15.0)
 
