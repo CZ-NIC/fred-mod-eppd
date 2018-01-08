@@ -23,48 +23,46 @@
 #ifndef EPP_CLIENT_H
 #define EPP_CLIENT_H
 
-#include "epp_common.h"
 #include "EPP.h"
+#include "epp_common.h"
 
 /**
  * Maximum number of retries when connection failure occurs before
  * the failure is announced to a caller.
  */
-#define MAX_RETRIES	3
+#define MAX_RETRIES 3
 /** Number of microseconds between retries when connection failure occurs. */
-#define RETR_SLEEP  100000
+#define RETR_SLEEP 100000
 
 /** Quick test if corba exception was raised. */
-#define raised_exception(ev)	((ev)->_major != CORBA_NO_EXCEPTION)
+#define raised_exception(ev) ((ev)->_major != CORBA_NO_EXCEPTION)
 
 
 /** Maximal size of property value in database */
 #define DB_FIELD_SIZE 2000
 
 /** True if exception is COMM_FAILURE, which is used in retry loop. */
-#define IS_NOT_COMM_FAILURE_EXCEPTION(_ev)                             \
-	(strcmp((_ev)->_id, "IDL:omg.org/CORBA/COMM_FAILURE:1.0"))
+#define IS_NOT_COMM_FAILURE_EXCEPTION(_ev)                                                         \
+    (strcmp((_ev)->_id, "IDL:omg.org/CORBA/COMM_FAILURE:1.0"))
 /** True if exception is EPP_ERROR. */
-#define IS_EPP_ERROR(_ev)                             \
-	(!strcmp((_ev)->_id, "IDL:ccReg/EPP/EppError:1.0"))
+#define IS_EPP_ERROR(_ev) (!strcmp((_ev)->_id, "IDL:ccReg/EPP/EppError:1.0"))
 /** True if exception is NO_MESSAGES. */
-#define IS_NO_MESSAGES(_ev)                             \
-	(!strcmp((_ev)->_id, "IDL:ccReg/EPP/NoMessages:1.0"))
+#define IS_NO_MESSAGES(_ev) (!strcmp((_ev)->_id, "IDL:ccReg/EPP/NoMessages:1.0"))
 
 /** Possible return values of functions from corba module. */
 typedef enum {
-	CORBA_OK,   /**< No errors. */
-	/** Corba function call failed (e.g. server is not available).  */
-	CORBA_ERROR,
-	CORBA_INT_ERROR, /**< This should occur unusualy (e.g. malloc failed) */
-	/** Epp server is responding but the response is not valid.  */
-	CORBA_REMOTE_ERROR
-}corba_status;
+    CORBA_OK, /**< No errors. */
+    /** Corba function call failed (e.g. server is not available).  */
+    CORBA_ERROR,
+    CORBA_INT_ERROR, /**< This should occur unusualy (e.g. malloc failed) */
+    /** Epp server is responding but the response is not valid.  */
+    CORBA_REMOTE_ERROR
+} corba_status;
 
 /** Reference to EPP CORBA service */
-typedef void *service_EPP;
+typedef void* service_EPP;
 /** Reference to fred-logd CORBA service */
-typedef void *service_Logger;
+typedef void* service_Logger;
 
 /**
  * Function wraps strings passed from XML parser into strings accepted
@@ -76,8 +74,7 @@ typedef void *service_Logger;
  * @param str	Input string.
  * @return      Output string.
  */
-char *
-wrap_str(const char *str);
+char* wrap_str(const char* str);
 
 /**
  * Purpose of this function is to get version string of ccReg from
@@ -90,11 +87,7 @@ wrap_str(const char *str);
  * @param curdate     Output parameter current date.
  * @return            If successfull 1 and 0 if corba function call failed.
  */
-int
-epp_call_hello(epp_context *epp_ctx,
-		service_EPP service,
-		char **version,
-		char **curdate);
+int epp_call_hello(epp_context* epp_ctx, service_EPP service, char** version, char** curdate);
 
 /**
  * Call corba login function, which sets up a session variables.
@@ -110,14 +103,10 @@ epp_call_hello(epp_context *epp_ctx,
  * @param cdata       Data from parsed xml command.
  * @return            Status.
  */
-corba_status
-epp_call_login(epp_context *epp_ctx,
-		service_EPP service,
-		unsigned long long *loginid,
-		const ccReg_TID request_id,
-		epp_lang *lang,
-		const char *fingerprint,
-		epp_command_data *cdata);
+corba_status epp_call_login(
+        epp_context* epp_ctx, service_EPP service, unsigned long long* loginid,
+        const ccReg_TID request_id, epp_lang* lang, const char* fingerprint,
+        epp_command_data* cdata);
 
 /**
  * Call corba logout function.
@@ -129,12 +118,9 @@ epp_call_login(epp_context *epp_ctx,
  * @param cdata       Data from parsed xml command.
  * @return            Status.
  */
-corba_status
-epp_call_logout(epp_context *epp_ctx,
-		service_EPP service,
-		unsigned long long *loginid,
-        const ccReg_TID request_id,
-		epp_command_data *cdata);
+corba_status epp_call_logout(
+        epp_context* epp_ctx, service_EPP service, unsigned long long* loginid,
+        const ccReg_TID request_id, epp_command_data* cdata);
 
 /**
  * Call generic command corba handler which decides what to do on the basis
@@ -152,13 +138,10 @@ epp_call_logout(epp_context *epp_ctx,
  * @param cdata       Data from parsed xml command.
  * @return            Status.
  */
-corba_status
-epp_call_cmd(epp_context *epp_ctx,
-        service_EPP service,
-        unsigned long long loginid,
-        const ccReg_TID request_id,
-        int has_contact_mailing_address_extension,
-        epp_command_data *cdata);
+corba_status epp_call_cmd(
+        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, int has_contact_mailing_address_extension,
+        epp_command_data* cdata);
 
 /**
  * This function calls corba function which saves generated XML in database.
@@ -172,11 +155,8 @@ epp_call_cmd(epp_context *epp_ctx,
  * @param cdata       Used to get svTRID.
  * @param xml         Output XML.
  */
-void
-epp_call_save_output_xml(epp_context *epp_ctx,
-		service_EPP service,
-		epp_command_data *cdata,
-		const char *xml);
+void epp_call_save_output_xml(
+        epp_context* epp_ctx, service_EPP service, epp_command_data* cdata, const char* xml);
 
 /**
  * Let the CR know that client has closed tcp session.
@@ -185,11 +165,9 @@ epp_call_save_output_xml(epp_context *epp_ctx,
  * @param service     EPP service.
  * @param loginid     Login ID of client.
  */
-void
-epp_call_CloseSession(epp_context *epp_ctx, service_EPP service,
-		unsigned long long loginid);
+void epp_call_CloseSession(epp_context* epp_ctx, service_EPP service, unsigned long long loginid);
 
 
-#define MAX_ERROR_MSG_LEN	100
+#define MAX_ERROR_MSG_LEN 100
 
 #endif /* EPP_CLIENT_H */

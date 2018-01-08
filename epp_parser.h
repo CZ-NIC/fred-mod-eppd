@@ -30,28 +30,28 @@
  * closed and when it shouldn't.
  */
 typedef enum {
-	PARSER_CMD_LOGIN,  /**< Login command. */
-	PARSER_CMD_LOGOUT, /**< Logout command. */
-	PARSER_CMD_OTHER,  /**< A command other than login and logout. */
-	PARSER_NOT_VALID,  /**< Request does not validate. */
-	/**
+    PARSER_CMD_LOGIN, /**< Login command. */
+    PARSER_CMD_LOGOUT, /**< Logout command. */
+    PARSER_CMD_OTHER, /**< A command other than login and logout. */
+    PARSER_NOT_VALID, /**< Request does not validate. */
+    /**
 	 * Request is not command but <hello> frame this indicates that greeting
 	 * should be generated.
 	 */
-	PARSER_HELLO,
-	/*
-	 * when following status values are returned, connection is closed
-	 */
-	PARSER_NOT_COMMAND,/**< Request is not a command nor hello frame. */
-	PARSER_NOT_XML,    /**< Request is not xml. */
-	PARSER_ESCHEMA,    /**< Error when parsing xml schema. */
-	/**
+    PARSER_HELLO,
+    /*
+     * when following status values are returned, connection is closed
+     */
+    PARSER_NOT_COMMAND, /**< Request is not a command nor hello frame. */
+    PARSER_NOT_XML, /**< Request is not xml. */
+    PARSER_ESCHEMA, /**< Error when parsing xml schema. */
+    /**
 	 * Internal parser error (e.g. malloc failed). This error is
 	 * esspecialy serious, therefor its log severity SHOULD be higher
 	 * than of the other errors.
 	 */
-	PARSER_EINTERNAL
-}parser_status;
+    PARSER_EINTERNAL
+} parser_status;
 
 /**
  * Enumeration of all implemented EPP commands as defined in rfc.
@@ -59,20 +59,20 @@ typedef enum {
  * value in command hash table for fast recognition of commands.
  */
 typedef enum {
-	EPP_RED_UNKNOWN_CMD,
-	EPP_RED_LOGIN,
-	EPP_RED_LOGOUT,
-	EPP_RED_CHECK,
-	EPP_RED_INFO,
-	EPP_RED_POLL,
-	EPP_RED_TRANSFER,
-	EPP_RED_CREATE,
-	EPP_RED_DELETE,
-	EPP_RED_RENEW,
-	EPP_RED_UPDATE,
-	EPP_RED_EXTCMD,
-        EPP_RED_HELLO
-}epp_red_command_type;
+    EPP_RED_UNKNOWN_CMD,
+    EPP_RED_LOGIN,
+    EPP_RED_LOGOUT,
+    EPP_RED_CHECK,
+    EPP_RED_INFO,
+    EPP_RED_POLL,
+    EPP_RED_TRANSFER,
+    EPP_RED_CREATE,
+    EPP_RED_DELETE,
+    EPP_RED_RENEW,
+    EPP_RED_UPDATE,
+    EPP_RED_EXTCMD,
+    EPP_RED_HELLO
+} epp_red_command_type;
 
 /**
  * This routine initializes libxml's parser, hash table for command
@@ -81,8 +81,7 @@ typedef enum {
  * @param url_schema  XML schema location.
  * @return            Parsed xml schema.
  */
-void *
-epp_parser_init(const char *url_schema);
+void* epp_parser_init(const char* url_schema);
 
 /**
  * This will cleanup command hash table, libxml's parser and release
@@ -90,8 +89,7 @@ epp_parser_init(const char *url_schema);
  *
  * @param schema    Parsed xml schema.
  */
-void
-epp_parser_init_cleanup(void *schema);
+void epp_parser_init_cleanup(void* schema);
 
 /**
  * This is the main workhorse of parser component. It's task is to parse
@@ -106,22 +104,16 @@ epp_parser_init_cleanup(void *schema);
  * @param cmd_type	Output of commnad type (used also by logging)
  * @return          Status of parsing.
  */
-parser_status
-epp_parse_command(epp_context *epp_ctx,
-		int loggedin,
-		void *schema,
-		const char *request,
-		unsigned bytes,
-		epp_command_data **cdata,
-		epp_red_command_type *cmd_type);
+parser_status epp_parse_command(
+        epp_context* epp_ctx, int loggedin, void* schema, const char* request, unsigned bytes,
+        epp_command_data** cdata, epp_red_command_type* cmd_type);
 
 /**
  * This will cleanup xpath context and parsed document tree.
  *
  * @param cdata_arg    cdata structure containing items to be cleaned up.
  */
-void
-epp_parser_request_cleanup(void *cdata_arg);
+void epp_parser_request_cleanup(void* cdata_arg);
 
 
 #endif /* EPP_PARSER_H */
