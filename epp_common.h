@@ -55,9 +55,9 @@ typedef struct
 typedef enum {
     EPP_UNKNOWN_CMD = 0,
     /*
-	 * 'dummy' is not a command from point of view of epp client, but is
-	 * command from central repository's point of view
-	 */
+     * 'dummy' is not a command from point of view of epp client, but is
+     * command from central repository's point of view
+     */
     EPP_DUMMY,
     /* session commands */
     EPP_LOGIN,
@@ -198,19 +198,19 @@ typedef struct
     /** Client provided input which caused the error. */
     char *value;
     /**
-	 * Specification of surrounding XML tags.
-	 *
-	 * For validation errors this is set to errspec_not_valid.
-	 */
+     * Specification of surrounding XML tags.
+     *
+     * For validation errors this is set to errspec_not_valid.
+     */
     epp_errorspec spec;
     /**
-	 * Human readable reason of error.
-	 *
-	 * For schema validity errors it is filled by mod_eppd (by message from
-	 * libxml) which is prefixed by localized message retrieved from
-	 * central register. In all other cases it is left empty and filled
-	 * by CR.
-	 */
+     * Human readable reason of error.
+     *
+     * For schema validity errors it is filled by mod_eppd (by message from
+     * libxml) which is prefixed by localized message retrieved from
+     * central register. In all other cases it is left empty and filled
+     * by CR.
+     */
     char *reason;
     /** Position of faulty element if it is part of list. */
     int position;
@@ -374,13 +374,13 @@ typedef struct
 typedef struct
 {
     /**
-	 * Value 1 means following items are exception to server policy, which
-	 * is assumed to be private (hide all items).
-	 * Value 0 means following items are exception to server policy, which
-	 * is assumed to be public (show all items).
-	 * And value -1 means there are not elements that require exceptional
-	 * behaviour.
-	 */
+     * Value 1 means following items are exception to server policy, which
+     * is assumed to be private (hide all items).
+     * Value 0 means following items are exception to server policy, which
+     * is assumed to be public (show all items).
+     * And value -1 means there are not elements that require exceptional
+     * behaviour.
+     */
     char flag;
     unsigned char name; /**< Contact's name is exceptional. */
     unsigned char org; /**< Contact's organization is exceptional. */
@@ -441,7 +441,8 @@ typedef struct
 typedef struct
 {
     char *ext_enumval; /**< Domain validation.*/
-    int publish; /**< Flag determining if this domain can be published in the ENUM dictionary. 0 for false, 1 for true */
+    int publish; /**< Flag determining if this domain can be published in the ENUM dictionary. 0 for
+                    false, 1 for true */
 } epp_ext_enum;
 
 typedef struct
@@ -892,14 +893,14 @@ typedef struct
     qhead errors;
 
     /**
-	 * Identification of epp command. This value influences selection
-	 * from in and out union.
-	 */
+     * Identification of epp command. This value influences selection
+     * from in and out union.
+     */
     epp_command_type type;
     /**
-	 * Command data
-	 * (Input + output parameters for all possible epp commands).
-	 */
+     * Command data
+     * (Input + output parameters for all possible epp commands).
+     */
     void *data;
 } epp_command_data;
 

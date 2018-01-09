@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -112,11 +112,11 @@ epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata, epp
             {
                 item = malloc(sizeof *item);
                 /*
-					 * note that we cannot use zero value for false value
-					 * since value zero of content pointer denotes that
-					 * the item in list is a sentinel (first or last).
-					 * Therefore we will use value 2 as false value.
-					 */
+                 * note that we cannot use zero value for false value
+                 * since value zero of content pointer denotes that
+                 * the item in list is a sentinel (first or last).
+                 * Therefore we will use value 2 as false value.
+                 */
                 CL_CONTENT(item) = (void *)1;
                 CL_ADD(cdata->out->check.bools, item);
             }
@@ -312,8 +312,8 @@ corba_status epp_call_info_nsset(epp_corba_globs *globs, int session, epp_comman
         /* allocate and initialize tech list */
         CL_NEW(cdata->out->info_nsset.tech);
         /*
-			 * allocate and initialize required number of ns items
-			 */
+         * allocate and initialize required number of ns items
+         */
         CL_NEW(cdata->out->info_nsset.ns);
 
         cdata->svTRID = strdup("fill");

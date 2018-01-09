@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -76,20 +76,20 @@ static void validerr_callback(void *ctx, xmlErrorPtr error)
         return;
 
     /*
-	 * xmlError has quite a lot of fields, we are interested only in 3
-	 * of them: code, message, node.
-	 */
+     * xmlError has quite a lot of fields, we are interested only in 3
+     * of them: code, message, node.
+     */
 
     /*
-	 * XXX error code should be further examined in order to get
-	 * more detailed error
-	 * valerr->code = error->code;
-	 */
+     * XXX error code should be further examined in order to get
+     * more detailed error
+     * valerr->code = error->code;
+     */
 
     /*
-	 * get error message (we don't use strdup because we have to
-	 * truncate trailing newline)
-	 */
+     * get error message (we don't use strdup because we have to
+     * truncate trailing newline)
+     */
     len = strlen(error->message);
     valerr->reason = (char *)epp_malloc(pool, len);
     if (valerr->reason == NULL)
@@ -99,17 +99,17 @@ static void validerr_callback(void *ctx, xmlErrorPtr error)
 
     /* XXX this needs to be done better way */
     /*
-	 * recognized errors:
-	 *    unknown command (2000)
-	 *    required parameter missing (2003)
-	 *    Parameter value range error (2004)
-	 *    Parameter value syntax error (2005)
-	 *    Unimplemented extension (2103)
-	 *    ???Unimplemented command (2101)???
-	 *    ???Unimplemented option (2102)???
-	 * all other errors are reported as:
-	 *    command syntax error (2001)
-	 */
+     * recognized errors:
+     *    unknown command (2000)
+     *    required parameter missing (2003)
+     *    Parameter value range error (2004)
+     *    Parameter value syntax error (2005)
+     *    Unimplemented extension (2103)
+     *    ???Unimplemented command (2101)???
+     *    ???Unimplemented option (2102)???
+     * all other errors are reported as:
+     *    command syntax error (2001)
+     */
 
     /* get content of problematic tag */
     buf = xmlBufferCreate();
@@ -200,11 +200,11 @@ char *epp_getSubtree(void *pool, epp_command_data *cdata, const char *xpath_expr
     }
 
     /*
-	 * Get content of problematic tag. It's not so easy task. We have
-	 * to declare namespaces defined higher in the tree which are relevant
-	 * to the part of document being dumped. Fortunatelly there is a
-	 * function from libxml library doing exactly that (xmlreconsiliatens).
-	 */
+     * Get content of problematic tag. It's not so easy task. We have
+     * to declare namespaces defined higher in the tree which are relevant
+     * to the part of document being dumped. Fortunatelly there is a
+     * function from libxml library doing exactly that (xmlreconsiliatens).
+     */
     buf = xmlBufferCreate();
     if (buf == NULL)
         return NULL;

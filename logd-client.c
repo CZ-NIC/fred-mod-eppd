@@ -344,7 +344,8 @@ int epp_log_CloseSession(
  * @param sourceIP		IP address of the client
  * @param content		content of the request
  * @param properties	List of properties (name, value pairs)
- * @param log_entry_id		output of ID of the new entry in log_entry database table. Id is used in other calls to logging
+ * @param log_entry_id		output of ID of the new entry in log_entry database table. Id is used in
+ * other calls to logging
  * @param errmsg		Output of a CORBA error message
  *
  * @returns				CORBA status code
@@ -538,7 +539,7 @@ int epp_log_close_message(
     CORBA_free(properties);
     CORBA_free(objrefs);
 
-    //TODO proper handling of exceptions
+    // TODO proper handling of exceptions
     // ret = CORBA_REMOTE_ERROR;
     if (raised_exception(ev))
     {
@@ -1628,7 +1629,8 @@ ccReg_TID log_epp_command(
  * @param	response	raw content of the response
  * @param 	cdata		command data, parsed content
  * @param 	session_id		Id into the login database table for this session
- * @param	log_entry_id 	Id of the log_entry record which will be updated by this call. The Id was obtained by log_epp_command()
+ * @param	log_entry_id 	Id of the log_entry record which will be updated by this call. The Id was
+ * obtained by log_epp_command()
  *
  * @return  status LOG_INTERNAL_ERROR or LOG_SUCCESS
  */

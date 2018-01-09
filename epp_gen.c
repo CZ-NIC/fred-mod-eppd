@@ -151,8 +151,8 @@ gen_status epp_gen_greeting(void *pool, const char *svid, const char *date, char
     WRITE_ELEMENT(writer, greeting_err, "objURI", NS_KEYSET);
     START_ELEMENT(writer, greeting_err, "svcExtension");
     /* not yet
-	WRITE_ELEMENT(writer, greeting_err, "extURI", NS_SECDNS);
-	*/
+    WRITE_ELEMENT(writer, greeting_err, "extURI", NS_SECDNS);
+    */
     WRITE_ELEMENT(writer, greeting_err, "extURI", NS_ENUMVAL);
     END_ELEMENT(writer, greeting_err); /* svcExtension */
     END_ELEMENT(writer, greeting_err); /* svcMenu */
@@ -331,9 +331,9 @@ static char gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
                 break;
             default:
                 /*
-				 * what should we do? We will create
-				 * nonvalidating document.
-				 */
+                 * what should we do? We will create
+                 * nonvalidating document.
+                 */
                 snprintf(type, 15, "%s", "unknown");
                 break;
         }
@@ -676,10 +676,10 @@ static char gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
             WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_FRED);
             WRITE_ELEMENT(writer, simple_err, "fred:zone", msgdata->msg.lc.zone);
             /*
-			 * XXX
-			 * this stupid code will be simplified after the
-			 * schemas will be corrected.
-			 */
+             * XXX
+             * this stupid code will be simplified after the
+             * schemas will be corrected.
+             */
             START_ELEMENT(writer, simple_err, "fred:limit");
             WRITE_ELEMENT(writer, simple_err, "fred:zone", msgdata->msg.lc.zone);
 
@@ -946,10 +946,10 @@ gen_status epp_gen_response(
         e = (epp_error *)q_content(&cdata->errors);
         START_ELEMENT(writer, simple_err, "extValue");
         /*
-		 * we cannot use standard macro WRITE_ELEMENT because we want
-		 * to preserve <,> chars, otherwise they would be substituted
-		 * by &lt;, &gt; respectively.
-		 */
+         * we cannot use standard macro WRITE_ELEMENT because we want
+         * to preserve <,> chars, otherwise they would be substituted
+         * by &lt;, &gt; respectively.
+         */
         START_ELEMENT(writer, simple_err, "value");
         if (e->spec != errspec_not_valid)
             e->value = get_bad_xml(epp_ctx->pool, cdata, e);
@@ -1009,35 +1009,35 @@ gen_status epp_gen_response(
         /* beware - the indentation is broken here */
 
         /*
-	 * Here is handler for each kind of response
-	 * Short reponses are coded directly into switch, long responses
-	 * are coded into separate functions called within the switch.
-	 */
+         * Here is handler for each kind of response
+         * Short reponses are coded directly into switch, long responses
+         * are coded into separate functions called within the switch.
+         */
         switch (cdata->type)
         {
             /* commands with no <resData> element */
             /*
-		case EPP_DUMMY:
-		case EPP_LOGIN:
-		case EPP_LOGOUT:
-		case EPP_POLL_ACK:
-		case EPP_POLL_REQ:
-		case EPP_DELETE_DOMAIN:
-		case EPP_DELETE_CONTACT:
-		case EPP_DELETE_NSSET:
-		case EPP_UPDATE_DOMAIN:
-		case EPP_UPDATE_CONTACT:
-		case EPP_UPDATE_NSSET:
-		case EPP_TRANSFER_DOMAIN:
-		case EPP_TRANSFER_CONTACT:
-		case EPP_TRANSFER_NSSET:
-		case EPP_SENDAUTHINFO_DOMAIN:
-		case EPP_SENDAUTHINFO_CONTACT:
-		case EPP_SENDAUTHINFO_NSSET:
-		case EPP_SENDAUTHINFO_KEYSET:
-		case EPP_TEST_NSSET:
-			break;
-		*/
+        case EPP_DUMMY:
+        case EPP_LOGIN:
+        case EPP_LOGOUT:
+        case EPP_POLL_ACK:
+        case EPP_POLL_REQ:
+        case EPP_DELETE_DOMAIN:
+        case EPP_DELETE_CONTACT:
+        case EPP_DELETE_NSSET:
+        case EPP_UPDATE_DOMAIN:
+        case EPP_UPDATE_CONTACT:
+        case EPP_UPDATE_NSSET:
+        case EPP_TRANSFER_DOMAIN:
+        case EPP_TRANSFER_CONTACT:
+        case EPP_TRANSFER_NSSET:
+        case EPP_SENDAUTHINFO_DOMAIN:
+        case EPP_SENDAUTHINFO_CONTACT:
+        case EPP_SENDAUTHINFO_NSSET:
+        case EPP_SENDAUTHINFO_KEYSET:
+        case EPP_TEST_NSSET:
+            break;
+        */
             /* query commands with <resData> element */
             case EPP_CHECK_DOMAIN:
             {

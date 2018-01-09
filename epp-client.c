@@ -505,14 +505,14 @@ static corba_status epp_call_dummy(
     int cerrno;
 
     /*
-	 * Input parameters:
-	 *    cdata->rc
-	 *    c_errorCodes (*)
-	 *    loginid
-	 *    c_clTRID (*)
-	 * Output parameters:
-	 *    c_errStrings (*)
-	 */
+     * Input parameters:
+     *    cdata->rc
+     *    c_errorCodes (*)
+     *    loginid
+     *    c_clTRID (*)
+     * Output parameters:
+     *    c_errStrings (*)
+     */
     c_clTRID = wrap_str(cdata->clTRID);
     if (c_clTRID == NULL)
         return CORBA_INT_ERROR;
@@ -636,17 +636,17 @@ corba_status epp_call_login(
     cdata->noresdata = 1;
     login = cdata->data;
     /*
-	 * Input parameters:
-	 *    c_clID (*)
-	 *    c_pw (*)
-	 *    c_newPW (*)
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 *    certID (a)
-	 *    c_lang
-	 * Output parameters:
-	 *    c_session
-	 */
+     * Input parameters:
+     *    c_clID (*)
+     *    c_pw (*)
+     *    c_newPW (*)
+     *    c_clTRID (*)
+     *    xml_in (a)
+     *    certID (a)
+     *    c_lang
+     * Output parameters:
+     *    c_session
+     */
     assert(cdata->xml_in != NULL);
     assert(certID != NULL);
     c_clTRID = wrap_str(cdata->clTRID);
@@ -727,12 +727,12 @@ corba_status epp_call_logout(
     epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd logout)");
     cdata->noresdata = 1;
     /*
-	 * Input parameters:
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters: none
-	 */
+     * Input parameters:
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters: none
+     */
     assert(cdata->xml_in != NULL);
 
     c_params = init_epp_params(*loginid, request_id, cdata->xml_in, cdata->clTRID);
@@ -792,14 +792,14 @@ static corba_status epp_call_check(
 
     check = cdata->data;
     /*
-	 * Input parameters:
-	 *    c_ids (*)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_avails (f)
-	 */
+     * Input parameters:
+     *    c_ids (*)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_avails (f)
+     */
     assert(cdata->xml_in != NULL);
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
     if (c_params == NULL)
@@ -870,8 +870,8 @@ static corba_status epp_call_check(
         return handle_exception(epp_ctx, cdata, ev);
 
     /*
-	 * Length of results returned should be same as lenght of input objects.
-	 */
+     * Length of results returned should be same as lenght of input objects.
+     */
     if (len != c_avails->_length)
     {
         epplog(epp_ctx, EPP_ERROR, "Bad length of check list");
@@ -928,7 +928,8 @@ static corba_status epp_call_check(
  * @param service EPP service.
  * @param loginid Session identifier.
  * @param request_id  fred-logd request ID
- * @param has_contact_mailing_address_extension has to return information about mailing address of contact
+ * @param has_contact_mailing_address_extension has to return information about mailing address of
+ * contact
  * @param cdata   Data from xml request.
  * @return        Status.
  */
@@ -946,14 +947,14 @@ static corba_status epp_call_info_contact(
 
     info_contact = cdata->data;
     /*
-	 * Input parameters:
-	 *    id (a)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_contact (*)
-	 */
+     * Input parameters:
+     *    id (a)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_contact (*)
+     */
     assert(cdata->xml_in);
     assert(info_contact->id);
 
@@ -1352,14 +1353,14 @@ static corba_status epp_call_info_domain(
 
     info_domain = cdata->data;
     /*
-	 * Input parameters:
-	 *    name (a)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_domain (*)
-	 */
+     * Input parameters:
+     *    name (a)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_domain (*)
+     */
     assert(info_domain->name);
     assert(cdata->xml_in);
 
@@ -1542,14 +1543,14 @@ static corba_status epp_call_info_nsset(
 
     info_nsset = cdata->data;
     /*
-	 * Input parameters:
-	 *    id (a)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_contact (*)
-	 */
+     * Input parameters:
+     *    id (a)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_contact (*)
+     */
     assert(info_nsset->id);
     assert(cdata->xml_in);
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
@@ -1722,14 +1723,14 @@ static corba_status epp_call_info_keyset(
 
     info_keyset = cdata->data;
     /*
-	 * Input parameters:
-	 *    id (a)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_contact (*)
-	 */
+     * Input parameters:
+     *    id (a)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_contact (*)
+     */
     assert(info_keyset->id);
     assert(cdata->xml_in);
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
@@ -1799,17 +1800,17 @@ static corba_status epp_call_poll_req(
 
     poll_req = cdata->data;
     /*
-	 * Input parameters:
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_msgID (*)
-	 *    c_count
-	 *    c_qdate (*)
-	 *    c_polltype
-	 *    c_mesg (*)
-	 */
+     * Input parameters:
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_msgID (*)
+     *    c_count
+     *    c_qdate (*)
+     *    c_polltype
+     *    c_mesg (*)
+     */
     assert(cdata->xml_in);
 
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
@@ -2235,15 +2236,15 @@ static corba_status epp_call_poll_ack(
 
     poll_ack = cdata->data;
     /*
-	 * Input parameters:
-	 *    msgid (a)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_count
-	 *    c_msgID (*)
-	 */
+     * Input parameters:
+     *    msgid (a)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_count
+     *    c_msgID (*)
+     */
     assert(poll_ack->msgid);
     assert(cdata->xml_in);
 
@@ -2325,21 +2326,21 @@ static corba_status epp_call_create_domain(
     c_registrant = NULL;
     c_params = NULL;
     /*
-	 * Input parameters:
-	 *    name (a)
-	 *    c_registrant (*)
-	 *    c_nsset    (*)
-	 *    c_authInfo (*)
-	 *    c_period   (*)
-	 *    c_admin  (*)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 *    c_ext_list (*)
-	 * Output parameters:
-	 *    c_crDate (*)
-	 *    c_exDate (*)
-	 */
+     * Input parameters:
+     *    name (a)
+     *    c_registrant (*)
+     *    c_nsset    (*)
+     *    c_authInfo (*)
+     *    c_period   (*)
+     *    c_admin  (*)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     *    c_ext_list (*)
+     * Output parameters:
+     *    c_crDate (*)
+     *    c_exDate (*)
+     */
     assert(create_domain->name);
     assert(cdata->xml_in);
 
@@ -2570,14 +2571,14 @@ static corba_status epp_call_create_contact(
     int retr, cerrno, len;
     epps_create_contact *create_contact = cdata->data;
     /*
-	 * Input parameters:
-	 *    id        (a)
-	 *    c_contact (*)
-	 *    loginid
-	 *    xml_in    (a)
-	 * Output parameters:
-	 *    c_crDate  (*)
-	 */
+     * Input parameters:
+     *    id        (a)
+     *    c_contact (*)
+     *    loginid
+     *    xml_in    (a)
+     * Output parameters:
+     *    c_crDate  (*)
+     */
     assert(create_contact->id);
     assert(cdata->xml_in);
 
@@ -2848,18 +2849,18 @@ static corba_status epp_call_create_nsset(
 
     create_nsset = cdata->data;
     /*
-	 * Input parameters:
-	 *    id (a)
-	 *    c_authInfo (*)
-	 *    c_tech (*)
-	 *    c_dnshost (*)
-	 *    level
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_crDate (*)
-	 */
+     * Input parameters:
+     *    id (a)
+     *    c_authInfo (*)
+     *    c_tech (*)
+     *    c_dnshost (*)
+     *    level
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_crDate (*)
+     */
     assert(create_nsset->id != NULL);
     assert(cdata->xml_in != NULL);
 
@@ -3038,18 +3039,18 @@ static corba_status epp_call_create_keyset(
 
     create_keyset = cdata->data;
     /*
-	 * Input parameters:
-	 *    id (a)
-	 *    c_authInfo (*)
-	 *    c_tech (*)
-	 *    c_dsrecord (*)
-	 *    level
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_crDate (*)
-	 */
+     * Input parameters:
+     *    id (a)
+     *    c_authInfo (*)
+     *    c_tech (*)
+     *    c_dsrecord (*)
+     *    level
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_crDate (*)
+     */
     assert(create_keyset->id != NULL);
     assert(cdata->xml_in != NULL);
 
@@ -3059,7 +3060,7 @@ static corba_status epp_call_create_keyset(
         return CORBA_INT_ERROR;
     }
 
-    /* alloc & init sequence of delegation signer records 
+    /* alloc & init sequence of delegation signer records
      * note: dsrecords are obsolete but we didn't changed
      * interface so we use only empty sequence */
     c_dsrecord = ccReg_DSRecord__alloc();
@@ -3227,13 +3228,13 @@ static corba_status epp_call_delete(
 
     delete = cdata->data;
     /*
-	 * Input parameters:
-	 *    id (a)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters: none
-	 */
+     * Input parameters:
+     *    id (a)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters: none
+     */
     assert(delete->id);
     assert(cdata->xml_in);
 
@@ -3306,17 +3307,17 @@ static corba_status epp_call_renew_domain(
     c_ext_list = NULL;
     c_params = NULL;
     /*
-	 * Input parameters:
-	 *    name (a)
-	 *    c_exDateIN (*)
-	 *    c_period (*)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 *    c_ext_list (*)
-	 * Output parameters:
-	 *    c_exDateOUT (*)
-	 */
+     * Input parameters:
+     *    name (a)
+     *    c_exDateIN (*)
+     *    c_period (*)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     *    c_ext_list (*)
+     * Output parameters:
+     *    c_exDateOUT (*)
+     */
     assert(renew->name);
     assert(cdata->xml_in);
 
@@ -3459,20 +3460,20 @@ static corba_status epp_call_update_domain(
     c_tmpcontact_rem = NULL;
     c_params = NULL;
     /*
-	 * Input parameters:
-	 *    name         (a)
-	 *    c_registrant (*)
-	 *    c_authInfo   (*)
-	 *    c_nsset      (*)
-	 *    c_admin_add  (*)
-	 *    c_admin_rem  (*)
-	 *    c_tmpcontact_rem  (*)
-	 *    loginid
-	 *    c_clTRID     (*)
-	 *    xml_in       (a)
-	 *    c_ext_list   (*)
-	 * Output parameters: none
-	 */
+     * Input parameters:
+     *    name         (a)
+     *    c_registrant (*)
+     *    c_authInfo   (*)
+     *    c_nsset      (*)
+     *    c_admin_add  (*)
+     *    c_admin_rem  (*)
+     *    c_tmpcontact_rem  (*)
+     *    loginid
+     *    c_clTRID     (*)
+     *    xml_in       (a)
+     *    c_ext_list   (*)
+     * Output parameters: none
+     */
     assert(update_domain->name);
     assert(cdata->xml_in);
 
@@ -3662,14 +3663,14 @@ static corba_status epp_call_update_contact(
     epps_update_contact *update_contact = cdata->data;
     ccReg_EppParams *c_params = NULL;
     /*
-	 * Input parameters:
-	 *    id (a)
-	 *    c_contact (*)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters: none
-	 */
+     * Input parameters:
+     *    id (a)
+     *    c_contact (*)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters: none
+     */
     assert(update_contact->id);
     assert(cdata->xml_in);
 
@@ -3680,9 +3681,9 @@ static corba_status epp_call_update_contact(
         goto error_input;
     }
     /*
-	 * Here we will change allocation schema: first do all allocs and then
-	 * check success.
-	 */
+     * Here we will change allocation schema: first do all allocs and then
+     * check success.
+     */
     if (update_contact->pi != NULL)
     {
         c_contact->Name = wrap_str(update_contact->pi->name);
@@ -3909,19 +3910,19 @@ static corba_status epp_call_update_nsset(
     c_authInfo = NULL;
     c_params = NULL;
     /*
-	 * Input parameters:
-	 *    id            (a)
-	 *    c_authInfo    (*)
-	 *    c_dnshost_add (*)
-	 *    c_dnshost_rem (*)
-	 *    c_tech_add    (*)
-	 *    c_tech_rem    (*)
-	 *    level
-	 *    loginid
-	 *    c_clTRID      (*)
-	 *    xml_in        (a)
-	 * Output parameters: none
-	 */
+     * Input parameters:
+     *    id            (a)
+     *    c_authInfo    (*)
+     *    c_dnshost_add (*)
+     *    c_dnshost_rem (*)
+     *    c_tech_add    (*)
+     *    c_tech_rem    (*)
+     *    level
+     *    loginid
+     *    c_clTRID      (*)
+     *    xml_in        (a)
+     * Output parameters: none
+     */
     assert(update_nsset->id);
     assert(cdata->xml_in);
 
@@ -4119,19 +4120,19 @@ static corba_status epp_call_update_keyset(
     c_authInfo = NULL;
     c_params = NULL;
     /*
-	 * Input parameters:
-	 *    id            (a)
-	 *    c_authInfo    (*)
-	 *    c_ds_add (*)
-	 *    c_ds_rem (*)
-	 *    c_tech_add    (*)
-	 *    c_tech_rem    (*)
-	 *    level
-	 *    loginid
-	 *    c_clTRID      (*)
-	 *    xml_in        (a)
-	 * Output parameters: none
-	 */
+     * Input parameters:
+     *    id            (a)
+     *    c_authInfo    (*)
+     *    c_ds_add (*)
+     *    c_ds_rem (*)
+     *    c_tech_add    (*)
+     *    c_tech_rem    (*)
+     *    level
+     *    loginid
+     *    c_clTRID      (*)
+     *    xml_in        (a)
+     * Output parameters: none
+     */
     assert(update_keyset->id);
     assert(cdata->xml_in);
 
@@ -4317,14 +4318,14 @@ static corba_status epp_call_transfer(
 
     transfer = cdata->data;
     /*
-	 * Input parameters:
-	 *    id (a)
-	 *    c_authInfo (*)
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters: none
-	 */
+     * Input parameters:
+     *    id (a)
+     *    c_authInfo (*)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters: none
+     */
     assert(transfer->id);
     assert(cdata->xml_in);
 
@@ -4409,13 +4410,13 @@ static corba_status epp_call_list(
 
     list = cdata->data;
     /*
-	 * Input parameters:
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_handles (*)
-	 */
+     * Input parameters:
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_handles (*)
+     */
     assert(cdata->xml_in);
 
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
@@ -4507,13 +4508,13 @@ static corba_status epp_call_sendauthinfo(
 
     sendAuthInfo = cdata->data;
     /*
-	 * Input parameters:
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    c_handle (*)
-	 *    xml_in (a)
-	 * Output parameters: none
-	 */
+     * Input parameters:
+     *    loginid
+     *    c_clTRID (*)
+     *    c_handle (*)
+     *    xml_in (a)
+     * Output parameters: none
+     */
     assert(cdata->xml_in);
 
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
@@ -4592,13 +4593,13 @@ static corba_status epp_call_creditinfo(
 
     creditInfo = cdata->data;
     /*
-	 * Input parameters:
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_zoneCredit (*)
-	 */
+     * Input parameters:
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_zoneCredit (*)
+     */
     assert(cdata->xml_in);
 
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
@@ -4685,15 +4686,15 @@ static corba_status epp_call_test_nsset(
     c_handle = NULL;
     c_names = NULL;
     /*
-	 * Input parameters:
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    c_handle (*)
-	 *    level
-	 *    c_names (*)
-	 *    xml_in (a)
-	 * Output parameters: none
-	 */
+     * Input parameters:
+     *    loginid
+     *    c_clTRID (*)
+     *    c_handle (*)
+     *    level
+     *    c_names (*)
+     *    xml_in (a)
+     * Output parameters: none
+     */
     assert(cdata->xml_in);
 
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
@@ -4783,15 +4784,15 @@ static corba_status epp_call_info(
     input_ok = 0;
     c_handle = NULL;
     /*
-	 * Input parameters:
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    c_infotype
-	 *    c_handle (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_count
-	 */
+     * Input parameters:
+     *    loginid
+     *    c_clTRID (*)
+     *    c_infotype
+     *    c_handle (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_count
+     */
     assert(cdata->xml_in);
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
     if (c_params == NULL)
@@ -4856,13 +4857,13 @@ static corba_status epp_call_getInfoResults(
 
     list = cdata->data;
     /*
-	 * Input parameters:
-	 *    loginid
-	 *    c_clTRID (*)
-	 *    xml_in (a)
-	 * Output parameters:
-	 *    c_handles (*)
-	 */
+     * Input parameters:
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_handles (*)
+     */
     assert(cdata->xml_in);
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
     if (c_params == NULL)

@@ -35,21 +35,21 @@ typedef enum {
     PARSER_CMD_OTHER, /**< A command other than login and logout. */
     PARSER_NOT_VALID, /**< Request does not validate. */
     /**
-	 * Request is not command but <hello> frame this indicates that greeting
-	 * should be generated.
-	 */
+     * Request is not command but <hello> frame this indicates that greeting
+     * should be generated.
+     */
     PARSER_HELLO,
     /*
-	 * when following status values are returned, connection is closed
-	 */
+     * when following status values are returned, connection is closed
+     */
     PARSER_NOT_COMMAND, /**< Request is not a command nor hello frame. */
     PARSER_NOT_XML, /**< Request is not xml. */
     PARSER_ESCHEMA, /**< Error when parsing xml schema. */
     /**
-	 * Internal parser error (e.g. malloc failed). This error is
-	 * esspecialy serious, therefor its log severity SHOULD be higher
-	 * than of the other errors.
-	 */
+     * Internal parser error (e.g. malloc failed). This error is
+     * esspecialy serious, therefor its log severity SHOULD be higher
+     * than of the other errors.
+     */
     PARSER_EINTERNAL
 } parser_status;
 

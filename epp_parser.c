@@ -247,9 +247,9 @@ static char *xpath_get1(void *pool, xmlXPathContextPtr ctx, const char *expr, in
 
     res = TEXT_CONTENT(obj, 0);
     /*
-	 * the value might be NULL in special circumstances, it is equivalent
-	 * to empty content of element, so we will copy empty string to result.
-	 */
+     * the value might be NULL in special circumstances, it is equivalent
+     * to empty content of element, so we will copy empty string to result.
+     */
     if (res == NULL)
         res = epp_strdup(pool, "");
     else
@@ -369,7 +369,7 @@ static char *xpath_get_attr(
 }
 
 
-/** 
+/**
  * Parse a boolean value entered either
  * as a number or as a string (true/false)
  *
@@ -554,9 +554,9 @@ void *epp_parser_init(const char *url_schema)
     }
 
     /*
-	 * It seems libxml is working well even without parser and xpath
-	 * initialization, but we will rather invoke them.
-	 */
+     * It seems libxml is working well even without parser and xpath
+     * initialization, but we will rather invoke them.
+     */
     xmlInitParser();
     xmlXPathInit();
 
@@ -567,9 +567,9 @@ void *epp_parser_init(const char *url_schema)
     schema = xmlSchemaParse(spctx);
     xmlSchemaFreeParserCtxt(spctx);
     /*
-	 * schema might be corrupted though it is unlikely, in that case
-	 * schema has NULL value
-	 */
+     * schema might be corrupted though it is unlikely, in that case
+     * schema has NULL value
+     */
     return (void *)schema;
 }
 
@@ -782,9 +782,9 @@ static void parse_info(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data
     RESET_XERR(xerr); /* clear value of errno */
 
     /*
-	 * catch the "list command" at the beginning, then proceed with
-	 * info command
-	 */
+     * catch the "list command" at the beginning, then proceed with
+     * info command
+     */
     exists = xpath_count(xpathCtx, "contact:list", &xerr);
     CHK_XERR(xerr, error);
     if (exists)
@@ -938,9 +938,9 @@ static void parse_poll(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data
     str = get_attr(xpathCtx->node, "msgID");
 
     /*
-	 * msgID attribute is not strictly required by xml schema so we
-	 * have to explicitly check if it is there
-	 */
+     * msgID attribute is not strictly required by xml schema so we
+     * have to explicitly check if it is there
+     */
     if (str == NULL)
     {
         if (new_error_item(pool, &cdata->errors, errspec_poll_msgID_missing))
@@ -1016,9 +1016,9 @@ static void parse_create_domain(void *pool, xmlXPathContextPtr xpathCtx, epp_com
     else
     {
         /*
-		 * value 0 means that the period was not given and default value
-		 * should be used instead
-		 */
+         * value 0 means that the period was not given and default value
+         * should be used instead
+         */
         create_domain->period = 0;
     }
 
@@ -1097,16 +1097,16 @@ static void parse_create_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
         CHK_XERR(xerr, error);
         create_contact->identtype = string2identtype(str);
         /*
-		 * schema and source code are out of sync if following error
-		 * occurs
-		 */
+         * schema and source code are out of sync if following error
+         * occurs
+         */
         assert(create_contact->identtype != ident_UNKNOWN);
     }
     /*
-	 * disclose flags - we don't interpret anyhow disclose flags, we just
-	 * send the values to CR and CR decides in conjuction with default
-	 * server policy what to do
-	 */
+     * disclose flags - we don't interpret anyhow disclose flags, we just
+     * send the values to CR and CR decides in conjuction with default
+     * server policy what to do
+     */
     xpath_chroot(xpathCtx, "contact:disclose", 0, &xerr);
     if (xerr == XERR_LIBXML)
     {
@@ -1557,9 +1557,9 @@ static void parse_renew(void *pool, xmlXPathContextPtr xpathCtx, epp_command_dat
     else
     {
         /*
-		 * value 0 means that the period was not given and default value
-		 * should be used instead
-		 */
+         * value 0 means that the period was not given and default value
+         * should be used instead
+         */
         renew->period = 0;
     }
 
@@ -1707,9 +1707,9 @@ static void parse_update_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
         {
             update_contact->identtype = string2identtype(str);
             /*
-			 * schema and source code is out of sync if following
-			 * assert does not hold
-			 */
+             * schema and source code is out of sync if following
+             * assert does not hold
+             */
             assert(update_contact->identtype != ident_UNKNOWN);
         }
     }
@@ -1726,9 +1726,9 @@ static void parse_update_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
     update_contact->vat = xpath_get1(pool, xpathCtx, "contact:vat", 0, &xerr);
     CHK_XERR(xerr, error);
     /*
-	 * there can be just one disclose section, now it depens if the flag is
-	 * 0 or 1
-	 */
+     * there can be just one disclose section, now it depens if the flag is
+     * 0 or 1
+     */
     xpath_chroot(xpathCtx, "contact:disclose", 0, &xerr);
     if (xerr == XERR_LIBXML)
     {
@@ -1858,14 +1858,14 @@ static void parse_update_keyset(void *pool, xmlXPathContextPtr xpathCtx, epp_com
         par_node = xpathCtx->node;
 
         /*
-		xpath_getn(pool, &update_keyset->rem_tech, xpathCtx,
-				"keyset:tech", &xerr);
-		CHK_XERR(xerr, error);
-		xpath_getn(pool, &update_keyset->rem_ds, xpathCtx,
-				"keyset:name", &xerr);
-		CHK_XERR(xerr, error);
-		xpathCtx->node = xpathCtx->node->parent;
-		*/
+        xpath_getn(pool, &update_keyset->rem_tech, xpathCtx,
+                "keyset:tech", &xerr);
+        CHK_XERR(xerr, error);
+        xpath_getn(pool, &update_keyset->rem_ds, xpathCtx,
+                "keyset:name", &xerr);
+        CHK_XERR(xerr, error);
+        xpathCtx->node = xpathCtx->node->parent;
+        */
         xpath_getn(pool, &update_keyset->rem_tech, xpathCtx, "keyset:tech", &xerr);
         CHK_XERR(xerr, error);
         /* rem DNSKEY records */
@@ -2170,12 +2170,12 @@ static void parse_transfer(void *pool, xmlXPathContextPtr xpathCtx, epp_command_
     str = get_attr(xpathCtx->node, "op");
     assert(str != NULL);
     /*
-	 * we process only transfer requests (not approves, cancels, queries, ..)
-	 * though all transfer commands are valid according to xml schemas
-	 * because we don't want to be incompatible with epp-1.0 standard.
-	 * If there is another command than "transfer request" we return
-	 * 2102 "Unimplemented option" response.
-	 */
+     * we process only transfer requests (not approves, cancels, queries, ..)
+     * though all transfer commands are valid according to xml schemas
+     * because we don't want to be incompatible with epp-1.0 standard.
+     * If there is another command than "transfer request" we return
+     * 2102 "Unimplemented option" response.
+     */
     if (strcmp(str, "request"))
     {
         if (new_error_item(pool, &cdata->errors, errspec_transfer_op))
@@ -2810,8 +2810,8 @@ static parser_status parse_command(
     node = xpathCtx->node;
 
     /*
-	 * command recognition part
-	 */
+     * command recognition part
+     */
     xpathObj = xmlXPathEvalExpression(BAD_CAST "epp:*[position()=1]", xpathCtx);
     if (xpathObj == NULL)
         return PARSER_EINTERNAL;
@@ -2825,10 +2825,10 @@ static parser_status parse_command(
     xmlXPathFreeObject(xpathObj);
 
     /*
-	 * Do validity checking for following cases:
-	 * 	- the user is not logged in and attempts to issue a command
-	 * 	- the user is already logged in and issues another login
-	 */
+     * Do validity checking for following cases:
+     * 	- the user is not logged in and attempts to issue a command
+     * 	- the user is already logged in and issues another login
+     */
     if ((*cmd != EPP_RED_LOGIN && !loggedin) || (*cmd == EPP_RED_LOGIN && loggedin))
     {
         cdata->type = EPP_DUMMY;
@@ -2843,9 +2843,9 @@ static parser_status parse_command(
             break;
         case EPP_RED_LOGOUT:
             /*
-			 * logout is so simple that we don't use dedicated
-			 * parsing function
-			 */
+             * logout is so simple that we don't use dedicated
+             * parsing function
+             */
             cdata->type = EPP_LOGOUT;
             break;
         case EPP_RED_CHECK:
@@ -3015,8 +3015,8 @@ parse_extension(void *pool, epp_command_data *cdata, xmlXPathContextPtr xpathCtx
     node = xpathCtx->node;
 
     /*
-	 * command recognition part
-	 */
+     * command recognition part
+     */
     xpath_chroot(xpathCtx, "fred:*[position()=1]", 0, &xerr);
     if (xerr == XERR_LIBXML)
     {
@@ -3209,8 +3209,8 @@ parser_status epp_parse_command(
         return PARSER_EINTERNAL;
     cdata = *cdata_arg;
     /* ... from now the management of cdata structure and all its items
-	 * is done at higher level -> we don't have to care about release
-	 * of resources which are part of cdata. */
+     * is done at higher level -> we don't have to care about release
+     * of resources which are part of cdata. */
 
     /* parse xml request */
     cdata->parsed_doc = xmlParseMemory(request, bytes);
@@ -3222,9 +3222,9 @@ parser_status epp_parse_command(
     if (dumpedXML == NULL || dumpLength <= 0)
         return PARSER_EINTERNAL;
     /*
-	 * we cannot use strdup since it is not sure the request is NULL
-	 * terminated
-	 */
+     * we cannot use strdup since it is not sure the request is NULL
+     * terminated
+     */
     cdata->xml_in = epp_malloc(epp_ctx->pool, dumpLength + 1);
     if (cdata->xml_in == NULL)
         return PARSER_EINTERNAL;
@@ -3249,10 +3249,10 @@ parser_status epp_parse_command(
     else if (val_ret == VAL_NOT_VALID)
     {
         /*
-		 * validation error consequence: response identifing a problem
-		 * (libxml message) is sent back to client, the connection
-		 * persists.
-		 */
+         * validation error consequence: response identifing a problem
+         * (libxml message) is sent back to client, the connection
+         * persists.
+         */
         cdata->rc = 2001;
         cdata->type = EPP_DUMMY;
         return PARSER_NOT_VALID;
@@ -3265,9 +3265,9 @@ parser_status epp_parse_command(
         return PARSER_EINTERNAL;
 
     /*
-	 * register namespaces and their prefixes in XPath context
-	 * Error handling is same for all xmlXPathRegisterNs calls.
-	 */
+     * register namespaces and their prefixes in XPath context
+     * Error handling is same for all xmlXPathRegisterNs calls.
+     */
     if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "epp", BAD_CAST NS_EPP) ||
         xmlXPathRegisterNs(xpathCtx, BAD_CAST "contact", BAD_CAST NS_CONTACT) ||
         xmlXPathRegisterNs(xpathCtx, BAD_CAST "domain", BAD_CAST NS_DOMAIN) ||
@@ -3295,10 +3295,10 @@ parser_status epp_parse_command(
     elemname = (char *)xpathCtx->node->name;
 
     /*
-	 * See what we have. <hello>, <command>, <extension> are admittable.
-	 * NOTE: Recognition is optimized, we exploit the difference in first
-	 * letter of valid elements.
-	 */
+     * See what we have. <hello>, <command>, <extension> are admittable.
+     * NOTE: Recognition is optimized, we exploit the difference in first
+     * letter of valid elements.
+     */
     switch (elemname[0])
     {
         case 'h':

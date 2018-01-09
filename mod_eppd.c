@@ -134,7 +134,7 @@
 /**
  * Many errors in logging will be logged to epplog with this severity,
  * If logging is mandatory, it should be rised much higher than EPP_DEBUG
-*/
+ */
 #define EPP_LOGD_ERRLVL EPP_ERROR
 
 /**
@@ -448,12 +448,12 @@ static int epp_read_request(epp_context *epp_ctx, char **content, unsigned *byte
     {
         char err_msg[256];
         /*
-		 * this used to be logged at EPP_FATAL level, but later was
-		 * changed to lower priority, because condition above catches
-		 * also cases, when client simply aborts the connection without
-		 * logging out first, which happens pretty often and is not
-		 * "fatal" at all.
-		 */
+         * this used to be logged at EPP_FATAL level, but later was
+         * changed to lower priority, because condition above catches
+         * also cases, when client simply aborts the connection without
+         * logging out first, which happens pretty often and is not
+         * "fatal" at all.
+         */
         if (status == APR_EOF)
         {
             epplog(epp_ctx,
@@ -472,10 +472,10 @@ static int epp_read_request(epp_context *epp_ctx, char **content, unsigned *byte
     }
 
     /*
-	 * convert bucket brigade into sequence of bytes
-	 * In most cases there is just one bucket of size 4, which
-	 * could be read directly. But we will not rely on it.
-	 */
+     * convert bucket brigade into sequence of bytes
+     * In most cases there is just one bucket of size 4, which
+     * could be read directly. But we will not rely on it.
+     */
     len = EPP_HEADER_LENGTH;
     status = apr_brigade_pflatten(bb, &buf, &len, pool);
     if (status != APR_SUCCESS)
@@ -506,9 +506,9 @@ static int epp_read_request(epp_context *epp_ctx, char **content, unsigned *byte
     hbo_size -= EPP_HEADER_LENGTH;
 
     /*
-	 * hbo_size needs to be checked, so that we know it's not total
-	 * garbage
-	 */
+     * hbo_size needs to be checked, so that we know it's not total
+     * garbage
+     */
     if (hbo_size < 1 || hbo_size > MAX_FRAME_LENGTH)
     {
         epplog(epp_ctx, EPP_ERROR, "Invalid epp frame length (%u bytes)", hbo_size);
@@ -606,12 +606,12 @@ static int get_md5(char *cert_md5, char *pem)
     unsigned char md5[20]; /* fingerprint in binary form */
 
     /*
-	 * This function is rather overcomplicated, because the interface
-	 * of openssl library is somewhat cumbersome. At first we have to
-	 * get PEM encoded ceritificate in BIO stream, which is input for
-	 * routine which creates X509 struct. Only X509 struct can then be
-	 * fed to X509_digest() function, which computes the fingerprint.
-	 */
+     * This function is rather overcomplicated, because the interface
+     * of openssl library is somewhat cumbersome. At first we have to
+     * get PEM encoded ceritificate in BIO stream, which is input for
+     * routine which creates X509 struct. Only X509 struct can then be
+     * fed to X509_digest() function, which computes the fingerprint.
+     */
     if ((bio = BIO_new(BIO_s_mem())) == NULL)
         return 0;
 
@@ -690,14 +690,14 @@ static int call_login(
     epplog(epp_ctx, EPP_DEBUG, "Fingerprint is: %s", cert_md5);
 
     /*
-	 * corba login function is somewhat special
-	 *   - session might be changed
-	 *   - lang might be changed
-	 *   - there is additional parameter identifing ssl certificate
-	 *     in order to match login name with used certificate on
-	 *     side of central repository. The identifing parameter
-	 *     is md5 digest of client's certificate.
-	 */
+     * corba login function is somewhat special
+     *   - session might be changed
+     *   - lang might be changed
+     *   - there is additional parameter identifing ssl certificate
+     *     in order to match login name with used certificate on
+     *     side of central repository. The identifing parameter
+     *     is md5 digest of client's certificate.
+     */
     *cstat = epp_call_login(epp_ctx, service, loginid, request_id, lang, cert_md5, cdata);
     return 1;
 }
@@ -915,9 +915,9 @@ static int gen_response(
         case GEN_OK:
             break;
         /*
-		 * following errors are serious and response cannot be sent
-		 * to client when any of them appears
-		 */
+         * following errors are serious and response cannot be sent
+         * to client when any of them appears
+         */
         case GEN_EBUFFER:
         case GEN_EWRITER:
         case GEN_EBUILD:
@@ -927,10 +927,10 @@ static int gen_response(
                    "terminating session");
             return 0;
         /*
-		 * following errors are only informative though serious.
-		 * The connection persists and response is sent back to
-		 * client.
-		 */
+         * following errors are only informative though serious.
+         * The connection persists and response is sent back to
+         * client.
+         */
         case GEN_NOT_XML:
             epplog(epp_ctx, EPP_ERROR, "Generated response is not XML");
             break;
@@ -992,12 +992,12 @@ static int epp_request_loop(
 
 #ifdef EPP_PERF
     /*
-	 * array of timestamps for perf measurement:
-	 *     time[0] - before parsing
-	 *     time[1] - after parsing and before corba call
-	 *     time[2] - after corba call and before response generation
-	 *     time[3] - after response generation
-	 */
+     * array of timestamps for perf measurement:
+     *     time[0] - before parsing
+     *     time[1] - after parsing and before corba call
+     *     time[2] - after corba call and before response generation
+     *     time[3] - after response generation
+     */
     apr_time_t times[5];
 #endif
 
@@ -1008,9 +1008,9 @@ static int epp_request_loop(
     lang = LANG_EN; /* default language is english */
 
     /*
-	 * The loop in which are processed requests until client logs out or
-	 * error appears.
-	 */
+     * The loop in which are processed requests until client logs out or
+     * error appears.
+     */
     while (1)
     {
         ccReg_TID act_log_entry_id = 0;
@@ -1066,9 +1066,9 @@ static int epp_request_loop(
         times[0] = apr_time_now(); /* before parsing */
 #endif
         /*
-		 * Deliver request to XML parser, the task of parser is
-		 * to fill cdata structure with data.
-		 */
+         * Deliver request to XML parser, the task of parser is
+         * to fill cdata structure with data.
+         */
 
 
         pstat = epp_parse_command(
@@ -1078,11 +1078,11 @@ static int epp_request_loop(
             cmd_type = EPP_RED_HELLO;
 
         /*
-		 * Register cleanup for cdata structure. The most of the
-		 * items in this structure are allocated from pool, but
-		 * parsed document tree and xpath context must be
-		 * explicitly released.
-		 */
+         * Register cleanup for cdata structure. The most of the
+         * items in this structure are allocated from pool, but
+         * parsed document tree and xpath context must be
+         * explicitly released.
+         */
         apr_pool_cleanup_register(rpool, (void *)cdata, epp_cleanup_request, apr_pool_cleanup_null);
 
         /* test if the failure is serious enough to close connection */
@@ -1189,10 +1189,10 @@ static int epp_request_loop(
             times[3] = apr_time_now(); /* after corba calls */
 #endif
             /*
-			 * generate greeting (server name is concatenation of
-			 * string from apache conf file and string retrieved
-			 * from corba server through version() function)
-			 */
+             * generate greeting (server name is concatenation of
+             * string from apache conf file and string retrieved
+             * from corba server through version() function)
+             */
             gstat = epp_gen_greeting(
                     epp_ctx->pool,
                     apr_pstrcat(rpool, sc->servername, " (", version, ")", NULL),
@@ -1249,7 +1249,8 @@ static int epp_request_loop(
             if (!sc->has_contact_mailing_address_extension &&
                 epp_request_contains_extra_addr_extension(cdata))
             {
-                /* request contains disabled extension so we return the most appropriate response code */
+                /* request contains disabled extension so we return the most appropriate response
+                 * code */
                 cdata->rc = 2103;
                 cdata->msg = epp_strdup(epp_ctx->pool, "Unimplemented extension");
                 cdata->svTRID = epp_strdup(epp_ctx->pool, "DUMMY-SVTRID");
@@ -1286,9 +1287,9 @@ static int epp_request_loop(
                 *login_id_save = login_id;
                 *session_id_save = session_id;
                 /*
-				 * this event should be logged explicitly if
-				 * login was successfull
-				 */
+                 * this event should be logged explicitly if
+                 * login was successfull
+                 */
                 epplog(epp_ctx,
                        EPP_INFO,
                        "Logged in "
@@ -1326,8 +1327,8 @@ static int epp_request_loop(
                     &valerr);
 
             /* put login id to the log record if it's not already there
-			 * (i.e. only in case we just logged in)
-			 */
+             * (i.e. only in case we just logged in)
+             */
 
             if (logger_service != NULL && act_log_entry_id != 0)
             {
@@ -1365,11 +1366,11 @@ static int epp_request_loop(
         epplog(epp_ctx, EPP_DEBUG, "Response content: %s", response);
 #ifdef EPP_PERF
         /*
-		 * record perf data
-		 * Apache 2.0 has problem with processing %llu formating,
-		 * therefore we overtype the results to a more common numeric
-		 * values.
-		 */
+         * record perf data
+         * Apache 2.0 has problem with processing %llu formating,
+         * therefore we overtype the results to a more common numeric
+         * values.
+         */
         epplog(epp_ctx,
                EPP_DEBUG,
                "Perf data: p(%u), l(%u), c(%u), "
@@ -1384,7 +1385,7 @@ static int epp_request_loop(
         if (status != APR_SUCCESS)
         {
             /* happens on every greeting when client just tests
-			 * the port. Not severe. */
+             * the port. Not severe. */
             char err_msg[256];
             epplog(epp_ctx,
                    EPP_INFO,
@@ -1415,8 +1416,8 @@ static int epp_request_loop(
         }
 
         /*
-		 * XXX TEMPORARY HACK -disconnect on certain EPP return codes.
-		 */
+         * XXX TEMPORARY HACK -disconnect on certain EPP return codes.
+         */
         switch (cdata->rc)
         {
             case 2500:
@@ -1428,10 +1429,10 @@ static int epp_request_loop(
         }
 
         /*XXX
-		 * if server is going down non-gracefully we will try to say
-		 * good-bye before we will be killed.
-		if (ap_graceful_stop_signalled()
-		 */
+         * if server is going down non-gracefully we will try to say
+         * good-bye before we will be killed.
+        if (ap_graceful_stop_signalled()
+         */
 
         apr_pool_destroy(rpool);
     }
@@ -1453,9 +1454,9 @@ static void *get_corba_service(epp_context *epp_ctx, char *name)
     conn_rec *c = (conn_rec *)epp_ctx->conn;
 
     /*
-	 * get module structure for mod_corba, in order to retrieve service
-	 * stored by that module in connection config.
-	 */
+     * get module structure for mod_corba, in order to retrieve service
+     * stored by that module in connection config.
+     */
     corba_module = NULL;
     for (i = 0; ap_loaded_modules[i] != NULL; i++)
         if (!strcmp(ap_loaded_modules[i]->name, "mod_corba.c"))
@@ -1536,9 +1537,9 @@ static int epp_process_connection(conn_rec *c)
     epp_ctx.conn = c;
     epp_ctx.pool = c->pool;
     /*
-	 * combination of timestamp and connection id should
-	 * provide mostly unique identifier
-	 */
+     * combination of timestamp and connection id should
+     * provide mostly unique identifier
+     */
     epp_ctx.session = (apr_time_now() * (c->id + 1)) % 524288;
 
     EPPservice = get_corba_service(&epp_ctx, sc->object);
@@ -1591,7 +1592,7 @@ static int epp_process_connection(conn_rec *c)
     epplog(&epp_ctx, EPP_DEBUG, "Client connected");
 
     /* Send greeting - this is the first message of session automatically
-	 * sent by server. */
+     * sent by server. */
 
     /* get info from CR needed for <greeting> frame */
     rc = epp_call_hello(&epp_ctx, EPPservice, &version, &curdate);
@@ -1604,10 +1605,10 @@ static int epp_process_connection(conn_rec *c)
         return HTTP_INTERNAL_SERVER_ERROR;
     }
     /*
-	 * generate greeting (server name is concatenation of string from
-	 * apache conf file and string retrieved from corba server through
-	 * version() function)
-	 */
+     * generate greeting (server name is concatenation of string from
+     * apache conf file and string retrieved from corba server through
+     * version() function)
+     */
     gstat = epp_gen_greeting(
             epp_ctx.pool,
             apr_pstrcat(epp_ctx.pool, sc->servername, " (", version, ")", NULL),
@@ -1698,9 +1699,9 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
     uint32_t nbo_size; /* response length in network byte order */
 
     /*
-	 * iterate through buckets in bucket brigade and compute total length
-	 * of response.
-	 */
+     * iterate through buckets in bucket brigade and compute total length
+     * of response.
+     */
     for (b = APR_BRIGADE_FIRST(bb), len = 0; b != APR_BRIGADE_SENTINEL(bb); b = APR_BUCKET_NEXT(b))
     {
 
@@ -1782,9 +1783,9 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptem
     eppd_server_conf *sc;
 
     /*
-	 * during authentication of epp client we need to get value of a
-	 * SSL variable. For that we need ssl_var_lookup function.
-	 */
+     * during authentication of epp client we need to get value of a
+     * SSL variable. For that we need ssl_var_lookup function.
+     */
     epp_ssl_lookup = APR_RETRIEVE_OPTIONAL_FN(ssl_var_lookup);
     if (epp_ssl_lookup == NULL)
     {
@@ -1821,9 +1822,9 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptem
     //#endif /* perms */
 
     /*
-	 * Iterate through available servers and if eppd is enabled
-	 * open epp log file initialize components and do further checking
-	 */
+     * Iterate through available servers and if eppd is enabled
+     * open epp log file initialize components and do further checking
+     */
     while (s != NULL)
     {
         char *fname;
@@ -1853,8 +1854,8 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptem
                 sc->defer_err = 0;
 
             /*
-			 * open epp log file (if configured to do so)
-			 */
+             * open epp log file (if configured to do so)
+             */
             if (sc->epplog && !sc->epplogfp)
             {
                 fname = ap_server_root_relative(p, sc->epplog);
@@ -1961,9 +1962,9 @@ static const char *set_epp_object(cmd_parms *cmd, void *dummy, const char *obj_n
         return err;
 
     /*
-	 * catch double definition of object's name
-	 * that's not serious fault so we will just print message in log
-	 */
+     * catch double definition of object's name
+     * that's not serious fault so we will just print message in log
+     */
     if (sc->object != NULL)
     {
         ap_log_error(
@@ -2001,9 +2002,9 @@ static const char *set_logger_object(cmd_parms *cmd, void *dummy, const char *ob
         return err;
 
     /*
-	 * catch double definition of object's name
-	 * that's not serious fault so we will just print message in log
-	 */
+     * catch double definition of object's name
+     * that's not serious fault so we will just print message in log
+     */
     if (sc->logger_object != NULL)
     {
         ap_log_error(
@@ -2043,9 +2044,9 @@ static const char *set_schema(cmd_parms *cmd, void *dummy, const char *schemaurl
         return err;
 
     /*
-	 * catch double definition of iorfile
-	 * that's not serious fault so we will just print message in log
-	 */
+     * catch double definition of iorfile
+     * that's not serious fault so we will just print message in log
+     */
     if (sc->schema != NULL)
     {
         ap_log_error(
@@ -2059,8 +2060,8 @@ static const char *set_schema(cmd_parms *cmd, void *dummy, const char *schemaurl
     }
 
     /*
-	 * do initialization of xml and parsing of xml schema
-	 */
+     * do initialization of xml and parsing of xml schema
+     */
     sc->schema = epp_parser_init(schemaurl);
     if (sc->schema == NULL)
     {
@@ -2072,8 +2073,8 @@ static const char *set_schema(cmd_parms *cmd, void *dummy, const char *schemaurl
                 schemaurl);
     }
     /*
-	 * Register cleanup for xml
-	 */
+     * Register cleanup for xml
+     */
     apr_pool_cleanup_register(cmd->pool, sc->schema, epp_cleanup_xml, apr_pool_cleanup_null);
 
     return NULL;
@@ -2098,9 +2099,9 @@ static const char *set_epplog(cmd_parms *cmd, void *dummy, const char *a1)
         return err;
 
     /*
-	 * catch double definition of iorfile
-	 * that's not serious fault so we will just print message in log
-	 */
+     * catch double definition of iorfile
+     * that's not serious fault so we will just print message in log
+     */
     if (sc->epplog != NULL)
     {
         ap_log_error(
@@ -2137,9 +2138,9 @@ static const char *set_loglevel(cmd_parms *cmd, void *dummy, const char *a1)
         return err;
 
     /*
-	 * catch double definition of loglevel
-	 * that's not serious fault so we will just print message in log
-	 */
+     * catch double definition of loglevel
+     * that's not serious fault so we will just print message in log
+     */
     if (sc->loglevel != 0)
     {
         ap_log_error(
@@ -2191,9 +2192,9 @@ static const char *set_servername(cmd_parms *cmd, void *dummy, const char *a1)
         return err;
 
     /*
-	 * catch double definition of servername
-	 * that's not serious fault so we will just print message in log
-	 */
+     * catch double definition of servername
+     * that's not serious fault so we will just print message in log
+     */
     if (sc->servername != NULL)
     {
         ap_log_error(
@@ -2342,7 +2343,7 @@ static void *create_eppd_config(apr_pool_t *p, server_rec *s)
 {
     eppd_server_conf *const sc = (eppd_server_conf *)apr_pcalloc(p, sizeof(*sc));
     sc->has_contact_mailing_address_extension =
-            0; //default value means that contacts do not feature mailing address extension
+            0; // default value means that contacts do not feature mailing address extension
     return sc;
 }
 
