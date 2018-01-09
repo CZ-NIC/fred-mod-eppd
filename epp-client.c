@@ -137,7 +137,7 @@ static int err_epp2idl(int eppcode)
 }
 
 
-char* wrap_str(const char* str)
+char *wrap_str(const char *str)
 {
     if (str == NULL)
     {
@@ -155,7 +155,7 @@ char* wrap_str(const char* str)
  * @param str	Input string.
  * @return      Output string.
  */
-static char* wrap_str_upd(const char* str)
+static char *wrap_str_upd(const char *str)
 {
     if (str == NULL)
         return CORBA_string_dup("");
@@ -176,9 +176,9 @@ static char* wrap_str_upd(const char* str)
  * @param cerrno  Set to 1 if malloc failed.
  * @return        Output string.
  */
-static char* unwrap_str(void* pool, const char* str, int* cerrno)
+static char *unwrap_str(void *pool, const char *str, int *cerrno)
 {
-    char* res;
+    char *res;
 
     assert(str != NULL);
 
@@ -202,9 +202,9 @@ static char* unwrap_str(void* pool, const char* str, int* cerrno)
  * @param id	  Identifier of string used in error message.
  * @return        Output string.
  */
-static char* unwrap_str_req(epp_context* epp_ctx, const char* str, int* cerrno, const char* id)
+static char *unwrap_str_req(epp_context *epp_ctx, const char *str, int *cerrno, const char *id)
 {
-    char* res;
+    char *res;
 
     assert(str != NULL);
 
@@ -223,11 +223,11 @@ static char* unwrap_str_req(epp_context* epp_ctx, const char* str, int* cerrno, 
 }
 
 
-ccReg_EppParams* init_epp_params(
-        const ccReg_TID login_id, const ccReg_TID request_id, const char* xml_in,
-        const char* clTRID)
+ccReg_EppParams *init_epp_params(
+        const ccReg_TID login_id, const ccReg_TID request_id, const char *xml_in,
+        const char *clTRID)
 {
-    ccReg_EppParams* c_params;
+    ccReg_EppParams *c_params;
 
     c_params = ccReg_EppParams__alloc();
     if (c_params == NULL)
@@ -257,11 +257,11 @@ ccReg_EppParams* init_epp_params(
     return c_params;
 }
 
-int epp_call_hello(epp_context* epp_ctx, service_EPP service, char** version, char** curdate)
+int epp_call_hello(epp_context *epp_ctx, service_EPP service, char **version, char **curdate)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_version;
-    CORBA_char* c_curdate;
+    CORBA_char *c_version;
+    CORBA_char *c_curdate;
     int retr, cerrno;
 
     epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd hello)");
@@ -320,7 +320,7 @@ int epp_call_hello(epp_context* epp_ctx, service_EPP service, char** version, ch
  * @param cdata     Epp data.
  * @return          Corba status.
  */
-static corba_status create_dummy_answer(epp_context* epp_ctx, epp_command_data* cdata)
+static corba_status create_dummy_answer(epp_context *epp_ctx, epp_command_data *cdata)
 {
     cdata->svTRID = epp_strdup(epp_ctx->pool, "DUMMY-SVTRID");
     if (cdata->svTRID == NULL)
@@ -357,7 +357,7 @@ static corba_status create_dummy_answer(epp_context* epp_ctx, epp_command_data* 
  * @return         CORBA status.
  */
 static corba_status
-epilog_success(epp_context* epp_ctx, epp_command_data* cdata, ccReg_Response* response)
+epilog_success(epp_context *epp_ctx, epp_command_data *cdata, ccReg_Response *response)
 {
     int cerrno;
 
@@ -384,9 +384,9 @@ epilog_success(epp_context* epp_ctx, epp_command_data* cdata, ccReg_Response* re
  * @return          0 if successful, 1 if required parameter is missing, 2 if
  *                  malloc failed.
  */
-static int epilog_failure(epp_context* epp_ctx, epp_command_data* cdata, ccReg_EPP_EppError* exc)
+static int epilog_failure(epp_context *epp_ctx, epp_command_data *cdata, ccReg_EPP_EppError *exc)
 {
-    ccReg_Error* c_error;
+    ccReg_Error *c_error;
     int i, cerrno;
 
     CLEAR_CERRNO(cerrno);
@@ -401,7 +401,7 @@ static int epilog_failure(epp_context* epp_ctx, epp_command_data* cdata, ccReg_E
     /* process all errors one by one */
     for (i = 0; i < exc->errorList._length; i++)
     {
-        epp_error* err_item;
+        epp_error *err_item;
 
         c_error = &exc->errorList._buffer[i];
 
@@ -434,15 +434,15 @@ static int epilog_failure(epp_context* epp_ctx, epp_command_data* cdata, ccReg_E
  * @return          Corba status.
  */
 static corba_status
-handle_exception(epp_context* epp_ctx, epp_command_data* cdata, CORBA_Environment* ev)
+handle_exception(epp_context *epp_ctx, epp_command_data *cdata, CORBA_Environment *ev)
 {
     int ret;
 
     if (IS_EPP_ERROR(ev))
     {
-        ccReg_EPP_EppError* err_data;
+        ccReg_EPP_EppError *err_data;
 
-        err_data = (ccReg_EPP_EppError*)ev->_any._value;
+        err_data = (ccReg_EPP_EppError *)ev->_any._value;
         ret = epilog_failure(epp_ctx, cdata, err_data);
         if (ret == 0)
             ret = CORBA_OK;
@@ -453,11 +453,11 @@ handle_exception(epp_context* epp_ctx, epp_command_data* cdata, CORBA_Environmen
     }
     else if (IS_NO_MESSAGES(ev))
     {
-        ccReg_EPP_NoMessages* exc;
+        ccReg_EPP_NoMessages *exc;
         int cerrno;
 
         CLEAR_CERRNO(cerrno);
-        exc = (ccReg_EPP_NoMessages*)ev->_any._value;
+        exc = (ccReg_EPP_NoMessages *)ev->_any._value;
 
         cdata->rc = exc->code;
         cdata->msg = unwrap_str_req(epp_ctx, exc->msg, &cerrno, "msg");
@@ -493,14 +493,14 @@ handle_exception(epp_context* epp_ctx, epp_command_data* cdata, CORBA_Environmen
  * @return        Status.
  */
 static corba_status epp_call_dummy(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_clTRID;
-    ccReg_Response* response;
-    ccReg_XmlErrors* c_errorCodes;
-    ccReg_ErrorStrings* c_errStrings;
+    CORBA_char *c_clTRID;
+    ccReg_Response *response;
+    ccReg_XmlErrors *c_errorCodes;
+    ccReg_ErrorStrings *c_errStrings;
     int len, i, retr;
     int cerrno;
 
@@ -540,7 +540,7 @@ static corba_status epp_call_dummy(
     i = 0;
     q_foreach(&cdata->errors)
     {
-        epp_error* err_item;
+        epp_error *err_item;
 
         err_item = q_content(&cdata->errors);
         c_errorCodes->_buffer[i++] = err_epp2idl(err_item->spec);
@@ -586,7 +586,7 @@ static corba_status epp_call_dummy(
     i = 0;
     q_foreach(&cdata->errors)
     {
-        epp_error* err_item;
+        epp_error *err_item;
 
         err_item = q_content(&cdata->errors);
         if (*c_errStrings->_buffer[i] == '\0')
@@ -621,16 +621,16 @@ static corba_status epp_call_dummy(
 }
 
 corba_status epp_call_login(
-        epp_context* epp_ctx, service_EPP service, unsigned long long* loginid,
-        const ccReg_TID request_id, epp_lang* lang, const char* certID, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long *loginid,
+        const ccReg_TID request_id, epp_lang *lang, const char *certID, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
     CORBA_unsigned_long_long c_session;
     CORBA_char *c_clID, *c_pw, *c_newPW, *c_clTRID;
     ccReg_Languages c_lang;
-    ccReg_Response* response;
+    ccReg_Response *response;
     int retr;
-    epps_login* login;
+    epps_login *login;
 
     epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd login)");
     cdata->noresdata = 1;
@@ -716,12 +716,12 @@ corba_status epp_call_login(
 }
 
 corba_status epp_call_logout(
-        epp_context* epp_ctx, service_EPP service, unsigned long long* loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long *loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_EppParams* c_params = NULL;
-    ccReg_Response* response;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_Response *response;
     int retr;
 
     epplog(epp_ctx, EPP_DEBUG, "Corba call (epp-cmd logout)");
@@ -779,16 +779,16 @@ corba_status epp_call_logout(
  * @return        Status.
  */
 static corba_status epp_call_check(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata, epp_object_type obj)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata, epp_object_type obj)
 {
     CORBA_Environment ev[1];
-    ccReg_EppParams* c_params = NULL;
-    ccReg_CheckResp* c_avails;
-    ccReg_Check* c_ids;
-    ccReg_Response* response;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_CheckResp *c_avails;
+    ccReg_Check *c_ids;
+    ccReg_Response *response;
     int len, i, retr;
-    epps_check* check;
+    epps_check *check;
 
     check = cdata->data;
     /*
@@ -882,7 +882,7 @@ static corba_status epp_call_check(
 
     for (i = 0; i < c_avails->_length; i++)
     {
-        epp_avail* avail;
+        epp_avail *avail;
         int cerrno;
 
         CLEAR_CERRNO(cerrno);
@@ -933,16 +933,16 @@ static corba_status epp_call_check(
  * @return        Status.
  */
 static corba_status epp_call_info_contact(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
         const ccReg_TID request_id, int has_contact_mailing_address_extension,
-        epp_command_data* cdata)
+        epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_EppParams* c_params = NULL;
-    ccReg_Contact* c_contact;
-    ccReg_Response* response;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_Contact *c_contact;
+    ccReg_Response *response;
     int i, retr, cerrno;
-    epps_info_contact* info_contact;
+    epps_info_contact *info_contact;
 
     info_contact = cdata->data;
     /*
@@ -1017,7 +1017,7 @@ static corba_status epp_call_info_contact(
     /* contact status */
     for (i = 0; i < c_contact->stat._length; i++)
     {
-        epp_status* status;
+        epp_status *status;
 
         status = epp_malloc(epp_ctx->pool, sizeof *status);
         if (status == NULL)
@@ -1042,7 +1042,7 @@ static corba_status epp_call_info_contact(
         goto error;
     for (i = 0; i < c_contact->Streets._length; i++)
     {
-        char* street;
+        char *street;
 
         street = unwrap_str(epp_ctx->pool, c_contact->Streets._buffer[i], &cerrno);
         if (cerrno != 0)
@@ -1124,7 +1124,7 @@ static corba_status epp_call_info_contact(
     /* mailing address info */
     if (has_contact_mailing_address_extension && c_contact->MailingAddress.is_set)
     {
-        epp_ext_item* const ext_item = epp_malloc(epp_ctx->pool, sizeof *ext_item);
+        epp_ext_item *const ext_item = epp_malloc(epp_ctx->pool, sizeof *ext_item);
         if (ext_item == NULL)
         {
             goto error;
@@ -1204,8 +1204,8 @@ error:
  *
  */
 int info_domain_data_copy(
-        epp_context* epp_ctx, epps_info_domain* info_domain, ccReg_Domain* c_domain,
-        CORBA_Environment* ev)
+        epp_context *epp_ctx, epps_info_domain *info_domain, ccReg_Domain *c_domain,
+        CORBA_Environment *ev)
 {
     int i, cerrno;
 
@@ -1255,7 +1255,7 @@ int info_domain_data_copy(
     /* allocate and initialize status, admin lists */
     for (i = 0; i < c_domain->stat._length; i++)
     {
-        epp_status* status;
+        epp_status *status;
 
         status = epp_malloc(epp_ctx->pool, sizeof *status);
         if (status == NULL)
@@ -1274,7 +1274,7 @@ int info_domain_data_copy(
     }
     for (i = 0; i < c_domain->admin._length; i++)
     {
-        char* admin;
+        char *admin;
 
         admin = unwrap_str_req(epp_ctx, c_domain->admin._buffer[i], &cerrno, "admin");
         if (cerrno != 0)
@@ -1284,7 +1284,7 @@ int info_domain_data_copy(
     }
     for (i = 0; i < c_domain->tmpcontact._length; i++)
     {
-        char* tmpcontact;
+        char *tmpcontact;
 
         tmpcontact =
                 unwrap_str_req(epp_ctx, c_domain->tmpcontact._buffer[i], &cerrno, "tmpcontact");
@@ -1297,13 +1297,13 @@ int info_domain_data_copy(
     /* look for extensions */
     for (i = 0; i < c_domain->ext._length; i++)
     {
-        epp_ext_item* ext_item;
+        epp_ext_item *ext_item;
 
         /* is it enumval extension? */
         if (CORBA_TypeCode_equal(
                     c_domain->ext._buffer[i]._type, TC_ccReg_ENUMValidationExtension, ev))
         {
-            ccReg_ENUMValidationExtension* c_enumval;
+            ccReg_ENUMValidationExtension *c_enumval;
 
             c_enumval = c_domain->ext._buffer[i]._value;
 
@@ -1340,15 +1340,15 @@ error:
  * @return        Status.
  */
 static corba_status epp_call_info_domain(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_EppParams* c_params = NULL;
-    ccReg_Response* response;
-    ccReg_Domain* c_domain;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_Response *response;
+    ccReg_Domain *c_domain;
     int i, retr, cerrno;
-    epps_info_domain* info_domain;
+    epps_info_domain *info_domain;
 
     info_domain = cdata->data;
     /*
@@ -1414,8 +1414,8 @@ static corba_status epp_call_info_domain(
  *
  */
 int info_nsset_data_copy(
-        epp_context* epp_ctx, epps_info_nsset* info_nsset, ccReg_NSSet* c_nsset,
-        CORBA_Environment* ev)
+        epp_context *epp_ctx, epps_info_nsset *info_nsset, ccReg_NSSet *c_nsset,
+        CORBA_Environment *ev)
 {
     int i, cerrno;
 
@@ -1454,7 +1454,7 @@ int info_nsset_data_copy(
     /* initialize status list */
     for (i = 0; i < c_nsset->stat._length; i++)
     {
-        epp_status* status;
+        epp_status *status;
 
         status = epp_malloc(epp_ctx->pool, sizeof *status);
         if (status == NULL)
@@ -1474,7 +1474,7 @@ int info_nsset_data_copy(
     /* initialize tech list */
     for (i = 0; i < c_nsset->tech._length; i++)
     {
-        char* tech;
+        char *tech;
 
         tech = unwrap_str_req(epp_ctx, c_nsset->tech._buffer[i], &cerrno, "tech");
         if (cerrno != 0)
@@ -1485,7 +1485,7 @@ int info_nsset_data_copy(
     /* initialize required number of ns items */
     for (i = 0; i < c_nsset->dns._length; i++)
     {
-        epp_ns* ns_item;
+        epp_ns *ns_item;
         int j;
 
         ns_item = epp_calloc(epp_ctx->pool, sizeof *ns_item);
@@ -1498,7 +1498,7 @@ int info_nsset_data_copy(
             goto error;
         for (j = 0; j < c_nsset->dns._buffer[i].inet._length; j++)
         {
-            char* addr;
+            char *addr;
 
             addr = unwrap_str_req(
                     epp_ctx, c_nsset->dns._buffer[i].inet._buffer[j], &cerrno, "addr");
@@ -1530,14 +1530,14 @@ error:
  * @return        Status.
  */
 static corba_status epp_call_info_nsset(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_EppParams* c_params = NULL;
-    ccReg_NSSet* c_nsset;
-    ccReg_Response* response;
-    epps_info_nsset* info_nsset;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_NSSet *c_nsset;
+    ccReg_Response *response;
+    epps_info_nsset *info_nsset;
     int i, retr, cerrno;
 
     info_nsset = cdata->data;
@@ -1602,8 +1602,8 @@ static corba_status epp_call_info_nsset(
  *
  */
 int info_keyset_data_copy(
-        epp_context* epp_ctx, epps_info_keyset* info_keyset, ccReg_KeySet* c_keyset,
-        CORBA_Environment* ev)
+        epp_context *epp_ctx, epps_info_keyset *info_keyset, ccReg_KeySet *c_keyset,
+        CORBA_Environment *ev)
 {
     int i, cerrno;
 
@@ -1641,7 +1641,7 @@ int info_keyset_data_copy(
     /* initialize status list */
     for (i = 0; i < c_keyset->stat._length; i++)
     {
-        epp_status* status;
+        epp_status *status;
 
         status = epp_malloc(epp_ctx->pool, sizeof *status);
         if (status == NULL)
@@ -1661,7 +1661,7 @@ int info_keyset_data_copy(
     /* initialize tech list */
     for (i = 0; i < c_keyset->tech._length; i++)
     {
-        char* tech;
+        char *tech;
 
         tech = unwrap_str_req(epp_ctx, c_keyset->tech._buffer[i], &cerrno, "tech");
         if (cerrno != 0)
@@ -1672,7 +1672,7 @@ int info_keyset_data_copy(
     /* initialize dnskey items */
     for (i = 0; i < c_keyset->dnsk._length; i++)
     {
-        epp_dnskey* dnskey_item;
+        epp_dnskey *dnskey_item;
 
         dnskey_item = epp_calloc(epp_ctx->pool, sizeof *dnskey_item);
         if (dnskey_item == NULL)
@@ -1710,14 +1710,14 @@ error:
  * @return        Status.
  */
 static corba_status epp_call_info_keyset(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_EppParams* c_params = NULL;
-    ccReg_KeySet* c_keyset;
-    ccReg_Response* response;
-    epps_info_keyset* info_keyset;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_KeySet *c_keyset;
+    ccReg_Response *response;
+    epps_info_keyset *info_keyset;
     int i, retr, cerrno;
 
     info_keyset = cdata->data;
@@ -1784,17 +1784,17 @@ static corba_status epp_call_info_keyset(
  * @return        Status.
  */
 static corba_status epp_call_poll_req(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
-    ccReg_Response* response;
+    ccReg_Response *response;
     ccReg_PollType c_polltype;
-    CORBA_any* c_mesg;
+    CORBA_any *c_mesg;
     CORBA_Environment ev[1];
     CORBA_unsigned_long_long c_count;
     CORBA_char *c_qdate, *c_msgID;
-    ccReg_EppParams* c_params = NULL;
-    epps_poll_req* poll_req;
+    ccReg_EppParams *c_params = NULL;
+    epps_poll_req *poll_req;
     int retr, cerrno;
 
     poll_req = cdata->data;
@@ -1860,7 +1860,7 @@ static corba_status epp_call_poll_req(
     {
         case ccReg_polltype_transfer_domain:
         {
-            ccReg_PollMsg_HandleDateReg* hdr = (ccReg_PollMsg_HandleDateReg*)c_mesg->_value;
+            ccReg_PollMsg_HandleDateReg *hdr = (ccReg_PollMsg_HandleDateReg *)c_mesg->_value;
             poll_req->type = pt_transfer_domain;
             poll_req->msg.hdt.handle = unwrap_str(epp_ctx->pool, hdr->handle, &cerrno);
             if (cerrno != 0)
@@ -1875,7 +1875,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_transfer_contact:
         {
-            ccReg_PollMsg_HandleDateReg* hdr = (ccReg_PollMsg_HandleDateReg*)c_mesg->_value;
+            ccReg_PollMsg_HandleDateReg *hdr = (ccReg_PollMsg_HandleDateReg *)c_mesg->_value;
             poll_req->type = pt_transfer_contact;
             poll_req->msg.hdt.handle = unwrap_str(epp_ctx->pool, hdr->handle, &cerrno);
             if (cerrno != 0)
@@ -1890,7 +1890,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_transfer_nsset:
         {
-            ccReg_PollMsg_HandleDateReg* hdr = (ccReg_PollMsg_HandleDateReg*)c_mesg->_value;
+            ccReg_PollMsg_HandleDateReg *hdr = (ccReg_PollMsg_HandleDateReg *)c_mesg->_value;
             poll_req->type = pt_transfer_nsset;
             poll_req->msg.hdt.handle = unwrap_str(epp_ctx->pool, hdr->handle, &cerrno);
             if (cerrno != 0)
@@ -1905,7 +1905,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_transfer_keyset:
         {
-            ccReg_PollMsg_HandleDateReg* hdr = (ccReg_PollMsg_HandleDateReg*)c_mesg->_value;
+            ccReg_PollMsg_HandleDateReg *hdr = (ccReg_PollMsg_HandleDateReg *)c_mesg->_value;
             poll_req->type = pt_transfer_keyset;
             poll_req->msg.hdt.handle = unwrap_str(epp_ctx->pool, hdr->handle, &cerrno);
             if (cerrno != 0)
@@ -1920,25 +1920,25 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_delete_contact:
             poll_req->type = pt_delete_contact;
-            poll_req->msg.handle = unwrap_str(epp_ctx->pool, *((char**)c_mesg->_value), &cerrno);
+            poll_req->msg.handle = unwrap_str(epp_ctx->pool, *((char **)c_mesg->_value), &cerrno);
             if (cerrno != 0)
                 goto error;
             break;
         case ccReg_polltype_delete_nsset:
             poll_req->type = pt_delete_nsset;
-            poll_req->msg.handle = unwrap_str(epp_ctx->pool, *((char**)c_mesg->_value), &cerrno);
+            poll_req->msg.handle = unwrap_str(epp_ctx->pool, *((char **)c_mesg->_value), &cerrno);
             if (cerrno != 0)
                 goto error;
             break;
         case ccReg_polltype_delete_keyset:
             poll_req->type = pt_delete_keyset;
-            poll_req->msg.handle = unwrap_str(epp_ctx->pool, *((char**)c_mesg->_value), &cerrno);
+            poll_req->msg.handle = unwrap_str(epp_ctx->pool, *((char **)c_mesg->_value), &cerrno);
             if (cerrno != 0)
                 goto error;
             break;
         case ccReg_polltype_delete_domain:
         {
-            ccReg_PollMsg_HandleDate* hd = (ccReg_PollMsg_HandleDate*)c_mesg->_value;
+            ccReg_PollMsg_HandleDate *hd = (ccReg_PollMsg_HandleDate *)c_mesg->_value;
             poll_req->type = pt_delete_domain;
             poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool, hd->handle, &cerrno);
             if (cerrno != 0)
@@ -1950,7 +1950,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_impexpiration:
         {
-            ccReg_PollMsg_HandleDate* hd = (ccReg_PollMsg_HandleDate*)c_mesg->_value;
+            ccReg_PollMsg_HandleDate *hd = (ccReg_PollMsg_HandleDate *)c_mesg->_value;
             poll_req->type = pt_impexpiration;
             poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool, hd->handle, &cerrno);
             if (cerrno != 0)
@@ -1962,7 +1962,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_expiration:
         {
-            ccReg_PollMsg_HandleDate* hd = (ccReg_PollMsg_HandleDate*)c_mesg->_value;
+            ccReg_PollMsg_HandleDate *hd = (ccReg_PollMsg_HandleDate *)c_mesg->_value;
             poll_req->type = pt_expiration;
             poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool, hd->handle, &cerrno);
             if (cerrno != 0)
@@ -1974,7 +1974,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_impvalidation:
         {
-            ccReg_PollMsg_HandleDate* hd = (ccReg_PollMsg_HandleDate*)c_mesg->_value;
+            ccReg_PollMsg_HandleDate *hd = (ccReg_PollMsg_HandleDate *)c_mesg->_value;
             poll_req->type = pt_impvalidation;
             poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool, hd->handle, &cerrno);
             if (cerrno != 0)
@@ -1986,7 +1986,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_validation:
         {
-            ccReg_PollMsg_HandleDate* hd = (ccReg_PollMsg_HandleDate*)c_mesg->_value;
+            ccReg_PollMsg_HandleDate *hd = (ccReg_PollMsg_HandleDate *)c_mesg->_value;
             poll_req->type = pt_validation;
             poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool, hd->handle, &cerrno);
             if (cerrno != 0)
@@ -1998,7 +1998,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_outzone:
         {
-            ccReg_PollMsg_HandleDate* hd = (ccReg_PollMsg_HandleDate*)c_mesg->_value;
+            ccReg_PollMsg_HandleDate *hd = (ccReg_PollMsg_HandleDate *)c_mesg->_value;
             poll_req->type = pt_outzone;
             poll_req->msg.hd.handle = unwrap_str(epp_ctx->pool, hd->handle, &cerrno);
             if (cerrno != 0)
@@ -2010,7 +2010,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_techcheck:
         {
-            ccReg_PollMsg_Techcheck* tc = (ccReg_PollMsg_Techcheck*)c_mesg->_value;
+            ccReg_PollMsg_Techcheck *tc = (ccReg_PollMsg_Techcheck *)c_mesg->_value;
             int i;
 
             poll_req->type = pt_techcheck;
@@ -2020,7 +2020,7 @@ static corba_status epp_call_poll_req(
             /* copy list of extra fqdns */
             for (i = 0; i < tc->fqdns._length; i++)
             {
-                char* fqdn = unwrap_str(epp_ctx->pool, tc->fqdns._buffer[i], &cerrno);
+                char *fqdn = unwrap_str(epp_ctx->pool, tc->fqdns._buffer[i], &cerrno);
                 if (cerrno != 0)
                     goto error;
                 if (q_add(epp_ctx->pool, &poll_req->msg.tc.fqdns, fqdn))
@@ -2028,8 +2028,8 @@ static corba_status epp_call_poll_req(
             }
             for (i = 0; i < tc->tests._length; i++)
             {
-                ccReg_TechcheckItem* tci = &tc->tests._buffer[i];
-                epp_testResult* tr = epp_malloc(epp_ctx->pool, sizeof *tr);
+                ccReg_TechcheckItem *tci = &tc->tests._buffer[i];
+                epp_testResult *tr = epp_malloc(epp_ctx->pool, sizeof *tr);
                 tr->status = (tci->status ? 1 : 0);
                 tr->testname = unwrap_str(epp_ctx->pool, tci->testname, &cerrno);
                 if (cerrno != 0)
@@ -2044,7 +2044,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_lowcredit:
         {
-            ccReg_PollMsg_LowCredit* lc = (ccReg_PollMsg_LowCredit*)c_mesg->_value;
+            ccReg_PollMsg_LowCredit *lc = (ccReg_PollMsg_LowCredit *)c_mesg->_value;
             poll_req->type = pt_lowcredit;
             poll_req->msg.lc.zone = unwrap_str(epp_ctx->pool, lc->zone, &cerrno);
             if (cerrno != 0)
@@ -2055,7 +2055,7 @@ static corba_status epp_call_poll_req(
         }
         case ccReg_polltype_request_fee_info:
         {
-            ccReg_PollMsg_RequestFeeInfo* rfi = (ccReg_PollMsg_RequestFeeInfo*)c_mesg->_value;
+            ccReg_PollMsg_RequestFeeInfo *rfi = (ccReg_PollMsg_RequestFeeInfo *)c_mesg->_value;
             poll_req->type = pt_request_fee_info;
             poll_req->msg.rfi.period_from = unwrap_str(epp_ctx->pool, rfi->periodFrom, &cerrno);
             if (cerrno != 0)
@@ -2074,7 +2074,7 @@ static corba_status epp_call_poll_req(
         {
             ccReg_Domain *c_old_data, *c_new_data;
 
-            ccReg_PollMsg_Update* up = (ccReg_PollMsg_Update*)c_mesg->_value;
+            ccReg_PollMsg_Update *up = (ccReg_PollMsg_Update *)c_mesg->_value;
             poll_req->type = pt_update_domain;
             poll_req->msg.upd.optrid = unwrap_str(epp_ctx->pool, up->opTRID, &cerrno);
             if (cerrno != 0)
@@ -2114,7 +2114,7 @@ static corba_status epp_call_poll_req(
         {
             ccReg_NSSet *c_old_data, *c_new_data;
 
-            ccReg_PollMsg_Update* up = (ccReg_PollMsg_Update*)c_mesg->_value;
+            ccReg_PollMsg_Update *up = (ccReg_PollMsg_Update *)c_mesg->_value;
             poll_req->type = pt_update_nsset;
             poll_req->msg.upn.optrid = unwrap_str(epp_ctx->pool, up->opTRID, &cerrno);
             if (cerrno != 0)
@@ -2154,7 +2154,7 @@ static corba_status epp_call_poll_req(
         {
             ccReg_KeySet *c_old_data, *c_new_data;
 
-            ccReg_PollMsg_Update* up = (ccReg_PollMsg_Update*)c_mesg->_value;
+            ccReg_PollMsg_Update *up = (ccReg_PollMsg_Update *)c_mesg->_value;
             poll_req->type = pt_update_keyset;
             poll_req->msg.upk.optrid = unwrap_str(epp_ctx->pool, up->opTRID, &cerrno);
             if (cerrno != 0)
@@ -2222,16 +2222,16 @@ error:
  * @return        Status.
  */
 static corba_status epp_call_poll_ack(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_msgID;
+    CORBA_char *c_msgID;
     CORBA_unsigned_long_long c_count;
-    ccReg_EppParams* c_params = NULL;
-    ccReg_Response* response;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_Response *response;
     int retr, cerrno;
-    epps_poll_ack* poll_ack;
+    epps_poll_ack *poll_ack;
 
     poll_ack = cdata->data;
     /*
@@ -2301,19 +2301,19 @@ error:
  * @return        Status.
  */
 static corba_status epp_call_create_domain(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
     CORBA_char *c_crDate, *c_exDate;
     CORBA_char *c_registrant, *c_nsset, *c_keyset, *c_authInfo;
-    ccReg_Response* response = NULL;
-    ccReg_AdminContact* c_admin = NULL;
-    ccReg_ExtensionList* c_ext_list = NULL;
-    ccReg_Period_str* c_period = NULL;
-    ccReg_EppParams* c_params = NULL;
+    ccReg_Response *response = NULL;
+    ccReg_AdminContact *c_admin = NULL;
+    ccReg_ExtensionList *c_ext_list = NULL;
+    ccReg_Period_str *c_period = NULL;
+    ccReg_EppParams *c_params = NULL;
     int len, i, retr, cerrno, input_ok;
-    epps_create_domain* create_domain;
+    epps_create_domain *create_domain;
 
     create_domain = cdata->data;
     input_ok = 0;
@@ -2393,12 +2393,12 @@ static corba_status epp_call_create_domain(
     i = 0;
     q_foreach(&create_domain->extensions)
     {
-        epp_ext_item* ext_item;
+        epp_ext_item *ext_item;
 
         ext_item = q_content(&create_domain->extensions);
         if (ext_item->extType == EPP_EXT_ENUMVAL)
         {
-            ccReg_ENUMValidationExtension* c_enumval;
+            ccReg_ENUMValidationExtension *c_enumval;
 
             c_enumval = ccReg_ENUMValidationExtension__alloc();
             if (c_enumval == NULL)
@@ -2561,14 +2561,14 @@ static char convDisclBack(ccReg_Disclose discl)
  * @return        Status.
  */
 static corba_status epp_call_create_contact(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid, ccReg_TID request_id,
-        int has_contact_mailing_address_extension, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid, ccReg_TID request_id,
+        int has_contact_mailing_address_extension, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_crDate;
-    ccReg_Response* response;
+    CORBA_char *c_crDate;
+    ccReg_Response *response;
     int retr, cerrno, len;
-    epps_create_contact* create_contact = cdata->data;
+    epps_create_contact *create_contact = cdata->data;
     /*
 	 * Input parameters:
 	 *    id        (a)
@@ -2582,7 +2582,7 @@ static corba_status epp_call_create_contact(
     assert(cdata->xml_in);
 
     /* fill in corba input values */
-    ccReg_ContactData* c_contact = ccReg_ContactChange__alloc();
+    ccReg_ContactData *c_contact = ccReg_ContactChange__alloc();
     if (c_contact == NULL)
     {
         return CORBA_INT_ERROR;
@@ -2705,7 +2705,7 @@ static corba_status epp_call_create_contact(
 
     q_foreach(&create_contact->extensions)
     {
-        epp_ext_item* ext_item = q_content(&create_contact->extensions);
+        epp_ext_item *ext_item = q_content(&create_contact->extensions);
         if (ext_item->extType == EPP_EXT_MAILING_ADDR)
         {
             if (!has_contact_mailing_address_extension ||
@@ -2715,7 +2715,7 @@ static corba_status epp_call_create_contact(
                 return CORBA_REMOTE_ERROR;
             }
 
-            epp_ext_mailingAddr_set* data = &ext_item->ext.ext_mailing_addr.data.set;
+            epp_ext_mailingAddr_set *data = &ext_item->ext.ext_mailing_addr.data.set;
 
             c_contact->MailingAddress.is_set = 1;
 
@@ -2775,7 +2775,7 @@ static corba_status epp_call_create_contact(
         c_contact->MailingAddress.data.CountryCode = wrap_str(NULL);
     }
 
-    ccReg_EppParams* c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
+    ccReg_EppParams *c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
     if (c_params == NULL)
     {
         CORBA_free(c_contact);
@@ -2834,17 +2834,17 @@ static corba_status epp_call_create_contact(
  * @return        Status.
  */
 static corba_status epp_call_create_nsset(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_Response* response;
-    ccReg_DNSHost* c_dnshost;
-    ccReg_TechContact* c_tech;
-    ccReg_EppParams* c_params = NULL;
+    ccReg_Response *response;
+    ccReg_DNSHost *c_dnshost;
+    ccReg_TechContact *c_tech;
+    ccReg_EppParams *c_params = NULL;
     CORBA_char *c_crDate, *c_authInfo;
     int len, i, retr, cerrno;
-    epps_create_nsset* create_nsset;
+    epps_create_nsset *create_nsset;
 
     create_nsset = cdata->data;
     /*
@@ -2889,7 +2889,7 @@ static corba_status epp_call_create_nsset(
     i = 0;
     q_foreach(&create_nsset->ns)
     {
-        epp_ns* ns;
+        epp_ns *ns;
         int j;
 
         ns = q_content(&create_nsset->ns);
@@ -3023,18 +3023,18 @@ static corba_status epp_call_create_nsset(
  * @return        Status.
  */
 static corba_status epp_call_create_keyset(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_Response* response;
-    ccReg_DSRecord* c_dsrecord;
-    ccReg_DNSKey* c_dnskey;
-    ccReg_TechContact* c_tech;
-    ccReg_EppParams* c_params;
+    ccReg_Response *response;
+    ccReg_DSRecord *c_dsrecord;
+    ccReg_DNSKey *c_dnskey;
+    ccReg_TechContact *c_tech;
+    ccReg_EppParams *c_params;
     CORBA_char *c_crDate, *c_authInfo;
     int len, i, retr, cerrno;
-    epps_create_keyset* create_keyset;
+    epps_create_keyset *create_keyset;
 
     create_keyset = cdata->data;
     /*
@@ -3090,7 +3090,7 @@ static corba_status epp_call_create_keyset(
     i = 0;
     q_foreach(&create_keyset->keys)
     {
-        epp_dnskey* dnskey;
+        epp_dnskey *dnskey;
 
         dnskey = q_content(&create_keyset->keys);
 
@@ -3216,14 +3216,14 @@ static corba_status epp_call_create_keyset(
  * @return        Status.
  */
 static corba_status epp_call_delete(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata, epp_object_type obj)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata, epp_object_type obj)
 {
     CORBA_Environment ev[1];
-    ccReg_Response* response;
-    ccReg_EppParams* c_params;
+    ccReg_Response *response;
+    ccReg_EppParams *c_params;
     int retr;
-    epps_delete* delete;
+    epps_delete *delete;
 
     delete = cdata->data;
     /*
@@ -3287,17 +3287,17 @@ static corba_status epp_call_delete(
  * @return        Status.
  */
 static corba_status epp_call_renew_domain(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_Response* response;
+    ccReg_Response *response;
     CORBA_char *c_exDateIN, *c_exDateOUT;
-    ccReg_Period_str* c_period;
-    ccReg_ExtensionList* c_ext_list;
-    ccReg_EppParams* c_params;
+    ccReg_Period_str *c_period;
+    ccReg_ExtensionList *c_ext_list;
+    ccReg_EppParams *c_params;
     int len, i, retr, cerrno, input_ok;
-    epps_renew* renew;
+    epps_renew *renew;
 
     renew = cdata->data;
     input_ok = 0;
@@ -3343,12 +3343,12 @@ static corba_status epp_call_renew_domain(
 
     q_foreach(&renew->extensions)
     {
-        epp_ext_item* ext_item;
+        epp_ext_item *ext_item;
 
         ext_item = q_content(&renew->extensions);
         if (ext_item->extType == EPP_EXT_ENUMVAL)
         {
-            ccReg_ENUMValidationExtension* c_enumval;
+            ccReg_ENUMValidationExtension *c_enumval;
 
             c_enumval = ccReg_ENUMValidationExtension__alloc();
             if (c_enumval == NULL)
@@ -3435,16 +3435,16 @@ error_input:
  * @return        status.
  */
 static corba_status epp_call_update_domain(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
     ccReg_AdminContact *c_admin_add, *c_admin_rem, *c_tmpcontact_rem;
-    ccReg_ExtensionList* c_ext_list;
-    epps_update_domain* update_domain;
+    ccReg_ExtensionList *c_ext_list;
+    epps_update_domain *update_domain;
     CORBA_char *c_registrant, *c_authInfo, *c_nsset, *c_keyset;
-    ccReg_Response* response = NULL;
-    ccReg_EppParams* c_params;
+    ccReg_Response *response = NULL;
+    ccReg_EppParams *c_params;
     int i, len, retr, input_ok;
 
     input_ok = 0;
@@ -3502,7 +3502,7 @@ static corba_status epp_call_update_domain(
     i = 0;
     q_foreach(&update_domain->add_admin)
     {
-        char* admin;
+        char *admin;
 
         admin = wrap_str(q_content(&update_domain->add_admin));
         if (admin == NULL)
@@ -3522,7 +3522,7 @@ static corba_status epp_call_update_domain(
     i = 0;
     q_foreach(&update_domain->rem_admin)
     {
-        char* admin;
+        char *admin;
 
         admin = wrap_str(q_content(&update_domain->rem_admin));
         if (admin == NULL)
@@ -3542,7 +3542,7 @@ static corba_status epp_call_update_domain(
     i = 0;
     q_foreach(&update_domain->rem_tmpcontact)
     {
-        char* tmpcontact;
+        char *tmpcontact;
 
         tmpcontact = wrap_str(q_content(&update_domain->rem_tmpcontact));
         if (tmpcontact == NULL)
@@ -3563,12 +3563,12 @@ static corba_status epp_call_update_domain(
     i = 0;
     q_foreach(&update_domain->extensions)
     {
-        epp_ext_item* ext_item;
+        epp_ext_item *ext_item;
 
         ext_item = q_content(&update_domain->extensions);
         if (ext_item->extType == EPP_EXT_ENUMVAL)
         {
-            ccReg_ENUMValidationExtension* c_enumval;
+            ccReg_ENUMValidationExtension *c_enumval;
 
             c_enumval = ccReg_ENUMValidationExtension__alloc();
             if (c_enumval == NULL)
@@ -3652,15 +3652,15 @@ error_input:
  * @return        Status.
  */
 static corba_status epp_call_update_contact(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
         const ccReg_TID request_id, int has_contact_mailing_address_extension,
-        epp_command_data* cdata)
+        epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_Response* response = NULL;
+    ccReg_Response *response = NULL;
     int input_ok = 0;
-    epps_update_contact* update_contact = cdata->data;
-    ccReg_EppParams* c_params = NULL;
+    epps_update_contact *update_contact = cdata->data;
+    ccReg_EppParams *c_params = NULL;
     /*
 	 * Input parameters:
 	 *    id (a)
@@ -3674,7 +3674,7 @@ static corba_status epp_call_update_contact(
     assert(cdata->xml_in);
 
     /* c_contact */
-    ccReg_ContactChange* c_contact = ccReg_ContactChange__alloc();
+    ccReg_ContactChange *c_contact = ccReg_ContactChange__alloc();
     if (c_contact == NULL)
     {
         goto error_input;
@@ -3778,7 +3778,7 @@ static corba_status epp_call_update_contact(
 
     q_foreach(&update_contact->extensions)
     {
-        epp_ext_item* const ext_item = q_content(&update_contact->extensions);
+        epp_ext_item *const ext_item = q_content(&update_contact->extensions);
         if (ext_item->extType == EPP_EXT_MAILING_ADDR)
         {
             if (!has_contact_mailing_address_extension)
@@ -3789,7 +3789,7 @@ static corba_status epp_call_update_contact(
             {
                 case mailing_addr_set:
                 {
-                    epp_ext_mailingAddr_set* data = &ext_item->ext.ext_mailing_addr.data.set;
+                    epp_ext_mailingAddr_set *data = &ext_item->ext.ext_mailing_addr.data.set;
 
                     c_contact->MailingAddress.action = ccReg_set;
 
@@ -3886,19 +3886,19 @@ error_input:
  * @return        Status.
  */
 static corba_status epp_call_update_nsset(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_authInfo;
-    ccReg_Response* response;
-    ccReg_DNSHost* c_dnshost_add;
-    ccReg_DNSHost* c_dnshost_rem;
-    ccReg_TechContact* c_tech_add;
-    ccReg_TechContact* c_tech_rem;
-    ccReg_EppParams* c_params;
+    CORBA_char *c_authInfo;
+    ccReg_Response *response;
+    ccReg_DNSHost *c_dnshost_add;
+    ccReg_DNSHost *c_dnshost_rem;
+    ccReg_TechContact *c_tech_add;
+    ccReg_TechContact *c_tech_rem;
+    ccReg_EppParams *c_params;
     int i, len, retr, input_ok;
-    epps_update_nsset* update_nsset;
+    epps_update_nsset *update_nsset;
 
     input_ok = 0;
     update_nsset = cdata->data;
@@ -3942,7 +3942,7 @@ static corba_status epp_call_update_nsset(
     i = 0;
     q_foreach(&update_nsset->add_tech)
     {
-        char* tech;
+        char *tech;
 
         tech = wrap_str(q_content(&update_nsset->add_tech));
         if (tech == NULL)
@@ -3962,7 +3962,7 @@ static corba_status epp_call_update_nsset(
     i = 0;
     q_foreach(&update_nsset->rem_tech)
     {
-        char* tech;
+        char *tech;
 
         tech = wrap_str(q_content(&update_nsset->rem_tech));
         if (tech == NULL)
@@ -3983,7 +3983,7 @@ static corba_status epp_call_update_nsset(
     i = 0;
     q_foreach(&update_nsset->add_ns)
     {
-        epp_ns* ns;
+        epp_ns *ns;
         int j;
 
         ns = q_content(&update_nsset->add_ns);
@@ -4000,7 +4000,7 @@ static corba_status epp_call_update_nsset(
         j = 0;
         q_foreach(&ns->addr)
         {
-            char* addr;
+            char *addr;
 
             addr = wrap_str(q_content(&ns->addr));
             if (addr == NULL)
@@ -4023,7 +4023,7 @@ static corba_status epp_call_update_nsset(
     i = 0;
     q_foreach(&update_nsset->rem_ns)
     {
-        char* fqdn;
+        char *fqdn;
 
         fqdn = wrap_str(q_content(&update_nsset->rem_ns));
         if (fqdn == NULL)
@@ -4091,21 +4091,21 @@ error_input:
  * @return        Status.
  */
 static corba_status epp_call_update_keyset(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_authInfo;
-    ccReg_Response* response;
-    ccReg_DSRecord* c_ds_add;
-    ccReg_DSRecord* c_ds_rem;
-    ccReg_DNSKey* c_dnskey_add;
-    ccReg_DNSKey* c_dnskey_rem;
-    ccReg_TechContact* c_tech_add;
-    ccReg_TechContact* c_tech_rem;
-    ccReg_EppParams* c_params;
+    CORBA_char *c_authInfo;
+    ccReg_Response *response;
+    ccReg_DSRecord *c_ds_add;
+    ccReg_DSRecord *c_ds_rem;
+    ccReg_DNSKey *c_dnskey_add;
+    ccReg_DNSKey *c_dnskey_rem;
+    ccReg_TechContact *c_tech_add;
+    ccReg_TechContact *c_tech_rem;
+    ccReg_EppParams *c_params;
     int i, len, retr, input_ok;
-    epps_update_keyset* update_keyset;
+    epps_update_keyset *update_keyset;
 
     input_ok = 0;
     update_keyset = cdata->data;
@@ -4152,7 +4152,7 @@ static corba_status epp_call_update_keyset(
     i = 0;
     q_foreach(&update_keyset->add_tech)
     {
-        char* tech;
+        char *tech;
 
         tech = wrap_str(q_content(&update_keyset->add_tech));
         if (tech == NULL)
@@ -4172,7 +4172,7 @@ static corba_status epp_call_update_keyset(
     i = 0;
     q_foreach(&update_keyset->rem_tech)
     {
-        char* tech;
+        char *tech;
 
         tech = wrap_str(q_content(&update_keyset->rem_tech));
         if (tech == NULL)
@@ -4202,7 +4202,7 @@ static corba_status epp_call_update_keyset(
     i = 0;
     q_foreach(&update_keyset->add_dnskey)
     {
-        epp_dnskey* key;
+        epp_dnskey *key;
 
         key = q_content(&update_keyset->add_dnskey);
 
@@ -4227,7 +4227,7 @@ static corba_status epp_call_update_keyset(
     i = 0;
     q_foreach(&update_keyset->rem_dnskey)
     {
-        epp_dnskey* key;
+        epp_dnskey *key;
 
         key = q_content(&update_keyset->rem_dnskey);
 
@@ -4305,15 +4305,15 @@ error_input:
  * @return        Status.
  */
 static corba_status epp_call_transfer(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata, epp_object_type obj)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata, epp_object_type obj)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_authInfo;
-    ccReg_Response* response;
-    ccReg_EppParams* c_params = NULL;
+    CORBA_char *c_authInfo;
+    ccReg_Response *response;
+    ccReg_EppParams *c_params = NULL;
     int retr;
-    epps_transfer* transfer;
+    epps_transfer *transfer;
 
     transfer = cdata->data;
     /*
@@ -4397,15 +4397,15 @@ static corba_status epp_call_transfer(
  * @return        Status.
  */
 static corba_status epp_call_list(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata, epp_object_type obj)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata, epp_object_type obj)
 {
     CORBA_Environment ev[1];
-    ccReg_EppParams* c_params = NULL;
-    ccReg_Response* response;
-    ccReg_Lists* c_handles;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_Response *response;
+    ccReg_Lists *c_handles;
     int i, retr;
-    epps_list* list;
+    epps_list *list;
 
     list = cdata->data;
     /*
@@ -4461,7 +4461,7 @@ static corba_status epp_call_list(
 
     for (i = 0; i < c_handles->_length; i++)
     {
-        char* handle;
+        char *handle;
         int cerrno;
 
         CLEAR_CERRNO(cerrno);
@@ -4495,14 +4495,14 @@ static corba_status epp_call_list(
  * @return        Status.
  */
 static corba_status epp_call_sendauthinfo(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata, epp_object_type obj)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata, epp_object_type obj)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_handle;
-    ccReg_Response* response;
-    epps_sendAuthInfo* sendAuthInfo;
-    ccReg_EppParams* c_params = NULL;
+    CORBA_char *c_handle;
+    ccReg_Response *response;
+    epps_sendAuthInfo *sendAuthInfo;
+    ccReg_EppParams *c_params = NULL;
     int retr;
 
     sendAuthInfo = cdata->data;
@@ -4580,14 +4580,14 @@ static corba_status epp_call_sendauthinfo(
  * @return        Status.
  */
 static corba_status epp_call_creditinfo(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_EppParams* c_params = NULL;
-    ccReg_ZoneCredit* c_zoneCredit;
-    ccReg_Response* response;
-    epps_creditInfo* creditInfo;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_ZoneCredit *c_zoneCredit;
+    ccReg_Response *response;
+    epps_creditInfo *creditInfo;
     int retr, i;
 
     creditInfo = cdata->data;
@@ -4628,7 +4628,7 @@ static corba_status epp_call_creditinfo(
 
     for (i = 0; i < c_zoneCredit->_length; i++)
     {
-        epp_zonecredit* zonecredit;
+        epp_zonecredit *zonecredit;
         int cerrno;
 
         zonecredit = epp_malloc(epp_ctx->pool, sizeof *zonecredit);
@@ -4669,15 +4669,15 @@ static corba_status epp_call_creditinfo(
  * @return        Status.
  */
 static corba_status epp_call_test_nsset(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_handle;
-    ccReg_EppParams* c_params = NULL;
-    ccReg_Lists* c_names;
-    ccReg_Response* response;
-    epps_test* test;
+    CORBA_char *c_handle;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_Lists *c_names;
+    ccReg_Response *response;
+    epps_test *test;
     int retr, len, i, input_ok;
 
     test = cdata->data;
@@ -4719,7 +4719,7 @@ static corba_status epp_call_test_nsset(
     i = 0;
     q_foreach(&test->names)
     {
-        char* name = q_content(&test->names);
+        char *name = q_content(&test->names);
 
         c_names->_buffer[i] = CORBA_string_dup(name);
         if (c_names->_buffer[i++] == NULL)
@@ -4768,15 +4768,15 @@ error_input:
  * @return         Status.
  */
 static corba_status epp_call_info(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata, ccReg_InfoType c_infotype)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata, ccReg_InfoType c_infotype)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_handle;
-    ccReg_EppParams* c_params = NULL;
+    CORBA_char *c_handle;
+    ccReg_EppParams *c_params = NULL;
     CORBA_long c_count;
-    ccReg_Response* response;
-    epps_info* info;
+    ccReg_Response *response;
+    epps_info *info;
     int retr, input_ok;
 
     info = cdata->data;
@@ -4844,15 +4844,15 @@ error_input:
  * @return        Status.
  */
 static corba_status epp_call_getInfoResults(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data* cdata)
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
-    ccReg_EppParams* c_params = NULL;
-    ccReg_Response* response;
-    ccReg_Lists* c_handles;
+    ccReg_EppParams *c_params = NULL;
+    ccReg_Response *response;
+    ccReg_Lists *c_handles;
     int i, retr;
-    epps_list* list;
+    epps_list *list;
 
     list = cdata->data;
     /*
@@ -4891,7 +4891,7 @@ static corba_status epp_call_getInfoResults(
 
     for (i = 0; i < c_handles->_length; i++)
     {
-        char* handle;
+        char *handle;
         int cerrno;
 
         CLEAR_CERRNO(cerrno);
@@ -4914,9 +4914,9 @@ static corba_status epp_call_getInfoResults(
 }
 
 corba_status epp_call_cmd(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
         const ccReg_TID request_id, int has_contact_mailing_address_extension,
-        epp_command_data* cdata)
+        epp_command_data *cdata)
 {
     corba_status cstat;
 
@@ -5129,7 +5129,7 @@ corba_status epp_call_cmd(
     return cstat;
 }
 
-void epp_call_CloseSession(epp_context* epp_ctx, service_EPP service, unsigned long long loginid)
+void epp_call_CloseSession(epp_context *epp_ctx, service_EPP service, unsigned long long loginid)
 {
     CORBA_Environment ev[1];
     int retr;

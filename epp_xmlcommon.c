@@ -42,8 +42,8 @@
  */
 typedef struct
 {
-    void* pool; /**< Pool to allocate memory from. */
-    qhead* err_list; /**< List of encountered errors. */
+    void *pool; /**< Pool to allocate memory from. */
+    qhead *err_list; /**< List of encountered errors. */
     xmlDocPtr doc; /**< XML document. */
 } valerr_ctx;
 
@@ -58,18 +58,18 @@ typedef struct
  * @param ctx     Hook's context pointer.
  * @param error   Specification of encountered error.
  */
-static void validerr_callback(void* ctx, xmlErrorPtr error)
+static void validerr_callback(void *ctx, xmlErrorPtr error)
 {
     /* used to get content of problematic xml tag */
     xmlBufferPtr buf;
     xmlNodePtr node;
     int len;
     /* used for new list item creation */
-    epp_error* valerr;
+    epp_error *valerr;
     /* get context parameters */
-    qhead* error_list = ((valerr_ctx*)ctx)->err_list;
-    xmlDocPtr doc = ((valerr_ctx*)ctx)->doc;
-    void* pool = ((valerr_ctx*)ctx)->pool;
+    qhead *error_list = ((valerr_ctx *)ctx)->err_list;
+    xmlDocPtr doc = ((valerr_ctx *)ctx)->doc;
+    void *pool = ((valerr_ctx *)ctx)->pool;
 
     /* in case of allocation failure simply don't log the error and exit */
     if ((valerr = epp_malloc(pool, sizeof *valerr)) == NULL)
@@ -91,7 +91,7 @@ static void validerr_callback(void* ctx, xmlErrorPtr error)
 	 * truncate trailing newline)
 	 */
     len = strlen(error->message);
-    valerr->reason = (char*)epp_malloc(pool, len);
+    valerr->reason = (char *)epp_malloc(pool, len);
     if (valerr->reason == NULL)
         return;
     strncpy(valerr->reason, error->message, --len); /*truncate trailing \n */
@@ -129,7 +129,7 @@ static void validerr_callback(void* ctx, xmlErrorPtr error)
         xmlBufferFree(buf);
         return;
     }
-    valerr->value = epp_strdup(pool, (char*)buf->content);
+    valerr->value = epp_strdup(pool, (char *)buf->content);
     xmlBufferFree(buf);
     if (valerr->value == NULL)
         return;
@@ -141,7 +141,7 @@ static void validerr_callback(void* ctx, xmlErrorPtr error)
         return;
 }
 
-valid_status validate_doc(void* pool, xmlSchemaPtr schema, xmlDocPtr doc, qhead* err_list)
+valid_status validate_doc(void *pool, xmlSchemaPtr schema, xmlDocPtr doc, qhead *err_list)
 {
     xmlSchemaValidCtxtPtr svctx; /* schema validator context */
     valerr_ctx ctx; /* context used for validator's error hook */
@@ -174,9 +174,9 @@ valid_status validate_doc(void* pool, xmlSchemaPtr schema, xmlDocPtr doc, qhead*
     return VAL_OK;
 }
 
-char* epp_getSubtree(void* pool, epp_command_data* cdata, const char* xpath_expr, int position)
+char *epp_getSubtree(void *pool, epp_command_data *cdata, const char *xpath_expr, int position)
 {
-    char* subtree;
+    char *subtree;
     xmlBufferPtr buf;
     xmlDocPtr doc;
     xmlNodePtr node;
@@ -223,7 +223,7 @@ char* epp_getSubtree(void* pool, epp_command_data* cdata, const char* xpath_expr
         xmlBufferFree(buf);
         return NULL;
     }
-    subtree = epp_strdup(pool, (char*)buf->content);
+    subtree = epp_strdup(pool, (char *)buf->content);
     xmlXPathFreeObject(xpath_obj);
     xmlBufferFree(buf);
     return subtree;
