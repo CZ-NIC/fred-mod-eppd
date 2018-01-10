@@ -222,7 +222,9 @@ typedef struct
  * TODO out of date - now in database. here it should contain only EPP actions
  */
 
-typedef enum {
+typedef enum
+{
+    incorrect_epp_action_type = 0,
     ClientLogin = 100,
     ClientLogout = 101,
     ClientGreeting = 105,
@@ -286,15 +288,11 @@ typedef enum {
 /**
  * Queue item type.
  */
-typedef struct queue_item_t qitem;
-/**
- * Definition of queue item type.
- */
-struct queue_item_t
+typedef struct qitem
 {
-    qitem *next; /**< Link to next item in a queue. */
+    struct qitem *next; /**< Link to next item in a queue. */
     void *content; /**< Pointer to content of item. */
-};
+} qitem;
 
 /**
  * Queue structure used on countless places throughout the program.
