@@ -1210,11 +1210,9 @@ static int epp_request_loop(
                        EPP_DEBUG,
                        "Closing logging request with requestID: %" APR_UINT64_T_FMT,
                        act_log_entry_id);
-                if (log_epp_response(
-                            epp_ctx, logger_service, NULL, response, cdata, 0, act_log_entry_id) ==
-                    LOG_INTERNAL_ERROR)
+                if (!log_epp_response(
+                            epp_ctx, logger_service, NULL, response, cdata, 0, act_log_entry_id).success)
                 {
-
                     epplog(epp_ctx,
                            EPP_LOGD_ERRLVL,
                            "Could not log EPP hello response in fred-logd");
@@ -1238,7 +1236,6 @@ static int epp_request_loop(
             gen_status gstat; /* XML generator return status */
             qhead valerr; /* encountered errors when validating response */
             int gret; /* return value from XML generator */
-            int log_ret; /* return value from fred-logd close request */
 
             /* log request which doesn't validate */
             if (pstat == PARSER_NOT_VALID)
@@ -1337,16 +1334,14 @@ static int epp_request_loop(
                        "Closing logging request with requestID: %" APR_UINT64_T_FMT,
                        act_log_entry_id);
 
-                log_ret = log_epp_response(
+                if (!log_epp_response(
                         epp_ctx,
                         logger_service,
                         &valerr,
                         response,
                         cdata,
                         pstat == PARSER_CMD_LOGIN ? session_id : 0,
-                        act_log_entry_id);
-
-                if (log_ret == LOG_INTERNAL_ERROR)
+                        act_log_entry_id).success)
                 {
                     epplog(epp_ctx,
                            EPP_LOGD_ERRLVL,

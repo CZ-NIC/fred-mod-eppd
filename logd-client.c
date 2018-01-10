@@ -5,7 +5,10 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "apr.h"
+#include <apr.h>
+
+static const epp_log_operation_result log_internal_error = {0};
+static const epp_log_operation_result log_success = {1};
 
 /* prototypes for functions using CORBA cals or CORBA data structures */
 struct ccReg_RequestProperties;
@@ -37,21 +40,21 @@ int epp_log_new_message(
     seq = epp_property_push(seq, name, value, CORBA_FALSE);                                        \
     if (seq == NULL)                                                                               \
     {                                                                                              \
-        return LOG_INTERNAL_ERROR;                                                                 \
+        return incorrect_epp_action_type;                                                          \
     }
 
 #define PUSH_PROPERTY_INT(seq, name, value)                                                        \
     seq = epp_property_push_int(seq, name, value);                                                 \
     if (seq == NULL)                                                                               \
     {                                                                                              \
-        return LOG_INTERNAL_ERROR;                                                                 \
+        return incorrect_epp_action_type;                                                          \
     }
 
 #define PUSH_QHEAD(seq, list, name)                                                                \
     seq = epp_property_push_qhead(seq, list, name, CORBA_FALSE);                                   \
     if (seq == NULL)                                                                               \
     {                                                                                              \
-        return LOG_INTERNAL_ERROR;                                                                 \
+        return incorrect_epp_action_type;                                                          \
     }
 
 
@@ -1021,6 +1024,55 @@ static epp_action_type log_props_poll(ccReg_RequestProperties **c_props, epp_com
     }
 }
 
+static epp_log_operation_result push_mailing_addr_extension(ccReg_RequestProperties *c_props, const qitem *extension)
+{
+    for ( ;extension != NULL; extension = extension->next)
+    {
+        const epp_ext_item *const ext_item = (const epp_ext_item*)(extension->content);
+        if ((ext_item->extType == EPP_EXT_MAILING_ADDR) &&
+            (ext_item->ext.ext_mailing_addr.command == mailing_addr_set))
+        {
+            const epp_ext_mailingAddr_set *const data = &ext_item->ext.ext_mailing_addr.data.set;
+            if ((data->Street1 != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.Street1", data->Street1, CORBA_FALSE) == NULL))
+            {
+                return log_internal_error;
+            }
+            if ((data->Street2 != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.Street2", data->Street2, CORBA_FALSE) == NULL))
+            {
+                return log_internal_error;
+            }
+            if ((data->Street3 != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.Street3", data->Street3, CORBA_FALSE) == NULL))
+            {
+                return log_internal_error;
+            }
+            if ((data->City != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.City", data->City, CORBA_FALSE) == NULL))
+            {
+                return log_internal_error;
+            }
+            if ((data->StateOrProvince != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.StateOrProvince", data->StateOrProvince, CORBA_FALSE) == NULL))
+            {
+                return log_internal_error;
+            }
+            if ((data->PostalCode != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.PostalCode", data->PostalCode, CORBA_FALSE) == NULL))
+            {
+                return log_internal_error;
+            }
+            if ((data->CountryCode != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.CountryCode", data->CountryCode, CORBA_FALSE) == NULL))
+            {
+                return log_internal_error;
+            }
+        }
+    }
+    return log_success;
+}
+
 static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
@@ -1029,14 +1081,14 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
     {
         case EPP_CREATE_CONTACT:
             action_type = ContactCreate;
-            epps_create_contact *cc = cdata->data;
+            epps_create_contact *const cc = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", cc->id);
 
             // postal info
             if ((*c_props = epp_log_postal_info(*c_props, &cc->pi)) == NULL)
             {
-                return LOG_INTERNAL_ERROR;
+                return incorrect_epp_action_type;
             }
 
             PUSH_PROPERTY(*c_props, "voice", cc->voice);
@@ -1047,7 +1099,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
             // disclose info
             if ((*c_props = epp_log_disclose_info(*c_props, &cc->discl)) == NULL)
             {
-                return LOG_INTERNAL_ERROR;
+                return incorrect_epp_action_type;
             }
 
             PUSH_PROPERTY(*c_props, "vat", cc->vat);
@@ -1064,7 +1116,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
                     PUSH_PROPERTY(*c_props, "identType", "passport");
                     break;
                 case ident_MPSV:
-                    PUSH_PROPERTY(*c_props, "identType", "number assinged by ministry");
+                    PUSH_PROPERTY(*c_props, "identType", "number assigned by ministry");
                     break;
                 case ident_ICO:
                     PUSH_PROPERTY(*c_props, "identType", "ICO");
@@ -1074,10 +1126,10 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
                     break;
             }
             PUSH_PROPERTY(*c_props, "notifyEmail", cc->notify_email);
+
+            push_mailing_addr_extension(*c_props, cc->extensions.cur);
             // COMMON
-
             break;
-
         case EPP_CREATE_DOMAIN:
             action_type = DomainCreate;
             epps_create_domain *cd = cdata->data;
@@ -1117,7 +1169,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
             // COMMON
             if ((*c_props = epp_property_push_nsset(*c_props, &cn->ns, "ns")) == NULL)
             {
-                return LOG_INTERNAL_ERROR;
+                return incorrect_epp_action_type;
             }
             PUSH_QHEAD(*c_props, &cn->tech, "techC");
 
@@ -1132,7 +1184,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
 
             if ((*c_props = epp_property_push_dnskey(*c_props, &ck->keys, "keys")) == NULL)
             {
-                return LOG_INTERNAL_ERROR;
+                return incorrect_epp_action_type;
             }
 
             PUSH_QHEAD(*c_props, &ck->tech, "techContact");
@@ -1203,13 +1255,13 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
         case EPP_UPDATE_CONTACT:
             action_type = ContactUpdate;
 
-            epps_update_contact *uc = cdata->data;
+            epps_update_contact *const uc = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", uc->id);
 
             if ((*c_props = epp_log_postal_info(*c_props, uc->pi)) == NULL)
             {
-                return LOG_INTERNAL_ERROR;
+                return incorrect_epp_action_type;
             }
 
             PUSH_PROPERTY(*c_props, "voice", uc->voice);
@@ -1219,7 +1271,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
 
             if ((*c_props = epp_log_disclose_info(*c_props, &uc->discl)) == NULL)
             {
-                return LOG_INTERNAL_ERROR;
+                return incorrect_epp_action_type;
             }
 
             PUSH_PROPERTY(*c_props, "vat", uc->vat);
@@ -1237,7 +1289,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
                     PUSH_PROPERTY(*c_props, "identType", "passport");
                     break;
                 case ident_MPSV:
-                    PUSH_PROPERTY(*c_props, "identType", "number assinged by ministry");
+                    PUSH_PROPERTY(*c_props, "identType", "number assigned by ministry");
                     break;
                 case ident_ICO:
                     PUSH_PROPERTY(*c_props, "identType", "ICO");
@@ -1248,9 +1300,10 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
             }
 
             PUSH_PROPERTY(*c_props, "notifyEmail", uc->notify_email);
+
+            push_mailing_addr_extension(*c_props, uc->extensions.cur);
             // COMMON
             break;
-
         case EPP_UPDATE_DOMAIN:
             action_type = DomainUpdate;
 
@@ -1287,7 +1340,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
             PUSH_QHEAD(*c_props, &un->rem_tech, "remTechC");
             if ((*c_props = epp_property_push_nsset(*c_props, &un->add_ns, "addNs")) == NULL)
             {
-                return LOG_INTERNAL_ERROR;
+                return incorrect_epp_action_type;
             }
             PUSH_QHEAD(*c_props, &un->rem_ns, "remNs");
 
@@ -1306,11 +1359,11 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
 
             if ((*c_props = epp_property_push_dnskey(*c_props, &uk->add_dnskey, "addKeys")) == NULL)
             {
-                return LOG_INTERNAL_ERROR;
+                return incorrect_epp_action_type;
             }
             if ((*c_props = epp_property_push_dnskey(*c_props, &uk->rem_dnskey, "remKeys")) == NULL)
             {
-                return LOG_INTERNAL_ERROR;
+                return incorrect_epp_action_type;
             }
 
             break;
@@ -1482,6 +1535,8 @@ log_props_default_extcmd_response(ccReg_RequestProperties **c_props, const epp_c
     }
 }
 
+static const ccReg_TID invalid_tid = 0;
+
 /**
  * Log an epp command using fred-logd service. Raw content as well as
  * parsed values inserted as properties are sent to the logging facility
@@ -1493,7 +1548,7 @@ log_props_default_extcmd_response(ccReg_RequestProperties **c_props, const epp_c
  * @param   cmdtype 	command type returned by parse_command function
  * @param 	sessionid   login id for the session
  *
- * @return  database ID of the new logging record or an error code LOG_INTERNAL_ERROR
+ * @return  database ID of the new logging record or an error code invalid_tid
  */
 ccReg_TID log_epp_command(
         epp_context *epp_ctx, service_Logger *service, char *remote_ip, char *request,
@@ -1532,7 +1587,7 @@ ccReg_TID log_epp_command(
             {
                 epplog(epp_ctx, EPP_ERROR, "fred-logd EPP_DUMMY logging error: %s", errmsg);
             }
-            return LOG_INTERNAL_ERROR;
+            return invalid_tid;
         }
     }
 
@@ -1604,15 +1659,12 @@ ccReg_TID log_epp_command(
     {
         return log_entry_id;
     }
-    else
+    if (errmsg[0] != '\0')
     {
-        if (errmsg[0] != '\0')
-        {
-            epplog(epp_ctx, EPP_ERROR, "fred-logd createRequest logging error: %s", errmsg);
-        }
-
-        return LOG_INTERNAL_ERROR;
+        epplog(epp_ctx, EPP_ERROR, "fred-logd createRequest logging error: %s", errmsg);
     }
+
+    return invalid_tid;
 }
 
 #undef PUSH_PROPERTY
@@ -1632,9 +1684,9 @@ ccReg_TID log_epp_command(
  * @param	log_entry_id 	Id of the log_entry record which will be updated by this call. The Id
  * was obtained by log_epp_command()
  *
- * @return  status LOG_INTERNAL_ERROR or LOG_SUCCESS
+ * @return  status of this operation
  */
-int log_epp_response(
+epp_log_operation_result log_epp_response(
         epp_context *epp_ctx, service_Logger *log_service, qhead *valerr, const char *response,
         const epp_command_data *cdata, ccReg_TID session_id, ccReg_TID log_entry_id)
 {
@@ -1650,19 +1702,19 @@ int log_epp_response(
         c_props = epp_property_push(c_props, "svTRID", cdata->svTRID, CORBA_FALSE);
         if (c_props == NULL)
         {
-            return LOG_INTERNAL_ERROR;
+            return log_internal_error;
         }
 
         c_props = epp_property_push_int(c_props, "rc", cdata->rc);
         if (c_props == NULL)
         {
-            return LOG_INTERNAL_ERROR;
+            return log_internal_error;
         }
 
         c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_FALSE);
         if (c_props == NULL)
         {
-            return LOG_INTERNAL_ERROR;
+            return log_internal_error;
         }
 
         if (cdata->type == EPP_CHECK_CONTACT || cdata->type == EPP_CHECK_DOMAIN ||
@@ -1690,50 +1742,37 @@ int log_epp_response(
             epps_create_nsset *cn = cdata->data;
             c_props = epp_property_push(c_props, "creationDate", cn->crDate, CORBA_FALSE);
         }
+        if (c_props == NULL)
+        {
+            return log_internal_error;
+        }
 
         log_props_default_extcmd_response(&c_props, cdata);
     }
 
     if (valerr != NULL && (c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL)
     {
-        return LOG_INTERNAL_ERROR;
+        return log_internal_error;
     }
 
-    if (cdata != NULL)
-    {
-        res = epp_log_close_message(
-                epp_ctx,
-                log_service,
-                response,
-                c_props,
-                NULL,
-                log_entry_id,
-                session_id,
-                cdata->rc,
-                errmsg);
-    }
-    else
-    {
-        res = epp_log_close_message(
-                epp_ctx,
-                log_service,
-                response,
-                c_props,
-                NULL,
-                log_entry_id,
-                session_id,
-                2400,
-                errmsg);
-    }
+    res = epp_log_close_message(
+            epp_ctx,
+            log_service,
+            response,
+            c_props,
+            NULL,
+            log_entry_id,
+            session_id,
+            cdata != NULL ? cdata->rc : 2400,
+            errmsg);
 
     if (res == CORBA_OK)
-        return LOG_SUCCESS;
-    else
     {
-        if (errmsg[0] != '\0')
-        {
-            epplog(epp_ctx, EPP_ERROR, "fred-logd logging error: %s", errmsg);
-        }
-        return LOG_INTERNAL_ERROR;
+        return log_success;
     }
+    if (errmsg[0] != '\0')
+    {
+        epplog(epp_ctx, EPP_ERROR, "fred-logd logging error: %s", errmsg);
+    }
+    return log_internal_error;
 }
