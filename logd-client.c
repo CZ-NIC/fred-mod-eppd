@@ -7,8 +7,8 @@
 
 #include <apr.h>
 
-static const epp_log_operation_result LOG_INTERNAL_ERROR = {0};
-static const epp_log_operation_result LOG_SUCCESS = {1};
+static const epp_log_operation_result log_internal_error = {0};
+static const epp_log_operation_result log_success = {1};
 
 /* prototypes for functions using CORBA cals or CORBA data structures */
 struct ccReg_RequestProperties;
@@ -1033,58 +1033,44 @@ static epp_log_operation_result push_mailing_addr_extension(ccReg_RequestPropert
             (ext_item->ext.ext_mailing_addr.command == mailing_addr_set))
         {
             const epp_ext_mailingAddr_set *const data = &ext_item->ext.ext_mailing_addr.data.set;
-            if (data->Street1 != NULL)
+            if ((data->Street1 != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.Street1", data->Street1, CORBA_FALSE) == NULL))
             {
-                if (epp_property_push(c_props, "extension.mailing_addr.Street1", data->Street1, CORBA_FALSE) == NULL)
-                {
-                    return LOG_INTERNAL_ERROR;
-                }
+                return log_internal_error;
             }
-            if (data->Street2 != NULL)
+            if ((data->Street2 != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.Street2", data->Street2, CORBA_FALSE) == NULL))
             {
-                if (epp_property_push(c_props, "extension.mailing_addr.Street2", data->Street2, CORBA_FALSE) == NULL)
-                {
-                    return LOG_INTERNAL_ERROR;
-                }
+                return log_internal_error;
             }
-            if (data->Street3 != NULL)
+            if ((data->Street3 != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.Street3", data->Street3, CORBA_FALSE) == NULL))
             {
-                if (epp_property_push(c_props, "extension.mailing_addr.Street3", data->Street3, CORBA_FALSE) == NULL)
-                {
-                    return LOG_INTERNAL_ERROR;
-                }
+                return log_internal_error;
             }
-            if (data->City != NULL)
+            if ((data->City != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.City", data->City, CORBA_FALSE) == NULL))
             {
-                if (epp_property_push(c_props, "extension.mailing_addr.City", data->City, CORBA_FALSE) == NULL)
-                {
-                    return LOG_INTERNAL_ERROR;
-                }
+                return log_internal_error;
             }
-            if (data->StateOrProvince != NULL)
+            if ((data->StateOrProvince != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.StateOrProvince", data->StateOrProvince, CORBA_FALSE) == NULL))
             {
-                if (epp_property_push(c_props, "extension.mailing_addr.StateOrProvince", data->StateOrProvince, CORBA_FALSE) == NULL)
-                {
-                    return LOG_INTERNAL_ERROR;
-                }
+                return log_internal_error;
             }
-            if (data->PostalCode != NULL)
+            if ((data->PostalCode != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.PostalCode", data->PostalCode, CORBA_FALSE) == NULL))
             {
-                if (epp_property_push(c_props, "extension.mailing_addr.PostalCode", data->PostalCode, CORBA_FALSE) == NULL)
-                {
-                    return LOG_INTERNAL_ERROR;
-                }
+                return log_internal_error;
             }
-            if (data->CountryCode != NULL)
+            if ((data->CountryCode != NULL) &&
+                (epp_property_push(c_props, "extension.mailing_addr.CountryCode", data->CountryCode, CORBA_FALSE) == NULL))
             {
-                if (epp_property_push(c_props, "extension.mailing_addr.CountryCode", data->CountryCode, CORBA_FALSE) == NULL)
-                {
-                    return LOG_INTERNAL_ERROR;
-                }
+                return log_internal_error;
             }
         }
     }
-    return LOG_SUCCESS;
+    return log_success;
 }
 
 static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_command_data *cdata)
@@ -1549,7 +1535,7 @@ log_props_default_extcmd_response(ccReg_RequestProperties **c_props, const epp_c
     }
 }
 
-#define INVALID_TID 0
+static const ccReg_TID invalid_tid = 0;
 
 /**
  * Log an epp command using fred-logd service. Raw content as well as
@@ -1562,7 +1548,7 @@ log_props_default_extcmd_response(ccReg_RequestProperties **c_props, const epp_c
  * @param   cmdtype 	command type returned by parse_command function
  * @param 	sessionid   login id for the session
  *
- * @return  database ID of the new logging record or an error code INVALID_TID
+ * @return  database ID of the new logging record or an error code invalid_tid
  */
 ccReg_TID log_epp_command(
         epp_context *epp_ctx, service_Logger *service, char *remote_ip, char *request,
@@ -1601,7 +1587,7 @@ ccReg_TID log_epp_command(
             {
                 epplog(epp_ctx, EPP_ERROR, "fred-logd EPP_DUMMY logging error: %s", errmsg);
             }
-            return INVALID_TID;
+            return invalid_tid;
         }
     }
 
@@ -1678,7 +1664,7 @@ ccReg_TID log_epp_command(
         epplog(epp_ctx, EPP_ERROR, "fred-logd createRequest logging error: %s", errmsg);
     }
 
-    return INVALID_TID;
+    return invalid_tid;
 }
 
 #undef PUSH_PROPERTY
@@ -1716,19 +1702,19 @@ epp_log_operation_result log_epp_response(
         c_props = epp_property_push(c_props, "svTRID", cdata->svTRID, CORBA_FALSE);
         if (c_props == NULL)
         {
-            return LOG_INTERNAL_ERROR;
+            return log_internal_error;
         }
 
         c_props = epp_property_push_int(c_props, "rc", cdata->rc);
         if (c_props == NULL)
         {
-            return LOG_INTERNAL_ERROR;
+            return log_internal_error;
         }
 
         c_props = epp_property_push(c_props, "msg", cdata->msg, CORBA_FALSE);
         if (c_props == NULL)
         {
-            return LOG_INTERNAL_ERROR;
+            return log_internal_error;
         }
 
         if (cdata->type == EPP_CHECK_CONTACT || cdata->type == EPP_CHECK_DOMAIN ||
@@ -1758,7 +1744,7 @@ epp_log_operation_result log_epp_response(
         }
         if (c_props == NULL)
         {
-            return LOG_INTERNAL_ERROR;
+            return log_internal_error;
         }
 
         log_props_default_extcmd_response(&c_props, cdata);
@@ -1766,7 +1752,7 @@ epp_log_operation_result log_epp_response(
 
     if (valerr != NULL && (c_props = epp_property_push_valerr(c_props, valerr, "xmlError")) == NULL)
     {
-        return LOG_INTERNAL_ERROR;
+        return log_internal_error;
     }
 
     res = epp_log_close_message(
@@ -1782,11 +1768,11 @@ epp_log_operation_result log_epp_response(
 
     if (res == CORBA_OK)
     {
-        return LOG_SUCCESS;
+        return log_success;
     }
     if (errmsg[0] != '\0')
     {
         epplog(epp_ctx, EPP_ERROR, "fred-logd logging error: %s", errmsg);
     }
-    return LOG_INTERNAL_ERROR;
+    return log_internal_error;
 }
