@@ -60,9 +60,9 @@ typedef enum {
 } corba_status;
 
 /** Reference to EPP CORBA service */
-typedef void* service_EPP;
+typedef void *service_EPP;
 /** Reference to fred-logd CORBA service */
-typedef void* service_Logger;
+typedef void *service_Logger;
 
 /**
  * Function wraps strings passed from XML parser into strings accepted
@@ -74,7 +74,7 @@ typedef void* service_Logger;
  * @param str	Input string.
  * @return      Output string.
  */
-char* wrap_str(const char* str);
+char *wrap_str(const char *str);
 
 /**
  * Purpose of this function is to get version string of ccReg from
@@ -87,7 +87,7 @@ char* wrap_str(const char* str);
  * @param curdate     Output parameter current date.
  * @return            If successfull 1 and 0 if corba function call failed.
  */
-int epp_call_hello(epp_context* epp_ctx, service_EPP service, char** version, char** curdate);
+int epp_call_hello(epp_context *epp_ctx, service_EPP service, char **version, char **curdate);
 
 /**
  * Call corba login function, which sets up a session variables.
@@ -104,9 +104,9 @@ int epp_call_hello(epp_context* epp_ctx, service_EPP service, char** version, ch
  * @return            Status.
  */
 corba_status epp_call_login(
-        epp_context* epp_ctx, service_EPP service, unsigned long long* loginid,
-        const ccReg_TID request_id, epp_lang* lang, const char* fingerprint,
-        epp_command_data* cdata);
+        epp_context *epp_ctx, service_EPP service, unsigned long long *loginid,
+        const ccReg_TID request_id, epp_lang *lang, const char *fingerprint,
+        epp_command_data *cdata);
 
 /**
  * Call corba logout function.
@@ -119,8 +119,8 @@ corba_status epp_call_login(
  * @return            Status.
  */
 corba_status epp_call_logout(
-        epp_context* epp_ctx, service_EPP service, unsigned long long* loginid,
-        const ccReg_TID request_id, epp_command_data* cdata);
+        epp_context *epp_ctx, service_EPP service, unsigned long long *loginid,
+        const ccReg_TID request_id, epp_command_data *cdata);
 
 /**
  * Call generic command corba handler which decides what to do on the basis
@@ -139,9 +139,9 @@ corba_status epp_call_logout(
  * @return            Status.
  */
 corba_status epp_call_cmd(
-        epp_context* epp_ctx, service_EPP service, unsigned long long loginid,
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
         const ccReg_TID request_id, int has_contact_mailing_address_extension,
-        epp_command_data* cdata);
+        epp_command_data *cdata);
 
 /**
  * This function calls corba function which saves generated XML in database.
@@ -156,7 +156,7 @@ corba_status epp_call_cmd(
  * @param xml         Output XML.
  */
 void epp_call_save_output_xml(
-        epp_context* epp_ctx, service_EPP service, epp_command_data* cdata, const char* xml);
+        epp_context *epp_ctx, service_EPP service, epp_command_data *cdata, const char *xml);
 
 /**
  * Let the CR know that client has closed tcp session.
@@ -165,7 +165,7 @@ void epp_call_save_output_xml(
  * @param service     EPP service.
  * @param loginid     Login ID of client.
  */
-void epp_call_CloseSession(epp_context* epp_ctx, service_EPP service, unsigned long long loginid);
+void epp_call_CloseSession(epp_context *epp_ctx, service_EPP service, unsigned long long loginid);
 
 
 #define MAX_ERROR_MSG_LEN 100

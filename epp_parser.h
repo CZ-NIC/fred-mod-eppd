@@ -35,9 +35,9 @@ typedef enum {
     PARSER_CMD_OTHER, /**< A command other than login and logout. */
     PARSER_NOT_VALID, /**< Request does not validate. */
     /**
-	 * Request is not command but <hello> frame this indicates that greeting
-	 * should be generated.
-	 */
+     * Request is not command but <hello> frame this indicates that greeting
+     * should be generated.
+     */
     PARSER_HELLO,
     /*
      * when following status values are returned, connection is closed
@@ -46,10 +46,10 @@ typedef enum {
     PARSER_NOT_XML, /**< Request is not xml. */
     PARSER_ESCHEMA, /**< Error when parsing xml schema. */
     /**
-	 * Internal parser error (e.g. malloc failed). This error is
-	 * esspecialy serious, therefor its log severity SHOULD be higher
-	 * than of the other errors.
-	 */
+     * Internal parser error (e.g. malloc failed). This error is
+     * esspecialy serious, therefor its log severity SHOULD be higher
+     * than of the other errors.
+     */
     PARSER_EINTERNAL
 } parser_status;
 
@@ -81,7 +81,7 @@ typedef enum {
  * @param url_schema  XML schema location.
  * @return            Parsed xml schema.
  */
-void* epp_parser_init(const char* url_schema);
+void *epp_parser_init(const char *url_schema);
 
 /**
  * This will cleanup command hash table, libxml's parser and release
@@ -89,7 +89,7 @@ void* epp_parser_init(const char* url_schema);
  *
  * @param schema    Parsed xml schema.
  */
-void epp_parser_init_cleanup(void* schema);
+void epp_parser_init_cleanup(void *schema);
 
 /**
  * This is the main workhorse of parser component. It's task is to parse
@@ -105,15 +105,15 @@ void epp_parser_init_cleanup(void* schema);
  * @return          Status of parsing.
  */
 parser_status epp_parse_command(
-        epp_context* epp_ctx, int loggedin, void* schema, const char* request, unsigned bytes,
-        epp_command_data** cdata, epp_red_command_type* cmd_type);
+        epp_context *epp_ctx, int loggedin, void *schema, const char *request, unsigned bytes,
+        epp_command_data **cdata, epp_red_command_type *cmd_type);
 
 /**
  * This will cleanup xpath context and parsed document tree.
  *
  * @param cdata_arg    cdata structure containing items to be cleaned up.
  */
-void epp_parser_request_cleanup(void* cdata_arg);
+void epp_parser_request_cleanup(void *cdata_arg);
 
 
 #endif /* EPP_PARSER_H */

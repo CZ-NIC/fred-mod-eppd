@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -27,9 +27,9 @@
 
 #include "epp_common.h"
 
-int q_add(void* pool, qhead* head, void* data)
+int q_add(void *pool, qhead *head, void *data)
 {
-    qitem* item;
+    qitem *item;
 
     item = epp_malloc(pool, sizeof *item);
     if (item == NULL)
@@ -44,7 +44,7 @@ int q_add(void* pool, qhead* head, void* data)
     }
     else
     {
-        qitem* iter;
+        qitem *iter;
 
         iter = head->body;
         while (iter->next != NULL)

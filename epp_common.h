@@ -43,8 +43,8 @@ typedef enum {
  */
 typedef struct
 {
-    void* pool; /**< Pool for allocations */
-    void* conn; /**< Connection handler */
+    void *pool; /**< Pool for allocations */
+    void *conn; /**< Connection handler */
     int session;
 } epp_context;
 
@@ -196,22 +196,22 @@ typedef enum {
 typedef struct
 {
     /** Client provided input which caused the error. */
-    char* value;
+    char *value;
     /**
-	 * Specification of surrounding XML tags.
-	 *
-	 * For validation errors this is set to errspec_not_valid.
-	 */
+     * Specification of surrounding XML tags.
+     *
+     * For validation errors this is set to errspec_not_valid.
+     */
     epp_errorspec spec;
     /**
-	 * Human readable reason of error.
-	 *
-	 * For schema validity errors it is filled by mod_eppd (by message from
-	 * libxml) which is prefixed by localized message retrieved from
-	 * central register. In all other cases it is left empty and filled
-	 * by CR.
-	 */
-    char* reason;
+     * Human readable reason of error.
+     *
+     * For schema validity errors it is filled by mod_eppd (by message from
+     * libxml) which is prefixed by localized message retrieved from
+     * central register. In all other cases it is left empty and filled
+     * by CR.
+     */
+    char *reason;
     /** Position of faulty element if it is part of list. */
     int position;
 } epp_error;
@@ -292,8 +292,8 @@ typedef struct queue_item_t qitem;
  */
 struct queue_item_t
 {
-    qitem* next; /**< Link to next item in a queue. */
-    void* content; /**< Pointer to content of item. */
+    qitem *next; /**< Link to next item in a queue. */
+    void *content; /**< Pointer to content of item. */
 };
 
 /**
@@ -304,8 +304,8 @@ struct queue_item_t
 typedef struct
 {
     int count; /**< Optimization for length() function. */
-    qitem* body; /**< Items in a queue. */
-    qitem* cur; /**< Currently selected item. */
+    qitem *body; /**< Items in a queue. */
+    qitem *cur; /**< Currently selected item. */
 } qhead;
 
 /** Get length of a queue. */
@@ -332,7 +332,7 @@ typedef struct
  * @param data    Pointer to data which shoud be enqueued.
  * @return        0 if successfull, otherwise 1.
  */
-int q_add(void* pool, qhead* head, void* data);
+int q_add(void *pool, qhead *head, void *data);
 
 /** @} */
 
@@ -345,8 +345,8 @@ int q_add(void* pool, qhead* head, void* data);
  */
 typedef struct
 {
-    char* value; /**< Status name. */
-    char* text; /**< Status value. */
+    char *value; /**< Status name. */
+    char *text; /**< Status value. */
 } epp_status;
 
 /**
@@ -354,13 +354,13 @@ typedef struct
  */
 typedef struct
 {
-    char* name; /**< Name. */
-    char* org; /**< Organization. */
+    char *name; /**< Name. */
+    char *org; /**< Organization. */
     qhead streets; /**< 3x street. */
-    char* city; /**< City. */
-    char* sp; /**< State or province. */
-    char* pc; /**< Postal code. */
-    char* cc; /**< Country code. */
+    char *city; /**< City. */
+    char *sp; /**< State or province. */
+    char *pc; /**< Postal code. */
+    char *cc; /**< Country code. */
 } epp_postalInfo;
 
 /**
@@ -374,13 +374,13 @@ typedef struct
 typedef struct
 {
     /**
-	 * Value 1 means following items are exception to server policy, which
-	 * is assumed to be private (hide all items).
-	 * Value 0 means following items are exception to server policy, which
-	 * is assumed to be public (show all items).
-	 * And value -1 means there are not elements that require exceptional
-	 * behaviour.
-	 */
+     * Value 1 means following items are exception to server policy, which
+     * is assumed to be private (hide all items).
+     * Value 0 means following items are exception to server policy, which
+     * is assumed to be public (show all items).
+     * And value -1 means there are not elements that require exceptional
+     * behaviour.
+     */
     char flag;
     unsigned char name; /**< Contact's name is exceptional. */
     unsigned char org; /**< Contact's organization is exceptional. */
@@ -399,7 +399,7 @@ typedef struct
  */
 typedef struct
 {
-    char* name; /**< fqdn of nameserver. */
+    char *name; /**< fqdn of nameserver. */
     qhead addr; /**< List of ip addresses. */
 } epp_ns;
 
@@ -409,7 +409,7 @@ typedef struct
     unsigned short flags; /**< key properties. supported values are 0, 256, 257 */
     unsigned char protocol; /**< = 3 */
     unsigned char alg; /**< algorithm type */
-    char* public_key; /**< base64 encoded public key */
+    char *public_key; /**< base64 encoded public key */
 } epp_dnskey;
 
 /** Type of identification number used in contact object. */
@@ -428,31 +428,32 @@ typedef enum { TIMEUNIT_MONTH, TIMEUNIT_YEAR } epp_timeunit;
 typedef struct
 {
     int avail; /**< True if object is available, false otherwise. */
-    char* reason; /**< If object is not available, here is the reason. */
+    char *reason; /**< If object is not available, here is the reason. */
 } epp_avail;
 
 /** Structure holding answer to EPP creditInfo command. */
 typedef struct
 {
-    char* zone; /**< True if object is available, false otherwise. */
-    char* credit; /**< Credit */
+    char *zone; /**< True if object is available, false otherwise. */
+    char *credit; /**< Credit */
 } epp_zonecredit;
 
 typedef struct
 {
-    char* ext_enumval; /**< Domain validation.*/
-    int publish; /**< Flag determining if this domain can be published in the ENUM dictionary. 0 for false, 1 for true */
+    char *ext_enumval; /**< Domain validation.*/
+    int publish; /**< Flag determining if this domain can be published in the ENUM dictionary. 0 for
+                    false, 1 for true */
 } epp_ext_enum;
 
 typedef struct
 {
-    char* Street1; ///< street - line #1
-    char* Street2; ///< street - line #2
-    char* Street3; ///< street - line #3
-    char* City; ///< city
-    char* StateOrProvince; ///< state or province
-    char* PostalCode; ///< postal code
-    char* CountryCode; ///< country code - 2 char ISO country code
+    char *Street1; ///< street - line #1
+    char *Street2; ///< street - line #2
+    char *Street3; ///< street - line #3
+    char *City; ///< city
+    char *StateOrProvince; ///< state or province
+    char *PostalCode; ///< postal code
+    char *CountryCode; ///< country code - 2 char ISO country code
 } epp_mailingAddr;
 
 typedef enum { mailing_addr_info, mailing_addr_set, mailing_addr_remove } epp_mailingAddrCommand;
@@ -511,9 +512,9 @@ typedef enum {
 /** Structure containing result of one technical test. */
 typedef struct
 {
-    char* testname;
+    char *testname;
     int status;
-    char* note;
+    char *note;
 } epp_testResult;
 
 /* ********************************************************************* */
@@ -522,9 +523,9 @@ typedef struct
 /** Login parameters. */
 typedef struct
 {
-    char* clID; /**< Client ID. */
-    char* pw; /**< Password. */
-    char* newPW; /**< New password. */
+    char *clID; /**< Client ID. */
+    char *pw; /**< Password. */
+    char *newPW; /**< New password. */
     qhead objuri; /**< currently not used */
     qhead exturi; /**< currently not used */
     unsigned lang; /**< Language. */
@@ -540,66 +541,66 @@ typedef struct
 /** Info contact parameters. */
 typedef struct
 {
-    char* id; /**< Id of wanted contact (input). */
-    char* handle; /**< Id of wanted contact (output).*/
-    char* roid; /**< ROID of object. */
+    char *id; /**< Id of wanted contact (input). */
+    char *handle; /**< Id of wanted contact (output).*/
+    char *roid; /**< ROID of object. */
     qhead status; /**< Contact's status. */
     epp_postalInfo pi; /**< Postal info. */
-    char* voice; /**< Telephone number. */
-    char* fax; /**< Fax number. */
-    char* email; /**< Email address. */
-    char* clID; /**< Owner's ID. */
-    char* crID; /**< ID of creator. */
-    char* crDate; /**< Creation date. */
-    char* upID; /**< ID of last updater. */
-    char* upDate; /**< Last updated. */
-    char* trDate; /**< Last transfered. */
-    char* authInfo; /**< Authorization information. */
+    char *voice; /**< Telephone number. */
+    char *fax; /**< Fax number. */
+    char *email; /**< Email address. */
+    char *clID; /**< Owner's ID. */
+    char *crID; /**< ID of creator. */
+    char *crDate; /**< Creation date. */
+    char *upID; /**< ID of last updater. */
+    char *upDate; /**< Last updated. */
+    char *trDate; /**< Last transfered. */
+    char *authInfo; /**< Authorization information. */
     epp_discl discl; /**< Disclose information section. */
-    char* vat; /**< VAT tax ID. */
-    char* ident; /**< Contact's unique ident. */
+    char *vat; /**< VAT tax ID. */
+    char *ident; /**< Contact's unique ident. */
     epp_identType identtype; /**< Type of unique ident. */
-    char* notify_email; /**< Notification email. */
+    char *notify_email; /**< Notification email. */
     qhead extensions; /**< List of extensions. */
 } epps_info_contact;
 
 /** Info domain parameters. */
 typedef struct
 {
-    char* name; /**< FQDN of wanted domain (input). */
-    char* handle; /**< FQDN of wanted domain (output). */
-    char* roid; /**< ROID of object. */
+    char *name; /**< FQDN of wanted domain (input). */
+    char *handle; /**< FQDN of wanted domain (output). */
+    char *roid; /**< ROID of object. */
     qhead status; /**< Domain's status. */
-    char* registrant; /**< Registrant of domain. */
+    char *registrant; /**< Registrant of domain. */
     qhead tmpcontact; /**< Temporary contact used for migration. */
     qhead admin; /**< Admin contact for domain. */
-    char* nsset; /**< Nsset of domain. */
-    char* keyset; /**< Keyset for domain */
-    char* clID; /**< Owner's ID. */
-    char* crID; /**< ID of creator. */
-    char* crDate; /**< Creation date. */
-    char* exDate; /**< Expiration date. */
-    char* upID; /**< ID of last updater. */
-    char* upDate; /**< Last updated. */
-    char* trDate; /**< Last transfered. */
-    char* authInfo; /**< Authorization information. */
+    char *nsset; /**< Nsset of domain. */
+    char *keyset; /**< Keyset for domain */
+    char *clID; /**< Owner's ID. */
+    char *crID; /**< ID of creator. */
+    char *crDate; /**< Creation date. */
+    char *exDate; /**< Expiration date. */
+    char *upID; /**< ID of last updater. */
+    char *upDate; /**< Last updated. */
+    char *trDate; /**< Last transfered. */
+    char *authInfo; /**< Authorization information. */
     qhead extensions; /**< List of domain extensions. */
 } epps_info_domain;
 
 /** Info nsset parameters. */
 typedef struct
 {
-    char* id; /**< Id of wanted nsset (input). */
-    char* handle; /**< Id of wanted nsset (output). */
-    char* roid; /**< ROID of object. */
+    char *id; /**< Id of wanted nsset (input). */
+    char *handle; /**< Id of wanted nsset (output). */
+    char *roid; /**< ROID of object. */
     qhead status; /**< Nsset's status. */
-    char* clID; /**< Owner's ID. */
-    char* crID; /**< ID of creator. */
-    char* crDate; /**< Creation date. */
-    char* upID; /**< ID of last updater. */
-    char* upDate; /**< Last updated. */
-    char* trDate; /**< Last transfered. */
-    char* authInfo; /**< Authorization information. */
+    char *clID; /**< Owner's ID. */
+    char *crID; /**< ID of creator. */
+    char *crDate; /**< Creation date. */
+    char *upID; /**< ID of last updater. */
+    char *upDate; /**< Last updated. */
+    char *trDate; /**< Last transfered. */
+    char *authInfo; /**< Authorization information. */
     qhead ns; /**< List of nameservers. */
     qhead tech; /**< List of technical contacts for nsset. */
     int level; /**< Report level. */
@@ -608,17 +609,17 @@ typedef struct
 /** Info keyset parameters */
 typedef struct
 {
-    char* id; /**< Id of wanted keyset (input). */
-    char* handle; /**< Id of wanted keyset (output). */
-    char* roid; /**< ROID of object. */
+    char *id; /**< Id of wanted keyset (input). */
+    char *handle; /**< Id of wanted keyset (output). */
+    char *roid; /**< ROID of object. */
     qhead status; /**< Keyset's status. */
-    char* clID; /**< Owner's ID. */
-    char* crID; /**< ID of creator. */
-    char* crDate; /**< Creation date. */
-    char* upID; /**< ID of last updater. */
-    char* upDate; /**< Last updated. */
-    char* trDate; /**< Last transfered. */
-    char* authInfo; /**< Authorization information. */
+    char *clID; /**< Owner's ID. */
+    char *crID; /**< ID of creator. */
+    char *crDate; /**< Creation date. */
+    char *upID; /**< ID of last updater. */
+    char *upDate; /**< Last updated. */
+    char *trDate; /**< Last transfered. */
+    char *authInfo; /**< Authorization information. */
     qhead keys; /**< List of DNS Key records */
     qhead tech; /**< List of technical contacts for keyset. */
 } epps_info_keyset;
@@ -627,60 +628,60 @@ typedef struct
 typedef struct
 {
     unsigned long long count; /**< Count of waiting messages. */
-    char* msgid; /**< ID of next message in a queue. */
-    char* qdate; /**< Date of message submission. */
+    char *msgid; /**< ID of next message in a queue. */
+    char *qdate; /**< Date of message submission. */
     epp_pollType type; /**< Type of poll message. */
     union
     {
-        char* handle;
+        char *handle;
         struct
         {
-            char* handle;
-            char* date;
-            char* clID;
+            char *handle;
+            char *date;
+            char *clID;
         } hdt; /**< Handle, date, registrator structure. */
         struct
         {
-            char* handle;
-            char* date;
+            char *handle;
+            char *date;
         } hd; /**< Handle, date structure. */
         struct
         {
-            char* handle;
+            char *handle;
             qhead fqdns;
             qhead tests;
         } tc; /**< Structure with results of technical tests. */
         struct
         {
-            char* zone;
-            char* limit;
-            char* credit;
+            char *zone;
+            char *limit;
+            char *credit;
         } lc; /**< Low credit structure. */
         struct
         {
-            char* period_from;
-            char* period_to;
+            char *period_from;
+            char *period_to;
             unsigned long long total_free_count;
             unsigned long long used_count;
-            char* price;
+            char *price;
         } rfi; /**< Request fee info structure */
         struct
         {
-            char* optrid;
+            char *optrid;
             unsigned long long pollid;
             epps_info_domain old_data;
             epps_info_domain new_data;
         } upd; /**< Update domain info */
         struct
         {
-            char* optrid;
+            char *optrid;
             unsigned long long pollid;
             epps_info_nsset old_data;
             epps_info_nsset new_data;
         } upn; /**< Update nsset info */
         struct
         {
-            char* optrid;
+            char *optrid;
             unsigned long long pollid;
             epps_info_keyset old_data;
             epps_info_keyset new_data;
@@ -691,148 +692,148 @@ typedef struct
 /** Poll acknoledge parameters. */
 typedef struct
 {
-    char* msgid; /**< ID of acknoledged message. */
+    char *msgid; /**< ID of acknoledged message. */
     unsigned long long count; /**< Count of waiting messages. */
-    char* newmsgid; /**< ID of first message in a queue. */
+    char *newmsgid; /**< ID of first message in a queue. */
 } epps_poll_ack;
 
 /** Create contact parameters. */
 typedef struct
 {
-    char* id; /**< Id of wanted contact (input). */
+    char *id; /**< Id of wanted contact (input). */
     epp_postalInfo pi; /**< Postal info. */
-    char* voice; /**< Telephone number. */
-    char* fax; /**< Fax number. */
-    char* email; /**< Email address. */
-    char* authInfo; /**< Authorization information. */
+    char *voice; /**< Telephone number. */
+    char *fax; /**< Fax number. */
+    char *email; /**< Email address. */
+    char *authInfo; /**< Authorization information. */
     epp_discl discl; /**< Disclose information section. */
-    char* vat; /**< VAT tax ID. */
-    char* ident; /**< Contact's unique ident. */
+    char *vat; /**< VAT tax ID. */
+    char *ident; /**< Contact's unique ident. */
     epp_identType identtype; /**< Type of unique ident. */
-    char* notify_email; /**< Notification email. */
-    char* crDate; /**< Creation date of contact. */
+    char *notify_email; /**< Notification email. */
+    char *crDate; /**< Creation date of contact. */
     qhead extensions; /**< List of extensions. */
 } epps_create_contact;
 
 /** Create domain parameters. */
 typedef struct
 {
-    char* name; /**< FQDN of wanted domain (input). */
-    char* registrant; /**< Registrant of domain. */
+    char *name; /**< FQDN of wanted domain (input). */
+    char *registrant; /**< Registrant of domain. */
     qhead admin; /**< Admin contact for domain. */
-    char* nsset; /**< Nsset of domain. */
-    char* keyset; /**< Keyset for domain */
+    char *nsset; /**< Nsset of domain. */
+    char *keyset; /**< Keyset for domain */
     int period; /**< Registration period in months. */
     epp_timeunit unit; /**< Registration period's unit. */
-    char* authInfo; /**< Authorization information. */
+    char *authInfo; /**< Authorization information. */
     qhead extensions; /**< List of domain extensions. */
-    char* crDate; /**< Creation date of domain. */
-    char* exDate; /**< Expiration date of domain. */
+    char *crDate; /**< Creation date of domain. */
+    char *exDate; /**< Expiration date of domain. */
 } epps_create_domain;
 
 /** Create nsset parameters. */
 typedef struct
 {
-    char* id; /**< Id of wanted nsset (input). */
-    char* authInfo; /**< Authorization information. */
+    char *id; /**< Id of wanted nsset (input). */
+    char *authInfo; /**< Authorization information. */
     qhead ns; /**< List of nameservers. */
     qhead tech; /**< List of technical contacts for nsset. */
-    char* crDate; /**< Creation date of nsset. */
+    char *crDate; /**< Creation date of nsset. */
     int level; /**< Report level. */
 } epps_create_nsset;
 
 /** Create keyset parameters */
 typedef struct
 {
-    char* id; /**< Id of wanted keyset (input). */
-    char* authInfo; /**< Authorization information. */
+    char *id; /**< Id of wanted keyset (input). */
+    char *authInfo; /**< Authorization information. */
     qhead keys; /**< List of DNS Key records */
     qhead tech; /**< List of technical contacts for keyset */
-    char* crDate; /**< Creation date of keyset. */
+    char *crDate; /**< Creation date of keyset. */
 } epps_create_keyset;
 
 /** Delete parameters. */
 typedef struct
 {
-    char* id; /**< ID of object to be deleted. */
+    char *id; /**< ID of object to be deleted. */
 } epps_delete;
 
 /** Renew domain parameters. */
 typedef struct
 {
-    char* name; /**< Name of renewed domain. */
-    char* curExDate; /**< Current expiration date. */
+    char *name; /**< Name of renewed domain. */
+    char *curExDate; /**< Current expiration date. */
     int period; /**< Renew period. */
     epp_timeunit unit; /**< Registration period's unit. */
     qhead extensions; /**< List of domain extensions. */
-    char* exDate; /**< New expiration date. */
+    char *exDate; /**< New expiration date. */
 } epps_renew;
 
 /** Update contact parameters. */
 typedef struct
 {
-    char* id; /**< Id of wanted contact (input). */
-    epp_postalInfo* pi; /**< Postal info. */
-    char* voice; /**< Telephone number. */
-    char* fax; /**< Fax number. */
-    char* email; /**< Email address. */
-    char* authInfo; /**< Authorization information. */
+    char *id; /**< Id of wanted contact (input). */
+    epp_postalInfo *pi; /**< Postal info. */
+    char *voice; /**< Telephone number. */
+    char *fax; /**< Fax number. */
+    char *email; /**< Email address. */
+    char *authInfo; /**< Authorization information. */
     epp_discl discl; /**< Disclose information section. */
-    char* vat; /**< VAT tax ID. */
-    char* ident; /**< Contact's unique ident. */
+    char *vat; /**< VAT tax ID. */
+    char *ident; /**< Contact's unique ident. */
     epp_identType identtype; /**< Type of unique ident. */
-    char* notify_email; /**< Notification email. */
+    char *notify_email; /**< Notification email. */
     qhead extensions; /**< List of extensions. */
 } epps_update_contact;
 
 /** Update domain parameters. */
 typedef struct
 {
-    char* name; /**< FQDN of wanted domain (input). */
-    char* registrant; /**< Registrant of domain. */
+    char *name; /**< FQDN of wanted domain (input). */
+    char *registrant; /**< Registrant of domain. */
     qhead add_admin; /**< Admin contacts to be added. */
     qhead rem_admin; /**< Admin contacts to be removed. */
     qhead rem_tmpcontact; /**< Temporary contact used for migration. */
-    char* nsset; /**< Nsset of domain. */
-    char* keyset; /**< Keyset of domain. */
-    char* authInfo; /**< Authorization information. */
+    char *nsset; /**< Nsset of domain. */
+    char *keyset; /**< Keyset of domain. */
+    char *authInfo; /**< Authorization information. */
     qhead extensions; /**< List of domain extensions. */
 } epps_update_domain;
 
 /** Update nsset parameters. */
 typedef struct
 {
-    char* id; /**< Id of wanted nsset (input). */
+    char *id; /**< Id of wanted nsset (input). */
     qhead add_tech; /**< Technical contacts to be added. */
     qhead rem_tech; /**< Technical contacts to be removed. */
     qhead add_ns; /**< Nameservers to be added. */
     qhead rem_ns; /**< Nameservers to be removed. */
-    char* authInfo; /**< Authorization information. */
+    char *authInfo; /**< Authorization information. */
     int level; /**< Report level. */
 } epps_update_nsset;
 
 /** Update keyset parameters */
 typedef struct
 {
-    char* id; /**< Id of wanted keyset (input). */
+    char *id; /**< Id of wanted keyset (input). */
     qhead add_tech; /**< Technical contacts to be added. */
     qhead rem_tech; /**< Technical contacts to be removed. */
     qhead add_dnskey; /**< DNSKEYs to be added. */
     qhead rem_dnskey; /**< DNSKEYs to be removed. */
-    char* authInfo; /**< Authorization information. */
+    char *authInfo; /**< Authorization information. */
 } epps_update_keyset;
 
 /** Transfer parameters. */
 typedef struct
 {
-    char* id; /**< Id of transfered object. */
-    char* authInfo; /**< Authorization information. */
+    char *id; /**< Id of transfered object. */
+    char *authInfo; /**< Authorization information. */
 } epps_transfer;
 
 /** SendAuthInfo parameters. */
 typedef struct
 {
-    char* id; /**< Handle of object. */
+    char *id; /**< Handle of object. */
 } epps_sendAuthInfo;
 
 /** CreditInfo parameters. */
@@ -844,7 +845,7 @@ typedef struct
 /** Test parameters. */
 typedef struct
 {
-    char* id; /**< ID of tested nsset. */
+    char *id; /**< ID of tested nsset. */
     qhead names; /**< Fqdns of domains to be tested with nsset. */
     int level; /**< Level of tests (-1 if not overriden). */
 } epps_test;
@@ -862,7 +863,7 @@ typedef struct
  */
 typedef struct
 {
-    char* handle; /**< Search key. */
+    char *handle; /**< Search key. */
     unsigned int count; /**< Count of results. */
 } epps_info;
 
@@ -877,30 +878,30 @@ typedef struct
  */
 typedef struct
 {
-    char* clTRID; /**< client's TRID */
-    char* svTRID; /**< server's TRID */
+    char *clTRID; /**< client's TRID */
+    char *svTRID; /**< server's TRID */
     int rc; /**< EPP return code defined in standard. */
-    char* msg; /**< Text message coresponding to return code. */
-    char* xml_in; /**< XML as it is received from client. Encoding
+    char *msg; /**< Text message coresponding to return code. */
+    char *xml_in; /**< XML as it is received from client. Encoding
          set by macro XML_IN_ENC*/
     /* parsed_doc and xpath_ctx are needed for error reporting. */
-    void* parsed_doc; /**< Parsed XML document tree. */
-    void* xpath_ctx; /**< XPath context. */
+    void *parsed_doc; /**< Parsed XML document tree. */
+    void *xpath_ctx; /**< XPath context. */
     /** True if there should be no resdata section or msgQ section. */
     short noresdata;
     /** List of validation errors or errors from central repository. */
     qhead errors;
 
     /**
-	 * Identification of epp command. This value influences selection
-	 * from in and out union.
-	 */
+     * Identification of epp command. This value influences selection
+     * from in and out union.
+     */
     epp_command_type type;
     /**
-	 * Command data
-	 * (Input + output parameters for all possible epp commands).
-	 */
-    void* data;
+     * Command data
+     * (Input + output parameters for all possible epp commands).
+     */
+    void *data;
 } epp_command_data;
 
 
@@ -913,7 +914,7 @@ typedef struct
  * @param level   Log level.
  * @param fmt     Printf-style format string.
  */
-void epplog(epp_context* epp_ctx, epp_loglevel level, const char* fmt, ...);
+void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...);
 
 /**
  * @defgroup allocgroup Functions for memory allocation.
@@ -931,7 +932,7 @@ void epplog(epp_context* epp_ctx, epp_loglevel level, const char* fmt, ...);
  * @param size    Number of bytes to allocate.
  * @return        Pointer to allocated memory.
  */
-void* epp_malloc(void* pool, unsigned size);
+void *epp_malloc(void *pool, unsigned size);
 
 /**
  * Allocate memory from memory pool and prezero it.
@@ -940,7 +941,7 @@ void* epp_malloc(void* pool, unsigned size);
  * @param size   Number of bytes to allocate.
  * @return       Pointer to allocated memory.
  */
-void* epp_calloc(void* pool, unsigned size);
+void *epp_calloc(void *pool, unsigned size);
 
 /**
  * Duplicate string from argument, the memory will be allocated from
@@ -950,7 +951,7 @@ void* epp_calloc(void* pool, unsigned size);
  * @param str    String which is going to be duplicated.
  * @return       Pointer duplicated string.
  */
-char* epp_strdup(void* pool, const char* str);
+char *epp_strdup(void *pool, const char *str);
 
 /**
  * Concatenate two strings in arguments, the memory will be allocated from
@@ -964,7 +965,7 @@ char* epp_strdup(void* pool, const char* str);
  * @param str2   String which will be appended.
  * @return       Pointer to new string.
  */
-char* epp_strcat(void* pool, const char* str1, const char* str2);
+char *epp_strcat(void *pool, const char *str1, const char *str2);
 
 /**
  * Print formatted string.
@@ -973,7 +974,7 @@ char* epp_strcat(void* pool, const char* str1, const char* str2);
  * @param fmt    Format of string.
  * @return       Formatted string allocated from pool.
  */
-char* epp_sprintf(void* pool, const char* fmt, ...);
+char *epp_sprintf(void *pool, const char *fmt, ...);
 
 /**
  * @}

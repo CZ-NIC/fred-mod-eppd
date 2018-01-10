@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -34,9 +34,9 @@ struct epp_corba_globs_t
     int v2;
 };
 
-epp_corba_globs* epp_corba_init(const char* ior)
+epp_corba_globs *epp_corba_init(const char *ior)
 {
-    epp_corba_globs* globs;
+    epp_corba_globs *globs;
     if ((globs = malloc(sizeof *globs)) == NULL)
     {
         return NULL;
@@ -45,12 +45,12 @@ epp_corba_globs* epp_corba_init(const char* ior)
     return globs;
 }
 
-void epp_corba_init_cleanup(epp_corba_globs* globs)
+void epp_corba_init_cleanup(epp_corba_globs *globs)
 {
     free(globs);
 }
 
-corba_status epp_call_dummy(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_dummy(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     cdata->svTRID = strdup("fill");
     cdata->msg = strdup("fill");
@@ -59,7 +59,7 @@ corba_status epp_call_dummy(epp_corba_globs* globs, int session, epp_command_dat
 }
 
 corba_status epp_call_login(
-        epp_corba_globs* globs, int* session, epp_lang* lang, epp_command_data* cdata, char* certID)
+        epp_corba_globs *globs, int *session, epp_lang *lang, epp_command_data *cdata, char *certID)
 {
     cdata->svTRID = strdup("fill");
     cdata->msg = strdup("fill");
@@ -70,7 +70,7 @@ corba_status epp_call_login(
     return CORBA_OK;
 }
 
-corba_status epp_call_logout(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_logout(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     cdata->svTRID = strdup("fill");
     cdata->msg = strdup("fill");
@@ -85,7 +85,7 @@ corba_status epp_call_logout(epp_corba_globs* globs, int session, epp_command_da
  * kinds of objects.
  */
 static corba_status
-epp_call_check(epp_corba_globs* globs, int session, epp_command_data* cdata, epp_object_type obj)
+epp_call_check(epp_corba_globs *globs, int session, epp_command_data *cdata, epp_object_type obj)
 {
     corba_status ret;
     int i;
@@ -95,7 +95,7 @@ epp_call_check(epp_corba_globs* globs, int session, epp_command_data* cdata, epp
         ret = CORBA_INT_ERROR;
     else
     {
-        struct circ_list* item;
+        struct circ_list *item;
 
         if ((cdata->out->check.bools = malloc(sizeof *item)) == NULL)
         {
@@ -117,7 +117,7 @@ epp_call_check(epp_corba_globs* globs, int session, epp_command_data* cdata, epp
                  * the item in list is a sentinel (first or last).
                  * Therefore we will use value 2 as false value.
                  */
-                CL_CONTENT(item) = (void*)1;
+                CL_CONTENT(item) = (void *)1;
                 CL_ADD(cdata->out->check.bools, item);
             }
             cdata->svTRID = strdup("fill");
@@ -129,26 +129,26 @@ epp_call_check(epp_corba_globs* globs, int session, epp_command_data* cdata, epp
     return ret;
 }
 
-corba_status epp_call_check_contact(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_check_contact(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     return epp_call_check(globs, session, cdata, EPP_CONTACT);
 }
 
-corba_status epp_call_check_domain(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_check_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     return epp_call_check(globs, session, cdata, EPP_DOMAIN);
 }
 
-corba_status epp_call_check_nsset(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_check_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     return epp_call_check(globs, session, cdata, EPP_NSSET);
 }
 
-corba_status epp_call_info_contact(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_info_contact(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
-    epp_postalInfo* pi;
-    epp_discl* discl;
-    struct circ_list* item;
+    epp_postalInfo *pi;
+    epp_discl *discl;
+    struct circ_list *item;
     corba_status ret;
 
     if ((cdata->out = calloc(1, sizeof(*cdata->out))) == NULL)
@@ -218,9 +218,9 @@ corba_status epp_call_info_contact(epp_corba_globs* globs, int session, epp_comm
     return ret;
 }
 
-corba_status epp_call_info_domain(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_info_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
-    struct circ_list* item;
+    struct circ_list *item;
     corba_status ret;
 
     if ((cdata->out = calloc(1, sizeof(*cdata->out))) == NULL)
@@ -267,9 +267,9 @@ corba_status epp_call_info_domain(epp_corba_globs* globs, int session, epp_comma
     return ret;
 }
 
-corba_status epp_call_info_nsset(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_info_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
-    struct circ_list* item;
+    struct circ_list *item;
     corba_status ret;
 
     if ((cdata->out = calloc(1, sizeof(*cdata->out))) == NULL)
@@ -325,7 +325,7 @@ corba_status epp_call_info_nsset(epp_corba_globs* globs, int session, epp_comman
     return ret;
 }
 
-corba_status epp_call_poll_req(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_poll_req(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     corba_status ret;
     if ((cdata->out = calloc(1, sizeof(*cdata->out))) == NULL)
@@ -345,7 +345,7 @@ corba_status epp_call_poll_req(epp_corba_globs* globs, int session, epp_command_
     return CORBA_OK;
 }
 
-corba_status epp_call_poll_ack(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_poll_ack(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     corba_status ret;
     if ((cdata->out = calloc(1, sizeof(*cdata->out))) == NULL)
@@ -363,7 +363,7 @@ corba_status epp_call_poll_ack(epp_corba_globs* globs, int session, epp_command_
     return CORBA_OK;
 }
 
-corba_status epp_call_create_domain(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_create_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     if ((cdata->out = calloc(1, sizeof(*cdata->out))) == NULL)
     {
@@ -380,7 +380,7 @@ corba_status epp_call_create_domain(epp_corba_globs* globs, int session, epp_com
     return CORBA_OK;
 }
 
-corba_status epp_call_create_contact(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_create_contact(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
 
     if ((cdata->out = calloc(1, sizeof(*cdata->out))) == NULL)
@@ -396,7 +396,7 @@ corba_status epp_call_create_contact(epp_corba_globs* globs, int session, epp_co
     return CORBA_OK;
 }
 
-corba_status epp_call_create_nsset(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_create_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     corba_status ret;
     if ((cdata->out = calloc(1, sizeof(*cdata->out))) == NULL)
@@ -416,7 +416,7 @@ corba_status epp_call_create_nsset(epp_corba_globs* globs, int session, epp_comm
 }
 
 static corba_status
-epp_call_delete(epp_corba_globs* globs, int session, epp_command_data* cdata, epp_object_type obj)
+epp_call_delete(epp_corba_globs *globs, int session, epp_command_data *cdata, epp_object_type obj)
 {
     cdata->svTRID = strdup("fill");
     cdata->msg = strdup("fill");
@@ -425,25 +425,25 @@ epp_call_delete(epp_corba_globs* globs, int session, epp_command_data* cdata, ep
     return CORBA_OK;
 }
 
-corba_status epp_call_delete_domain(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_delete_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     assert(cdata->in != NULL);
     return epp_call_delete(globs, session, cdata, EPP_DOMAIN);
 }
 
-corba_status epp_call_delete_contact(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_delete_contact(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     assert(cdata->in != NULL);
     return epp_call_delete(globs, session, cdata, EPP_CONTACT);
 }
 
-corba_status epp_call_delete_nsset(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_delete_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     assert(cdata->in != NULL);
     return epp_call_delete(globs, session, cdata, EPP_NSSET);
 }
 
-corba_status epp_call_renew_domain(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_renew_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     if ((cdata->out = calloc(1, sizeof(*cdata->out))) == NULL)
     {
@@ -460,7 +460,7 @@ corba_status epp_call_renew_domain(epp_corba_globs* globs, int session, epp_comm
     return CORBA_OK;
 }
 
-corba_status epp_call_update_domain(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_update_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     corba_status ret;
     cdata->svTRID = strdup("fill");
@@ -470,7 +470,7 @@ corba_status epp_call_update_domain(epp_corba_globs* globs, int session, epp_com
     return ret;
 }
 
-corba_status epp_call_update_contact(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_update_contact(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     corba_status ret;
     cdata->svTRID = strdup("fill");
@@ -480,7 +480,7 @@ corba_status epp_call_update_contact(epp_corba_globs* globs, int session, epp_co
     return ret;
 }
 
-corba_status epp_call_update_nsset(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_update_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     corba_status ret;
     cdata->svTRID = strdup("fill");
@@ -491,7 +491,7 @@ corba_status epp_call_update_nsset(epp_corba_globs* globs, int session, epp_comm
 }
 
 static corba_status
-epp_call_transfer(epp_corba_globs* globs, int session, epp_command_data* cdata, epp_object_type obj)
+epp_call_transfer(epp_corba_globs *globs, int session, epp_command_data *cdata, epp_object_type obj)
 {
     cdata->svTRID = strdup("fill");
     cdata->msg = strdup("fill");
@@ -499,13 +499,13 @@ epp_call_transfer(epp_corba_globs* globs, int session, epp_command_data* cdata, 
     return CORBA_OK;
 }
 
-corba_status epp_call_transfer_domain(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_transfer_domain(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     assert(cdata->in != NULL);
     return epp_call_transfer(globs, session, cdata, EPP_DOMAIN);
 }
 
-corba_status epp_call_transfer_nsset(epp_corba_globs* globs, int session, epp_command_data* cdata)
+corba_status epp_call_transfer_nsset(epp_corba_globs *globs, int session, epp_command_data *cdata)
 {
     assert(cdata->in != NULL);
     return epp_call_transfer(globs, session, cdata, EPP_NSSET);

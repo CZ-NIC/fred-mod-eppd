@@ -14,22 +14,22 @@ struct ccReg_RequestProperties;
 static const long LC_EPP = 3;
 
 /* functions for filling log properties */
-ccReg_RequestProperties* epp_property_push_qhead(
-        ccReg_RequestProperties* c_props, qhead* list, char* list_name, CORBA_boolean child);
-ccReg_RequestProperties*
-epp_property_push(ccReg_RequestProperties* c_props, char* name, char* value, CORBA_boolean child);
-ccReg_RequestProperties*
-epp_property_push_int(ccReg_RequestProperties* c_props, char* name, int value);
+ccReg_RequestProperties *epp_property_push_qhead(
+        ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean child);
+ccReg_RequestProperties *
+epp_property_push(ccReg_RequestProperties *c_props, char *name, char *value, CORBA_boolean child);
+ccReg_RequestProperties *
+epp_property_push_int(ccReg_RequestProperties *c_props, char *name, int value);
 
 int epp_log_close_message(
-        epp_context* epp_ctx, service_Logger service, const char* content,
-        ccReg_RequestProperties* properties, ccReg_ObjectReferences* objrefs,
-        ccReg_TID log_entry_id, ccReg_TID session_id, CORBA_long result_code, char* errmsg);
+        epp_context *epp_ctx, service_Logger service, const char *content,
+        ccReg_RequestProperties *properties, ccReg_ObjectReferences *objrefs,
+        ccReg_TID log_entry_id, ccReg_TID session_id, CORBA_long result_code, char *errmsg);
 
 int epp_log_new_message(
-        epp_context* epp_ctx, service_Logger service, const char* sourceIP, const char* content,
-        ccReg_RequestProperties* properties, ccReg_ObjectReferences* objrefs,
-        epp_action_type action_type, ccReg_TID* log_entry_id, ccReg_TID sessionid, char* errmsg);
+        epp_context *epp_ctx, service_Logger service, const char *sourceIP, const char *content,
+        ccReg_RequestProperties *properties, ccReg_ObjectReferences *objrefs,
+        epp_action_type action_type, ccReg_TID *log_entry_id, ccReg_TID sessionid, char *errmsg);
 
 /* end of prototypes for functions using CORBA cals or CORBA data structures */
 
@@ -55,20 +55,20 @@ int epp_log_new_message(
     }
 
 
-static epp_action_type log_props_login(ccReg_RequestProperties** c_props, epp_command_data* cdata);
-static epp_action_type log_props_check(ccReg_RequestProperties** c_props, epp_command_data* cdata);
-static epp_action_type log_props_info(ccReg_RequestProperties** c_props, epp_command_data* cdata);
-static epp_action_type log_props_poll(ccReg_RequestProperties** c_props, epp_command_data* cdata);
-static epp_action_type log_props_create(ccReg_RequestProperties** c_props, epp_command_data* cdata);
-static epp_action_type log_props_delete(ccReg_RequestProperties** c_props, epp_command_data* cdata);
-static epp_action_type log_props_renew(ccReg_RequestProperties** c_props, epp_command_data* cdata);
-static epp_action_type log_props_update(ccReg_RequestProperties** c_props, epp_command_data* cdata);
+static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_check(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_info(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_poll(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_delete(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_renew(ccReg_RequestProperties **c_props, epp_command_data *cdata);
+static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_command_data *cdata);
 static epp_action_type
-log_props_transfer(ccReg_RequestProperties** c_props, epp_command_data* cdata);
+log_props_transfer(ccReg_RequestProperties **c_props, epp_command_data *cdata);
 static epp_action_type
-log_props_default_extcmd(ccReg_RequestProperties** c_props, epp_command_data* cdata);
+log_props_default_extcmd(ccReg_RequestProperties **c_props, epp_command_data *cdata);
 static void
-log_props_default_extcmd_response(ccReg_RequestProperties** c_props, const epp_command_data* cdata);
+log_props_default_extcmd_response(ccReg_RequestProperties **c_props, const epp_command_data *cdata);
 
 /** Maximum property name length for fred-logd logging facility */
 static const int LOG_PROP_NAME_LENGTH = 50;
@@ -88,8 +88,8 @@ static const int LOG_PROP_NAME_LENGTH = 50;
  *
  */
 
-ccReg_RequestProperties* epp_property_push_qhead(
-        ccReg_RequestProperties* c_props, qhead* list, char* list_name, CORBA_boolean child)
+ccReg_RequestProperties *epp_property_push_qhead(
+        ccReg_RequestProperties *c_props, qhead *list, char *list_name, CORBA_boolean child)
 {
     if (list->count == 0)
     {
@@ -98,7 +98,7 @@ ccReg_RequestProperties* epp_property_push_qhead(
 
     q_foreach(list)
     {
-        if ((c_props = epp_property_push(c_props, list_name, (char*)q_content(list), child)) ==
+        if ((c_props = epp_property_push(c_props, list_name, (char *)q_content(list), child)) ==
             NULL)
         {
             return NULL;
@@ -121,8 +121,8 @@ ccReg_RequestProperties* epp_property_push_qhead(
  *
  * @returns			NULL in case of an allocation error, modified c_props otherwise
  */
-ccReg_RequestProperties*
-epp_property_push(ccReg_RequestProperties* c_props, char* name, char* value, CORBA_boolean child)
+ccReg_RequestProperties *
+epp_property_push(ccReg_RequestProperties *c_props, char *name, char *value, CORBA_boolean child)
 {
     if (c_props == NULL)
     {
@@ -179,8 +179,8 @@ epp_property_push(ccReg_RequestProperties* c_props, char* name, char* value, COR
  * @returns			NULL in case of an allocation error, modified c_props otherwise
  */
 
-ccReg_RequestProperties*
-epp_property_push_int(ccReg_RequestProperties* c_props, char* name, int value)
+ccReg_RequestProperties *
+epp_property_push_int(ccReg_RequestProperties *c_props, char *name, int value)
 {
     char str[12];
     int old_length;
@@ -236,11 +236,11 @@ epp_property_push_int(ccReg_RequestProperties* c_props, char* name, int value)
  * @returns		CORBA status code
  */
 int epp_log_CreateSession(
-        epp_context* epp_ctx, service_Logger service, const char* user_name, ccReg_TID user_id,
-        ccReg_TID* const log_session_id, char* errmsg)
+        epp_context *epp_ctx, service_Logger service, const char *user_name, ccReg_TID user_id,
+        ccReg_TID *const log_session_id, char *errmsg)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_name;
+    CORBA_char *c_name;
     ccReg_TID session_id = 0;
     int retr;
 
@@ -298,7 +298,7 @@ int epp_log_CreateSession(
  * @returns		CORBA status code
  */
 int epp_log_CloseSession(
-        epp_context* epp_ctx, service_Logger service, ccReg_TID log_session_id, char* errmsg)
+        epp_context *epp_ctx, service_Logger service, ccReg_TID log_session_id, char *errmsg)
 {
     CORBA_Environment ev[1];
     int retr;
@@ -344,15 +344,16 @@ int epp_log_CloseSession(
  * @param sourceIP		IP address of the client
  * @param content		content of the request
  * @param properties	List of properties (name, value pairs)
- * @param log_entry_id		output of ID of the new entry in log_entry database table. Id is used in other calls to logging
+ * @param log_entry_id		output of ID of the new entry in log_entry database table. Id is used in
+ * other calls to logging
  * @param errmsg		Output of a CORBA error message
  *
  * @returns				CORBA status code
  */
 int epp_log_new_message(
-        epp_context* epp_ctx, service_Logger service, const char* source_ip, const char* content,
-        ccReg_RequestProperties* properties, ccReg_ObjectReferences* objrefs,
-        epp_action_type action_type, ccReg_TID* log_entry_id, ccReg_TID sessionid, char* errmsg)
+        epp_context *epp_ctx, service_Logger service, const char *source_ip, const char *content,
+        ccReg_RequestProperties *properties, ccReg_ObjectReferences *objrefs,
+        epp_action_type action_type, ccReg_TID *log_entry_id, ccReg_TID sessionid, char *errmsg)
 {
     CORBA_Environment ev[1];
     CORBA_char *c_source_ip, *c_content;
@@ -467,12 +468,12 @@ int epp_log_new_message(
  * @returns			CORBA status code
  */
 int epp_log_close_message(
-        epp_context* epp_ctx, service_Logger service, const char* content,
-        ccReg_RequestProperties* properties, ccReg_ObjectReferences* objrefs,
-        ccReg_TID log_entry_id, ccReg_TID session_id, CORBA_long result_code, char* errmsg)
+        epp_context *epp_ctx, service_Logger service, const char *content,
+        ccReg_RequestProperties *properties, ccReg_ObjectReferences *objrefs,
+        ccReg_TID log_entry_id, ccReg_TID session_id, CORBA_long result_code, char *errmsg)
 {
     CORBA_Environment ev[1];
-    CORBA_char* c_content;
+    CORBA_char *c_content;
     int retr; /* retry counter */
 
     c_content = wrap_str(content);
@@ -538,7 +539,7 @@ int epp_log_close_message(
     CORBA_free(properties);
     CORBA_free(objrefs);
 
-    //TODO proper handling of exceptions
+    // TODO proper handling of exceptions
     // ret = CORBA_REMOTE_ERROR;
     if (raised_exception(ev))
     {
@@ -568,19 +569,19 @@ int epp_log_close_message(
  * @returns 		log entry properties or NULL in case of an allocation error
  *
  */
-ccReg_RequestProperties*
-epp_property_push_valerr(ccReg_RequestProperties* c_props, qhead* list, char* list_name)
+ccReg_RequestProperties *
+epp_property_push_valerr(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
 {
     char str[LOG_PROP_NAME_LENGTH]; /* property name */
 
-    epp_error* value; /* ds record data structure */
+    epp_error *value; /* ds record data structure */
 
     if (q_length(*list) > 0)
     {
 
         q_foreach(list)
         {
-            value = (epp_error*)q_content(list);
+            value = (epp_error *)q_content(list);
 
             str[0] = '\0';
             snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "element");
@@ -611,19 +612,19 @@ epp_property_push_valerr(ccReg_RequestProperties* c_props, qhead* list, char* li
  * @returns 		log entry properties or NULL in case of an allocation error
  *
  */
-ccReg_RequestProperties*
-epp_property_push_nsset(ccReg_RequestProperties* c_props, qhead* list, char* list_name)
+ccReg_RequestProperties *
+epp_property_push_nsset(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
 {
     char str[LOG_PROP_NAME_LENGTH]; /* property name */
 
-    epp_ns* value; /* ds record data structure */
+    epp_ns *value; /* ds record data structure */
 
     if (q_length(*list) > 0)
     {
 
         q_foreach(list)
         {
-            value = (epp_ns*)q_content(list);
+            value = (epp_ns *)q_content(list);
 
             str[0] = '\0';
             snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "name");
@@ -654,17 +655,17 @@ epp_property_push_nsset(ccReg_RequestProperties* c_props, qhead* list, char* lis
  * @returns 		log entry properties or NULL in case of an allocation error
  *
  */
-ccReg_RequestProperties*
-epp_property_push_dnskey(ccReg_RequestProperties* c_props, qhead* list, char* list_name)
+ccReg_RequestProperties *
+epp_property_push_dnskey(ccReg_RequestProperties *c_props, qhead *list, char *list_name)
 {
     char str[LOG_PROP_NAME_LENGTH];
-    epp_dnskey* value;
+    epp_dnskey *value;
 
     if (q_length(*list) > 0)
     {
         q_foreach(list)
         {
-            value = (epp_dnskey*)q_content(list);
+            value = (epp_dnskey *)q_content(list);
 
             str[0] = '\0';
             snprintf(str, LOG_PROP_NAME_LENGTH, "%s.%s", list_name, "flags");
@@ -706,7 +707,7 @@ epp_property_push_dnskey(ccReg_RequestProperties* c_props, qhead* list, char* li
  *
  *  @returns 	log entry properties or NULL in case of an allocation error
  */
-ccReg_RequestProperties* epp_log_postal_info(ccReg_RequestProperties* p, epp_postalInfo* pi)
+ccReg_RequestProperties *epp_log_postal_info(ccReg_RequestProperties *p, epp_postalInfo *pi)
 {
     if (pi == NULL)
         return p;
@@ -744,7 +745,7 @@ ccReg_RequestProperties* epp_log_postal_info(ccReg_RequestProperties* p, epp_pos
  *
  *  @returns 	log entry properties or NULL in case of an allocation error
  */
-ccReg_RequestProperties* epp_log_disclose_info(ccReg_RequestProperties* p, epp_discl* ed)
+ccReg_RequestProperties *epp_log_disclose_info(ccReg_RequestProperties *p, epp_discl *ed)
 {
     if (ed->flag == 1)
     {
@@ -793,10 +794,10 @@ ccReg_RequestProperties* epp_log_disclose_info(ccReg_RequestProperties* p, epp_d
     return p;
 }
 
-static epp_action_type log_props_login(ccReg_RequestProperties** c_props, epp_command_data* cdata)
+static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
-    epps_login* el;
+    epps_login *el;
 
     if (cdata->type == EPP_LOGIN)
     {
@@ -823,7 +824,7 @@ static epp_action_type log_props_login(ccReg_RequestProperties** c_props, epp_co
     }
     else
     {
-        epps_sendAuthInfo* ai = cdata->data;
+        epps_sendAuthInfo *ai = cdata->data;
 
         switch (cdata->type)
         {
@@ -890,7 +891,7 @@ static epp_action_type log_props_login(ccReg_RequestProperties** c_props, epp_co
     return action_type;
 }
 
-static epp_action_type log_props_check(ccReg_RequestProperties** c_props, epp_command_data* cdata)
+static epp_action_type log_props_check(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
 
@@ -915,9 +916,9 @@ static epp_action_type log_props_check(ccReg_RequestProperties** c_props, epp_co
     return action_type;
 }
 
-static void log_props_out_check(ccReg_RequestProperties** c_props, const epp_command_data* cdata)
+static void log_props_out_check(ccReg_RequestProperties **c_props, const epp_command_data *cdata)
 {
-    epps_check* ec;
+    epps_check *ec;
 
     ec = cdata->data;
 
@@ -926,7 +927,7 @@ static void log_props_out_check(ccReg_RequestProperties** c_props, const epp_com
 
     q_foreach(&ec->ids)
     {
-        epp_avail* avail;
+        epp_avail *avail;
 
         if ((ec->avails).cur == NULL)
             break;
@@ -948,7 +949,7 @@ static void log_props_out_check(ccReg_RequestProperties** c_props, const epp_com
     }
 }
 
-static epp_action_type log_props_info(ccReg_RequestProperties** c_props, epp_command_data* cdata)
+static epp_action_type log_props_info(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
 
@@ -969,7 +970,7 @@ static epp_action_type log_props_info(ccReg_RequestProperties** c_props, epp_com
 
         case EPP_INFO_CONTACT:
         {
-            epps_info_contact* i = cdata->data;
+            epps_info_contact *i = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", i->id)
             action_type = ContactInfo;
@@ -977,7 +978,7 @@ static epp_action_type log_props_info(ccReg_RequestProperties** c_props, epp_com
         }
         case EPP_INFO_KEYSET:
         {
-            epps_info_keyset* i = cdata->data;
+            epps_info_keyset *i = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", i->id)
             action_type = KeysetInfo;
@@ -985,7 +986,7 @@ static epp_action_type log_props_info(ccReg_RequestProperties** c_props, epp_com
         }
         case EPP_INFO_NSSET:
         {
-            epps_info_nsset* i = cdata->data;
+            epps_info_nsset *i = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", i->id)
             action_type = NSsetInfo;
@@ -993,7 +994,7 @@ static epp_action_type log_props_info(ccReg_RequestProperties** c_props, epp_com
         }
         case EPP_INFO_DOMAIN:
         {
-            epps_info_domain* i = cdata->data;
+            epps_info_domain *i = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", i->name)
             action_type = DomainInfo;
@@ -1006,11 +1007,11 @@ static epp_action_type log_props_info(ccReg_RequestProperties** c_props, epp_com
     return action_type;
 }
 
-static epp_action_type log_props_poll(ccReg_RequestProperties** c_props, epp_command_data* cdata)
+static epp_action_type log_props_poll(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     if (cdata->type == EPP_POLL_ACK)
     {
-        epps_poll_ack* pa = cdata->data;
+        epps_poll_ack *pa = cdata->data;
         PUSH_PROPERTY(*c_props, "msgId", pa->msgid);
         return PollAcknowledgement;
     }
@@ -1020,7 +1021,7 @@ static epp_action_type log_props_poll(ccReg_RequestProperties** c_props, epp_com
     }
 }
 
-static epp_action_type log_props_create(ccReg_RequestProperties** c_props, epp_command_data* cdata)
+static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
 
@@ -1028,7 +1029,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties** c_props, epp_c
     {
         case EPP_CREATE_CONTACT:
             action_type = ContactCreate;
-            epps_create_contact* cc = cdata->data;
+            epps_create_contact *cc = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", cc->id);
 
@@ -1079,7 +1080,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties** c_props, epp_c
 
         case EPP_CREATE_DOMAIN:
             action_type = DomainCreate;
-            epps_create_domain* cd = cdata->data;
+            epps_create_domain *cd = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", cd->name);
             PUSH_PROPERTY(*c_props, "registrant", cd->registrant);
@@ -1104,7 +1105,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties** c_props, epp_c
 
         case EPP_CREATE_NSSET:
             action_type = NSsetCreate;
-            epps_create_nsset* cn = cdata->data;
+            epps_create_nsset *cn = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", cn->id);
             PUSH_PROPERTY(*c_props, "authInfo", cn->authInfo);
@@ -1123,7 +1124,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties** c_props, epp_c
             break;
         case EPP_CREATE_KEYSET:
             action_type = KeysetCreate;
-            epps_create_keyset* ck = cdata->data;
+            epps_create_keyset *ck = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", ck->id);
             PUSH_PROPERTY(*c_props, "authInfo", ck->authInfo);
@@ -1142,10 +1143,10 @@ static epp_action_type log_props_create(ccReg_RequestProperties** c_props, epp_c
     return action_type;
 }
 
-static epp_action_type log_props_delete(ccReg_RequestProperties** c_props, epp_command_data* cdata)
+static epp_action_type log_props_delete(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
-    epps_delete* ed;
+    epps_delete *ed;
 
     switch (cdata->type)
     {
@@ -1170,10 +1171,10 @@ static epp_action_type log_props_delete(ccReg_RequestProperties** c_props, epp_c
     return action_type;
 }
 
-static epp_action_type log_props_renew(ccReg_RequestProperties** c_props, epp_command_data* cdata)
+static epp_action_type log_props_renew(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
-    epps_renew* er;
+    epps_renew *er;
     action_type = DomainRenew;
     er = cdata->data;
 
@@ -1193,7 +1194,7 @@ static epp_action_type log_props_renew(ccReg_RequestProperties** c_props, epp_co
     return action_type;
 }
 
-static epp_action_type log_props_update(ccReg_RequestProperties** c_props, epp_command_data* cdata)
+static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
 
@@ -1202,7 +1203,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties** c_props, epp_c
         case EPP_UPDATE_CONTACT:
             action_type = ContactUpdate;
 
-            epps_update_contact* uc = cdata->data;
+            epps_update_contact *uc = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", uc->id);
 
@@ -1253,7 +1254,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties** c_props, epp_c
         case EPP_UPDATE_DOMAIN:
             action_type = DomainUpdate;
 
-            epps_update_domain* ud = cdata->data;
+            epps_update_domain *ud = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", ud->name);
             PUSH_PROPERTY(*c_props, "registrant", ud->registrant);
@@ -1271,7 +1272,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties** c_props, epp_c
 
         case EPP_UPDATE_NSSET:
             action_type = NSsetUpdate;
-            epps_update_nsset* un = cdata->data;
+            epps_update_nsset *un = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", un->id);
             PUSH_PROPERTY(*c_props, "authInfo", un->authInfo);
@@ -1294,7 +1295,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties** c_props, epp_c
 
         case EPP_UPDATE_KEYSET:
             action_type = KeysetUpdate;
-            epps_update_keyset* uk = cdata->data;
+            epps_update_keyset *uk = cdata->data;
 
             PUSH_PROPERTY(*c_props, "handle", uk->id);
             PUSH_PROPERTY(*c_props, "authInfo", uk->authInfo);
@@ -1320,10 +1321,10 @@ static epp_action_type log_props_update(ccReg_RequestProperties** c_props, epp_c
 }
 
 static epp_action_type
-log_props_transfer(ccReg_RequestProperties** c_props, epp_command_data* cdata)
+log_props_transfer(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
-    epps_transfer* et;
+    epps_transfer *et;
 
     switch (cdata->type)
     {
@@ -1351,11 +1352,11 @@ log_props_transfer(ccReg_RequestProperties** c_props, epp_command_data* cdata)
 }
 
 static epp_action_type
-log_props_default_extcmd(ccReg_RequestProperties** c_props, epp_command_data* cdata)
+log_props_default_extcmd(ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
-    epps_test* epp_test;
-    epps_sendAuthInfo* auth_info;
+    epps_test *epp_test;
+    epps_sendAuthInfo *auth_info;
 
     switch (cdata->type)
     {
@@ -1443,11 +1444,11 @@ log_props_default_extcmd(ccReg_RequestProperties** c_props, epp_command_data* cd
 }
 
 static void
-log_props_default_extcmd_response(ccReg_RequestProperties** c_props, const epp_command_data* cdata)
+log_props_default_extcmd_response(ccReg_RequestProperties **c_props, const epp_command_data *cdata)
 {
 
-    epps_creditInfo* credit_info;
-    epps_info* result;
+    epps_creditInfo *credit_info;
+    epps_info *result;
 
     switch (cdata->type)
     {
@@ -1456,7 +1457,7 @@ log_props_default_extcmd_response(ccReg_RequestProperties** c_props, const epp_c
 
             q_foreach(&credit_info->zonecredits)
             {
-                epp_zonecredit* zonecredit;
+                epp_zonecredit *zonecredit;
 
                 zonecredit = q_content(&credit_info->zonecredits);
                 *c_props = epp_property_push(*c_props, "zone", zonecredit->zone, CORBA_FALSE);
@@ -1495,15 +1496,15 @@ log_props_default_extcmd_response(ccReg_RequestProperties** c_props, const epp_c
  * @return  database ID of the new logging record or an error code LOG_INTERNAL_ERROR
  */
 ccReg_TID log_epp_command(
-        epp_context* epp_ctx, service_Logger* service, char* remote_ip, char* request,
-        epp_command_data* cdata, epp_red_command_type cmdtype, ccReg_TID sessionid)
+        epp_context *epp_ctx, service_Logger *service, char *remote_ip, char *request,
+        epp_command_data *cdata, epp_red_command_type cmdtype, ccReg_TID sessionid)
 {
     int res; /* response from corba call wrapper */
     epp_action_type action_type = UnknownAction;
     ccReg_TID log_entry_id;
 
     char errmsg[MAX_ERROR_MSG_LEN]; /* error message returned from corba call */
-    ccReg_RequestProperties* c_props = NULL; /* properties to be sent to the log */
+    ccReg_RequestProperties *c_props = NULL; /* properties to be sent to the log */
 
 
     errmsg[0] = '\0';
@@ -1628,18 +1629,19 @@ ccReg_TID log_epp_command(
  * @param	response	raw content of the response
  * @param 	cdata		command data, parsed content
  * @param 	session_id		Id into the login database table for this session
- * @param	log_entry_id 	Id of the log_entry record which will be updated by this call. The Id was obtained by log_epp_command()
+ * @param	log_entry_id 	Id of the log_entry record which will be updated by this call. The Id
+ * was obtained by log_epp_command()
  *
  * @return  status LOG_INTERNAL_ERROR or LOG_SUCCESS
  */
 int log_epp_response(
-        epp_context* epp_ctx, service_Logger* log_service, qhead* valerr, const char* response,
-        const epp_command_data* cdata, ccReg_TID session_id, ccReg_TID log_entry_id)
+        epp_context *epp_ctx, service_Logger *log_service, qhead *valerr, const char *response,
+        const epp_command_data *cdata, ccReg_TID session_id, ccReg_TID log_entry_id)
 {
     int res;
 
     char errmsg[MAX_ERROR_MSG_LEN]; /* error message returned from corba call */
-    ccReg_RequestProperties* c_props = NULL; /* properties to be sent to the log */
+    ccReg_RequestProperties *c_props = NULL; /* properties to be sent to the log */
 
     errmsg[0] = '\0';
     // output properties
@@ -1670,22 +1672,22 @@ int log_epp_response(
         }
         else if (cdata->type == EPP_CREATE_CONTACT)
         {
-            epps_create_contact* cc = cdata->data;
+            epps_create_contact *cc = cdata->data;
             c_props = epp_property_push(c_props, "creationDate", cc->crDate, CORBA_FALSE);
         }
         else if (cdata->type == EPP_CREATE_DOMAIN)
         {
-            epps_create_domain* cd = cdata->data;
+            epps_create_domain *cd = cdata->data;
             c_props = epp_property_push(c_props, "creationDate", cd->crDate, CORBA_FALSE);
         }
         else if (cdata->type == EPP_CREATE_KEYSET)
         {
-            epps_create_keyset* ck = cdata->data;
+            epps_create_keyset *ck = cdata->data;
             c_props = epp_property_push(c_props, "creationDate", ck->crDate, CORBA_FALSE);
         }
         else if (cdata->type == EPP_CREATE_NSSET)
         {
-            epps_create_nsset* cn = cdata->data;
+            epps_create_nsset *cn = cdata->data;
             c_props = epp_property_push(c_props, "creationDate", cn->crDate, CORBA_FALSE);
         }
 

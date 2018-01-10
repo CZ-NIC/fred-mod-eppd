@@ -35,6 +35,7 @@ BreakBeforeBinaryOperators: None
 BreakBeforeBraces: Custom
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializersBeforeComma: false
+BreakStringLiterals: false
 ColumnLimit: 100
 CommentPragmas: '^lint'
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
@@ -69,9 +70,8 @@ PenaltyBreakFirstLessLess: 120
 PenaltyBreakString: 1000
 PenaltyExcessCharacter: 1000000
 PenaltyReturnTypeOnItsOwnLine: 60
-PenaltyBreakBeforeFirstCallParameter: 60
-PointerAlignment: Left
-ReflowComments: false
+PointerAlignment: Right
+ReflowComments: true
 SortIncludes: true
 SpaceAfterCStyleCast: false
 SpaceBeforeAssignmentOperators: true

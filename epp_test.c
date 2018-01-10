@@ -55,25 +55,25 @@ typedef struct
 /*
  * Memory Pool routines
  */
-static void* create_pool(void)
+static void *create_pool(void)
 {
-    pool_t* p;
+    pool_t *p;
 
-    p = (pool_t*)calloc(1, sizeof *p);
+    p = (pool_t *)calloc(1, sizeof *p);
     if (p == NULL)
         return NULL;
 #ifdef DEBUG_ALLOC
     p->count = 0;
     p->bytes = 0;
 #endif
-    return (void*)p;
+    return (void *)p;
 }
 
-static void destroy_pool(void* pool)
+static void destroy_pool(void *pool)
 {
-    pool_t* p = (pool_t*)pool;
-    qitem* iter;
-    qitem* last;
+    pool_t *p = (pool_t *)pool;
+    qitem *iter;
+    qitem *last;
 
 #ifdef DEBUG_ALLOC
     fprintf(stderr, "Destroying pool:\n");
@@ -97,11 +97,11 @@ static void destroy_pool(void* pool)
     free(p);
 }
 
-static void* epp_alloc(pool_t* p, unsigned size, int prezero)
+static void *epp_alloc(pool_t *p, unsigned size, int prezero)
 {
-    void* chunk;
-    qitem* item;
-    qitem* iter;
+    void *chunk;
+    qitem *item;
+    qitem *iter;
 
     chunk = malloc(size);
     if (chunk == NULL)
@@ -141,32 +141,32 @@ static void* epp_alloc(pool_t* p, unsigned size, int prezero)
     return chunk;
 }
 
-void* epp_malloc(void* pool, unsigned size)
+void *epp_malloc(void *pool, unsigned size)
 {
-    pool_t* p = (pool_t*)pool;
+    pool_t *p = (pool_t *)pool;
 
     return epp_alloc(p, size, 0);
 }
 
-void* epp_calloc(void* pool, unsigned size)
+void *epp_calloc(void *pool, unsigned size)
 {
-    pool_t* p = (pool_t*)pool;
+    pool_t *p = (pool_t *)pool;
 
     return epp_alloc(p, size, 1);
 }
 
-char* epp_strdup(void* pool, const char* str)
+char *epp_strdup(void *pool, const char *str)
 {
-    pool_t* p = (pool_t*)pool;
+    pool_t *p = (pool_t *)pool;
     unsigned len;
-    char* new_str;
+    char *new_str;
 
     if (str == NULL)
         return NULL;
     len = strnlen(str, MAX_STR_LEN);
     if (len == MAX_STR_LEN)
         return NULL;
-    new_str = (char*)epp_alloc(p, len + 1, 0);
+    new_str = (char *)epp_alloc(p, len + 1, 0);
     if (new_str == NULL)
         return NULL;
     memcpy(new_str, str, len);
@@ -174,18 +174,18 @@ char* epp_strdup(void* pool, const char* str)
     return new_str;
 }
 
-char* epp_strcat(void* pool, const char* str1, const char* str2)
+char *epp_strcat(void *pool, const char *str1, const char *str2)
 {
-    pool_t* p = (pool_t*)pool;
+    pool_t *p = (pool_t *)pool;
     unsigned len;
-    char* new_str;
+    char *new_str;
 
     if (str1 == NULL || str2 == NULL)
         return NULL;
     len = strnlen(str1, MAX_STR_LEN) + strnlen(str2, MAX_STR_LEN);
     if (len >= MAX_STR_LEN)
         return NULL;
-    new_str = (char*)epp_alloc(p, len + 1, 0);
+    new_str = (char *)epp_alloc(p, len + 1, 0);
     if (new_str == NULL)
         return NULL;
     strncpy(new_str, str1, len);
@@ -195,7 +195,7 @@ char* epp_strcat(void* pool, const char* str1, const char* str2)
     return new_str;
 }
 
-char* epp_sprintf(void* pool, const char* fmt, ...)
+char *epp_sprintf(void *pool, const char *fmt, ...)
 {
     char buffer[100];
     va_list ap;
@@ -208,7 +208,7 @@ char* epp_sprintf(void* pool, const char* fmt, ...)
     return epp_strdup(pool, buffer);
 }
 
-void epplog(epp_context* epp_ctx, epp_loglevel level, const char* fmt, ...)
+void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
 {
     va_list ap;
 
@@ -217,13 +217,13 @@ void epplog(epp_context* epp_ctx, epp_loglevel level, const char* fmt, ...)
     va_end(ap);
 }
 
-ccReg_EPP get_service(CORBA_ORB orb, const char* ns_loc, const char* obj_name)
+ccReg_EPP get_service(CORBA_ORB orb, const char *ns_loc, const char *obj_name)
 {
     ccReg_EPP service = CORBA_OBJECT_NIL; /* object's stub */
     CORBA_Environment ev[1];
     CosNaming_NamingContext ns; /* used for nameservice */
-    CosNaming_NameComponent* name_component; /* EPP's name */
-    CosNaming_Name* cos_name; /* Cos name used in service lookup */
+    CosNaming_NameComponent *name_component; /* EPP's name */
+    CosNaming_Name *cos_name; /* Cos name used in service lookup */
     char ns_string[150];
 
     CORBA_exception_init(ev);
@@ -300,7 +300,7 @@ cmd_t getcmd(void)
     return CMD_UNKNOWN;
 }
 
-int readinput(char* text)
+int readinput(char *text)
 {
     int c;
     int i = 0;
@@ -319,12 +319,12 @@ int readinput(char* text)
     return 1;
 }
 
-int readfile(char* text)
+int readfile(char *text)
 {
     int c;
     int i;
     char filename[MAX_FILE_NAME];
-    FILE* f;
+    FILE *f;
 
     fputs("type filename: ", stderr);
     for (i = 0; (c = getchar()) != '\n' && i < MAX_FILE_NAME - 1; i++)
@@ -354,11 +354,11 @@ int readfile(char* text)
     return 1;
 }
 
-int openfile(char* text, char* filename)
+int openfile(char *text, char *filename)
 {
     int c;
     int i;
-    FILE* f;
+    FILE *f;
 
 
     if ((f = fopen(filename, "r")) == NULL)
@@ -402,30 +402,30 @@ void usage(void)
     fprintf(stderr, "       3    CORBA call failed\n");
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     ccReg_EPP service;
     CORBA_ORB orb;
-    char* greeting;
+    char *greeting;
     unsigned long long loginid;
     epp_lang lang;
-    epp_command_data* cdata;
+    epp_command_data *cdata;
     char text[MAX_LENGTH];
     char quit;
     cmd_t cmd;
     parser_status pstat;
     corba_status cstat;
     gen_status gstat;
-    void* schema = NULL;
-    void* pool;
+    void *schema = NULL;
+    void *pool;
     int firsttime;
     int ar;
     int interactive;
     int test = 0;
     int pflag = 0;
-    const char* host = NULL;
-    const char* fp = NULL;
-    const char* schemafile = NULL;
+    const char *host = NULL;
+    const char *fp = NULL;
+    const char *schemafile = NULL;
     int ret;
     CORBA_Environment ev[1];
     epp_context epp_ctx;
@@ -595,8 +595,8 @@ int main(int argc, char* argv[])
 
         if (pstat == PARSER_HELLO)
         {
-            char* version;
-            char* curdate;
+            char *version;
+            char *curdate;
 
             /* API: greeting */
             if (epp_call_hello(&epp_ctx, service, &version, &curdate) != CORBA_OK)
@@ -654,7 +654,7 @@ int main(int argc, char* argv[])
 
         if (cstat != CORBA_INT_ERROR)
         {
-            char* response;
+            char *response;
             qhead valerr;
 
             valerr.body = NULL;
@@ -694,7 +694,7 @@ int main(int argc, char* argv[])
                     fputs("Server response does not validate\n", stderr);
                     q_foreach(&valerr)
                     {
-                        epp_error* e = q_content(&valerr);
+                        epp_error *e = q_content(&valerr);
                         fprintf(stderr, "\tElement: %s\n", e->value);
                         fprintf(stderr, "\tReason: %s\n", e->reason);
                     }

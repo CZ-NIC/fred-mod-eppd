@@ -102,7 +102,7 @@
                                       ->content                                                    \
                             : NULL))
 
-int read_epp_dnskey(void* pool, xmlXPathContextPtr xpathCtx, epp_dnskey* key);
+int read_epp_dnskey(void *pool, xmlXPathContextPtr xpathCtx, epp_dnskey *key);
 
 /**
  * This function returns specified attribute value of given node.
@@ -112,7 +112,7 @@ int read_epp_dnskey(void* pool, xmlXPathContextPtr xpathCtx, epp_dnskey* key);
  * @param name     Name of attribute.
  * @return         Pointer to attribute's value.
  */
-static char* get_attr(xmlNodePtr node, const char* name)
+static char *get_attr(xmlNodePtr node, const char *name)
 {
     xmlAttrPtr prop;
 
@@ -123,7 +123,7 @@ static char* get_attr(xmlNodePtr node, const char* name)
     {
         if (xmlStrEqual(prop->name, BAD_CAST name))
         {
-            return (char*)prop->children->content;
+            return (char *)prop->children->content;
         }
         prop = prop->next;
     }
@@ -149,7 +149,7 @@ static char* get_attr(xmlNodePtr node, const char* name)
  * @return       The old relative root, which was substituted by new one; or
  *               NULL in case of change failure (new node was not found).
  */
-static xmlNodePtr xpath_chroot(xmlXPathContextPtr ctx, const char* expr, int index, int* xerr)
+static xmlNodePtr xpath_chroot(xmlXPathContextPtr ctx, const char *expr, int index, int *xerr)
 {
     xmlXPathObjectPtr obj;
     xmlNodePtr oldNode;
@@ -184,7 +184,7 @@ static xmlNodePtr xpath_chroot(xmlXPathContextPtr ctx, const char* expr, int ind
  *               the function).
  * @return       Count of elements which satisfy xpath expression.
  */
-static int xpath_count(xmlXPathContextPtr ctx, const char* expr, int* xerr)
+static int xpath_count(xmlXPathContextPtr ctx, const char *expr, int *xerr)
 {
     xmlXPathObjectPtr obj;
     int count;
@@ -217,10 +217,10 @@ static int xpath_count(xmlXPathContextPtr ctx, const char* expr, int* xerr)
  *               the function).
  * @return       String with content of xml element allocated from pool.
  */
-static char* xpath_get1(void* pool, xmlXPathContextPtr ctx, const char* expr, int req, int* xerr)
+static char *xpath_get1(void *pool, xmlXPathContextPtr ctx, const char *expr, int req, int *xerr)
 {
     xmlXPathObjectPtr obj;
-    char* res;
+    char *res;
 
     obj = xmlXPathEvalExpression(BAD_CAST expr, ctx);
     if (obj == NULL)
@@ -271,7 +271,7 @@ static char* xpath_get1(void* pool, xmlXPathContextPtr ctx, const char* expr, in
  *               the function).
  * @return If succesfull 1, in case of failure 0.
  */
-static void xpath_getn(void* pool, qhead* list, xmlXPathContextPtr ctx, const char* expr, int* xerr)
+static void xpath_getn(void *pool, qhead *list, xmlXPathContextPtr ctx, const char *expr, int *xerr)
 {
     int i;
     xmlXPathObjectPtr obj;
@@ -286,7 +286,7 @@ static void xpath_getn(void* pool, qhead* list, xmlXPathContextPtr ctx, const ch
     /* iterate through selected items */
     for (i = 0; i < xmlXPathNodeSetGetLength(obj->nodesetval); i++)
     {
-        char* value;
+        char *value;
 
         if (TEXT_CONTENT(obj, i) == NULL)
             continue;
@@ -328,8 +328,8 @@ static void xpath_getn(void* pool, qhead* list, xmlXPathContextPtr ctx, const ch
  *               the function).
  * @return       String with content of xml element allocated from pool.
  */
-static char* xpath_get_attr(
-        void* pool, xmlXPathContextPtr ctx, const char* expr, const char* attr, int req, int* xerr)
+static char *xpath_get_attr(
+        void *pool, xmlXPathContextPtr ctx, const char *expr, const char *attr, int req, int *xerr)
 {
     xmlXPathObjectPtr obj;
     char *str, *attr_val;
@@ -369,7 +369,7 @@ static char* xpath_get_attr(
 }
 
 
-/** 
+/**
  * Parse a boolean value entered either
  * as a number or as a string (true/false)
  *
@@ -377,7 +377,7 @@ static char* xpath_get_attr(
  *
  * @returns  	0 or 1
  */
-int parse_boolean(char* str)
+int parse_boolean(char *str)
 {
     // this could be also treated as an error
     if (*str == '\0')
@@ -409,8 +409,8 @@ typedef struct cmd_hash_item_t cmd_hash_item;
  */
 struct cmd_hash_item_t
 {
-    cmd_hash_item* next; /**< Next item in hash table. */
-    char* key; /**< Hash key (command name). */
+    cmd_hash_item *next; /**< Next item in hash table. */
+    char *key; /**< Hash key (command name). */
     epp_command_type val; /**< Hash value (command type). */
 };
 
@@ -420,7 +420,7 @@ struct cmd_hash_item_t
  * Once the table is initialized, it is read-only. There for it is thread-safe
  * eventhough it is declared as static and not protected by a lock.
  */
-static cmd_hash_item* hash_cmd[HASH_SIZE_CMD];
+static cmd_hash_item *hash_cmd[HASH_SIZE_CMD];
 
 /**
  * Function for hashing of command name.
@@ -434,7 +434,7 @@ static cmd_hash_item* hash_cmd[HASH_SIZE_CMD];
  * @param key   Command name.
  * @return      Hash value.
  */
-static unsigned char get_cmd_hash(const char* key)
+static unsigned char get_cmd_hash(const char *key)
 {
     int i;
     unsigned char hash = 0;
@@ -454,9 +454,9 @@ static unsigned char get_cmd_hash(const char* key)
  *              return values are due to the way of their processing in
  *              epp_parser_init()).
  */
-static char cmd_hash_insert(const char* key, epp_command_type type)
+static char cmd_hash_insert(const char *key, epp_command_type type)
 {
-    cmd_hash_item* hi;
+    cmd_hash_item *hi;
     int index;
 
     assert(key != NULL);
@@ -486,9 +486,9 @@ static char cmd_hash_insert(const char* key, epp_command_type type)
  * @return      Command type, if command is not found in hash table, value
  *              EPP_UNKNOWN_CMD is returned.
  */
-static epp_command_type cmd_hash_lookup(const char* key)
+static epp_command_type cmd_hash_lookup(const char *key)
 {
-    cmd_hash_item* hi;
+    cmd_hash_item *hi;
 
     /* iterate through hash chain */
     for (hi = hash_cmd[get_cmd_hash(key)]; hi != NULL; hi = hi->next)
@@ -508,7 +508,7 @@ static epp_command_type cmd_hash_lookup(const char* key)
  */
 static void cmd_hash_clean(void)
 {
-    cmd_hash_item* tmp;
+    cmd_hash_item *tmp;
     int i;
 
     /* step through all hash table indexes */
@@ -525,7 +525,7 @@ static void cmd_hash_clean(void)
     }
 }
 
-void* epp_parser_init(const char* url_schema)
+void *epp_parser_init(const char *url_schema)
 {
     xmlSchemaPtr schema; /* parsed schema */
     xmlSchemaParserCtxtPtr spctx; /* schema parser's context */
@@ -570,19 +570,19 @@ void* epp_parser_init(const char* url_schema)
      * schema might be corrupted though it is unlikely, in that case
      * schema has NULL value
      */
-    return (void*)schema;
+    return (void *)schema;
 }
 
-void epp_parser_init_cleanup(void* schema)
+void epp_parser_init_cleanup(void *schema)
 {
     xmlSchemaFree((xmlSchemaPtr)schema);
     cmd_hash_clean();
     xmlCleanupParser();
 }
 
-void epp_parser_request_cleanup(void* cdata_arg)
+void epp_parser_request_cleanup(void *cdata_arg)
 {
-    epp_command_data* cdata = (epp_command_data*)cdata_arg;
+    epp_command_data *cdata = (epp_command_data *)cdata_arg;
 
     /* be carefull when freeing - any of pointers might be NULL */
     if (cdata == NULL)
@@ -601,9 +601,9 @@ void epp_parser_request_cleanup(void* cdata_arg)
  * @param errspec  Specific code of an error.
  * @return         0 in case of success otherwise 1.
  */
-static int new_error_item(void* pool, qhead* errors, epp_errorspec errspec)
+static int new_error_item(void *pool, qhead *errors, epp_errorspec errspec)
 {
-    epp_error* valerr;
+    epp_error *valerr;
 
     valerr = epp_malloc(pool, sizeof *valerr);
     if (valerr == NULL)
@@ -625,10 +625,10 @@ static int new_error_item(void* pool, qhead* errors, epp_errorspec errspec)
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_login(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_login(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_login* login;
-    char* str;
+    epps_login *login;
+    char *str;
     int xerr;
 
     RESET_XERR(xerr); /* clear value of errno */
@@ -641,11 +641,11 @@ static void parse_login(void* pool, xmlXPathContextPtr xpathCtx, epp_command_dat
     /* check if language matches */
     str = xpath_get1(pool, xpathCtx, "epp:options/epp:lang", 1, &xerr);
     CHK_XERR(xerr, error);
-    if (xmlStrEqual((xmlChar*)str, BAD_CAST "en"))
+    if (xmlStrEqual((xmlChar *)str, BAD_CAST "en"))
     {
         login->lang = LANG_EN;
     }
-    else if (xmlStrEqual((xmlChar*)str, BAD_CAST "cs"))
+    else if (xmlStrEqual((xmlChar *)str, BAD_CAST "cs"))
     {
         login->lang = LANG_CS;
     }
@@ -659,7 +659,7 @@ static void parse_login(void* pool, xmlXPathContextPtr xpathCtx, epp_command_dat
     /* check if EPP version matches */
     str = xpath_get1(pool, xpathCtx, "epp:options/epp:version", 1, &xerr);
     CHK_XERR(xerr, error);
-    if (!xmlStrEqual((xmlChar*)str, BAD_CAST "1.0"))
+    if (!xmlStrEqual((xmlChar *)str, BAD_CAST "1.0"))
     {
         cdata->type = EPP_DUMMY;
         cdata->rc = 2100;
@@ -693,9 +693,9 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_check(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_check(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_check* check;
+    epps_check *check;
     int xerr;
 
     RESET_XERR(xerr); /* clear value of errno */
@@ -775,7 +775,7 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_info(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_info(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
     int xerr, exists;
 
@@ -827,7 +827,7 @@ static void parse_info(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data
     xpath_chroot(xpathCtx, "contact:info", 0, &xerr);
     if (xerr == XERR_OK)
     {
-        epps_info_contact* info_contact;
+        epps_info_contact *info_contact;
 
         if ((cdata->data = epp_calloc(pool, sizeof *info_contact)) == NULL)
             goto error;
@@ -845,7 +845,7 @@ static void parse_info(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data
     xpath_chroot(xpathCtx, "domain:info", 0, &xerr);
     if (xerr == XERR_OK)
     {
-        epps_info_domain* info_domain;
+        epps_info_domain *info_domain;
 
         if ((cdata->data = epp_calloc(pool, sizeof *info_domain)) == NULL)
             goto error;
@@ -863,7 +863,7 @@ static void parse_info(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data
     xpath_chroot(xpathCtx, "nsset:info", 0, &xerr);
     if (xerr == XERR_OK)
     {
-        epps_info_nsset* info_nsset;
+        epps_info_nsset *info_nsset;
 
         if ((cdata->data = epp_calloc(pool, sizeof *info_nsset)) == NULL)
             goto error;
@@ -881,7 +881,7 @@ static void parse_info(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data
     xpath_chroot(xpathCtx, "keyset:info", 0, &xerr);
     if (xerr == XERR_OK)
     {
-        epps_info_keyset* info_keyset;
+        epps_info_keyset *info_keyset;
 
         if ((cdata->data = epp_calloc(pool, sizeof *info_keyset)) == NULL)
             goto error;
@@ -913,7 +913,7 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_poll(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_poll(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
     const char *op, *str;
 
@@ -922,7 +922,7 @@ static void parse_poll(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data
     assert(op != NULL);
     if (!strcmp(op, "req"))
     {
-        epps_poll_req* poll_req;
+        epps_poll_req *poll_req;
 
         /* it is request */
         if ((cdata->data = epp_calloc(pool, sizeof *poll_req)) == NULL)
@@ -950,7 +950,7 @@ static void parse_poll(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data
     }
     else
     {
-        epps_poll_ack* poll_ack;
+        epps_poll_ack *poll_ack;
 
         if ((cdata->data = epp_calloc(pool, sizeof *poll_ack)) == NULL)
             goto error;
@@ -974,10 +974,10 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_create_domain(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_create_domain(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_create_domain* create_domain;
-    char* str;
+    epps_create_domain *create_domain;
+    char *str;
     int xerr;
 
     RESET_XERR(xerr); /* clear value of errno */
@@ -1036,7 +1036,7 @@ error:
  * @param str String to be compared and categorized.
  * @return If string is not matched, ident_UNKNOWN is returned.
  */
-static epp_identType string2identtype(const char* str)
+static epp_identType string2identtype(const char *str)
 {
     if (strcmp("op", str) == 0)
         return ident_OP;
@@ -1059,9 +1059,9 @@ static epp_identType string2identtype(const char* str)
  * @param xpathCtx XPath context.
  * @param cdata Output of parsing stage.
  */
-static void parse_create_contact(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_create_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_create_contact* create_contact;
+    epps_create_contact *create_contact;
     int xerr;
 
     RESET_XERR(xerr); /* clear value of errno */
@@ -1091,7 +1091,7 @@ static void parse_create_contact(void* pool, xmlXPathContextPtr xpathCtx, epp_co
     create_contact->identtype = ident_UNKNOWN;
     if (create_contact->ident != NULL)
     {
-        char* str;
+        char *str;
 
         str = xpath_get_attr(pool, xpathCtx, "contact:ident", "type", 1, &xerr);
         CHK_XERR(xerr, error);
@@ -1114,7 +1114,7 @@ static void parse_create_contact(void* pool, xmlXPathContextPtr xpathCtx, epp_co
     }
     else if (xerr == XERR_OK)
     {
-        char* str;
+        char *str;
 
         str = get_attr(xpathCtx->node, "flag");
         assert(str != NULL);
@@ -1190,11 +1190,11 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_create_nsset(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_create_nsset(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_create_nsset* create_nsset;
+    epps_create_nsset *create_nsset;
     xmlXPathObjectPtr xpathObj;
-    char* level;
+    char *level;
     int j, xerr;
 
     RESET_XERR(xerr); /* clear value of errno */
@@ -1225,7 +1225,7 @@ static void parse_create_nsset(void* pool, xmlXPathContextPtr xpathCtx, epp_comm
 
     for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++)
     {
-        epp_ns* ns;
+        epp_ns *ns;
 
         /* allocate data structures */
         if ((ns = epp_calloc(pool, sizeof *ns)) == NULL)
@@ -1263,9 +1263,9 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_create_keyset(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_create_keyset(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_create_keyset* create_keyset;
+    epps_create_keyset *create_keyset;
     xmlXPathObjectPtr xpathObj;
     xmlNodePtr par_node;
     int j, xerr;
@@ -1295,7 +1295,7 @@ static void parse_create_keyset(void* pool, xmlXPathContextPtr xpathCtx, epp_com
 
     for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++)
     {
-        epp_dnskey* key;
+        epp_dnskey *key;
 
         /* allocate data structures */
         if ((key = epp_calloc(pool, sizeof(epp_dnskey))) == NULL)
@@ -1338,9 +1338,9 @@ error:
  * @param key		DNSKEY structure filled with data
  * @returns 		1 on success, 0 on failure (goto error in other functions
  */
-int read_epp_dnskey(void* pool, xmlXPathContextPtr xpathCtx, epp_dnskey* key)
+int read_epp_dnskey(void *pool, xmlXPathContextPtr xpathCtx, epp_dnskey *key)
 {
-    char* str;
+    char *str;
     int xerr;
 
     RESET_XERR(xerr);
@@ -1373,7 +1373,7 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_create(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_create(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
     int xerr;
 
@@ -1437,9 +1437,9 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_delete(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_delete(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_delete* delete;
+    epps_delete *delete;
     int xerr;
 
     RESET_XERR(xerr); /* clear value of errno */
@@ -1519,10 +1519,10 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_renew(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_renew(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_renew* renew;
-    char* str;
+    epps_renew *renew;
+    char *str;
     int xerr;
 
     RESET_XERR(xerr); /* clear value of errno */
@@ -1578,9 +1578,9 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_update_domain(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_update_domain(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_update_domain* update_domain;
+    epps_update_domain *update_domain;
     int xerr;
 
     RESET_XERR(xerr); /* clear value of errno */
@@ -1656,9 +1656,9 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_update_contact(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_update_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_update_contact* update_contact;
+    epps_update_contact *update_contact;
     int xerr;
 
     RESET_XERR(xerr); /* clear value of errno */
@@ -1689,7 +1689,7 @@ static void parse_update_contact(void* pool, xmlXPathContextPtr xpathCtx, epp_co
     update_contact->identtype = ident_UNKNOWN;
     if (update_contact->ident != NULL)
     {
-        char* str;
+        char *str;
 
         str = xpath_get_attr(pool, xpathCtx, "contact:ident", "type", 1, &xerr);
         CHK_XERR(xerr, error);
@@ -1736,7 +1736,7 @@ static void parse_update_contact(void* pool, xmlXPathContextPtr xpathCtx, epp_co
     }
     else if (xerr == XERR_OK)
     {
-        char* str;
+        char *str;
 
         str = get_attr(xpathCtx->node, "flag");
         assert(str != NULL);
@@ -1827,9 +1827,9 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_update_keyset(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_update_keyset(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_update_keyset* update_keyset;
+    epps_update_keyset *update_keyset;
     xmlXPathObjectPtr xpathObj;
     xmlNodePtr par_node, root_node;
     int j, xerr;
@@ -1858,14 +1858,14 @@ static void parse_update_keyset(void* pool, xmlXPathContextPtr xpathCtx, epp_com
         par_node = xpathCtx->node;
 
         /*
-		xpath_getn(pool, &update_keyset->rem_tech, xpathCtx,
-				"keyset:tech", &xerr);
-		CHK_XERR(xerr, error);
-		xpath_getn(pool, &update_keyset->rem_ds, xpathCtx,
-				"keyset:name", &xerr);
-		CHK_XERR(xerr, error);
-		xpathCtx->node = xpathCtx->node->parent;
-		*/
+        xpath_getn(pool, &update_keyset->rem_tech, xpathCtx,
+                "keyset:tech", &xerr);
+        CHK_XERR(xerr, error);
+        xpath_getn(pool, &update_keyset->rem_ds, xpathCtx,
+                "keyset:name", &xerr);
+        CHK_XERR(xerr, error);
+        xpathCtx->node = xpathCtx->node->parent;
+        */
         xpath_getn(pool, &update_keyset->rem_tech, xpathCtx, "keyset:tech", &xerr);
         CHK_XERR(xerr, error);
         /* rem DNSKEY records */
@@ -1875,7 +1875,7 @@ static void parse_update_keyset(void* pool, xmlXPathContextPtr xpathCtx, epp_com
 
         for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++)
         {
-            epp_dnskey* key;
+            epp_dnskey *key;
 
             /* allocate and initialize data structures */
             if ((key = epp_calloc(pool, sizeof(epp_dnskey))) == NULL)
@@ -1931,7 +1931,7 @@ static void parse_update_keyset(void* pool, xmlXPathContextPtr xpathCtx, epp_com
 
         for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++)
         {
-            epp_dnskey* key;
+            epp_dnskey *key;
 
             /* allocate and initialize data structures */
             if ((key = epp_calloc(pool, sizeof(epp_dnskey))) == NULL)
@@ -1979,12 +1979,12 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_update_nsset(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_update_nsset(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_update_nsset* update_nsset;
+    epps_update_nsset *update_nsset;
     xmlXPathObjectPtr xpathObj;
     int j, xerr;
-    char* level;
+    char *level;
 
     RESET_XERR(xerr); /* clear value of errno */
 
@@ -2035,7 +2035,7 @@ static void parse_update_nsset(void* pool, xmlXPathContextPtr xpathCtx, epp_comm
         /* process all nameservers */
         for (j = 0; j < xmlXPathNodeSetGetLength(xpathObj->nodesetval); j++)
         {
-            epp_ns* ns;
+            epp_ns *ns;
 
             /* allocate and initialize data structures */
             if ((ns = epp_calloc(pool, sizeof *ns)) == NULL)
@@ -2085,7 +2085,7 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_update(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_update(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
     int xerr;
 
@@ -2154,11 +2154,11 @@ error:
  * @param xpathCtx  XPath context.
  * @param cdata     Output of parsing stage.
  */
-static void parse_transfer(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_transfer(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_transfer* transfer;
+    epps_transfer *transfer;
     int xerr;
-    char* str;
+    char *str;
 
     /* allocate necessary structures */
     if ((cdata->data = epp_calloc(pool, sizeof *transfer)) == NULL)
@@ -2267,9 +2267,9 @@ error:
  * @param xpathCtx Xpath context.
  * @param cdata Parsed data.
  */
-static void parse_sendAuthInfo(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_sendAuthInfo(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_sendAuthInfo* sendAuthInfo;
+    epps_sendAuthInfo *sendAuthInfo;
     int xerr;
 
     cdata->data = epp_calloc(pool, sizeof *sendAuthInfo);
@@ -2357,9 +2357,9 @@ error:
  *                 it is id).
  */
 static void
-parse_infoKey(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata, const char* key)
+parse_infoKey(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata, const char *key)
 {
-    epps_info* info;
+    epps_info *info;
     int xerr;
 
     cdata->data = epp_calloc(pool, sizeof(epps_info));
@@ -2388,10 +2388,10 @@ error:
  * @param xpathCtx Xpath context.
  * @param cdata Parsed data.
  */
-static void parse_test(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+static void parse_test(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_test* test;
-    char* level;
+    epps_test *test;
+    char *level;
     int xerr;
 
     cdata->data = epp_calloc(pool, sizeof *test);
@@ -2443,12 +2443,12 @@ error:
  * @param cdata     Output of parsing stage.
  */
 static void
-parse_ext_enumval_create(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+parse_ext_enumval_create(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_create_domain* create_domain;
-    epp_ext_item* ext_item;
+    epps_create_domain *create_domain;
+    epp_ext_item *ext_item;
     int xerr;
-    char* str;
+    char *str;
 
     /* assure we are being called in corect context */
     if (cdata->type != EPP_CREATE_DOMAIN)
@@ -2496,12 +2496,12 @@ error:
  * @param cdata     Output of parsing stage.
  */
 static void
-parse_ext_enumval_update(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+parse_ext_enumval_update(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_update_domain* update_domain;
-    epp_ext_item* ext_item;
+    epps_update_domain *update_domain;
+    epp_ext_item *ext_item;
     int xerr;
-    char* str;
+    char *str;
 
     /* assure we are being called in corect context */
     if (cdata->type != EPP_UPDATE_DOMAIN)
@@ -2549,12 +2549,12 @@ error:
  * @param cdata     Output of parsing stage.
  */
 static void
-parse_ext_enumval_renew(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+parse_ext_enumval_renew(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_renew* renew;
-    epp_ext_item* ext_item;
+    epps_renew *renew;
+    epp_ext_item *ext_item;
     int xerr;
-    char* str;
+    char *str;
 
     /* assure we are being called in corect context */
     if (cdata->type != EPP_RENEW_DOMAIN)
@@ -2601,9 +2601,9 @@ error:
  * @param cdata     Output of parsing stage.
  */
 static void
-parse_ext_extraaddr_create(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+parse_ext_extraaddr_create(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_create_contact* create_contact = cdata->data;
+    epps_create_contact *create_contact = cdata->data;
     int xerr = -1;
 
     /* assure we are being called in corect context */
@@ -2616,7 +2616,7 @@ parse_ext_extraaddr_create(void* pool, xmlXPathContextPtr xpathCtx, epp_command_
 
     RESET_XERR(xerr);
 
-    epp_ext_item* ext_item = epp_calloc(pool, sizeof *ext_item);
+    epp_ext_item *ext_item = epp_calloc(pool, sizeof *ext_item);
     if (ext_item == NULL)
     {
         goto error;
@@ -2676,9 +2676,9 @@ error:
  * @param cdata     Output of parsing stage.
  */
 static void
-parse_ext_extraaddr_update(void* pool, xmlXPathContextPtr xpathCtx, epp_command_data* cdata)
+parse_ext_extraaddr_update(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data *cdata)
 {
-    epps_update_contact* update_contact = cdata->data;
+    epps_update_contact *update_contact = cdata->data;
 
     /* assure we are being called in corect context */
     if (cdata->type != EPP_UPDATE_CONTACT)
@@ -2688,7 +2688,7 @@ parse_ext_extraaddr_update(void* pool, xmlXPathContextPtr xpathCtx, epp_command_
         return;
     }
 
-    epp_ext_item* ext_item = epp_calloc(pool, sizeof *ext_item);
+    epp_ext_item *ext_item = epp_calloc(pool, sizeof *ext_item);
     int xerr = -1;
     if (ext_item == NULL)
     {
@@ -2798,7 +2798,7 @@ error:
  * @return           Status.
  */
 static parser_status parse_command(
-        void* pool, int loggedin, epp_command_data* cdata, epp_red_command_type* cmd,
+        void *pool, int loggedin, epp_command_data *cdata, epp_red_command_type *cmd,
         xmlXPathContextPtr xpathCtx)
 {
     xmlXPathObjectPtr xpathObj;
@@ -2819,7 +2819,7 @@ static parser_status parse_command(
     assert(xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1);
 
     /* command lookup through hash table .. huraaa :) */
-    *cmd = cmd_hash_lookup((char*)xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->name);
+    *cmd = cmd_hash_lookup((char *)xmlXPathNodeSetItem(xpathObj->nodesetval, 0)->name);
     /* change relative root to command's node */
     xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
     xmlXPathFreeObject(xpathObj);
@@ -2895,14 +2895,14 @@ static parser_status parse_command(
         {
             const xmlNodePtr ext_node = xmlXPathNodeSetItem(xpathObj->nodesetval, i);
             xpathCtx->node = ext_node;
-            const char* const ext_ns = (ext_node->ns) ? (char*)ext_node->ns->href : NULL;
+            const char *const ext_ns = (ext_node->ns) ? (char *)ext_node->ns->href : NULL;
             if (ext_ns == NULL)
             {
                 continue;
             }
             if (!strcmp(ext_ns, NS_ENUMVAL))
             {
-                const char* const ext_name = (char*)ext_node->name;
+                const char *const ext_name = (char *)ext_node->name;
                 if (!strcmp(ext_name, "create"))
                 {
                     parse_ext_enumval_create(pool, xpathCtx, cdata);
@@ -2925,7 +2925,7 @@ static parser_status parse_command(
             }
             else if (!strcmp(ext_ns, NS_EXTRAADDR))
             {
-                const char* const ext_name = (char*)ext_node->name;
+                const char *const ext_name = (char *)ext_node->name;
 
                 /* restore relative root */
                 xpathCtx->node = node;
@@ -2991,11 +2991,11 @@ static parser_status parse_command(
  * @return           Status.
  */
 static parser_status
-parse_extension(void* pool, epp_command_data* cdata, xmlXPathContextPtr xpathCtx)
+parse_extension(void *pool, epp_command_data *cdata, xmlXPathContextPtr xpathCtx)
 {
     xmlNodePtr node;
     int xerr, matched;
-    const char* elemname;
+    const char *elemname;
 
     RESET_XERR(xerr); /* clear value of errno */
     xpath_chroot(xpathCtx, "fred:extcommand", 0, &xerr);
@@ -3024,7 +3024,7 @@ parse_extension(void* pool, epp_command_data* cdata, xmlXPathContextPtr xpathCtx
     }
     assert(xerr == XERR_OK);
 
-    elemname = (char*)xpathCtx->node->name;
+    elemname = (char *)xpathCtx->node->name;
     matched = 0;
 
     switch (elemname[0])
@@ -3185,18 +3185,18 @@ parse_extension(void* pool, epp_command_data* cdata, xmlXPathContextPtr xpathCtx
 }
 
 parser_status epp_parse_command(
-        epp_context* epp_ctx, int loggedin, void* schema, const char* request, unsigned bytes,
-        epp_command_data** cdata_arg, epp_red_command_type* cmd_type)
+        epp_context *epp_ctx, int loggedin, void *schema, const char *request, unsigned bytes,
+        epp_command_data **cdata_arg, epp_red_command_type *cmd_type)
 {
     xmlXPathContextPtr xpathCtx;
     xmlXPathObjectPtr xpathObj;
-    xmlChar* dumpedXML;
+    xmlChar *dumpedXML;
     int dumpLength;
-    epp_command_data* cdata;
+    epp_command_data *cdata;
     valid_status val_ret;
     parser_status ret;
 
-    const char* elemname;
+    const char *elemname;
 
     /* check input parameters */
     assert(epp_ctx != NULL);
@@ -3204,7 +3204,7 @@ parser_status epp_parse_command(
     assert(bytes != 0);
 
     /* allocate cdata structure */
-    *cdata_arg = (epp_command_data*)epp_calloc(epp_ctx->pool, sizeof *cdata);
+    *cdata_arg = (epp_command_data *)epp_calloc(epp_ctx->pool, sizeof *cdata);
     if (*cdata_arg == NULL)
         return PARSER_EINTERNAL;
     cdata = *cdata_arg;
@@ -3292,7 +3292,7 @@ parser_status epp_parse_command(
     assert(xmlXPathNodeSetGetLength(xpathObj->nodesetval) == 1);
     xpathCtx->node = xmlXPathNodeSetItem(xpathObj->nodesetval, 0);
     xmlXPathFreeObject(xpathObj);
-    elemname = (char*)xpathCtx->node->name;
+    elemname = (char *)xpathCtx->node->name;
 
     /*
      * See what we have. <hello>, <command>, <extension> are admittable.

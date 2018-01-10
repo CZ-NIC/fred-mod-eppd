@@ -108,7 +108,7 @@
  * @}
  */
 
-gen_status epp_gen_greeting(void* pool, const char* svid, const char* date, char** greeting)
+gen_status epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting)
 {
     xmlBufferPtr buf;
     xmlTextWriterPtr writer;
@@ -151,8 +151,8 @@ gen_status epp_gen_greeting(void* pool, const char* svid, const char* date, char
     WRITE_ELEMENT(writer, greeting_err, "objURI", NS_KEYSET);
     START_ELEMENT(writer, greeting_err, "svcExtension");
     /* not yet
-	WRITE_ELEMENT(writer, greeting_err, "extURI", NS_SECDNS);
-	*/
+    WRITE_ELEMENT(writer, greeting_err, "extURI", NS_SECDNS);
+    */
     WRITE_ELEMENT(writer, greeting_err, "extURI", NS_ENUMVAL);
     END_ELEMENT(writer, greeting_err); /* svcExtension */
     END_ELEMENT(writer, greeting_err); /* svcMenu */
@@ -187,7 +187,7 @@ greeting_err:
     if (!error_seen)
     {
         /* successful end */
-        *greeting = epp_strdup(pool, (char*)buf->content);
+        *greeting = epp_strdup(pool, (char *)buf->content);
         xmlBufferFree(buf);
         return GEN_OK;
     }
@@ -206,9 +206,9 @@ greeting_err:
  * @param cdata    Data needed to generate XML.
  * @return         1 if OK, 0 in case of failure.
  */
-static char gen_info_contact(xmlTextWriterPtr writer, epp_command_data* cdata)
+static char gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
 {
-    epps_info_contact* info_contact;
+    epps_info_contact *info_contact;
 
     info_contact = cdata->data;
 
@@ -219,7 +219,7 @@ static char gen_info_contact(xmlTextWriterPtr writer, epp_command_data* cdata)
     WRITE_ELEMENT(writer, simple_err, "contact:roid", info_contact->roid);
     q_foreach(&info_contact->status)
     {
-        epp_status* status;
+        epp_status *status;
 
         status = q_content(&info_contact->status);
         START_ELEMENT(writer, simple_err, "contact:status");
@@ -359,7 +359,7 @@ simple_err:
  * @param cdata    Data needed to generate XML.
  * @return         1 if OK, 0 in case of failure.
  */
-static char gen_info_domain(xmlTextWriterPtr writer, epps_info_domain* info_domain)
+static char gen_info_domain(xmlTextWriterPtr writer, epps_info_domain *info_domain)
 {
     START_ELEMENT(writer, simple_err, "domain:infData");
     WRITE_ATTRIBUTE(writer, simple_err, "xmlns:domain", NS_DOMAIN);
@@ -368,7 +368,7 @@ static char gen_info_domain(xmlTextWriterPtr writer, epps_info_domain* info_doma
     WRITE_ELEMENT(writer, simple_err, "domain:roid", info_domain->roid);
     q_foreach(&info_domain->status)
     {
-        epp_status* status;
+        epp_status *status;
 
         status = q_content(&info_domain->status);
         START_ELEMENT(writer, simple_err, "domain:status");
@@ -411,7 +411,7 @@ simple_err:
  * @param cdata    Data needed to generate XML.
  * @return         1 if OK, 0 in case of failure.
  */
-static char gen_info_nsset(xmlTextWriterPtr writer, epps_info_nsset* info_nsset)
+static char gen_info_nsset(xmlTextWriterPtr writer, epps_info_nsset *info_nsset)
 {
     char level[3]; /* sufficient for reportlevel */
 
@@ -423,7 +423,7 @@ static char gen_info_nsset(xmlTextWriterPtr writer, epps_info_nsset* info_nsset)
     /* status flags */
     q_foreach(&info_nsset->status)
     {
-        epp_status* status;
+        epp_status *status;
 
         status = q_content(&info_nsset->status);
         START_ELEMENT(writer, simple_err, "nsset:status");
@@ -441,9 +441,9 @@ static char gen_info_nsset(xmlTextWriterPtr writer, epps_info_nsset* info_nsset)
     /* print nameservers */
     q_foreach(&info_nsset->ns)
     {
-        epp_ns* ns;
+        epp_ns *ns;
 
-        ns = (epp_ns*)q_content(&info_nsset->ns);
+        ns = (epp_ns *)q_content(&info_nsset->ns);
         START_ELEMENT(writer, simple_err, "nsset:ns");
         WRITE_ELEMENT(writer, simple_err, "nsset:name", ns->name);
         /* print addrs of nameserver */
@@ -475,7 +475,7 @@ simple_err:
  * @param cdata    Data needed to generate XML.
  * @return         1 if OK, 0 in case of failure.
  */
-static char gen_info_keyset(xmlTextWriterPtr writer, epps_info_keyset* info_keyset)
+static char gen_info_keyset(xmlTextWriterPtr writer, epps_info_keyset *info_keyset)
 {
     START_ELEMENT(writer, simple_err, "keyset:infData");
     WRITE_ATTRIBUTE(writer, simple_err, "xmlns:keyset", NS_KEYSET);
@@ -485,7 +485,7 @@ static char gen_info_keyset(xmlTextWriterPtr writer, epps_info_keyset* info_keys
     /* status flags */
     q_foreach(&info_keyset->status)
     {
-        epp_status* status;
+        epp_status *status;
 
         status = q_content(&info_keyset->status);
         START_ELEMENT(writer, simple_err, "keyset:status");
@@ -503,10 +503,10 @@ static char gen_info_keyset(xmlTextWriterPtr writer, epps_info_keyset* info_keys
     /* print dnskey records */
     q_foreach(&info_keyset->keys)
     {
-        epp_dnskey* key;
+        epp_dnskey *key;
         char str[10];
 
-        key = (epp_dnskey*)q_content(&info_keyset->keys);
+        key = (epp_dnskey *)q_content(&info_keyset->keys);
         START_ELEMENT(writer, simple_err, "keyset:dnskey");
 
         snprintf(str, 9, "%d", key->flags);
@@ -539,7 +539,7 @@ simple_err:
  * @param msgdata   Message data plus its type.
  * @return          1 if OK, 0 in case of failure.
  */
-static char gen_poll_message(xmlTextWriterPtr writer, epps_poll_req* msgdata)
+static char gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
 {
     switch (msgdata->type)
     {
@@ -659,7 +659,7 @@ static char gen_poll_message(xmlTextWriterPtr writer, epps_poll_req* msgdata)
             }
             q_foreach(&msgdata->msg.tc.tests)
             {
-                epp_testResult* tr = q_content(&msgdata->msg.tc.tests);
+                epp_testResult *tr = q_content(&msgdata->msg.tc.tests);
                 START_ELEMENT(writer, simple_err, "nsset:result");
                 WRITE_ELEMENT(writer, simple_err, "nsset:testname", tr->testname);
                 WRITE_ELEMENT(writer, simple_err, "nsset:status", (tr->status ? "true" : "false"));
@@ -778,9 +778,9 @@ simple_err:
  * @param cdata  Command data containing xpath context and parsed document.
  * @param e      Error specification.
  */
-static char* get_bad_xml(void* pool, epp_command_data* cdata, epp_error* e)
+static char *get_bad_xml(void *pool, epp_command_data *cdata, epp_error *e)
 {
-    char* loc_spec;
+    char *loc_spec;
 
     switch (e->spec)
     {
@@ -891,8 +891,8 @@ static char* get_bad_xml(void* pool, epp_command_data* cdata, epp_error* e)
 }
 
 gen_status epp_gen_response(
-        epp_context* epp_ctx, int validate, void* schema, epp_lang lang, epp_command_data* cdata,
-        char** response, qhead* valerr)
+        epp_context *epp_ctx, int validate, void *schema, epp_lang lang, epp_command_data *cdata,
+        char **response, qhead *valerr)
 {
     xmlTextWriterPtr writer;
     xmlBufferPtr buf;
@@ -941,9 +941,9 @@ gen_status epp_gen_response(
     END_ELEMENT(writer, simple_err); /* msg */
     q_foreach(&cdata->errors)
     {
-        epp_error* e;
+        epp_error *e;
 
-        e = (epp_error*)q_content(&cdata->errors);
+        e = (epp_error *)q_content(&cdata->errors);
         START_ELEMENT(writer, simple_err, "extValue");
         /*
          * we cannot use standard macro WRITE_ELEMENT because we want
@@ -968,7 +968,7 @@ gen_status epp_gen_response(
     /* print message queue data if command was poll_<something> */
     if (cdata->type == EPP_POLL_REQ)
     {
-        epps_poll_req* poll_req;
+        epps_poll_req *poll_req;
         char strbuf[25]; /* is enough number */
 
         poll_req = cdata->data;
@@ -988,7 +988,7 @@ gen_status epp_gen_response(
     }
     else if (cdata->type == EPP_POLL_ACK)
     {
-        epps_poll_ack* poll_ack;
+        epps_poll_ack *poll_ack;
         char strbuf[25]; /* is enough number */
 
         poll_ack = cdata->data;
@@ -1017,31 +1017,31 @@ gen_status epp_gen_response(
         {
             /* commands with no <resData> element */
             /*
-		case EPP_DUMMY:
-		case EPP_LOGIN:
-		case EPP_LOGOUT:
-		case EPP_POLL_ACK:
-		case EPP_POLL_REQ:
-		case EPP_DELETE_DOMAIN:
-		case EPP_DELETE_CONTACT:
-		case EPP_DELETE_NSSET:
-		case EPP_UPDATE_DOMAIN:
-		case EPP_UPDATE_CONTACT:
-		case EPP_UPDATE_NSSET:
-		case EPP_TRANSFER_DOMAIN:
-		case EPP_TRANSFER_CONTACT:
-		case EPP_TRANSFER_NSSET:
-		case EPP_SENDAUTHINFO_DOMAIN:
-		case EPP_SENDAUTHINFO_CONTACT:
-		case EPP_SENDAUTHINFO_NSSET:
-		case EPP_SENDAUTHINFO_KEYSET:
-		case EPP_TEST_NSSET:
-			break;
-		*/
+        case EPP_DUMMY:
+        case EPP_LOGIN:
+        case EPP_LOGOUT:
+        case EPP_POLL_ACK:
+        case EPP_POLL_REQ:
+        case EPP_DELETE_DOMAIN:
+        case EPP_DELETE_CONTACT:
+        case EPP_DELETE_NSSET:
+        case EPP_UPDATE_DOMAIN:
+        case EPP_UPDATE_CONTACT:
+        case EPP_UPDATE_NSSET:
+        case EPP_TRANSFER_DOMAIN:
+        case EPP_TRANSFER_CONTACT:
+        case EPP_TRANSFER_NSSET:
+        case EPP_SENDAUTHINFO_DOMAIN:
+        case EPP_SENDAUTHINFO_CONTACT:
+        case EPP_SENDAUTHINFO_NSSET:
+        case EPP_SENDAUTHINFO_KEYSET:
+        case EPP_TEST_NSSET:
+            break;
+        */
             /* query commands with <resData> element */
             case EPP_CHECK_DOMAIN:
             {
-                epps_check* check;
+                epps_check *check;
 
                 check = cdata->data;
                 START_ELEMENT(writer, simple_err, "domain:chkData");
@@ -1050,7 +1050,7 @@ gen_status epp_gen_response(
                 q_reset(&check->avails);
                 q_foreach(&check->ids)
                 {
-                    epp_avail* avail;
+                    epp_avail *avail;
 
                     avail = q_content(&check->avails);
                     START_ELEMENT(writer, simple_err, "domain:cd");
@@ -1077,7 +1077,7 @@ gen_status epp_gen_response(
             }
             case EPP_CHECK_CONTACT:
             {
-                epps_check* check;
+                epps_check *check;
 
                 check = cdata->data;
                 START_ELEMENT(writer, simple_err, "contact:chkData");
@@ -1086,7 +1086,7 @@ gen_status epp_gen_response(
                 q_reset(&check->avails);
                 q_foreach(&check->ids)
                 {
-                    epp_avail* avail;
+                    epp_avail *avail;
 
                     avail = q_content(&check->avails);
                     START_ELEMENT(writer, simple_err, "contact:cd");
@@ -1107,7 +1107,7 @@ gen_status epp_gen_response(
             }
             case EPP_CHECK_NSSET:
             {
-                epps_check* check;
+                epps_check *check;
 
                 check = cdata->data;
                 START_ELEMENT(writer, simple_err, "nsset:chkData");
@@ -1116,7 +1116,7 @@ gen_status epp_gen_response(
                 q_reset(&check->avails);
                 q_foreach(&check->ids)
                 {
-                    epp_avail* avail;
+                    epp_avail *avail;
 
                     avail = q_content(&check->avails);
                     START_ELEMENT(writer, simple_err, "nsset:cd");
@@ -1137,7 +1137,7 @@ gen_status epp_gen_response(
             }
             case EPP_CHECK_KEYSET:
             {
-                epps_check* check;
+                epps_check *check;
 
                 check = cdata->data;
                 START_ELEMENT(writer, simple_err, "keyset:chkData");
@@ -1146,7 +1146,7 @@ gen_status epp_gen_response(
                 q_reset(&check->avails);
                 q_foreach(&check->ids)
                 {
-                    epp_avail* avail;
+                    epp_avail *avail;
 
                     avail = q_content(&check->avails);
                     START_ELEMENT(writer, simple_err, "keyset:cd");
@@ -1166,7 +1166,7 @@ gen_status epp_gen_response(
                 break;
             }
             case EPP_INFO_DOMAIN:
-                if (!gen_info_domain(writer, (epps_info_domain*)cdata->data))
+                if (!gen_info_domain(writer, (epps_info_domain *)cdata->data))
                     goto simple_err;
                 break;
             case EPP_INFO_CONTACT:
@@ -1174,18 +1174,18 @@ gen_status epp_gen_response(
                     goto simple_err;
                 break;
             case EPP_INFO_NSSET:
-                if (!gen_info_nsset(writer, (epps_info_nsset*)cdata->data))
+                if (!gen_info_nsset(writer, (epps_info_nsset *)cdata->data))
                     goto simple_err;
                 break;
             case EPP_INFO_KEYSET:
-                if (!gen_info_keyset(writer, (epps_info_keyset*)cdata->data))
+                if (!gen_info_keyset(writer, (epps_info_keyset *)cdata->data))
                     goto simple_err;
                 break;
 
             /* transform commands with <resData> element */
             case EPP_CREATE_DOMAIN:
             {
-                epps_create_domain* create_domain;
+                epps_create_domain *create_domain;
 
                 create_domain = cdata->data;
                 START_ELEMENT(writer, simple_err, "domain:creData");
@@ -1199,7 +1199,7 @@ gen_status epp_gen_response(
             }
             case EPP_CREATE_CONTACT:
             {
-                epps_create_contact* create_contact;
+                epps_create_contact *create_contact;
 
                 create_contact = cdata->data;
                 START_ELEMENT(writer, simple_err, "contact:creData");
@@ -1212,7 +1212,7 @@ gen_status epp_gen_response(
             }
             case EPP_CREATE_NSSET:
             {
-                epps_create_nsset* create_nsset;
+                epps_create_nsset *create_nsset;
 
                 create_nsset = cdata->data;
                 START_ELEMENT(writer, simple_err, "nsset:creData");
@@ -1225,7 +1225,7 @@ gen_status epp_gen_response(
             }
             case EPP_CREATE_KEYSET:
             {
-                epps_create_keyset* create_keyset;
+                epps_create_keyset *create_keyset;
 
                 create_keyset = cdata->data;
                 START_ELEMENT(writer, simple_err, "keyset:creData");
@@ -1238,7 +1238,7 @@ gen_status epp_gen_response(
             }
             case EPP_RENEW_DOMAIN:
             {
-                epps_renew* renew;
+                epps_renew *renew;
 
                 renew = cdata->data;
                 START_ELEMENT(writer, simple_err, "domain:renData");
@@ -1251,7 +1251,7 @@ gen_status epp_gen_response(
             }
             case EPP_LIST_CONTACT:
             {
-                epps_list* list;
+                epps_list *list;
 
                 list = cdata->data;
                 START_ELEMENT(writer, simple_err, "contact:listData");
@@ -1266,7 +1266,7 @@ gen_status epp_gen_response(
             }
             case EPP_LIST_DOMAIN:
             {
-                epps_list* list;
+                epps_list *list;
 
                 list = cdata->data;
                 START_ELEMENT(writer, simple_err, "domain:listData");
@@ -1281,7 +1281,7 @@ gen_status epp_gen_response(
             }
             case EPP_LIST_NSSET:
             {
-                epps_list* list;
+                epps_list *list;
 
                 list = cdata->data;
                 START_ELEMENT(writer, simple_err, "nsset:listData");
@@ -1296,7 +1296,7 @@ gen_status epp_gen_response(
             }
             case EPP_LIST_KEYSET:
             {
-                epps_list* list;
+                epps_list *list;
 
                 list = cdata->data;
                 START_ELEMENT(writer, simple_err, "keyset:listData");
@@ -1311,7 +1311,7 @@ gen_status epp_gen_response(
             }
             case EPP_CREDITINFO:
             {
-                epps_creditInfo* creditInfo;
+                epps_creditInfo *creditInfo;
                 char credit[50];
 
                 creditInfo = cdata->data;
@@ -1320,7 +1320,7 @@ gen_status epp_gen_response(
                 WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_FRED);
                 q_foreach(&creditInfo->zonecredits)
                 {
-                    epp_zonecredit* zonecredit;
+                    epp_zonecredit *zonecredit;
 
                     START_ELEMENT(writer, simple_err, "fred:zoneCredit");
                     zonecredit = q_content(&creditInfo->zonecredits);
@@ -1342,7 +1342,7 @@ gen_status epp_gen_response(
             case EPP_INFO_KEYSETS_BY_CONTACT:
             case EPP_INFO_NSSETS_BY_NS:
             {
-                epps_info* info;
+                epps_info *info;
                 char infocount[20];
 
                 info = cdata->data;
@@ -1356,7 +1356,7 @@ gen_status epp_gen_response(
             }
             case EPP_INFO_GET_RESULTS:
             {
-                epps_list* list;
+                epps_list *list;
 
                 list = cdata->data;
                 START_ELEMENT(writer, simple_err, "fred:resultsList");
@@ -1378,14 +1378,14 @@ gen_status epp_gen_response(
         /* optional domain extensions */
         if (cdata->type == EPP_INFO_DOMAIN)
         {
-            epps_info_domain* info_domain;
+            epps_info_domain *info_domain;
             int print_ext;
 
             info_domain = cdata->data;
             print_ext = 0;
             q_foreach(&info_domain->extensions)
             {
-                epp_ext_item* ext_item;
+                epp_ext_item *ext_item;
 
                 if (!print_ext)
                 {
@@ -1425,12 +1425,12 @@ gen_status epp_gen_response(
         /* optional contact info extensions */
         if (cdata->type == EPP_INFO_CONTACT)
         {
-            epps_info_contact* info_contact = cdata->data;
+            epps_info_contact *info_contact = cdata->data;
             int print_ext = 0;
 
             q_foreach(&info_contact->extensions)
             {
-                epp_ext_item* ext_item = q_content(&info_contact->extensions);
+                epp_ext_item *ext_item = q_content(&info_contact->extensions);
 
                 if (!print_ext)
                 {
@@ -1551,7 +1551,7 @@ simple_err:
         return GEN_EBUILD;
     }
 
-    *response = epp_strdup(epp_ctx->pool, (char*)buf->content);
+    *response = epp_strdup(epp_ctx->pool, (char *)buf->content);
     xmlBufferFree(buf);
     if (*response == NULL)
     {

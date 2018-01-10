@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -56,7 +56,7 @@ typedef enum {
  * @param greeting Greeting string.
  * @return         Generator status.
  */
-gen_status epp_gen_greeting(void* pool, const char* svid, const char* date, char** greeting);
+gen_status epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting);
 
 /**
  * Generate command response in XML format.
@@ -74,8 +74,8 @@ gen_status epp_gen_greeting(void* pool, const char* svid, const char* date, char
  * @return         Generator status.
  */
 gen_status epp_gen_response(
-        epp_context* epp_ctx, int validate, void* schema, epp_lang lang, epp_command_data* cdata,
-        char** response, qhead* valerr);
+        epp_context *epp_ctx, int validate, void *schema, epp_lang lang, epp_command_data *cdata,
+        char **response, qhead *valerr);
 
 /**
  * Convenient wrapper around epp_gen_response for error cases.

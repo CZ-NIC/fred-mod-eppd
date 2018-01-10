@@ -1,4 +1,4 @@
-/*  
+/*
  *  Copyright (C) 2007  CZ.NIC, z.s.p.o.
  *
  *  This file is part of FRED.
@@ -79,7 +79,7 @@ typedef enum {
  * @param err_list Initialized and empty list for storing encountered errors.
  * @return         Status.
  */
-valid_status validate_doc(void* pool, xmlSchemaPtr schema, xmlDocPtr doc, qhead* err_list);
+valid_status validate_doc(void *pool, xmlSchemaPtr schema, xmlDocPtr doc, qhead *err_list);
 
 /**
  * Get subtree of XML document based on xpath expression.
@@ -94,6 +94,6 @@ valid_status validate_doc(void* pool, xmlSchemaPtr schema, xmlDocPtr doc, qhead*
  * @param position   Poradi elementu v mnozine pasujicich elementu.
  * @return           String with resulting subtree allocated from pool.
  */
-char* epp_getSubtree(void* pool, epp_command_data* cdata, const char* xpath_expr, int position);
+char *epp_getSubtree(void *pool, epp_command_data *cdata, const char *xpath_expr, int position);
 
 #endif /* EPP_XMLCOMMON_H */

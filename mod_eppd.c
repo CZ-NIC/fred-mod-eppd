@@ -134,7 +134,7 @@
 /**
  * Many errors in logging will be logged to epplog with this severity,
  * If logging is mandatory, it should be rised much higher than EPP_DEBUG
-*/
+ */
 #define EPP_LOGD_ERRLVL EPP_ERROR
 
 /**
@@ -145,14 +145,14 @@ module AP_MODULE_DECLARE_DATA eppd_module;
 /**
  * function for obtaining a reference to a CORBA object
  */
-static void* get_corba_service(epp_context* epp_ctx, char* name);
+static void *get_corba_service(epp_context *epp_ctx, char *name);
 
 
 /**
  * SSL variable lookup function pointer used for client's PEM encoded
  * certificate retrieval.
  */
-static APR_OPTIONAL_FN_TYPE(ssl_var_lookup)* epp_ssl_lookup = NULL;
+static APR_OPTIONAL_FN_TYPE(ssl_var_lookup) *epp_ssl_lookup = NULL;
 
 /**
  * Configuration structure of eppd module.
@@ -160,22 +160,22 @@ static APR_OPTIONAL_FN_TYPE(ssl_var_lookup)* epp_ssl_lookup = NULL;
 typedef struct
 {
     int epp_enabled; /**< Decides whether mod_eppd is enabled for host.*/
-    char* servername; /**< Epp server name used in <greeting> frame. */
-    char* ns_loc; /**< Location of CORBA nameservice. */
-    char* object; /**< Name under which the object is known. */
-    char* logger_object; /**< Name of fred-logd object */
+    char *servername; /**< Epp server name used in <greeting> frame. */
+    char *ns_loc; /**< Location of CORBA nameservice. */
+    char *object; /**< Name under which the object is known. */
+    char *logger_object; /**< Name of fred-logd object */
     int logd_mandatory; /**< Whether fred-logd failure is fatal to EPP */
-    void* schema; /**< URL of EPP schema (use just path). */
+    void *schema; /**< URL of EPP schema (use just path). */
     int valid_resp; /**< Validate response before sending it to client.*/
-    char* epplog; /**< Epp log filename. */
-    apr_file_t* epplogfp; /**< File descriptor of epp log file. */
+    char *epplog; /**< Epp log filename. */
+    apr_file_t *epplogfp; /**< File descriptor of epp log file. */
     epp_loglevel loglevel; /**< Epp log level. */
     int defer_err; /**< Time value for deferring error response. */
     int has_contact_mailing_address_extension; /**< Contacts feature mailing address extension. */
 } eppd_server_conf;
 
 /** Used for access serialization to epp log file. */
-static apr_global_mutex_t* epp_log_lock;
+static apr_global_mutex_t *epp_log_lock;
 
 #if AP_SERVER_MINORVERSION_NUMBER == 0
 /**
@@ -197,9 +197,9 @@ static apr_global_mutex_t* epp_log_lock;
  * @param size Size of chunk to allocate.
  * @return     Allocated chunk.
  */
-void* epp_malloc(void* pool, unsigned size)
+void *epp_malloc(void *pool, unsigned size)
 {
-    apr_pool_t* p = (apr_pool_t*)pool;
+    apr_pool_t *p = (apr_pool_t *)pool;
 
     return apr_palloc(p, size);
 }
@@ -215,9 +215,9 @@ void* epp_malloc(void* pool, unsigned size)
  * @param size Size of chunk to allocate.
  * @return     Allocated chunk.
  */
-void* epp_calloc(void* pool, unsigned size)
+void *epp_calloc(void *pool, unsigned size)
 {
-    apr_pool_t* p = (apr_pool_t*)pool;
+    apr_pool_t *p = (apr_pool_t *)pool;
 
     return apr_pcalloc(p, size);
 }
@@ -233,9 +233,9 @@ void* epp_calloc(void* pool, unsigned size)
  * @param str  String which is going to be duplicated.
  * @return     Duplicated string.
  */
-char* epp_strdup(void* pool, const char* str)
+char *epp_strdup(void *pool, const char *str)
 {
-    apr_pool_t* p = (apr_pool_t*)pool;
+    apr_pool_t *p = (apr_pool_t *)pool;
 
     return apr_pstrdup(p, str);
 }
@@ -251,9 +251,9 @@ char* epp_strdup(void* pool, const char* str)
  * @param str2 Second concatenated string.
  * @return     Duplicated string.
  */
-char* epp_strcat(void* pool, const char* str1, const char* str2)
+char *epp_strcat(void *pool, const char *str1, const char *str2)
 {
-    apr_pool_t* p = (apr_pool_t*)pool;
+    apr_pool_t *p = (apr_pool_t *)pool;
 
     return apr_pstrcat(p, str1, str2, NULL);
 }
@@ -268,11 +268,11 @@ char* epp_strcat(void* pool, const char* str1, const char* str2)
  * @param fmt  Format of string.
  * @return     Formatted string allocated from pool.
  */
-char* epp_sprintf(void* pool, const char* fmt, ...)
+char *epp_sprintf(void *pool, const char *fmt, ...)
 {
     va_list ap;
-    char* str;
-    apr_pool_t* p = (apr_pool_t*)pool;
+    char *str;
+    apr_pool_t *p = (apr_pool_t *)pool;
 
     va_start(ap, fmt);
     str = apr_pvsprintf(p, fmt, ap);
@@ -287,7 +287,7 @@ char* epp_sprintf(void* pool, const char* fmt, ...)
  * @param buf Buffer to print time into.
  * @param nbytes Size of the buffer.
  */
-static void current_logtime(char* buf, int nbytes)
+static void current_logtime(char *buf, int nbytes)
 {
     apr_time_exp_t t;
     apr_size_t len;
@@ -304,26 +304,26 @@ static void current_logtime(char* buf, int nbytes)
             t.tm_gmtoff % (60 * 60));
 }
 
-void epplog(epp_context* epp_ctx, epp_loglevel level, const char* fmt, ...)
+void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
 {
-    char* logline; /* the actual text written to log file */
-    char* text; /* log message as passed from client */
+    char *logline; /* the actual text written to log file */
+    char *text; /* log message as passed from client */
     char timestr[80]; /* buffer for timestamp */
     int i, session;
     va_list ap;
-    conn_rec* conn; /* apache connection struct pointer*/
-    apr_pool_t* pool; /* apache pool struct pointer */
-    const char* rhost; /* ip address of remote host */
+    conn_rec *conn; /* apache connection struct pointer*/
+    apr_pool_t *pool; /* apache pool struct pointer */
+    const char *rhost; /* ip address of remote host */
     apr_size_t nbytes; /* length of logline */
     apr_status_t rv;
-    eppd_server_conf* sc;
+    eppd_server_conf *sc;
 
     /* copy items from context struct to individual variables */
     conn = epp_ctx->conn;
     pool = epp_ctx->pool;
     session = epp_ctx->session;
     /* get module config */
-    sc = (eppd_server_conf*)ap_get_module_config(conn->base_server->module_config, &eppd_module);
+    sc = (eppd_server_conf *)ap_get_module_config(conn->base_server->module_config, &eppd_module);
 
     /* cancel out messages with lower priority than configured loglevel */
     if (level > sc->loglevel)
@@ -411,7 +411,7 @@ void epplog(epp_context* epp_ctx, epp_loglevel level, const char* fmt, ...)
  * @param cdata   Structure containing data to be freed.
  * @return        Always success.
  */
-static apr_status_t epp_cleanup_request(void* cdata)
+static apr_status_t epp_cleanup_request(void *cdata)
 {
     epp_parser_request_cleanup(cdata);
     return APR_SUCCESS;
@@ -428,16 +428,16 @@ static apr_status_t epp_cleanup_request(void* cdata)
  * @param bytes     Length of request (excluding header length).
  * @return          0 if successful, 1 if EOF was red and 2 when error occured.
  */
-static int epp_read_request(epp_context* epp_ctx, char** content, unsigned* bytes)
+static int epp_read_request(epp_context *epp_ctx, char **content, unsigned *bytes)
 {
-    char* buf; /* buffer for request */
+    char *buf; /* buffer for request */
     uint32_t hbo_size; /* size of request in host byte order */
     uint32_t nbo_size; /* size of request in network byte order */
     apr_status_t status;
     apr_size_t len;
-    apr_bucket_brigade* bb;
-    conn_rec* conn = epp_ctx->conn;
-    apr_pool_t* pool = epp_ctx->pool;
+    apr_bucket_brigade *bb;
+    conn_rec *conn = epp_ctx->conn;
+    apr_pool_t *pool = epp_ctx->pool;
 
     bb = apr_brigade_create(pool, conn->bucket_alloc);
 
@@ -499,7 +499,7 @@ static int epp_read_request(epp_context* epp_ctx, char** content, unsigned* byte
 
     /* beware of alignment issues - this should be safe */
     for (len = 0; len < EPP_HEADER_LENGTH; len++)
-        ((char*)&nbo_size)[len] = buf[len];
+        ((char *)&nbo_size)[len] = buf[len];
     hbo_size = ntohl(nbo_size);
 
     /* exclude header length */
@@ -562,7 +562,7 @@ static int epp_read_request(epp_context* epp_ctx, char** content, unsigned* byte
     }
     /* NULL terminate the request - needed for request logging */
     {
-        char* newcontent;
+        char *newcontent;
 
         newcontent = apr_palloc(pool, len + 1);
         if (newcontent == NULL)
@@ -597,10 +597,10 @@ static int epp_read_request(epp_context* epp_ctx, char** content, unsigned* byte
  * @param pem        PEM encoded certificate in its string representation.
  * @return           1 if successful and 0 when error occured.
  */
-static int get_md5(char* cert_md5, char* pem)
+static int get_md5(char *cert_md5, char *pem)
 {
-    X509* x; /* openssl's struture for representing x509 certificate */
-    BIO* bio; /* openssl's basic input/output stream */
+    X509 *x; /* openssl's struture for representing x509 certificate */
+    BIO *bio; /* openssl's basic input/output stream */
     int i;
     unsigned int len; /* length of fingerprint in binary form */
     unsigned char md5[20]; /* fingerprint in binary form */
@@ -662,14 +662,14 @@ static int get_md5(char* cert_md5, char* pem)
  * @return          0 in case of internal error, 1 if ok.
  */
 static int call_login(
-        epp_context* epp_ctx, service_EPP* service, epp_command_data* cdata,
-        unsigned long long* loginid, const ccReg_TID request_id, epp_lang* lang,
-        corba_status* cstat)
+        epp_context *epp_ctx, service_EPP *service, epp_command_data *cdata,
+        unsigned long long *loginid, const ccReg_TID request_id, epp_lang *lang,
+        corba_status *cstat)
 {
     char cert_md5[80]; /* should be enough for md5 hash of cert */
-    char* pem; /* pem encoded client's certificate */
-    conn_rec* conn; /* apache connection */
-    apr_pool_t* pool; /* memory pool */
+    char *pem; /* pem encoded client's certificate */
+    conn_rec *conn; /* apache connection */
+    apr_pool_t *pool; /* memory pool */
 
     conn = epp_ctx->conn;
     pool = epp_ctx->pool;
@@ -698,7 +698,7 @@ static int call_login(
      *     side of central repository. The identifing parameter
      *     is md5 digest of client's certificate.
      */
-     *cstat = epp_call_login(epp_ctx, service, loginid, request_id, lang, cert_md5, cdata);
+    *cstat = epp_call_login(epp_ctx, service, loginid, request_id, lang, cert_md5, cdata);
     return 1;
 }
 
@@ -708,18 +708,18 @@ static int call_login(
  * @param cdata  EPP data
  * @return       1 in case of extension is found, 0 otherwise
  */
-static int epp_request_contains_extra_addr_extension(epp_command_data* cdata)
+static int epp_request_contains_extra_addr_extension(epp_command_data *cdata)
 {
-    qhead* extension_list = NULL;
+    qhead *extension_list = NULL;
 
     if (cdata->type == EPP_CREATE_CONTACT)
     {
-        epps_create_contact* create_contact = cdata->data;
+        epps_create_contact *create_contact = cdata->data;
         extension_list = &create_contact->extensions;
     }
     else if (cdata->type == EPP_UPDATE_CONTACT)
     {
-        epps_update_contact* update_contact = cdata->data;
+        epps_update_contact *update_contact = cdata->data;
         extension_list = &update_contact->extensions;
     }
 
@@ -727,7 +727,7 @@ static int epp_request_contains_extra_addr_extension(epp_command_data* cdata)
     {
         q_foreach(extension_list)
         {
-            epp_ext_item* ext_item = q_content(extension_list);
+            epp_ext_item *ext_item = q_content(extension_list);
             if (ext_item->extType == EPP_EXT_MAILING_ADDR)
             {
                 return 1;
@@ -757,9 +757,9 @@ static int epp_request_contains_extra_addr_extension(epp_command_data* cdata)
  * @return          0 in case of internal error, 1 if ok.
  */
 static int call_corba(
-        epp_context* epp_ctx, service_EPP* service, service_Logger* service_log,
-        epp_command_data* cdata, parser_status pstat, unsigned long long* loginid,
-        ccReg_TID* const session_id, const ccReg_TID request_id, epp_lang* lang,
+        epp_context *epp_ctx, service_EPP *service, service_Logger *service_log,
+        epp_command_data *cdata, parser_status pstat, unsigned long long *loginid,
+        ccReg_TID *const session_id, const ccReg_TID request_id, epp_lang *lang,
         unsigned int logd_mandatory, int has_contact_mailing_address_extension)
 {
     corba_status cstat; /* ret code of corba component */
@@ -777,11 +777,11 @@ static int call_corba(
         // if logged in successfully and fred-logd service is available
         if (cstat == CORBA_OK)
         {
-            char* registrar_name;
+            char *registrar_name;
 
             if (service_log != NULL)
             {
-                registrar_name = ((epps_login*)cdata->data)->clID;
+                registrar_name = ((epps_login *)cdata->data)->clID;
                 log_cstat = epp_log_CreateSession(
                         epp_ctx, service_log, registrar_name, 0, session_id, errmsg);
             }
@@ -900,8 +900,8 @@ static int call_corba(
  * @return          0 in case of internal error, 1 if ok.
  */
 static int gen_response(
-        epp_context* epp_ctx, service_EPP* service, epp_command_data* cdata, int validate,
-        void* schema, epp_lang lang, char** response, gen_status* gstat, qhead* valerr)
+        epp_context *epp_ctx, service_EPP *service, epp_command_data *cdata, int validate,
+        void *schema, epp_lang lang, char **response, gen_status *gstat, qhead *valerr)
 {
 
     valerr->body = NULL;
@@ -951,7 +951,7 @@ static int gen_response(
             /* print more information about validation errors */
             q_foreach(valerr)
             {
-                epp_error* e = q_content(valerr);
+                epp_error *e = q_content(valerr);
 
                 epplog(epp_ctx, EPP_ERROR, "Element: %s", e->value);
                 epplog(epp_ctx, EPP_ERROR, "Reason: %s", e->reason);
@@ -971,23 +971,23 @@ static int gen_response(
 
 /** Read and process EPP requests waiting in the queue */
 static int epp_request_loop(
-        epp_context* epp_ctx, apr_bucket_brigade* bb, service_EPP* EPPservice,
-        service_Logger* logger_service, eppd_server_conf* sc, unsigned long long* login_id_save,
-        ccReg_TID* session_id_save)
+        epp_context *epp_ctx, apr_bucket_brigade *bb, service_EPP *EPPservice,
+        service_Logger *logger_service, eppd_server_conf *sc, unsigned long long *login_id_save,
+        ccReg_TID *session_id_save)
 {
     epp_lang lang; /* session's language */
-    apr_pool_t* rpool; /* connection memory pool */
+    apr_pool_t *rpool; /* connection memory pool */
     parser_status pstat; /* parser's return code */
     apr_status_t status; /* used to store rc of apr functions */
-    epp_command_data* cdata; /* command data structure */
+    epp_command_data *cdata; /* command data structure */
     epp_red_command_type cmd_type; /* command type determined by the parser */
     unsigned int bytes; /* length of request */
-    char* request; /* raw request read from socket */
-    char* response; /* generated XML answer to client */
+    char *request; /* raw request read from socket */
+    char *response; /* generated XML answer to client */
     int retval; /* return code of read_request */
     unsigned long long login_id; /* login id of client's session */
     ccReg_TID session_id; /* id for log_session table */
-    char* remote_ipaddr;
+    char *remote_ipaddr;
 
 
 #ifdef EPP_PERF
@@ -1019,7 +1019,7 @@ static int epp_request_loop(
         bzero(times, 5 * sizeof(times[0]));
 #endif
         /* allocate new pool for request */
-        apr_pool_create(&rpool, ((conn_rec*)epp_ctx->conn)->pool);
+        apr_pool_create(&rpool, ((conn_rec *)epp_ctx->conn)->pool);
         apr_pool_tag(rpool, "EPP_request");
         epp_ctx->pool = rpool;
         /* possible previous content is gone with request pool */
@@ -1083,7 +1083,7 @@ static int epp_request_loop(
          * parsed document tree and xpath context must be
          * explicitly released.
          */
-        apr_pool_cleanup_register(rpool, (void*)cdata, epp_cleanup_request, apr_pool_cleanup_null);
+        apr_pool_cleanup_register(rpool, (void *)cdata, epp_cleanup_request, apr_pool_cleanup_null);
 
         /* test if the failure is serious enough to close connection */
         if (pstat > PARSER_HELLO)
@@ -1132,7 +1132,7 @@ static int epp_request_loop(
         }
         else
         {
-            remote_ipaddr = client_ip((conn_rec*)epp_ctx->conn);
+            remote_ipaddr = client_ip((conn_rec *)epp_ctx->conn);
         }
 
         if (logger_service != NULL)
@@ -1171,8 +1171,8 @@ static int epp_request_loop(
         if (pstat == PARSER_HELLO)
         {
             int rc; /* corba ret code */
-            char* version; /* version of fred_rifd */
-            char* curdate; /* cur. date returned from fred_rifd */
+            char *version; /* version of fred_rifd */
+            char *curdate; /* cur. date returned from fred_rifd */
             gen_status gstat; /* generator's return code */
 
             /* get info from CR needed for <greeting> frame */
@@ -1249,26 +1249,26 @@ static int epp_request_loop(
             if (!sc->has_contact_mailing_address_extension &&
                 epp_request_contains_extra_addr_extension(cdata))
             {
-                /* request contains disabled extension so we return the most appropriate response code */
+                /* request contains disabled extension so we return the most appropriate response
+                 * code */
                 cdata->rc = 2103;
                 cdata->msg = epp_strdup(epp_ctx->pool, "Unimplemented extension");
                 cdata->svTRID = epp_strdup(epp_ctx->pool, "DUMMY-SVTRID");
                 cdata->noresdata = 1;
             }
             /* call function from corba backend */
-            else if (
-                    !call_corba(
-                            epp_ctx,
-                            EPPservice,
-                            logger_service,
-                            cdata,
-                            pstat,
-                            &login_id,
-                            &session_id,
-                            act_log_entry_id,
-                            &lang,
-                            sc->logd_mandatory,
-                            sc->has_contact_mailing_address_extension))
+            else if (!call_corba(
+                             epp_ctx,
+                             EPPservice,
+                             logger_service,
+                             cdata,
+                             pstat,
+                             &login_id,
+                             &session_id,
+                             act_log_entry_id,
+                             &lang,
+                             sc->logd_mandatory,
+                             sc->has_contact_mailing_address_extension))
             {
                 return HTTP_INTERNAL_SERVER_ERROR;
             }
@@ -1381,7 +1381,7 @@ static int epp_request_loop(
                (unsigned)(times[4] - times[3]), /* generator */
                (unsigned)(apr_time_now() - times[4])); /*send*/
 #endif
-        status = ap_fflush(((conn_rec*)epp_ctx->conn)->output_filters, bb);
+        status = ap_fflush(((conn_rec *)epp_ctx->conn)->output_filters, bb);
         if (status != APR_SUCCESS)
         {
             /* happens on every greeting when client just tests
@@ -1431,8 +1431,8 @@ static int epp_request_loop(
         /*XXX
          * if server is going down non-gracefully we will try to say
          * good-bye before we will be killed.
-		if (ap_graceful_stop_signalled()
-		 */
+        if (ap_graceful_stop_signalled()
+         */
 
         apr_pool_destroy(rpool);
     }
@@ -1445,13 +1445,13 @@ static int epp_request_loop(
  * @param epp_ctx   EPP context.
  * @param name  	Name of the service.
  */
-static void* get_corba_service(epp_context* epp_ctx, char* name)
+static void *get_corba_service(epp_context *epp_ctx, char *name)
 {
     int i;
-    apr_hash_t* references; /* directory of CORBA object references */
-    module* corba_module;
-    void* service;
-    conn_rec* c = (conn_rec*)epp_ctx->conn;
+    apr_hash_t *references; /* directory of CORBA object references */
+    module *corba_module;
+    void *service;
+    conn_rec *c = (conn_rec *)epp_ctx->conn;
 
     /*
      * get module structure for mod_corba, in order to retrieve service
@@ -1474,7 +1474,7 @@ static void* get_corba_service(epp_context* epp_ctx, char* name)
         return NULL;
     }
 
-    references = (apr_hash_t*)ap_get_module_config(c->conn_config, corba_module);
+    references = (apr_hash_t *)ap_get_module_config(c->conn_config, corba_module);
     if (references == NULL)
     {
         epplog(epp_ctx,
@@ -1484,7 +1484,7 @@ static void* get_corba_service(epp_context* epp_ctx, char* name)
         return NULL;
     }
 
-    service = (void*)apr_hash_get(references, name, strlen(name));
+    service = (void *)apr_hash_get(references, name, strlen(name));
     if (service == NULL)
     {
         epplog(epp_ctx,
@@ -1511,23 +1511,23 @@ static void* get_corba_service(epp_context* epp_ctx, char* name)
  * @param c   Incoming connection.
  * @return    Return code
  */
-static int epp_process_connection(conn_rec* c)
+static int epp_process_connection(conn_rec *c)
 {
     unsigned long long loginid; /* login id of client */
     ccReg_TID sessionid; /* session id from fred-logd */
     int rc; /* corba ret code */
     int ret; /* command loop return code */
-    char* version; /* version of fred_rifd */
-    char* curdate; /* cur. date returned from fred_rifd */
-    char* response; /* greeting response */
+    char *version; /* version of fred_rifd */
+    char *curdate; /* cur. date returned from fred_rifd */
+    char *response; /* greeting response */
     apr_status_t status; /* used to store rc of apr functions */
     gen_status gstat; /* generator's return code */
     epp_context epp_ctx; /* context (session , connection, pool) */
     service_EPP EPPservice; /* CORBA object reference for fred-rifd */
     service_Logger logger_service; /* CORBA object reference for fred-logd */
-    apr_bucket_brigade* bb;
-    server_rec* s = c->base_server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    apr_bucket_brigade *bb;
+    server_rec *s = c->base_server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
     /* do nothing if eppd is disabled */
     if (!sc->epp_enabled)
@@ -1692,7 +1692,7 @@ static int epp_process_connection(conn_rec* c)
  * @param bb   Bucket brigade containing a response.
  * @return     Return code of next filter in chain.
  */
-static apr_status_t epp_output_filter(ap_filter_t* f, apr_bucket_brigade* bb)
+static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
 {
     apr_bucket *b, *bnew;
     apr_size_t len;
@@ -1722,7 +1722,7 @@ static apr_status_t epp_output_filter(ap_filter_t* f, apr_bucket_brigade* bb)
     /* header size is included in total size */
     nbo_size = htonl(len + EPP_HEADER_LENGTH);
     /* create new bucket containing only length of request */
-    bnew = apr_bucket_heap_create((char*)&nbo_size, EPP_HEADER_LENGTH, NULL, f->c->bucket_alloc);
+    bnew = apr_bucket_heap_create((char *)&nbo_size, EPP_HEADER_LENGTH, NULL, f->c->bucket_alloc);
     /* insert the new bucket in front of the response */
     APR_BUCKET_INSERT_BEFORE(APR_BRIGADE_FIRST(bb), bnew);
 
@@ -1737,7 +1737,7 @@ static apr_status_t epp_output_filter(ap_filter_t* f, apr_bucket_brigade* bb)
  * @param p    Memory pool.
  * @param s    Server record.
  */
-static void epp_init_child_hook(apr_pool_t* p, server_rec* s)
+static void epp_init_child_hook(apr_pool_t *p, server_rec *s)
 {
     apr_status_t rv;
 
@@ -1760,7 +1760,7 @@ static void epp_init_child_hook(apr_pool_t* p, server_rec* s)
  * @param data   XML schema.
  * @return       Always success.
  */
-static apr_status_t epp_cleanup_xml(void* data)
+static apr_status_t epp_cleanup_xml(void *data)
 {
     epp_parser_init_cleanup(data);
     return APR_SUCCESS;
@@ -1777,10 +1777,10 @@ static apr_status_t epp_cleanup_xml(void* data)
  * @param s     Server record.
  * @return      Status.
  */
-static int epp_postconfig_hook(apr_pool_t* p, apr_pool_t* plog, apr_pool_t* ptemp, server_rec* s)
+static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
 {
     apr_status_t rv = 0;
-    eppd_server_conf* sc;
+    eppd_server_conf *sc;
 
     /*
      * during authentication of epp client we need to get value of a
@@ -1827,9 +1827,9 @@ static int epp_postconfig_hook(apr_pool_t* p, apr_pool_t* plog, apr_pool_t* ptem
      */
     while (s != NULL)
     {
-        char* fname;
+        char *fname;
 
-        sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+        sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
         if (sc->epp_enabled)
         {
@@ -1915,12 +1915,12 @@ static int epp_postconfig_hook(apr_pool_t* p, apr_pool_t* plog, apr_pool_t* ptem
  * @param flag     1 means EPPprotocol is turned on, 0 means turned off.
  * @return         Error string in case of failure otherwise NULL.
  */
-static const char* set_epp_protocol(cmd_parms* cmd, void* dummy, int flag)
+static const char *set_epp_protocol(cmd_parms *cmd, void *dummy, int flag)
 {
-    server_rec* s = cmd->server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
-    const char* err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    const char *err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err)
         return err;
 
@@ -1928,12 +1928,12 @@ static const char* set_epp_protocol(cmd_parms* cmd, void* dummy, int flag)
     return NULL;
 }
 
-static const char* set_epp_logd_mandatory(cmd_parms* cmd, void* dummy, int flag)
+static const char *set_epp_logd_mandatory(cmd_parms *cmd, void *dummy, int flag)
 {
-    server_rec* s = cmd->server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
-    const char* err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    const char *err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err)
         return err;
 
@@ -1951,11 +1951,11 @@ static const char* set_epp_logd_mandatory(cmd_parms* cmd, void* dummy, int flag)
  * @param obj_name  A name of object.
  * @return          Error string in case of failure otherwise NULL.
  */
-static const char* set_epp_object(cmd_parms* cmd, void* dummy, const char* obj_name)
+static const char *set_epp_object(cmd_parms *cmd, void *dummy, const char *obj_name)
 {
-    const char* err;
-    server_rec* s = cmd->server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    const char *err;
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
     err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err)
@@ -1991,11 +1991,11 @@ static const char* set_epp_object(cmd_parms* cmd, void* dummy, const char* obj_n
  * @param obj_name  A name of object.
  * @return          Error string in case of failure otherwise NULL.
  */
-static const char* set_logger_object(cmd_parms* cmd, void* dummy, const char* obj_name)
+static const char *set_logger_object(cmd_parms *cmd, void *dummy, const char *obj_name)
 {
-    const char* err;
-    server_rec* s = cmd->server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    const char *err;
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
     err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err)
@@ -2033,11 +2033,11 @@ static const char* set_logger_object(cmd_parms* cmd, void* dummy, const char* ob
  * @param schemaurl The file with xml schema of EPP protocol.
  * @return          Error string in case of failure otherwise NULL.
  */
-static const char* set_schema(cmd_parms* cmd, void* dummy, const char* schemaurl)
+static const char *set_schema(cmd_parms *cmd, void *dummy, const char *schemaurl)
 {
-    const char* err;
-    server_rec* s = cmd->server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    const char *err;
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
     err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err)
@@ -2088,11 +2088,11 @@ static const char* set_schema(cmd_parms* cmd, void* dummy, const char* schemaurl
  * @param a1      The file where log messages from mod_eppd should be logged.
  * @return        Error string in case of failure otherwise NULL.
  */
-static const char* set_epplog(cmd_parms* cmd, void* dummy, const char* a1)
+static const char *set_epplog(cmd_parms *cmd, void *dummy, const char *a1)
 {
-    const char* err;
-    server_rec* s = cmd->server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    const char *err;
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
     err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err)
@@ -2127,11 +2127,11 @@ static const char* set_epplog(cmd_parms* cmd, void* dummy, const char* a1)
  * @param a1      Loglevel is one of fatal, error, warning, info, debug.
  * @return        Error string in case of failure otherwise NULL.
  */
-static const char* set_loglevel(cmd_parms* cmd, void* dummy, const char* a1)
+static const char *set_loglevel(cmd_parms *cmd, void *dummy, const char *a1)
 {
-    const char* err;
-    server_rec* s = cmd->server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    const char *err;
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
     err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err)
@@ -2181,11 +2181,11 @@ static const char* set_loglevel(cmd_parms* cmd, void* dummy, const char* a1)
  * @param a1     Server name of length less than 30 characters.
  * @return       Error string in case of failure otherwise NULL.
  */
-static const char* set_servername(cmd_parms* cmd, void* dummy, const char* a1)
+static const char *set_servername(cmd_parms *cmd, void *dummy, const char *a1)
 {
-    const char* err;
-    server_rec* s = cmd->server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    const char *err;
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
     err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err)
@@ -2221,12 +2221,12 @@ static const char* set_servername(cmd_parms* cmd, void* dummy, const char* a1)
  * @param flag    1 if mod_eppd's responses should be validated, otherwise 0.
  * @return        Error string in case of failure otherwise NULL.
  */
-static const char* set_valid_resp(cmd_parms* cmd, void* dummy, int flag)
+static const char *set_valid_resp(cmd_parms *cmd, void *dummy, int flag)
 {
-    server_rec* s = cmd->server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
-    const char* err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    const char *err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err)
         return err;
 
@@ -2243,9 +2243,9 @@ static const char* set_valid_resp(cmd_parms* cmd, void* dummy, int flag)
  *                deferring error responses from CR
  * @return        Error string in case of failure otherwise NULL.
  */
-static const char* set_defer_errors(cmd_parms* cmd, void* dummy, const char* a1)
+static const char *set_defer_errors(cmd_parms *cmd, void *dummy, const char *a1)
 {
-    const char* err;
+    const char *err;
     int val;
 
     val = atoi(a1);
@@ -2253,8 +2253,8 @@ static const char* set_defer_errors(cmd_parms* cmd, void* dummy, const char* a1)
     if (val < DEFER_MIN || val > DEFER_MAX)
         return "Defer time for error responses out of range";
 
-    server_rec* s = cmd->server;
-    eppd_server_conf* sc = (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    server_rec *s = cmd->server;
+    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
     err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err)
@@ -2273,13 +2273,13 @@ static const char* set_defer_errors(cmd_parms* cmd, void* dummy, const char* a1)
  * @param flag    1 if contacts feature mailing address extension, otherwise 0.
  * @return        Error string in case of failure otherwise NULL.
  */
-static const char* set_contact_mailing_address_extension(cmd_parms* cmd, void* dummy, int flag)
+static const char *set_contact_mailing_address_extension(cmd_parms *cmd, void *dummy, int flag)
 {
-    server_rec* const s = cmd->server;
-    eppd_server_conf* const sc =
-            (eppd_server_conf*)ap_get_module_config(s->module_config, &eppd_module);
+    server_rec *const s = cmd->server;
+    eppd_server_conf *const sc =
+            (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
-    const char* const err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    const char *const err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
     if (err != NULL)
     {
         return err;
@@ -2339,20 +2339,20 @@ static const command_rec eppd_cmds[] = {
 /**
  * Initialization of of mod_eppd's configuration structure.
  */
-static void* create_eppd_config(apr_pool_t* p, server_rec* s)
+static void *create_eppd_config(apr_pool_t *p, server_rec *s)
 {
-    eppd_server_conf* const sc = (eppd_server_conf*)apr_pcalloc(p, sizeof(*sc));
+    eppd_server_conf *const sc = (eppd_server_conf *)apr_pcalloc(p, sizeof(*sc));
     sc->has_contact_mailing_address_extension =
-            0; //default value means that contacts do not feature mailing address extension
+            0; // default value means that contacts do not feature mailing address extension
     return sc;
 }
 
 /**
  * Registration of various hooks which the mod_eppd is interested in.
  */
-static void register_hooks(apr_pool_t* p)
+static void register_hooks(apr_pool_t *p)
 {
-    static const char* const aszPre[] = {"mod_corba.c", NULL};
+    static const char *const aszPre[] = {"mod_corba.c", NULL};
 
     ap_hook_child_init(epp_init_child_hook, NULL, NULL, APR_HOOK_MIDDLE);
     ap_hook_post_config(epp_postconfig_hook, NULL, NULL, APR_HOOK_MIDDLE);
