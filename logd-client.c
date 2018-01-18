@@ -1024,11 +1024,11 @@ static epp_action_type log_props_poll(ccReg_RequestProperties **c_props, epp_com
     }
 }
 
-static epp_log_operation_result push_mailing_addr_extension(ccReg_RequestProperties *c_props, const qitem *extension)
+static epp_log_operation_result push_mailing_addr_extension(ccReg_RequestProperties *c_props, qhead *extensions)
 {
-    for ( ;extension != NULL; extension = extension->next)
+    q_foreach(extensions)
     {
-        const epp_ext_item *const ext_item = (const epp_ext_item*)(extension->content);
+        const epp_ext_item *const ext_item = q_content(extensions);
         if ((ext_item->extType == EPP_EXT_MAILING_ADDR) &&
             (ext_item->ext.ext_mailing_addr.command == mailing_addr_set))
         {
@@ -1127,7 +1127,7 @@ static epp_action_type log_props_create(ccReg_RequestProperties **c_props, epp_c
             }
             PUSH_PROPERTY(*c_props, "notifyEmail", cc->notify_email);
 
-            push_mailing_addr_extension(*c_props, cc->extensions.cur);
+            push_mailing_addr_extension(*c_props, &cc->extensions);
             // COMMON
             break;
         case EPP_CREATE_DOMAIN:
@@ -1301,7 +1301,7 @@ static epp_action_type log_props_update(ccReg_RequestProperties **c_props, epp_c
 
             PUSH_PROPERTY(*c_props, "notifyEmail", uc->notify_email);
 
-            push_mailing_addr_extension(*c_props, uc->extensions.cur);
+            push_mailing_addr_extension(*c_props, &uc->extensions);
             // COMMON
             break;
         case EPP_UPDATE_DOMAIN:
