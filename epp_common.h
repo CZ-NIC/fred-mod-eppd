@@ -315,10 +315,8 @@ typedef struct
 /** Reset current item to the first one. */
 #define q_reset(_qhead) ((_qhead)->cur = (_qhead)->body)
 /**
- * Iterate through items in a list. cl advances each round to next item in
- * list, until the sentinel is encountered. Caller must be sure that the
- * list pointer is at the beginning when using this macro - use cl_reset
- * for that.
+ * Iterate through items in a list. At first, internal pointer is set to the list begining
+ * then it advances each round to the next item in a list, until the sentinel is encountered.
  */
 #define q_foreach(_qhead)                                                                          \
     for ((_qhead)->cur = (_qhead)->body; (_qhead)->cur != NULL; (_qhead)->cur = (_qhead)->cur->next)
