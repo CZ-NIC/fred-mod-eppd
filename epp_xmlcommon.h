@@ -25,6 +25,9 @@
 #ifndef EPP_XMLCOMMON_H
 #define EPP_XMLCOMMON_H
 
+#include <libxml/tree.h>
+#include <libxml/xmlschemas.h>
+
 /** Standard EPP xml namespace */
 #define NS_EPP "urn:ietf:params:xml:ns:epp-1.0"
 /** Our custom namespace used for contact object */

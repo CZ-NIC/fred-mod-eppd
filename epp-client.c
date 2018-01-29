@@ -1348,7 +1348,7 @@ static corba_status epp_call_info_domain(
     ccReg_EppParams *c_params = NULL;
     ccReg_Response *response;
     ccReg_Domain *c_domain;
-    int i, retr, cerrno;
+    int retr;
     epps_info_domain *info_domain;
 
     info_domain = cdata->data;
@@ -1539,7 +1539,7 @@ static corba_status epp_call_info_nsset(
     ccReg_NSSet *c_nsset;
     ccReg_Response *response;
     epps_info_nsset *info_nsset;
-    int i, retr, cerrno;
+    int retr;
 
     info_nsset = cdata->data;
     /*
@@ -1719,7 +1719,7 @@ static corba_status epp_call_info_keyset(
     ccReg_KeySet *c_keyset;
     ccReg_Response *response;
     epps_info_keyset *info_keyset;
-    int i, retr, cerrno;
+    int retr;
 
     info_keyset = cdata->data;
     /*
@@ -2583,7 +2583,7 @@ static corba_status epp_call_create_contact(
     assert(cdata->xml_in);
 
     /* fill in corba input values */
-    ccReg_ContactData *c_contact = ccReg_ContactChange__alloc();
+    ccReg_ContactData *const c_contact = ccReg_ContactData__alloc();
     if (c_contact == NULL)
     {
         return CORBA_INT_ERROR;

@@ -50,39 +50,46 @@
  * 	mod_eppd module can be found in README file.
  */
 
-#include "http_core.h"
-#include "http_log.h"
-#include "httpd.h"
-#include <unistd.h>
-#define CORE_PRIVATE
-#include "http_config.h"
-#include "http_connection.h" /* connection hooks */
-#undef CORE_PRIVATE
+#include "mod_eppd.h"
+
+/*
+ * our header files
+ */
+#include "epp-client.h"
+#include "epp_common.h"
+#include "epp_gen.h"
+#include "epp_parser.h"
+#include "logd-client.h"
+#include "xml-in-out-log.h"
+
+#include <http_core.h>
+#include <http_log.h>
+#include <httpd.h>
+#include <http_config.h>
+#include <http_connection.h> /* connection hooks */
+
+#include <mod_ssl.h> /* ssl_var_lookup */
 
 #define APR_WANT_BYTEFUNC
 #define APR_WANT_STRFUNC
-#include "apr_buckets.h"
-#include "apr_file_io.h"
-#include "apr_want.h" /* ntohl/htonl-like functions */
+#include <apr_buckets.h>
+#include <apr_file_io.h>
+#include <apr_want.h> /* ntohl/htonl-like functions */
 #ifndef APR_FOPEN_READ
 /** define which overcomes subtle difference between apache 2.0 and 2.2. */
 #define APR_FOPEN_READ APR_READ
 #endif
-#include "apr_general.h"
-#include "apr_global_mutex.h"
-#include "apr_hash.h"
-#include "apr_lib.h" /* apr_isdigit() */
-#include "apr_pools.h"
-#include "apr_strings.h"
-#include "apr_time.h"
+#include <apr_general.h>
+#include <apr_global_mutex.h>
+#include <apr_hash.h>
+#include <apr_lib.h> /* apr_isdigit() */
+#include <apr_pools.h>
+#include <apr_strings.h>
+#include <apr_time.h>
 
-#include "scoreboard.h"
-#include "util_filter.h"
-//#ifdef AP_NEED_SET_MUTEX_PERMS
-#include "unixd.h"
-//#endif
-
-#include "mod_ssl.h" /* ssl_var_lookup */
+#include <scoreboard.h>
+#include <util_filter.h>
+#include <unixd.h>
 
 /*
  * openssl header files
@@ -91,6 +98,12 @@
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
+
+#include <unistd.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 /*
  * apache 2.2 -> 2.4 changes
@@ -101,19 +114,6 @@
 #else
 #define client_ip(r) ((r)->remote_ip)
 #define ap_unixd_set_global_mutex_perms unixd_set_global_mutex_perms
-#endif
-
-/*
- * our header files
- */
-#include "epp-client.h"
-#include "epp_common.h"
-#include "epp_gen.h"
-#include "epp_parser.h"
-#include "logd-client.h"
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
 #endif
 
 /** Min and max time values (in msec) for deferring error responses  */
@@ -137,15 +137,200 @@
  */
 #define EPP_LOGD_ERRLVL EPP_ERROR
 
+
 /**
- * eppd_module declaration.
+ * Handler for apache's configuration directive "EPPxmlinoutlog".
+ *
+ * @param cmd     Command structure.
+ * @param dummy   Not used parameter.
+ * @param value   The file where received/sent xml requests/answers should be logged.
+ * @return        Error string in case of failure otherwise NULL.
  */
-module AP_MODULE_DECLARE_DATA eppd_module;
+static const char *set_xml_in_out_log(cmd_parms *cmd, void *dummy, const char *value)
+{
+    ap_log_error(
+            APLOG_MARK,
+            APLOG_DEBUG,
+            APR_SUCCESS,
+            (server_rec*)NULL,
+            "mod_eppd set XML in/out log called");
+    eppd_server_conf *const conf = (eppd_server_conf*)ap_get_module_config(cmd->server->module_config, &eppd_module);
+
+    const char *const err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    if (err != NULL)
+    {
+        return err;
+    }
+    const int first_definition_of_logfile = conf->xml_in_out_log_filename == NULL;
+    if (first_definition_of_logfile)
+    {
+        conf->xml_in_out_log_filename = ap_server_root_relative(cmd->pool, value);
+    }
+    else
+    {
+        ap_log_error(
+                APLOG_MARK,
+                APLOG_ERR,
+                0,
+                cmd->server,
+                "mod_eppd: multiple definition of xml_in_out_log "
+                "file. Only the first one will be accepted.");
+    }
+    return NULL;
+}
+
+static void xml_in_out_init_child_hook(apr_pool_t *p, server_rec *s)
+{
+    while (s != NULL)
+    {
+        const eppd_server_conf *const sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
+
+        if ((sc != NULL) &&
+            sc->epp_enabled &&
+            (sc->xml_in_out_log_filename != NULL) &&
+            (sc->xml_in_out_log_filename[0] != '\0'))
+        {
+            const apr_status_t rv = apr_global_mutex_child_init(
+                    &xml_in_out_log_mutex,
+                    sc->xml_in_out_log_filename,
+                    s->process->pool);
+            if (rv != APR_SUCCESS)
+            {
+                ap_log_error(
+                        APLOG_MARK,
+                        APLOG_CRIT,
+                        rv,
+                        s,
+                        "mod_eppd: could "
+                        "not init xml in/out log mutex in child");
+            }
+            else
+            {
+                ap_log_error(
+                        APLOG_MARK,
+                        APLOG_DEBUG,
+                        APR_SUCCESS,
+                        s,
+                        "mod_eppd: xml in/out log lock initialized in child");
+            }
+        }
+        s = s->next;
+    }
+}
+
+static apr_status_t init_global_mutex(apr_global_mutex_t **mutex, const char *name, server_rec *s, const char *key)
+{
+    if (mutex == NULL)
+    {
+        return APR_BADARG;
+    }
+    if (*mutex != NULL)
+    {
+        return APR_SUCCESS;
+    }
+    void *data = NULL;
+    apr_pool_userdata_get(&data, key, s->process->pool);
+    if (data != NULL)
+    {
+        *mutex = (apr_global_mutex_t *)data;
+        return APR_SUCCESS;
+    }
+    apr_status_t rv = apr_global_mutex_create(mutex, name, APR_LOCK_DEFAULT, s->process->pool);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s, "mod_eppd: could not create epp_log_lock");
+        return rv;
+    }
+    rv = ap_unixd_set_global_mutex_perms(*mutex);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_error(
+                APLOG_MARK,
+                APLOG_CRIT,
+                rv,
+                s,
+                "mod_eppd: Could not set permissions on epp_log_lock; check User and Group directives");
+        return rv;
+    }
+    rv = apr_pool_userdata_set((const void *)*mutex, key, apr_pool_cleanup_null, s->process->pool);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_error(
+                APLOG_MARK,
+                APLOG_CRIT,
+                rv,
+                s,
+                "mod_eppd: Could not store epp_log_lock");
+        return rv;
+    }
+    return APR_SUCCESS;
+}
+
+static int xml_in_out_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
+{
+    ap_log_error(
+            APLOG_MARK,
+            APLOG_DEBUG,
+            APR_SUCCESS,
+            s,
+            "mod_eppd XML in/out post config hook called");
+    while (s != NULL)
+    {
+        eppd_server_conf *const sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
+        if ((sc != NULL) &&
+            (sc->xml_in_out_log_filename != NULL) &&
+            (sc->xml_in_out_log_filename[0] != '\0') &&
+            (sc->xml_in_out_log_file == NULL))
+        {
+            ap_log_error(
+                    APLOG_MARK,
+                    APLOG_DEBUG,
+                    APR_SUCCESS,
+                    s,
+                    "mod_eppd XML in/out post config hook called with \"%s\"", sc->xml_in_out_log_filename);
+            const apr_status_t result_of_file_open = apr_file_open(
+                    &sc->xml_in_out_log_file,
+                    sc->xml_in_out_log_filename,
+                    (APR_WRITE | APR_APPEND | APR_CREATE),
+                    (APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD),
+                    p);
+            if (result_of_file_open != APR_SUCCESS)
+            {
+                ap_log_error(
+                        APLOG_MARK,
+                        APLOG_ERR,
+                        result_of_file_open,
+                        s,
+                        "mod_eppd: could not open xml in/out log file %s",
+                        sc->xml_in_out_log_filename);
+                return HTTP_INTERNAL_SERVER_ERROR;
+            }
+            const apr_status_t result_of_mutex_create = init_global_mutex(
+                    &xml_in_out_log_mutex,
+                    sc->xml_in_out_log_filename,
+                    s,
+                    "mod_eppd_xml_in_out_log_lock_key");
+
+            if (result_of_mutex_create != APR_SUCCESS)
+            {
+                ap_log_error(
+                        APLOG_MARK,
+                        APLOG_CRIT,
+                        result_of_mutex_create,
+                        s,
+                        "mod_eppd: could not create xml_in_out_log_mutex");
+                return HTTP_INTERNAL_SERVER_ERROR;
+            }
+        }
+        s = s->next;
+    }
+    return OK;
+}
 
 /**
  * function for obtaining a reference to a CORBA object
  */
-static void *get_corba_service(epp_context *epp_ctx, char *name);
+static void *get_corba_service(epp_context *epp_ctx, const char *name);
 
 
 /**
@@ -154,28 +339,8 @@ static void *get_corba_service(epp_context *epp_ctx, char *name);
  */
 static APR_OPTIONAL_FN_TYPE(ssl_var_lookup) *epp_ssl_lookup = NULL;
 
-/**
- * Configuration structure of eppd module.
- */
-typedef struct
-{
-    int epp_enabled; /**< Decides whether mod_eppd is enabled for host.*/
-    char *servername; /**< Epp server name used in <greeting> frame. */
-    char *ns_loc; /**< Location of CORBA nameservice. */
-    char *object; /**< Name under which the object is known. */
-    char *logger_object; /**< Name of fred-logd object */
-    int logd_mandatory; /**< Whether fred-logd failure is fatal to EPP */
-    void *schema; /**< URL of EPP schema (use just path). */
-    int valid_resp; /**< Validate response before sending it to client.*/
-    char *epplog; /**< Epp log filename. */
-    apr_file_t *epplogfp; /**< File descriptor of epp log file. */
-    epp_loglevel loglevel; /**< Epp log level. */
-    int defer_err; /**< Time value for deferring error response. */
-    int has_contact_mailing_address_extension; /**< Contacts feature mailing address extension. */
-} eppd_server_conf;
-
 /** Used for access serialization to epp log file. */
-static apr_global_mutex_t *epp_log_lock;
+static apr_global_mutex_t *epp_log_lock = NULL;
 
 #if AP_SERVER_MINORVERSION_NUMBER == 0
 /**
@@ -401,8 +566,6 @@ void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
         ap_log_cerror(
                 APLOG_MARK, APLOG_ERR, rv, conn, "apr_global_mutex_unlock(epp_log_lock) failed");
     }
-
-    return;
 }
 
 /**
@@ -580,7 +743,7 @@ static int epp_read_request(epp_context *epp_ctx, char **content, unsigned *byte
     }
 
     epplog(epp_ctx, EPP_DEBUG, "request received (length %u bytes)", hbo_size);
-    epplog(epp_ctx, EPP_DEBUG, "raw request content: %s", *content);
+    xml_in_out_log(epp_ctx, "raw request content:\n%s", *content);
 
     apr_brigade_destroy(bb);
     *bytes = (unsigned)len;
@@ -1051,9 +1214,12 @@ static int epp_request_loop(
                         epplog(epp_ctx, EPP_LOGD_ERRLVL, "Logd: Corba call failed");
                         break;
                     case CORBA_REMOTE_ERROR:
-                        epplog(epp_ctx,
-                               EPP_LOGD_ERRLVL,
-                               "Logd: Unqualified answer from CORBA server!");
+                        epplog(epp_ctx, EPP_LOGD_ERRLVL, "Logd: Unqualified answer from CORBA server!");
+                        break;
+                    case CORBA_INT_ERROR:
+                        epplog(epp_ctx, EPP_LOGD_ERRLVL, "Logd: Internal error on CORBA client side!");
+                        break;
+                    case CORBA_OK:
                         break;
                 }
             }
@@ -1358,7 +1524,7 @@ static int epp_request_loop(
 #endif
         /* send response back to client */
         apr_brigade_puts(bb, NULL, NULL, response);
-        epplog(epp_ctx, EPP_DEBUG, "Response content: %s", response);
+        xml_in_out_log(epp_ctx, "Response content:\n%s", response);
 #ifdef EPP_PERF
         /*
          * record perf data
@@ -1440,7 +1606,7 @@ static int epp_request_loop(
  * @param epp_ctx   EPP context.
  * @param name  	Name of the service.
  */
-static void *get_corba_service(epp_context *epp_ctx, char *name)
+static void *get_corba_service(epp_context *epp_ctx, const char *name)
 {
     int i;
     apr_hash_t *references; /* directory of CORBA object references */
@@ -1734,18 +1900,41 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
  */
 static void epp_init_child_hook(apr_pool_t *p, server_rec *s)
 {
-    apr_status_t rv;
+    ap_log_error(
+            APLOG_MARK,
+            APLOG_DEBUG,
+            APR_SUCCESS,
+            (server_rec*)NULL,
+            "mod_eppd init child hook called");
 
-    rv = apr_global_mutex_child_init(&epp_log_lock, NULL, p);
-    if (rv != APR_SUCCESS)
+    xml_in_out_init_child_hook(p, s);
+    while (s != NULL)
     {
-        ap_log_error(
-                APLOG_MARK,
-                APLOG_CRIT,
-                rv,
-                s,
-                "mod_eppd: could "
-                "not init epp log lock in child");
+        const eppd_server_conf *const sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
+
+        if ((sc != NULL) && sc->epp_enabled && (sc->epplog != NULL))
+        {
+            const apr_status_t rv = apr_global_mutex_child_init(&epp_log_lock, sc->epplog, s->process->pool);
+            if (rv != APR_SUCCESS)
+            {
+                ap_log_error(
+                        APLOG_MARK,
+                        APLOG_CRIT,
+                        rv,
+                        s,
+                        "mod_eppd: could not init epp log lock in child");
+            }
+            else
+            {
+                ap_log_error(
+                        APLOG_MARK,
+                        APLOG_DEBUG,
+                        APR_SUCCESS,
+                        s,
+                        "mod_eppd: log lock initialized in child");
+            }
+        }
+        s = s->next;
     }
 }
 
@@ -1774,8 +1963,12 @@ static apr_status_t epp_cleanup_xml(void *data)
  */
 static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
 {
-    apr_status_t rv = 0;
-    eppd_server_conf *sc;
+    ap_log_error(
+            APLOG_MARK,
+            APLOG_DEBUG,
+            APR_SUCCESS,
+            (server_rec*)NULL,
+            "mod_eppd post config hook called");
 
     /*
      * during authentication of epp client we need to get value of a
@@ -1787,34 +1980,24 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptem
         ap_log_error(
                 APLOG_MARK,
                 APLOG_CRIT,
-                rv,
+                APR_SUCCESS,
                 s,
                 "mod_eppd: could not retrieve ssl_var_lookup "
                 "function. Is mod_ssl loaded?");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    /* create the rewriting lockfiles in the parent */
-    if ((rv = apr_global_mutex_create(&epp_log_lock, NULL, APR_LOCK_DEFAULT, p)) != APR_SUCCESS)
-    {
-        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s, "mod_eppd: could not create epp_log_lock");
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    //#ifdef AP_NEED_SET_MUTEX_PERMS
-    rv = ap_unixd_set_global_mutex_perms(epp_log_lock);
+    apr_status_t rv = xml_in_out_postconfig_hook(p, plog, ptemp, s);
     if (rv != APR_SUCCESS)
     {
         ap_log_error(
                 APLOG_MARK,
-                APLOG_CRIT,
+                APLOG_ERR,
                 rv,
                 s,
-                "mod_eppd: Could not set permissions on "
-                "epp_log_lock; check User and Group directives");
+                "mod_eppd: xml in/out post config hook failed");
         return HTTP_INTERNAL_SERVER_ERROR;
     }
-    //#endif /* perms */
 
     /*
      * Iterate through available servers and if eppd is enabled
@@ -1822,11 +2005,9 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptem
      */
     while (s != NULL)
     {
-        char *fname;
+        eppd_server_conf *const sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
-        sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
-
-        if (sc->epp_enabled)
+        if ((sc != NULL) && (sc->epp_enabled))
         {
             if (sc->servername == NULL)
             {
@@ -1840,47 +2021,44 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptem
             }
             /* set default values for object lookup data */
             if (sc->object == NULL)
+            {
                 sc->object = apr_pstrdup(p, "EPP");
+            }
             /* set default loglevel */
             if (sc->loglevel == 0)
+            {
                 sc->loglevel = EPP_INFO;
-
-            if (sc->defer_err < DEFER_MIN || sc->defer_err > DEFER_MAX)
+            }
+            if ((sc->defer_err < DEFER_MIN) || (DEFER_MAX < sc->defer_err))
+            {
                 sc->defer_err = 0;
-
+            }
             /*
              * open epp log file (if configured to do so)
              */
-            if (sc->epplog && !sc->epplogfp)
+            if ((sc->epplog != NULL) && (sc->epplogfp == NULL))
             {
-                fname = ap_server_root_relative(p, sc->epplog);
-                if (!fname)
-                {
-                    ap_log_error(
-                            APLOG_MARK,
-                            APLOG_ERR,
-                            APR_EBADPATH,
-                            s,
-                            "mod_eppd: Invalid "
-                            "EPPlog path %s",
-                            sc->epplog);
-                    return HTTP_INTERNAL_SERVER_ERROR;
-                }
-                if ((rv = apr_file_open(
-                             &sc->epplogfp,
-                             fname,
-                             (APR_WRITE | APR_APPEND | APR_CREATE),
-                             (APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD),
-                             p)) != APR_SUCCESS)
+                rv = apr_file_open(
+                        &sc->epplogfp,
+                        sc->epplog,
+                        (APR_WRITE | APR_APPEND | APR_CREATE),
+                        (APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD),
+                        p);
+                if (rv != APR_SUCCESS)
                 {
                     ap_log_error(
                             APLOG_MARK,
                             APLOG_ERR,
                             rv,
                             s,
-                            "mod_eppd: could not open "
-                            "EPPlog file %s",
-                            fname);
+                            "mod_eppd: could not open EPPlog file %s",
+                            sc->epplog);
+                    return HTTP_INTERNAL_SERVER_ERROR;
+                }
+                rv = init_global_mutex(&epp_log_lock, sc->epplog, s, "mod_eppd_epp_log_lock_key");
+                if (rv != APR_SUCCESS)
+                {
+                    ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s, "mod_eppd: could not create epp_log_lock");
                     return HTTP_INTERNAL_SERVER_ERROR;
                 }
             }
@@ -2085,14 +2263,14 @@ static const char *set_schema(cmd_parms *cmd, void *dummy, const char *schemaurl
  */
 static const char *set_epplog(cmd_parms *cmd, void *dummy, const char *a1)
 {
-    const char *err;
-    server_rec *s = cmd->server;
-    eppd_server_conf *sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
+    server_rec *const s = cmd->server;
+    eppd_server_conf *const sc = (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
 
-    err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
-    if (err)
+    const char *const err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    if (err != NULL)
+    {
         return err;
-
+    }
     /*
      * catch double definition of iorfile
      * that's not serious fault so we will just print message in log
@@ -2109,7 +2287,7 @@ static const char *set_epplog(cmd_parms *cmd, void *dummy, const char *a1)
         return NULL;
     }
 
-    sc->epplog = apr_pstrdup(cmd->pool, a1);
+    sc->epplog = ap_server_root_relative(cmd->pool, a1);
 
     return NULL;
 }
@@ -2312,6 +2490,9 @@ static const command_rec eppd_cmds[] = {
                 "Set to on, to validate every outcomming response."
                 "This will slow down the server and should be used "
                 "only for debugging purposes."),
+        AP_INIT_TAKE1(
+                "EPPxmlinoutlog", set_xml_in_out_log, NULL, RSRC_CONF,
+                "The file where received/sent xml requests/answers should be logged"),
         AP_INIT_TAKE1(
                 "EPPobject", set_epp_object, NULL, RSRC_CONF,
                 "Alias under which is the reference to EPP object "

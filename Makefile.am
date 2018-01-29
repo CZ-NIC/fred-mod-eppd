@@ -62,11 +62,11 @@ libcorbalogger_la_LDFLAGS = ${ORBIT_LIBS}
 
 libxmleppd_la_SOURCES = epp_gen.c epp_gen.h epp_parser.c epp_parser.h \
                         epp_xmlcommon.c epp_xmlcommon.h 
-libxmleppd_la_CFLAGS  = ${XML_CPPFLAGS}
+libxmleppd_la_CFLAGS  = ${XML_CPPFLAGS} ${APACHE_CFLAGS}
 libxmleppd_la_LDFLAGS = ${XML_LIBS}
 
 libmodeppd_la_SOURCES = epp_common.c epp_common.h epp-client.c epp-client.h \
-    logd-client.c logd-client.h mod_eppd.c 
+    logd-client.c logd-client.h mod_eppd.c mod_eppd.h xml-in-out-log.c xml-in-out-log.h
 libmodeppd_la_CFLAGS  = ${INCL} -include EPP.h -include Logger.h \
     -include DateTime.h -include _dataTypes.h -include Registry.h -include Admin.h \
     -include Filters.h -include Whois.h
@@ -75,7 +75,7 @@ libmodeppd_la_LIBADD  = libcorbadatatypes.la libcorbaregistry.la \
     libxmleppd.la libcorbawhois.la
 
 epp_test_SOURCES      = epp_test.c
-epp_test_CFLAGS     = ${ORBIT_CFLAGS} 
+epp_test_CFLAGS       = ${ORBIT_CFLAGS} 
 epp_test_LDADD        = libmodeppd.la ${ORBIT_LIBS}
 
 if DX_COND_html
