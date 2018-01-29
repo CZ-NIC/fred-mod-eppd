@@ -86,8 +86,24 @@ void xml_in_out_log(epp_context *epp_ctx, const char *fmt, ...)
                 APLOG_MARK, APLOG_ERR, rv, conn, "apr_global_mutex_lock(xml_in_out_log_mutex) failed");
     }
 
-    apr_size_t nbytes = strlen(logline);
-    apr_file_write(sc->xml_in_out_log_file, logline, &nbytes);
+    const apr_size_t nbytes = strlen(logline);
+    apr_size_t wbytes = nbytes;
+    rv = apr_file_write(sc->xml_in_out_log_file, logline, &wbytes);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_cerror(
+                APLOG_MARK, APLOG_ERR, rv, conn, "apr_file_write() failed");
+    }
+    else if (wbytes != nbytes)
+    {
+        ap_log_cerror(
+                APLOG_MARK,
+                APLOG_NOTICE,
+                rv,
+                conn,
+                "apr_file_write() wrote %" APR_SIZE_T_FMT " bytes "
+                "instead of %" APR_SIZE_T_FMT, wbytes, nbytes);
+    }
 
     rv = apr_global_mutex_unlock(xml_in_out_log_mutex);
     if (rv != APR_SUCCESS)

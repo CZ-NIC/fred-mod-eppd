@@ -743,7 +743,7 @@ static int epp_read_request(epp_context *epp_ctx, char **content, unsigned *byte
     }
 
     epplog(epp_ctx, EPP_DEBUG, "request received (length %u bytes)", hbo_size);
-    xml_in_out_log(epp_ctx, "raw request content:\n%s", *content);
+    xml_in_out_log(epp_ctx, "raw request content:" APR_EOL_STR "%s", *content);
 
     apr_brigade_destroy(bb);
     *bytes = (unsigned)len;
@@ -1524,7 +1524,7 @@ static int epp_request_loop(
 #endif
         /* send response back to client */
         apr_brigade_puts(bb, NULL, NULL, response);
-        xml_in_out_log(epp_ctx, "Response content:\n%s", response);
+        xml_in_out_log(epp_ctx, "Response content:" APR_EOL_STR "%s", response);
 #ifdef EPP_PERF
         /*
          * record perf data

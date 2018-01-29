@@ -3234,7 +3234,7 @@ parser_status epp_parse_command(
     xmlFree(dumpedXML);
 
     xml_in_out_log(epp_ctx,
-           "Request content dumped in %s encoding:\n%s",
+           "Request content dumped in %s encoding:" APR_EOL_STR "%s",
            XML_IN_ENC,
            cdata->xml_in);
 
