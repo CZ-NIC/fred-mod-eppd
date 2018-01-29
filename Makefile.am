@@ -29,39 +29,39 @@ EXTRA_DIST = unconfig.h fred-mod-eppd.spec doxy.conf
 BUILT_SOURCES = DateTime-common.c _dataTypes-common.c Registry-common.c Whois-common.c \
     EPP-common.c Logger-common.c Filters-common.c Admin-common.c
 
-INCL       = ${APACHE_CFLAGS} ${APACHE_CPPFLAGS} ${ORBIT_CFLAGS} ${CPPFLAGS} 
+INCL       = ${APACHE_CFLAGS} ${APACHE_CPPFLAGS} ${ORBIT_CFLAGS} ${CPPFLAGS}
 AM_LDFLAGS = ${ORBIT_LIBS} ${LIBS} ${LDFLAGS}
 
-nodist_libcorbadatatypes_la_SOURCES = DateTime.h DateTime-common.c DateTime-stubs.c _dataTypes.h _dataTypes-common.c _dataTypes-stubs.c 
-libcorbadatatypes_la_CFLAGS  = ${ORBIT_CFLAGS} 
+nodist_libcorbadatatypes_la_SOURCES = DateTime.h DateTime-common.c DateTime-stubs.c _dataTypes.h _dataTypes-common.c _dataTypes-stubs.c
+libcorbadatatypes_la_CFLAGS  = ${ORBIT_CFLAGS}
 libcorbadatatypes_la_LDFLAGS = ${ORBIT_LIBS}
 
 nodist_libcorbaregistry_la_SOURCES = Registry.h Registry-common.c Registry-stubs.c
-libcorbaregistry_la_CFLAGS  = ${ORBIT_CFLAGS} 
+libcorbaregistry_la_CFLAGS  = ${ORBIT_CFLAGS}
 libcorbaregistry_la_LDFLAGS = ${ORBIT_LIBS}
 
-nodist_libcorbaadmin_la_SOURCES = Admin-common.c Admin-stubs.c Admin.h 
-libcorbaadmin_la_CFLAGS  = ${ORBIT_CFLAGS} 
+nodist_libcorbaadmin_la_SOURCES = Admin-common.c Admin-stubs.c Admin.h
+libcorbaadmin_la_CFLAGS  = ${ORBIT_CFLAGS}
 libcorbaadmin_la_LDFLAGS = ${ORBIT_LIBS}
 
-nodist_libcorbawhois_la_SOURCES = Whois-common.c Whois-stubs.c Whois.h 
-libcorbawhois_la_CFLAGS  = ${ORBIT_CFLAGS} 
+nodist_libcorbawhois_la_SOURCES = Whois-common.c Whois-stubs.c Whois.h
+libcorbawhois_la_CFLAGS  = ${ORBIT_CFLAGS}
 libcorbawhois_la_LDFLAGS = ${ORBIT_LIBS}
 
 nodist_libcorbafilters_la_SOURCES = Filters-common.c Filters-stubs.c Filters.h
-libcorbafilters_la_CFLAGS  = ${ORBIT_CFLAGS} 
+libcorbafilters_la_CFLAGS  = ${ORBIT_CFLAGS}
 libcorbafilters_la_LDFLAGS = ${ORBIT_LIBS}
 
-nodist_libcorbaepp_la_SOURCES = EPP-common.c EPP-stubs.c EPP.h 
-libcorbaepp_la_CFLAGS  = ${ORBIT_CFLAGS} 
+nodist_libcorbaepp_la_SOURCES = EPP-common.c EPP-stubs.c EPP.h
+libcorbaepp_la_CFLAGS  = ${ORBIT_CFLAGS}
 libcorbaepp_la_LDFLAGS = ${ORBIT_LIBS}
 
 nodist_libcorbalogger_la_SOURCES = Logger-common.c Logger-stubs.c Logger.h
-libcorbalogger_la_CFLAGS  = ${ORBIT_CFLAGS} 
+libcorbalogger_la_CFLAGS  = ${ORBIT_CFLAGS}
 libcorbalogger_la_LDFLAGS = ${ORBIT_LIBS}
 
 libxmleppd_la_SOURCES = epp_gen.c epp_gen.h epp_parser.c epp_parser.h \
-                        epp_xmlcommon.c epp_xmlcommon.h 
+                        epp_xmlcommon.c epp_xmlcommon.h
 libxmleppd_la_CFLAGS  = ${XML_CPPFLAGS} ${APACHE_CFLAGS}
 libxmleppd_la_LDFLAGS = ${XML_LIBS}
 
@@ -75,7 +75,7 @@ libmodeppd_la_LIBADD  = libcorbadatatypes.la libcorbaregistry.la \
     libxmleppd.la libcorbawhois.la
 
 epp_test_SOURCES      = epp_test.c
-epp_test_CFLAGS       = ${ORBIT_CFLAGS} 
+epp_test_CFLAGS       = ${ORBIT_CFLAGS}
 epp_test_LDADD        = libmodeppd.la ${ORBIT_LIBS}
 
 if DX_COND_html
@@ -96,7 +96,7 @@ mod_eppd.la: libmodeppd.la
 
 DateTime-common.c : $(IDLDIR)/DateTime.idl
 	$(ORBIT_IDL) --onlytop --noskels $(IDLDIR)/DateTime.idl
-	
+
 _dataTypes-common.c : $(IDLDIR)/_dataTypes.idl
 	$(ORBIT_IDL) --onlytop --noskels $(IDLDIR)/_dataTypes.idl
 
@@ -114,6 +114,6 @@ Admin-common.c : $(IDLDIR)/Admin.idl
 
 Filters-common.c : $(IDLDIR)/Filters.idl
 	$(ORBIT_IDL) --onlytop --noskels $(IDLDIR)/Filters.idl
-	
+
 Whois-common.c : $(IDLDIR)/Whois.idl
 	$(ORBIT_IDL) --onlytop --noskels $(IDLDIR)/Whois.idl
