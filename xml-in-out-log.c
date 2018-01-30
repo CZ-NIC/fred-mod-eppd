@@ -17,6 +17,7 @@
  */
 
 #include "xml-in-out-log.h"
+#include "xml-in-out-log-details.h"
 #include "mod_eppd.h"
 
 #include <http_core.h>
@@ -29,8 +30,6 @@
 
 #include <stdarg.h>
 #include <unistd.h>
-
-apr_global_mutex_t *xml_in_out_log_mutex = NULL;
 
 void xml_in_out_log(epp_context *epp_ctx, const char *fmt, ...)
 {

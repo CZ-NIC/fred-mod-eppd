@@ -61,6 +61,7 @@
 #include "epp_parser.h"
 #include "logd-client.h"
 #include "xml-in-out-log.h"
+#include "xml-in-out-log-details.h"
 
 #include <http_core.h>
 #include <http_log.h>

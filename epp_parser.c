@@ -35,6 +35,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <apr.h>
+
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xmlmemory.h>

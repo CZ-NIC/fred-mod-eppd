@@ -66,7 +66,8 @@ libxmleppd_la_CFLAGS  = ${XML_CPPFLAGS} ${APACHE_CFLAGS}
 libxmleppd_la_LDFLAGS = ${XML_LIBS}
 
 libmodeppd_la_SOURCES = epp_common.c epp_common.h epp-client.c epp-client.h \
-    logd-client.c logd-client.h mod_eppd.c mod_eppd.h xml-in-out-log.c xml-in-out-log.h
+    logd-client.c logd-client.h mod_eppd.c mod_eppd.h xml-in-out-log.c xml-in-out-log.h \
+    xml-in-out-log-details.c xml-in-out-log-details.h
 libmodeppd_la_CFLAGS  = ${INCL} -include EPP.h -include Logger.h \
     -include DateTime.h -include _dataTypes.h -include Registry.h -include Admin.h \
     -include Filters.h -include Whois.h
