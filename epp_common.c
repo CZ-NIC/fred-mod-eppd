@@ -21,11 +21,11 @@
  * Function definitions shared by all components of mod_eppd are here.
  */
 
+#include "epp_common.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-
-#include "epp_common.h"
 
 int q_add(void *pool, qhead *head, void *data)
 {

@@ -1312,7 +1312,6 @@ gen_status epp_gen_response(
             case EPP_CREDITINFO:
             {
                 epps_creditInfo *creditInfo;
-                char credit[50];
 
                 creditInfo = cdata->data;
                 START_ELEMENT(writer, simple_err, "fred:resCreditInfo");

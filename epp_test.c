@@ -16,22 +16,20 @@
  *  along with FRED.  If not, see <http://www.gnu.org/licenses/>.
  */
 #define _GNU_SOURCE
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include <ORBitservices/CosNaming.h>
-#include <orbit/orbit.h>
-
+#include "EPP.h"
 #include "epp-client.h"
 #include "epp_common.h"
 #include "epp_gen.h"
 #include "epp_parser.h"
 
-#include "EPP.h"
-#include "epp-client.h"
-#include "epp_common.h"
+#include <ORBitservices/CosNaming.h>
+#include <orbit/orbit.h>
+
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define MAX_LENGTH 10000
 #define MAX_FILE_NAME 256
@@ -209,6 +207,15 @@ char *epp_sprintf(void *pool, const char *fmt, ...)
 }
 
 void epplog(epp_context *epp_ctx, epp_loglevel level, const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+}
+
+void xml_in_out_log(epp_context *epp_ctx, const char *fmt, ...)
 {
     va_list ap;
 

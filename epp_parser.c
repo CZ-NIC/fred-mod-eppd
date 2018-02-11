@@ -25,10 +25,17 @@
  * structure. Currently the component is based on libxml library.
  */
 
+#include "epp_common.h"
+#include "epp_parser.h"
+#include "epp_xmlcommon.h"
+#include "xml-in-out-log.h"
+
 #include <assert.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <apr.h>
 
 #include <libxml/parser.h>
 #include <libxml/tree.h>
@@ -36,10 +43,6 @@
 #include <libxml/xmlschemas.h>
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
-
-#include "epp_common.h"
-#include "epp_parser.h"
-#include "epp_xmlcommon.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -3232,9 +3235,8 @@ parser_status epp_parse_command(
     cdata->xml_in[dumpLength] = '\0';
     xmlFree(dumpedXML);
 
-    epplog(epp_ctx,
-           EPP_DEBUG,
-           "Request content dumped in %s encoding: %s",
+    xml_in_out_log(epp_ctx,
+           "Request content dumped in %s encoding:" APR_EOL_STR "%s",
            XML_IN_ENC,
            cdata->xml_in);
 
