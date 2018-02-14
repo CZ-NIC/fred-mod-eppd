@@ -1,3 +1,7 @@
+2018-02-14 (2.17.0)
+
+    * Separate configurable log file for epp (xml) requests and responses
+
 2018-01-08 Michal Strnad (2.16.0)
 
     * Hide registrars plaintext passwords
