@@ -159,7 +159,7 @@ gen_status epp_gen_greeting(void *pool, const char *svid, const char *date, char
     /* dcp part */
     START_ELEMENT(writer, greeting_err, "dcp");
     START_ELEMENT(writer, greeting_err, "access");
-    START_ELEMENT(writer, greeting_err, "all");
+    START_ELEMENT(writer, greeting_err, "none");
     END_ELEMENT(writer, greeting_err);
     END_ELEMENT(writer, greeting_err);
     START_ELEMENT(writer, greeting_err, "statement");
