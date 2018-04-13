@@ -1106,7 +1106,7 @@ static corba_status epp_call_info_contact(
     }
     /* disclose info */
 
-    c_contact->DiscloseFlag = convDisclBack(info_contact->discl.flag);
+    info_contact->discl.flag = convDisclBack(c_contact->DiscloseFlag);
 
     /* init discl values only if there is exceptional behaviour */
     if (info_contact->discl.flag != -1)
