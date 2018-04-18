@@ -269,17 +269,21 @@ static char gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
          * for info contact operation (infupdDiscloseType). If module included
          * them in output, xml response would not be valid.
          *
+         */
+#ifdef DO_OUTPUT_NAME_DISCLOSE
         if (info_contact->discl.name)
         {
             START_ELEMENT(writer, simple_err, "contact:name");
             END_ELEMENT(writer, simple_err);
         }
+#endif
+#ifdef DO_OUTPUT_ORG_DISCLOSE
         if (info_contact->discl.org)
         {
             START_ELEMENT(writer, simple_err, "contact:org");
             END_ELEMENT(writer, simple_err);
         }
-        */
+#endif
         if (info_contact->discl.addr)
         {
             START_ELEMENT(writer, simple_err, "contact:addr");
