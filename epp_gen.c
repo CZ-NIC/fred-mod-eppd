@@ -266,8 +266,8 @@ static char gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
          * is set to hide)
          *
          * Also note that name and org are not specified in xml schema type
-         * for info contact operation (infupdDiscloseType). If module would included
-         * them in output, xml response would have been valid.
+         * for info contact operation (infupdDiscloseType). If module included
+         * them in output, xml response would not be valid.
          *
         if (info_contact->discl.name)
         {
