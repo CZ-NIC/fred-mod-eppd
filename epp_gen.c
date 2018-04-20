@@ -159,7 +159,7 @@ gen_status epp_gen_greeting(void *pool, const char *svid, const char *date, char
     /* dcp part */
     START_ELEMENT(writer, greeting_err, "dcp");
     START_ELEMENT(writer, greeting_err, "access");
-    START_ELEMENT(writer, greeting_err, "all");
+    START_ELEMENT(writer, greeting_err, "none");
     END_ELEMENT(writer, greeting_err);
     END_ELEMENT(writer, greeting_err);
     START_ELEMENT(writer, greeting_err, "statement");
@@ -260,16 +260,30 @@ static char gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
             WRITE_ATTRIBUTE(writer, simple_err, "flag", "0");
         else
             WRITE_ATTRIBUTE(writer, simple_err, "flag", "1");
+        /*
+         * Discloseflags for name and organization cannot be changed by registrars
+         * so we don't output them (this is issue only when server default policy
+         * is set to hide)
+         *
+         * Also note that name and org are not specified in xml schema type
+         * for info contact operation (infupdDiscloseType). If module included
+         * them in output, xml response would not be valid.
+         *
+         */
+#ifdef DO_OUTPUT_NAME_DISCLOSE
         if (info_contact->discl.name)
         {
             START_ELEMENT(writer, simple_err, "contact:name");
             END_ELEMENT(writer, simple_err);
         }
+#endif
+#ifdef DO_OUTPUT_ORG_DISCLOSE
         if (info_contact->discl.org)
         {
             START_ELEMENT(writer, simple_err, "contact:org");
             END_ELEMENT(writer, simple_err);
         }
+#endif
         if (info_contact->discl.addr)
         {
             START_ELEMENT(writer, simple_err, "contact:addr");
