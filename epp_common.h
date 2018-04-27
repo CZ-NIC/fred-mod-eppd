@@ -500,6 +500,7 @@ typedef enum {
     pt_delete_domain, /**< Domain was deleted. */
     pt_lowcredit, /**< Credit of registrator is low. */
     pt_request_fee_info, /**< Requests price/count info */
+    pt_update_contact, /**< Contact changed */
     pt_update_domain, /**< Domain changed */
     pt_update_nsset, /**< NSSet changed */
     pt_update_keyset /**< KeySet changed */
@@ -661,6 +662,13 @@ typedef struct
             unsigned long long used_count;
             char *price;
         } rfi; /**< Request fee info structure */
+        struct
+        {
+            char *optrid;
+            unsigned long long pollid;
+            epps_info_contact old_data;
+            epps_info_contact new_data;
+        } upc; /**< Update contact info */
         struct
         {
             char *optrid;

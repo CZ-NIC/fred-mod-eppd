@@ -203,15 +203,11 @@ greeting_err:
  * xml subtree.
  *
  * @param writer   XML writer.
- * @param cdata    Data needed to generate XML.
+ * @param info_contact    Data needed to generate XML.
  * @return         1 if OK, 0 in case of failure.
  */
-static char gen_info_contact(xmlTextWriterPtr writer, epp_command_data *cdata)
+static char gen_info_contact(xmlTextWriterPtr writer, epps_info_contact *info_contact)
 {
-    epps_info_contact *info_contact;
-
-    info_contact = cdata->data;
-
     START_ELEMENT(writer, simple_err, "contact:infData");
     WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
     WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
@@ -370,7 +366,7 @@ simple_err:
  * xml subtree.
  *
  * @param writer   XML writer.
- * @param cdata    Data needed to generate XML.
+ * @param info_domain    Data needed to generate XML.
  * @return         1 if OK, 0 in case of failure.
  */
 static char gen_info_domain(xmlTextWriterPtr writer, epps_info_domain *info_domain)
@@ -422,7 +418,7 @@ simple_err:
  * xml subtree.
  *
  * @param writer   XML writer.
- * @param cdata    Data needed to generate XML.
+ * @param info_nsset    Data needed to generate XML.
  * @return         1 if OK, 0 in case of failure.
  */
 static char gen_info_nsset(xmlTextWriterPtr writer, epps_info_nsset *info_nsset)
@@ -486,7 +482,7 @@ simple_err:
  * xml subtree.
  *
  * @param writer   XML writer.
- * @param cdata    Data needed to generate XML.
+ * @param info_keyset    Data needed to generate XML.
  * @return         1 if OK, 0 in case of failure.
  */
 static char gen_info_keyset(xmlTextWriterPtr writer, epps_info_keyset *info_keyset)
@@ -720,6 +716,23 @@ static char gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
             snprintf(number, 49, "%llu", msgdata->msg.rfi.used_count);
             WRITE_ELEMENT(writer, simple_err, "fred:usedCount", number);
             WRITE_ELEMENT(writer, simple_err, "fred:price", msgdata->msg.rfi.price);
+            END_ELEMENT(writer, simple_err);
+            break;
+        }
+        case pt_update_contact:
+        {
+            START_ELEMENT(writer, simple_err, "contact:updateData");
+            WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
+            WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
+            WRITE_ELEMENT(writer, simple_err, "contact:opTRID", msgdata->msg.upc.optrid);
+            START_ELEMENT(writer, simple_err, "contact:oldData");
+            if (!gen_info_contact(writer, &msgdata->msg.upc.old_data))
+                goto simple_err;
+            END_ELEMENT(writer, simple_err);
+            START_ELEMENT(writer, simple_err, "contact:newData");
+            if (!gen_info_contact(writer, &msgdata->msg.upc.new_data))
+                goto simple_err;
+            END_ELEMENT(writer, simple_err);
             END_ELEMENT(writer, simple_err);
             break;
         }
@@ -1184,7 +1197,7 @@ gen_status epp_gen_response(
                     goto simple_err;
                 break;
             case EPP_INFO_CONTACT:
-                if (!gen_info_contact(writer, cdata))
+                if (!gen_info_contact(writer, (epps_info_contact *)cdata->data))
                     goto simple_err;
                 break;
             case EPP_INFO_NSSET:
