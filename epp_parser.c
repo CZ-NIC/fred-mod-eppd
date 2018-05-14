@@ -1683,6 +1683,8 @@ static void parse_update_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
     {
         /* there is nothing more to parse */
         cdata->type = EPP_UPDATE_CONTACT;
+        /* flag must be initialized to 'empty' value */
+        update_contact->discl.flag = -1;
         return;
     }
 

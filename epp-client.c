@@ -922,68 +922,19 @@ static corba_status epp_call_check(
 }
 
 /**
- * EPP info contact.
+ * Helper function for copy contact data from corba to internal structure
  *
- * @param epp_ctx Epp context.
- * @param service EPP service.
- * @param loginid Session identifier.
- * @param request_id  fred-logd request ID
- * @param has_contact_mailing_address_extension has to return information about mailing address of
- * contact
- * @param cdata   Data from xml request.
- * @return        Status.
+ * @param epp_ctx     Epp context
+ * @param info_contact Destination contact data structure
+ * @param c_contact    Source contact data structure
+ * @param ev          Corba exception
+ *
  */
-static corba_status epp_call_info_contact(
-        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, int has_contact_mailing_address_extension,
-        epp_command_data *cdata)
+int info_contact_data_copy(
+        epp_context *epp_ctx, epps_info_contact *info_contact, ccReg_Contact *c_contact, int has_contact_mailing_address_extension,
+        CORBA_Environment *ev)
 {
-    CORBA_Environment ev[1];
-    ccReg_EppParams *c_params = NULL;
-    ccReg_Contact *c_contact;
-    ccReg_Response *response;
-    int i, retr, cerrno;
-    epps_info_contact *info_contact;
-
-    info_contact = cdata->data;
-    /*
-     * Input parameters:
-     *    id (a)
-     *    loginid
-     *    c_clTRID (*)
-     *    xml_in (a)
-     * Output parameters:
-     *    c_contact (*)
-     */
-    assert(cdata->xml_in);
-    assert(info_contact->id);
-
-    c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
-    if (c_params == NULL)
-    {
-        return CORBA_INT_ERROR;
-    }
-
-    for (retr = 0; retr < MAX_RETRIES; retr++)
-    {
-        if (retr != 0)
-            CORBA_exception_free(ev);
-        CORBA_exception_init(ev);
-
-        /* get information about contact from central repository */
-        response = ccReg_EPP_ContactInfo(
-                (ccReg_EPP)service, info_contact->id, &c_contact, c_params, ev);
-
-        /* if COMM_FAILURE exception is not raised quit retry loop */
-        if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
-            break;
-        usleep(RETR_SLEEP);
-    }
-    CORBA_free(c_params);
-
-    /* if it is exception then return */
-    if (raised_exception(ev))
-        return handle_exception(epp_ctx, cdata, ev);
+    int i, cerrno;
 
     CLEAR_CERRNO(cerrno);
 
@@ -1106,7 +1057,7 @@ static corba_status epp_call_info_contact(
     }
     /* disclose info */
 
-    c_contact->DiscloseFlag = convDisclBack(info_contact->discl.flag);
+    info_contact->discl.flag = convDisclBack(c_contact->DiscloseFlag);
 
     /* init discl values only if there is exceptional behaviour */
     if (info_contact->discl.flag != -1)
@@ -1186,13 +1137,87 @@ static corba_status epp_call_info_contact(
         }
     }
 
-    CORBA_free(c_contact);
-    return epilog_success(epp_ctx, cdata, response);
+    return 1;
 
 error:
-    CORBA_free(c_contact);
-    CORBA_free(response);
-    return CORBA_INT_ERROR;
+    return 0;
+}
+
+/**
+ * EPP info contact.
+ *
+ * @param epp_ctx Epp context.
+ * @param service EPP service.
+ * @param loginid Session identifier.
+ * @param request_id  fred-logd request ID
+ * @param has_contact_mailing_address_extension has to return information about mailing address of
+ * contact
+ * @param cdata   Data from xml request.
+ * @return        Status.
+ */
+static corba_status epp_call_info_contact(
+        epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
+        const ccReg_TID request_id, int has_contact_mailing_address_extension,
+        epp_command_data *cdata)
+{
+    CORBA_Environment ev[1];
+    ccReg_EppParams *c_params = NULL;
+    ccReg_Contact *c_contact;
+    ccReg_Response *response;
+    int retr;
+    epps_info_contact *info_contact;
+
+    info_contact = cdata->data;
+    /*
+     * Input parameters:
+     *    id (a)
+     *    loginid
+     *    c_clTRID (*)
+     *    xml_in (a)
+     * Output parameters:
+     *    c_contact (*)
+     */
+    assert(cdata->xml_in);
+    assert(info_contact->id);
+
+    c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
+    if (c_params == NULL)
+    {
+        return CORBA_INT_ERROR;
+    }
+
+    for (retr = 0; retr < MAX_RETRIES; retr++)
+    {
+        if (retr != 0)
+            CORBA_exception_free(ev);
+        CORBA_exception_init(ev);
+
+        /* get information about contact from central repository */
+        response = ccReg_EPP_ContactInfo(
+                (ccReg_EPP)service, info_contact->id, &c_contact, c_params, ev);
+
+        /* if COMM_FAILURE exception is not raised quit retry loop */
+        if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
+            break;
+        usleep(RETR_SLEEP);
+    }
+    CORBA_free(c_params);
+
+    /* if it is exception then return */
+    if (raised_exception(ev))
+        return handle_exception(epp_ctx, cdata, ev);
+
+    if (info_contact_data_copy(epp_ctx, info_contact, c_contact, has_contact_mailing_address_extension, ev) == 1)
+    {
+        CORBA_free(c_contact);
+        return epilog_success(epp_ctx, cdata, response);
+    }
+    else
+    {
+        CORBA_free(c_contact);
+        CORBA_free(response);
+        return CORBA_INT_ERROR;
+    }
 }
 
 /**
@@ -1786,7 +1811,7 @@ static corba_status epp_call_info_keyset(
  */
 static corba_status epp_call_poll_req(
         epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, epp_command_data *cdata)
+        const ccReg_TID request_id, epp_command_data *cdata, int has_contact_mailing_address_extension)
 {
     ccReg_Response *response;
     ccReg_PollType c_polltype;
@@ -2069,6 +2094,46 @@ static corba_status epp_call_poll_req(
             poll_req->msg.rfi.price = unwrap_str(epp_ctx->pool, rfi->price, &cerrno);
             if (cerrno != 0)
                 goto error;
+            break;
+        }
+        case ccReg_polltype_update_contact:
+        {
+            ccReg_Contact *c_old_data, *c_new_data;
+
+            ccReg_PollMsg_Update *up = (ccReg_PollMsg_Update *)c_mesg->_value;
+            poll_req->type = pt_update_contact;
+            poll_req->msg.upc.optrid = unwrap_str(epp_ctx->pool, up->opTRID, &cerrno);
+            if (cerrno != 0)
+                goto error;
+            poll_req->msg.upc.pollid = up->pollID;
+
+            /* another corba call for contact data details */
+            CORBA_exception_init(ev);
+            c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
+
+            ccReg_EPP_PollRequestGetUpdateContactDetails(
+                    (ccReg_EPP)service, up->pollID, &c_old_data, &c_new_data, c_params, ev);
+
+            CORBA_free(c_params);
+            if (raised_exception(ev))
+                return handle_exception(epp_ctx, cdata, ev);
+            /* end of corba call */
+
+            if (info_contact_data_copy(epp_ctx, &poll_req->msg.upc.old_data, c_old_data, has_contact_mailing_address_extension, ev) != 1)
+            {
+                CORBA_free(c_old_data);
+                CORBA_free(c_new_data);
+                goto error;
+            }
+            if (info_contact_data_copy(epp_ctx, &poll_req->msg.upc.new_data, c_new_data, has_contact_mailing_address_extension, ev) != 1)
+            {
+                CORBA_free(c_old_data);
+                CORBA_free(c_new_data);
+                goto error;
+            }
+
+            CORBA_free(c_old_data);
+            CORBA_free(c_new_data);
             break;
         }
         case ccReg_polltype_update_domain:
@@ -4972,7 +5037,7 @@ corba_status epp_call_cmd(
             break;
         case EPP_POLL_REQ:
             cdata->noresdata = 1;
-            cstat = epp_call_poll_req(epp_ctx, service, loginid, request_id, cdata);
+            cstat = epp_call_poll_req(epp_ctx, service, loginid, request_id, cdata, has_contact_mailing_address_extension);
             break;
         case EPP_POLL_ACK:
             cdata->noresdata = 1;
