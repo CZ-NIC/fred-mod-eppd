@@ -1,3 +1,4 @@
+#include "Logger-common.c"
 #include "logd-client.h"
 #include "epp_parser.h"
 #include <stdio.h>
