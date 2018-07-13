@@ -1,11 +1,18 @@
 cmake_minimum_required(VERSION 3.5)
 
-find_program(IDL_PROGRAM orbit-idl-2)
-find_program(GIT_PROGRAM git)
-find_program(APXS_PROGRAM apxs)
-find_program(APR_PROGRAM apr-config)
-find_program(CCACHE_PROGRAM ccache)
+macro(assert_binary_in_path name binary)
+    find_program(${name} ${binary})
+    if(NOT ${name})
+        message(FATAL_ERROR "${binary} not found!")
+    endif()
+endmacro()
 
+assert_binary_in_path(IDL_PROGRAM orbit-idl-2)
+assert_binary_in_path(GIT_PROGRAM git)
+assert_binary_in_path(APXS_PROGRAM apxs)
+assert_binary_in_path(APR_PROGRAM apr-config)
+
+find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
 endif()
