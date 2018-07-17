@@ -56,9 +56,6 @@ set_default(SVN_REV ${VERSION})
 set_default(CONFIG_FILE_NAME 02-fred-mod-eppd-apache.conf)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_BINARY_DIR}/config.h)
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/conf/${CONFIG_FILE_NAME}.in
-    ${CMAKE_BINARY_DIR}/conf/${CONFIG_FILE_NAME})
 
 
 function(compile_idl_files)
@@ -132,6 +129,12 @@ store_linker_info(apxs APXS_LIBS)
 execute_process(COMMAND ${APXS_PROGRAM} "-q" "LIBEXECDIR" OUTPUT_VARIABLE APXS_MODULES)
 string(STRIP ${APXS_MODULES} APXS_MODULES)
 string(REGEX REPLACE "^/" "" APXS_MODULES ${APXS_MODULES})
+
+set_default(MODULE_INSTALLDIR ${CMAKE_INSTALL_PREFIX}/${APXS_MODULES})
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/conf/${CONFIG_FILE_NAME}.in
+    ${CMAKE_BINARY_DIR}/conf/${CONFIG_FILE_NAME})
 
 execute_process(COMMAND ${APR_PROGRAM} "--cflags" OUTPUT_VARIABLE APR_CFLAGS)
 execute_process(COMMAND ${APR_PROGRAM} "--cppflags" OUTPUT_VARIABLE APR_CPPFLAGS)
