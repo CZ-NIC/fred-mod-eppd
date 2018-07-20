@@ -10,7 +10,7 @@ endmacro()
 assert_binary_in_path(IDL_PROGRAM orbit-idl-2)
 assert_binary_in_path(GIT_PROGRAM git)
 assert_binary_in_path(APXS_PROGRAM apxs)
-assert_binary_in_path(APR_PROGRAM apr-config)
+assert_binary_in_path(APR_PROGRAM apr-1-config)
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
