@@ -56,7 +56,8 @@ typedef enum {
  * @param greeting Greeting string.
  * @return         Generator status.
  */
-gen_status epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting);
+gen_status epp_gen_greeting(
+    void *pool, const char *svid, const char *date, char **greeting, int has_contact_mailing_address_extension);
 
 /**
  * Generate command response in XML format.

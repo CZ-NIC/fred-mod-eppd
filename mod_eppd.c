@@ -1364,7 +1364,8 @@ static int epp_request_loop(
                     epp_ctx->pool,
                     apr_pstrcat(rpool, sc->servername, " (", version, ")", NULL),
                     curdate,
-                    &response);
+                    &response,
+                    sc->has_contact_mailing_address_extension);
 
             // hello doesn't fill any return data into cdata,
             // so we have to use a little hack like this for logger:
@@ -1775,7 +1776,8 @@ static int epp_process_connection(conn_rec *c)
             epp_ctx.pool,
             apr_pstrcat(epp_ctx.pool, sc->servername, " (", version, ")", NULL),
             curdate,
-            &response);
+            &response,
+            sc->has_contact_mailing_address_extension);
     if (gstat != GEN_OK)
     {
         epplog(&epp_ctx, EPP_FATAL, "Error when creating epp greeting");
