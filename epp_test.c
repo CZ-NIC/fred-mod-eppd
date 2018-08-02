@@ -604,6 +604,7 @@ int main(int argc, char *argv[])
         {
             char *version;
             char *curdate;
+            const int has_contact_mailing_address_extension = 0;
 
             /* API: greeting */
             if (epp_call_hello(&epp_ctx, service, &version, &curdate) != CORBA_OK)
@@ -620,7 +621,7 @@ int main(int argc, char *argv[])
                 quit = 1;
                 goto epilog;
             }
-            gstat = epp_gen_greeting(pool, version, curdate, &greeting);
+            gstat = epp_gen_greeting(pool, version, curdate, &greeting, has_contact_mailing_address_extension);
             if (gstat != GEN_OK)
             {
                 fputs("Error when creating epp greeting\n", stderr);

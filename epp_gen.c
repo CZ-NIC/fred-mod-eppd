@@ -108,7 +108,8 @@
  * @}
  */
 
-gen_status epp_gen_greeting(void *pool, const char *svid, const char *date, char **greeting)
+gen_status epp_gen_greeting(
+    void *pool, const char *svid, const char *date, char **greeting, int has_contact_mailing_address_extension)
 {
     xmlBufferPtr buf;
     xmlTextWriterPtr writer;
@@ -154,6 +155,10 @@ gen_status epp_gen_greeting(void *pool, const char *svid, const char *date, char
     WRITE_ELEMENT(writer, greeting_err, "extURI", NS_SECDNS);
     */
     WRITE_ELEMENT(writer, greeting_err, "extURI", NS_ENUMVAL);
+    if (has_contact_mailing_address_extension)
+    {
+        WRITE_ELEMENT(writer, greeting_err, "extURI", NS_EXTRAADDR);
+    }
     END_ELEMENT(writer, greeting_err); /* svcExtension */
     END_ELEMENT(writer, greeting_err); /* svcMenu */
     /* dcp part */
