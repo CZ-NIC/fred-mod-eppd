@@ -537,6 +537,25 @@ int main(int argc, char *argv[])
         if (pflag) /* just ping the nameservice */
             break;
 
+        eppd_server_xml_conf xml_schema;
+        xml_schema.has_contact_mailing_address_extension = 0;
+        xml_schema.data_collection_policy_access = dcpa_none;
+        xml_schema.contact_create_available_disclose_elements.name = 0;
+        xml_schema.contact_create_available_disclose_elements.organization = 0;
+        xml_schema.contact_create_available_disclose_elements.address = 0;
+        xml_schema.contact_create_available_disclose_elements.telephone = 1;
+        xml_schema.contact_create_available_disclose_elements.fax = 1;
+        xml_schema.contact_create_available_disclose_elements.email = 1;
+        xml_schema.contact_create_available_disclose_elements.vat = 1;
+        xml_schema.contact_create_available_disclose_elements.ident = 1;
+        xml_schema.contact_create_available_disclose_elements.notify_email = 1;
+
+        xml_schema.contact_info_available_disclose_elements =
+                xml_schema.contact_create_available_disclose_elements;
+        xml_schema.contact_info_available_disclose_elements.address = 1;
+
+        xml_schema.contact_update_available_disclose_elements =
+                xml_schema.contact_info_available_disclose_elements;
         if (firsttime)
         {
             firsttime = 0;
@@ -597,14 +616,13 @@ int main(int argc, char *argv[])
 
             /* API: process command */
             pstat = epp_parse_command(
-                    &epp_ctx, (loginid != 0), schema, text, strlen(text), &cdata, &cmdtype);
+                    &epp_ctx, (loginid != 0), schema, text, strlen(text), &cdata, &xml_schema, &cmdtype);
         }
 
         if (pstat == PARSER_HELLO)
         {
             char *version;
             char *curdate;
-            const int has_contact_mailing_address_extension = 0;
 
             /* API: greeting */
             if (epp_call_hello(&epp_ctx, service, &version, &curdate) != CORBA_OK)
@@ -621,7 +639,7 @@ int main(int argc, char *argv[])
                 quit = 1;
                 goto epilog;
             }
-            gstat = epp_gen_greeting(pool, version, curdate, &greeting, has_contact_mailing_address_extension);
+            gstat = epp_gen_greeting(pool, version, curdate, &xml_schema, &greeting);
             if (gstat != GEN_OK)
             {
                 fputs("Error when creating epp greeting\n", stderr);
@@ -649,10 +667,9 @@ int main(int argc, char *argv[])
         else if (pstat == PARSER_CMD_OTHER || pstat == PARSER_NOT_VALID)
         {
             /* API: corba call */
-            const int has_contact_mailing_address_extension = 0;
+            cdata->xml_schema = xml_schema;
             // TODO ugly hack - supply a real ID
-            cstat = epp_call_cmd(
-                    &epp_ctx, service, loginid, 0, has_contact_mailing_address_extension, cdata);
+            cstat = epp_call_cmd(&epp_ctx, service, loginid, 0, cdata);
         }
         else
         {

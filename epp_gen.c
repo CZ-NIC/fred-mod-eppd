@@ -109,13 +109,18 @@
  */
 
 gen_status epp_gen_greeting(
-    void *pool, const char *svid, const char *date, char **greeting, int has_contact_mailing_address_extension)
+        void *pool,
+        const char *svid,
+        const char *date,
+        const eppd_server_xml_conf *xml_schema,
+        char **greeting)
 {
     xmlBufferPtr buf;
     xmlTextWriterPtr writer;
     int error_seen = 1;
 
     assert(svid != NULL);
+    assert(xml_schema != NULL);
 
     buf = xmlBufferCreate();
     if (buf == NULL)
@@ -155,7 +160,7 @@ gen_status epp_gen_greeting(
     WRITE_ELEMENT(writer, greeting_err, "extURI", NS_SECDNS);
     */
     WRITE_ELEMENT(writer, greeting_err, "extURI", NS_ENUMVAL);
-    if (has_contact_mailing_address_extension)
+    if (xml_schema->has_contact_mailing_address_extension)
     {
         WRITE_ELEMENT(writer, greeting_err, "extURI", NS_EXTRAADDR);
     }
@@ -164,7 +169,17 @@ gen_status epp_gen_greeting(
     /* dcp part */
     START_ELEMENT(writer, greeting_err, "dcp");
     START_ELEMENT(writer, greeting_err, "access");
-    START_ELEMENT(writer, greeting_err, "none");
+    switch (xml_schema->data_collection_policy_access)
+    {
+        case dcpa_all:
+            START_ELEMENT(writer, greeting_err, "all");
+            break;
+        case dcpa_none:
+            START_ELEMENT(writer, greeting_err, "none");
+            break;
+        default:
+            goto greeting_err;
+    }
     END_ELEMENT(writer, greeting_err);
     END_ELEMENT(writer, greeting_err);
     START_ELEMENT(writer, greeting_err, "statement");
@@ -203,6 +218,14 @@ greeting_err:
     return GEN_EBUILD;
 }
 
+static unsigned char does_enabled_discloseflag_differ_from_default_policy(
+        unsigned char is_enabled,
+        epp_PrivacyPolicy discloseflag,
+        epp_PrivacyPolicy default_policy)
+{
+    return is_enabled && (discloseflag != default_policy);
+}
+
 /**
  * This is assistant function for generating info contact <resData>
  * xml subtree.
@@ -211,7 +234,10 @@ greeting_err:
  * @param info_contact    Data needed to generate XML.
  * @return         1 if OK, 0 in case of failure.
  */
-static char gen_info_contact(xmlTextWriterPtr writer, epps_info_contact *info_contact)
+static char gen_info_contact(
+        xmlTextWriterPtr writer,
+        epps_info_contact *info_contact,
+        const eppd_server_xml_conf *xml_schema)
 {
     START_ELEMENT(writer, simple_err, "contact:infData");
     WRITE_ATTRIBUTE(writer, simple_err, "xmlns:contact", NS_CONTACT);
@@ -253,74 +279,116 @@ static char gen_info_contact(xmlTextWriterPtr writer, epps_info_contact *info_co
     WRITE_ELEMENT(writer, simple_err, "contact:upDate", info_contact->upDate);
     WRITE_ELEMENT(writer, simple_err, "contact:trDate", info_contact->trDate);
     WRITE_ELEMENT(writer, simple_err, "contact:authInfo", info_contact->authInfo);
+
+    epp_PrivacyPolicy default_policy;
+    switch (xml_schema->data_collection_policy_access)
+    {
+    case dcpa_all:
+        default_policy = public_data;
+        break;
+    case dcpa_none:
+        default_policy = private_data;
+        break;
+    default:
+        goto simple_err;
+    }
+    const epp_controlled_privacy_data_mask enabled_disclose_elements = xml_schema->contact_info_available_disclose_elements;
+    epp_controlled_privacy_data_mask to_generate;
+    to_generate.name = does_enabled_discloseflag_differ_from_default_policy(
+            enabled_disclose_elements.name,
+            info_contact->discl.name,
+            default_policy);
+    to_generate.organization = does_enabled_discloseflag_differ_from_default_policy(
+            enabled_disclose_elements.organization,
+            info_contact->discl.organization,
+            default_policy);
+    to_generate.address = does_enabled_discloseflag_differ_from_default_policy(
+            enabled_disclose_elements.address,
+            info_contact->discl.address,
+            default_policy);
+    to_generate.telephone = does_enabled_discloseflag_differ_from_default_policy(
+            enabled_disclose_elements.telephone,
+            info_contact->discl.telephone,
+            default_policy);
+    to_generate.fax = does_enabled_discloseflag_differ_from_default_policy(
+            enabled_disclose_elements.fax,
+            info_contact->discl.fax,
+            default_policy);
+    to_generate.email = does_enabled_discloseflag_differ_from_default_policy(
+            enabled_disclose_elements.email,
+            info_contact->discl.email,
+            default_policy);
+    to_generate.vat = does_enabled_discloseflag_differ_from_default_policy(
+            enabled_disclose_elements.vat,
+            info_contact->discl.vat,
+            default_policy);
+    to_generate.ident = does_enabled_discloseflag_differ_from_default_policy(
+            enabled_disclose_elements.ident,
+            info_contact->discl.ident,
+            default_policy);
+    to_generate.notify_email = does_enabled_discloseflag_differ_from_default_policy(
+            enabled_disclose_elements.notify_email,
+            info_contact->discl.notify_email,
+            default_policy);
     /* output disclose section if it is not empty */
-    if (info_contact->discl.flag != -1)
+    if (to_generate.name ||
+        to_generate.organization ||
+        to_generate.address ||
+        to_generate.telephone ||
+        to_generate.fax ||
+        to_generate.email ||
+        to_generate.vat ||
+        to_generate.ident ||
+        to_generate.notify_email)
     {
         START_ELEMENT(writer, simple_err, "contact:disclose");
-        if (info_contact->discl.flag == 0)
-            WRITE_ATTRIBUTE(writer, simple_err, "flag", "0");
-        else
-            WRITE_ATTRIBUTE(writer, simple_err, "flag", "1");
-        /*
-         * Discloseflags for name and organization cannot be changed by registrars
-         * so we don't output them (this is issue only when server default policy
-         * is set to hide)
-         *
-         * Also note that name and org are not specified in xml schema type
-         * for info contact operation (infupdDiscloseType). If module included
-         * them in output, xml response would not be valid.
-         *
-         */
-#ifdef DO_OUTPUT_NAME_DISCLOSE
-        if (info_contact->discl.name)
+        WRITE_ATTRIBUTE(writer, simple_err, "flag", default_policy == public_data ? "0" : "1");
+        if (to_generate.name)
         {
             START_ELEMENT(writer, simple_err, "contact:name");
             END_ELEMENT(writer, simple_err);
         }
-#endif
-#ifdef DO_OUTPUT_ORG_DISCLOSE
-        if (info_contact->discl.org)
+        if (to_generate.organization)
         {
             START_ELEMENT(writer, simple_err, "contact:org");
             END_ELEMENT(writer, simple_err);
         }
-#endif
-        if (info_contact->discl.addr)
+        if (to_generate.address)
         {
             START_ELEMENT(writer, simple_err, "contact:addr");
             END_ELEMENT(writer, simple_err);
         }
-        if (info_contact->discl.voice)
+        if (to_generate.telephone)
         {
             START_ELEMENT(writer, simple_err, "contact:voice");
             END_ELEMENT(writer, simple_err);
         }
-        if (info_contact->discl.fax)
+        if (to_generate.fax)
         {
             START_ELEMENT(writer, simple_err, "contact:fax");
             END_ELEMENT(writer, simple_err);
         }
-        if (info_contact->discl.email)
+        if (to_generate.email)
         {
             START_ELEMENT(writer, simple_err, "contact:email");
             END_ELEMENT(writer, simple_err);
         }
-        if (info_contact->discl.vat)
+        if (to_generate.vat)
         {
             START_ELEMENT(writer, simple_err, "contact:vat");
             END_ELEMENT(writer, simple_err);
         }
-        if (info_contact->discl.ident)
+        if (to_generate.ident)
         {
             START_ELEMENT(writer, simple_err, "contact:ident");
             END_ELEMENT(writer, simple_err);
         }
-        if (info_contact->discl.notifyEmail)
+        if (to_generate.notify_email)
         {
             START_ELEMENT(writer, simple_err, "contact:notifyEmail");
             END_ELEMENT(writer, simple_err);
         }
-        END_ELEMENT(writer, simple_err); /* disclose */
+        END_ELEMENT(writer, simple_err); /* contact:disclose */
     }
     WRITE_ELEMENT(writer, simple_err, "contact:vat", info_contact->vat);
     if (info_contact->ident != NULL)
@@ -554,7 +622,10 @@ simple_err:
  * @param msgdata   Message data plus its type.
  * @return          1 if OK, 0 in case of failure.
  */
-static char gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
+static char gen_poll_message(
+        xmlTextWriterPtr writer,
+        epps_poll_req *msgdata,
+        const eppd_server_xml_conf *xml_schema)
 {
     switch (msgdata->type)
     {
@@ -731,12 +802,16 @@ static char gen_poll_message(xmlTextWriterPtr writer, epps_poll_req *msgdata)
             WRITE_ATTRIBUTE(writer, simple_err, "xsi:schemaLocation", LOC_CONTACT);
             WRITE_ELEMENT(writer, simple_err, "contact:opTRID", msgdata->msg.upc.optrid);
             START_ELEMENT(writer, simple_err, "contact:oldData");
-            if (!gen_info_contact(writer, &msgdata->msg.upc.old_data))
+            if (!gen_info_contact(writer, &msgdata->msg.upc.old_data, xml_schema))
+            {
                 goto simple_err;
+            }
             END_ELEMENT(writer, simple_err);
             START_ELEMENT(writer, simple_err, "contact:newData");
-            if (!gen_info_contact(writer, &msgdata->msg.upc.new_data))
+            if (!gen_info_contact(writer, &msgdata->msg.upc.new_data, xml_schema))
+            {
                 goto simple_err;
+            }
             END_ELEMENT(writer, simple_err);
             END_ELEMENT(writer, simple_err);
             break;
@@ -1012,8 +1087,10 @@ gen_status epp_gen_response(
             WRITE_ATTRIBUTE(writer, simple_err, "id", poll_req->msgid);
             WRITE_ELEMENT(writer, simple_err, "qDate", poll_req->qdate);
             START_ELEMENT(writer, simple_err, "msg");
-            if (!gen_poll_message(writer, poll_req))
+            if (!gen_poll_message(writer, poll_req, &(cdata->xml_schema)))
+            {
                 goto simple_err;
+            }
             END_ELEMENT(writer, simple_err); /* msg */
             END_ELEMENT(writer, simple_err); /* msgQ */
         }
@@ -1202,8 +1279,10 @@ gen_status epp_gen_response(
                     goto simple_err;
                 break;
             case EPP_INFO_CONTACT:
-                if (!gen_info_contact(writer, (epps_info_contact *)cdata->data))
+                if (!gen_info_contact(writer, (epps_info_contact *)cdata->data, &(cdata->xml_schema)))
+                {
                     goto simple_err;
+                }
                 break;
             case EPP_INFO_NSSET:
                 if (!gen_info_nsset(writer, (epps_info_nsset *)cdata->data))

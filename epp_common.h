@@ -48,6 +48,17 @@ typedef struct
     int session;
 } epp_context;
 
+typedef enum
+{
+    dcpa_all,
+    dcpa_none,
+} epp_DataCollectionPolicyAccess;
+
+inline epp_DataCollectionPolicyAccess get_default_data_collection_policy_access()
+{
+    return dcpa_none;
+}
+
 /**
  * Enumeration of codes of all EPP commands this module is able to handle.
  * The object specific commands are written as EPP_{command}_{object}.
@@ -359,36 +370,53 @@ typedef struct
     char *cc; /**< Country code. */
 } epp_postalInfo;
 
+typedef enum
+{
+    public_data,
+    private_data,
+    unused_privacy_policy
+} epp_PrivacyPolicy;
+
 /**
  * Disclose information of contact.
- * All items except flag inside are treated as booleans.
- * Value 1 means it is an exception to data collection policy.
- * Flag represents the default server policy.
- * Example: if server data collection policy is "public" (flag == 0)
- * 	then value 1 in this structure means the item should be hidden.
  */
 typedef struct
 {
-    /**
-     * Value 1 means following items are exception to server policy, which
-     * is assumed to be private (hide all items).
-     * Value 0 means following items are exception to server policy, which
-     * is assumed to be public (show all items).
-     * And value -1 means there are not elements that require exceptional
-     * behaviour.
-     */
-    char flag;
-    unsigned char name; /**< Contact's name is exceptional. */
-    unsigned char org; /**< Contact's organization is exceptional. */
-    unsigned char addr; /**< Contact's address is exceptional. */
-    unsigned char voice; /**< Contact's voice (tel. num.) is exceptional. */
-    unsigned char fax; /**< Contact's fax number is exceptional. */
-    unsigned char email; /**< Contact's email address is exceptional. */
-    unsigned char vat; /**< Contact's VAT is exceptional. */
-    unsigned char ident; /**< Contact's ident is exceptional. */
-    /** Contact's notification emai is exceptional. */
-    unsigned char notifyEmail;
+    epp_PrivacyPolicy name;
+    epp_PrivacyPolicy organization;
+    epp_PrivacyPolicy address;
+    epp_PrivacyPolicy telephone;
+    epp_PrivacyPolicy fax;
+    epp_PrivacyPolicy email;
+    epp_PrivacyPolicy vat;
+    epp_PrivacyPolicy ident;
+    epp_PrivacyPolicy notify_email;
 } epp_discl;
+
+typedef struct
+{
+    unsigned name:1;
+    unsigned organization:1;
+    unsigned address:1;
+    unsigned telephone:1;
+    unsigned fax:1;
+    unsigned email:1;
+    unsigned vat:1;
+    unsigned ident:1;
+    unsigned notify_email:1;
+} epp_controlled_privacy_data_mask;
+
+/**
+ * Configuration of entities enabled in xml schemas.
+ */
+typedef struct
+{
+    int has_contact_mailing_address_extension; /**< Contacts feature mailing address extension. */
+    epp_DataCollectionPolicyAccess data_collection_policy_access;
+    epp_controlled_privacy_data_mask contact_info_available_disclose_elements;
+    epp_controlled_privacy_data_mask contact_create_available_disclose_elements;
+    epp_controlled_privacy_data_mask contact_update_available_disclose_elements;
+} eppd_server_xml_conf;
 
 /**
  * Nameserver has a name and possibly more than one ip address.
@@ -409,7 +437,8 @@ typedef struct
 } epp_dnskey;
 
 /** Type of identification number used in contact object. */
-typedef enum {
+typedef enum
+{
     ident_UNKNOWN, /**< Unknown value can also mean undefined. */
     ident_OP, /**< Number of ID card. */
     ident_PASSPORT, /**< Number of passport. */
@@ -782,6 +811,7 @@ typedef struct
     char *fax; /**< Fax number. */
     char *email; /**< Email address. */
     char *authInfo; /**< Authorization information. */
+    unsigned char discl_update; /**< Use disclose information section. */
     epp_discl discl; /**< Disclose information section. */
     char *vat; /**< VAT tax ID. */
     char *ident; /**< Contact's unique ident. */
@@ -901,6 +931,7 @@ typedef struct
      * from in and out union.
      */
     epp_command_type type;
+    eppd_server_xml_conf xml_schema; /**< Entities enabled in xml schemas. */
     /**
      * Command data
      * (Input + output parameters for all possible epp commands).

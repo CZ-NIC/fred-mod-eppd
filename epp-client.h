@@ -134,13 +134,12 @@ corba_status epp_call_logout(
  * @param service     EPP service.
  * @param loginid     Session identifier
  * @param request_id  fred-logd request ID
- * @param has_contact_mailing_address_extension given capability is enabled
  * @param cdata       Data from parsed xml command.
  * @return            Status.
  */
 corba_status epp_call_cmd(
         epp_context *epp_ctx, service_EPP service, unsigned long long loginid,
-        const ccReg_TID request_id, int has_contact_mailing_address_extension,
+        const ccReg_TID request_id,
         epp_command_data *cdata);
 
 /**

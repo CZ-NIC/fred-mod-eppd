@@ -13,7 +13,7 @@
 # is activated for that connection.
 #
 
-# EPP port, assigned by IANA
+# EPP port, 700 assigned by IANA
 Listen @PORT@
 
 #LoadModule corba_module modules/mod_corba.so
@@ -55,6 +55,19 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    EPPloglevel       info
    # Validate responses from the mod_eppd (Turning it on can cause a slowdown.)
    EPPvalidResponse  Off
+   # Enable / Disable mailing address extension
+   EPPcontactMailingAddressExtension On
+
+   # Element <greeting><dcp><access>
+   # possibilities: all, none
+   EPPdataCollectionPolicyAccess none
+   # An exhaustive enum of <contact:xxx> elements available in a <contact:disclose> element
+   # for contactCreate operation
+   EPPcontactCreateDiscloseflags telephone fax email vat ident notifyemail
+   # for contactUpdate operation
+   EPPcontactUpdateDiscloseflags address telephone fax email vat ident notifyemail
+   # for result of contactInfo operation
+   EPPcontactInfoDiscloseflags address telephone fax email vat ident notifyemail
 
    ### SSL Configuration
    # Activate the SSL module - this must always be on!
@@ -71,6 +84,4 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
    # File with the Certificates of recognized Certification Authorities (CA)
    # All client certificates of registrars must be issued by any CA in this file
    SSLCACertificateFile  @DATAROOTDIR@/@PACKAGE@/ssl/test-cert.pem
-   # Enable / Disable mailing address extension
-   EPPcontactMailingAddressExtension Off
 </VirtualHost>

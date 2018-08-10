@@ -585,15 +585,20 @@ void epp_parser_init_cleanup(void *schema)
 
 void epp_parser_request_cleanup(void *cdata_arg)
 {
-    epp_command_data *cdata = (epp_command_data *)cdata_arg;
+    epp_command_data* const cdata = (epp_command_data*)cdata_arg;
 
     /* be carefull when freeing - any of pointers might be NULL */
-    if (cdata == NULL)
-        return;
-    if (cdata->xpath_ctx != NULL)
-        xmlXPathFreeContext((xmlXPathContextPtr)cdata->xpath_ctx);
-    if (cdata->parsed_doc != NULL)
-        xmlFreeDoc((xmlDocPtr)cdata->parsed_doc);
+    if (cdata != NULL)
+    {
+        if (cdata->xpath_ctx != NULL)
+        {
+            xmlXPathFreeContext((xmlXPathContextPtr)cdata->xpath_ctx);
+        }
+        if (cdata->parsed_doc != NULL)
+        {
+            xmlFreeDoc((xmlDocPtr)cdata->parsed_doc);
+        }
+    }
 }
 
 /**
@@ -1041,17 +1046,27 @@ error:
  */
 static epp_identType string2identtype(const char *str)
 {
-    if (strcmp("op", str) == 0)
+    assert(str != NULL);
+    if (strcmp(str, "op") == 0)
+    {
         return ident_OP;
-    else if (strcmp("passport", str) == 0)
+    }
+    if (strcmp(str, "passport") == 0)
+    {
         return ident_PASSPORT;
-    else if (strcmp("mpsv", str) == 0)
+    }
+    if (strcmp(str, "mpsv") == 0)
+    {
         return ident_MPSV;
-    else if (strcmp("ico", str) == 0)
+    }
+    if (strcmp(str, "ico") == 0)
+    {
         return ident_ICO;
-    else if (strcmp("birthday", str) == 0)
+    }
+    if (strcmp(str, "birthday") == 0)
+    {
         return ident_BIRTHDAY;
-
+    }
     return ident_UNKNOWN;
 }
 
@@ -1071,7 +1086,9 @@ static void parse_create_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
 
     /* allocate necessary structures */
     if ((cdata->data = epp_calloc(pool, sizeof *create_contact)) == NULL)
+    {
         goto error;
+    }
     create_contact = cdata->data;
 
     /* get the contact data */
@@ -1094,66 +1111,144 @@ static void parse_create_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
     create_contact->identtype = ident_UNKNOWN;
     if (create_contact->ident != NULL)
     {
-        char *str;
-
-        str = xpath_get_attr(pool, xpathCtx, "contact:ident", "type", 1, &xerr);
+        const char* const str = xpath_get_attr(pool, xpathCtx, "contact:ident", "type", 1, &xerr);
         CHK_XERR(xerr, error);
         create_contact->identtype = string2identtype(str);
         /*
-         * schema and source code are out of sync if following error
-         * occurs
+         * schema and source code are out of sync if following error occurs
          */
         assert(create_contact->identtype != ident_UNKNOWN);
     }
-    /*
-     * disclose flags - we don't interpret anyhow disclose flags, we just
-     * send the values to CR and CR decides in conjuction with default
-     * server policy what to do
-     */
     xpath_chroot(xpathCtx, "contact:disclose", 0, &xerr);
     if (xerr == XERR_LIBXML)
     {
         goto error;
     }
-    else if (xerr == XERR_OK)
+
+    epp_PrivacyPolicy default_privacy_policy;
+    switch (get_default_data_collection_policy_access())
     {
-        char *str;
-
-        str = get_attr(xpathCtx->node, "flag");
+        case dcpa_all:
+            default_privacy_policy = public_data;
+            break;
+        case dcpa_none:
+            default_privacy_policy = private_data;
+            break;
+        default:
+            goto error;
+    }
+    const epp_controlled_privacy_data_mask available_disclose_elements =
+            cdata->xml_schema.contact_create_available_disclose_elements;
+    if (xerr == XERR_OK)
+    {
+        const char* const str = get_attr(xpathCtx->node, "flag");
         assert(str != NULL);
-        create_contact->discl.flag = parse_boolean(str);
 
-        if (*str == '0')
+        const epp_PrivacyPolicy element_presents = *str == '0' ? private_data : public_data;
+        const epp_PrivacyPolicy element_absents = default_privacy_policy;
+        if (available_disclose_elements.name)
         {
-            create_contact->discl.flag = 0;
+            create_contact->discl.name = 0 < xpath_count(xpathCtx, "contact:name", &xerr) ? element_presents
+                                                                                          : element_absents;
+            CHK_XERR(xerr, error);
         }
         else
         {
-            create_contact->discl.flag = 1;
+            create_contact->discl.name = unused_privacy_policy;
         }
-        create_contact->discl.name = xpath_count(xpathCtx, "contact:name", &xerr);
-        CHK_XERR(xerr, error);
-        create_contact->discl.org = xpath_count(xpathCtx, "contact:org", &xerr);
-        CHK_XERR(xerr, error);
-        create_contact->discl.addr = xpath_count(xpathCtx, "contact:addr", &xerr);
-        CHK_XERR(xerr, error);
-        create_contact->discl.voice = xpath_count(xpathCtx, "contact:voice", &xerr);
-        CHK_XERR(xerr, error);
-        create_contact->discl.fax = xpath_count(xpathCtx, "contact:fax", &xerr);
-        CHK_XERR(xerr, error);
-        create_contact->discl.email = xpath_count(xpathCtx, "contact:email", &xerr);
-        CHK_XERR(xerr, error);
-        create_contact->discl.vat = xpath_count(xpathCtx, "contact:vat", &xerr);
-        CHK_XERR(xerr, error);
-        create_contact->discl.ident = xpath_count(xpathCtx, "contact:ident", &xerr);
-        CHK_XERR(xerr, error);
-        create_contact->discl.notifyEmail = xpath_count(xpathCtx, "contact:notifyEmail", &xerr);
-        CHK_XERR(xerr, error);
+        if (available_disclose_elements.organization)
+        {
+            create_contact->discl.organization = 0 < xpath_count(xpathCtx, "contact:org", &xerr) ? element_presents
+                                                                                                 : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            create_contact->discl.organization = unused_privacy_policy;
+        }
+        if (available_disclose_elements.address)
+        {
+            create_contact->discl.address = 0 < xpath_count(xpathCtx, "contact:addr", &xerr) ? element_presents
+                                                                                             : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            create_contact->discl.address = unused_privacy_policy;
+        }
+        if (available_disclose_elements.telephone)
+        {
+            create_contact->discl.telephone = 0 < xpath_count(xpathCtx, "contact:voice", &xerr) ? element_presents
+                                                                                                : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            create_contact->discl.telephone = unused_privacy_policy;
+        }
+        if (available_disclose_elements.fax)
+        {
+            create_contact->discl.fax = 0 < xpath_count(xpathCtx, "contact:fax", &xerr) ? element_presents
+                                                                                        : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            create_contact->discl.fax = unused_privacy_policy;
+        }
+        if (available_disclose_elements.email)
+        {
+            create_contact->discl.email = 0 < xpath_count(xpathCtx, "contact:email", &xerr) ? element_presents
+                                                                                            : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            create_contact->discl.email = unused_privacy_policy;
+        }
+        if (available_disclose_elements.vat)
+        {
+            create_contact->discl.vat = 0 < xpath_count(xpathCtx, "contact:vat", &xerr) ? element_presents
+                                                                                        : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            create_contact->discl.vat = unused_privacy_policy;
+        }
+        if (available_disclose_elements.ident)
+        {
+            create_contact->discl.ident = 0 < xpath_count(xpathCtx, "contact:ident", &xerr) ? element_presents
+                                                                                            : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            create_contact->discl.ident = unused_privacy_policy;
+        }
+        if (available_disclose_elements.notify_email)
+        {
+            create_contact->discl.notify_email = 0 < xpath_count(xpathCtx, "contact:notifyEmail", &xerr) ? element_presents
+                                                                                                         : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            create_contact->discl.notify_email = unused_privacy_policy;
+        }
         xpathCtx->node = xpathCtx->node->parent;
     }
     else
     {
-        create_contact->discl.flag = -1;
+        create_contact->discl.name = available_disclose_elements.name ? default_privacy_policy : unused_privacy_policy;
+        create_contact->discl.organization = available_disclose_elements.organization ? default_privacy_policy : unused_privacy_policy;
+        create_contact->discl.address = available_disclose_elements.address ? default_privacy_policy : unused_privacy_policy;
+        create_contact->discl.telephone = available_disclose_elements.telephone ? default_privacy_policy : unused_privacy_policy;
+        create_contact->discl.fax = available_disclose_elements.fax ? default_privacy_policy : unused_privacy_policy;
+        create_contact->discl.email = available_disclose_elements.email ? default_privacy_policy : unused_privacy_policy;
+        create_contact->discl.vat = available_disclose_elements.vat ? default_privacy_policy : unused_privacy_policy;
+        create_contact->discl.ident = available_disclose_elements.ident ? default_privacy_policy : unused_privacy_policy;
+        create_contact->discl.notify_email = available_disclose_elements.notify_email ? default_privacy_policy : unused_privacy_policy;
         RESET_XERR(xerr); /* clear value of errno */
     }
     /* postal info, change relative root */
@@ -1678,13 +1773,14 @@ static void parse_update_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
     /* chg data */
     xpath_chroot(xpathCtx, "contact:chg", 0, &xerr);
     if (xerr == XERR_LIBXML)
+    {
         goto error;
-    else if (xerr == XERR_CONSTR)
+    }
+    if (xerr == XERR_CONSTR)
     {
         /* there is nothing more to parse */
         cdata->type = EPP_UPDATE_CONTACT;
-        /* flag must be initialized to 'empty' value */
-        update_contact->discl.flag = -1;
+        update_contact->discl_update = 0;
         return;
     }
 
@@ -1699,16 +1795,17 @@ static void parse_update_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
         str = xpath_get_attr(pool, xpathCtx, "contact:ident", "type", 1, &xerr);
         CHK_XERR(xerr, error);
         /* if ident is non-empty, type attribute must be present */
-        if (*update_contact->ident != '\0' && str == NULL)
+        if ((*update_contact->ident != '\0') && (str == NULL))
         {
             if (new_error_item(pool, &cdata->errors, errspec_contact_identtype_missing))
+            {
                 goto error;
-
+            }
             cdata->rc = 2003;
             cdata->type = EPP_DUMMY;
             return;
         }
-        else if (str != NULL)
+        if (str != NULL)
         {
             update_contact->identtype = string2identtype(str);
             /*
@@ -1739,55 +1836,137 @@ static void parse_update_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
     {
         goto error;
     }
-    else if (xerr == XERR_OK)
+    if (xerr == XERR_OK)
     {
-        char *str;
-
-        str = get_attr(xpathCtx->node, "flag");
-        assert(str != NULL);
-        if (*str == '0')
+        epp_PrivacyPolicy default_privacy_policy;
+        switch (cdata->xml_schema.data_collection_policy_access)
         {
-            update_contact->discl.flag = 0;
+            case dcpa_all:
+                default_privacy_policy = public_data;
+                break;
+            case dcpa_none:
+                default_privacy_policy = private_data;
+                break;
+            default:
+                goto error;
+        }
+        const char *const str = get_attr(xpathCtx->node, "flag");
+        assert(str != NULL);
+        const epp_PrivacyPolicy element_presents = *str == '0' ? private_data : public_data;
+        const epp_PrivacyPolicy element_absents = default_privacy_policy;
+        const epp_controlled_privacy_data_mask available_disclose_elements =
+                cdata->xml_schema.contact_update_available_disclose_elements;
+        update_contact->discl_update = 1;
+        if (available_disclose_elements.name)
+        {
+            update_contact->discl.name = 0 < xpath_count(xpathCtx, "contact:name", &xerr) ? element_presents
+                                                                                          : element_absents;
+            CHK_XERR(xerr, error);
         }
         else
         {
-            update_contact->discl.flag = 1;
+            update_contact->discl.name = unused_privacy_policy;
         }
-        update_contact->discl.name = xpath_count(xpathCtx, "contact:name", &xerr);
-        CHK_XERR(xerr, error);
-        update_contact->discl.org = xpath_count(xpathCtx, "contact:org", &xerr);
-        CHK_XERR(xerr, error);
-        update_contact->discl.addr = xpath_count(xpathCtx, "contact:addr", &xerr);
-        CHK_XERR(xerr, error);
-        update_contact->discl.voice = xpath_count(xpathCtx, "contact:voice", &xerr);
-        CHK_XERR(xerr, error);
-        update_contact->discl.fax = xpath_count(xpathCtx, "contact:fax", &xerr);
-        CHK_XERR(xerr, error);
-        update_contact->discl.email = xpath_count(xpathCtx, "contact:email", &xerr);
-        CHK_XERR(xerr, error);
-        update_contact->discl.vat = xpath_count(xpathCtx, "contact:vat", &xerr);
-        CHK_XERR(xerr, error);
-        update_contact->discl.ident = xpath_count(xpathCtx, "contact:ident", &xerr);
-        CHK_XERR(xerr, error);
-        update_contact->discl.notifyEmail = xpath_count(xpathCtx, "contact:notifyEmail", &xerr);
-        CHK_XERR(xerr, error);
+        if (available_disclose_elements.organization)
+        {
+            update_contact->discl.organization = 0 < xpath_count(xpathCtx, "contact:org", &xerr) ? element_presents
+                                                                                                 : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            update_contact->discl.organization = unused_privacy_policy;
+        }
+        if (available_disclose_elements.address)
+        {
+            update_contact->discl.address = 0 < xpath_count(xpathCtx, "contact:addr", &xerr) ? element_presents
+                                                                                             : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            update_contact->discl.address = unused_privacy_policy;
+        }
+        if (available_disclose_elements.telephone)
+        {
+            update_contact->discl.telephone = 0 < xpath_count(xpathCtx, "contact:voice", &xerr) ? element_presents
+                                                                                                : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            update_contact->discl.telephone = unused_privacy_policy;
+        }
+        if (available_disclose_elements.fax)
+        {
+            update_contact->discl.fax = 0 < xpath_count(xpathCtx, "contact:fax", &xerr) ? element_presents
+                                                                                        : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            update_contact->discl.fax = unused_privacy_policy;
+        }
+        if (available_disclose_elements.email)
+        {
+            update_contact->discl.email = 0 < xpath_count(xpathCtx, "contact:email", &xerr) ? element_presents
+                                                                                            : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            update_contact->discl.email = unused_privacy_policy;
+        }
+        if (available_disclose_elements.vat)
+        {
+            update_contact->discl.vat = 0 < xpath_count(xpathCtx, "contact:vat", &xerr) ? element_presents
+                                                                                        : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            update_contact->discl.vat = unused_privacy_policy;
+        }
+        if (available_disclose_elements.ident)
+        {
+            update_contact->discl.ident = 0 < xpath_count(xpathCtx, "contact:ident", &xerr) ? element_presents
+                                                                                            : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            update_contact->discl.ident = unused_privacy_policy;
+        }
+        if (available_disclose_elements.notify_email)
+        {
+            update_contact->discl.notify_email = 0 < xpath_count(xpathCtx, "contact:notifyEmail", &xerr) ? element_presents
+                                                                                                         : element_absents;
+            CHK_XERR(xerr, error);
+        }
+        else
+        {
+            update_contact->discl.notify_email = unused_privacy_policy;
+        }
         xpathCtx->node = xpathCtx->node->parent;
     }
     else
     {
-        update_contact->discl.flag = -1;
+        update_contact->discl_update = 0;
         RESET_XERR(xerr); /* clear value of errno */
     }
     /* postal info, change relative root */
     xpath_chroot(xpathCtx, "contact:postalInfo", 0, &xerr);
     if (xerr == XERR_LIBXML)
+    {
         goto error;
-    else if (xerr == XERR_OK)
+    }
+    if (xerr == XERR_OK)
     {
         update_contact->pi = epp_calloc(pool, sizeof *(update_contact->pi));
         if (update_contact->pi == NULL)
+        {
             goto error;
-
+        }
         update_contact->pi->name = xpath_get1(pool, xpathCtx, "contact:name", 0, &xerr);
         CHK_XERR(xerr, error);
         update_contact->pi->org = xpath_get1(pool, xpathCtx, "contact:org", 0, &xerr);
@@ -1796,8 +1975,10 @@ static void parse_update_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
         /* address, change relative root */
         xpath_chroot(xpathCtx, "contact:addr", 0, &xerr);
         if (xerr == XERR_LIBXML)
+        {
             goto error;
-        else if (xerr == XERR_OK)
+        }
+        if (xerr == XERR_OK)
         {
             update_contact->pi->city = xpath_get1(pool, xpathCtx, "contact:city", 0, &xerr);
             CHK_XERR(xerr, error);
@@ -1812,10 +1993,14 @@ static void parse_update_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
             CHK_XERR(xerr, error);
         }
         else
+        {
             RESET_XERR(xerr); /* clear value of errno */
+        }
     }
     else
+    {
         RESET_XERR(xerr); /* clear value of errno */
+    }
 
     cdata->type = EPP_UPDATE_CONTACT;
     return;
@@ -3191,15 +3376,13 @@ parse_extension(void *pool, epp_command_data *cdata, xmlXPathContextPtr xpathCtx
 
 parser_status epp_parse_command(
         epp_context *epp_ctx, int loggedin, void *schema, const char *request, unsigned bytes,
-        epp_command_data **cdata_arg, epp_red_command_type *cmd_type)
+        epp_command_data **cdata_arg, const eppd_server_xml_conf *xml_schema, epp_red_command_type *cmd_type)
 {
     xmlXPathContextPtr xpathCtx;
     xmlXPathObjectPtr xpathObj;
     xmlChar *dumpedXML;
     int dumpLength;
-    epp_command_data *cdata;
     valid_status val_ret;
-    parser_status ret;
 
     const char *elemname;
 
@@ -3207,12 +3390,17 @@ parser_status epp_parse_command(
     assert(epp_ctx != NULL);
     assert(request != NULL);
     assert(bytes != 0);
+    assert(cdata_arg != NULL);
+    assert(xml_schema != NULL);
 
     /* allocate cdata structure */
-    *cdata_arg = (epp_command_data *)epp_calloc(epp_ctx->pool, sizeof *cdata);
+    *cdata_arg = (epp_command_data*)epp_calloc(epp_ctx->pool, sizeof **cdata_arg);
     if (*cdata_arg == NULL)
+    {
         return PARSER_EINTERNAL;
-    cdata = *cdata_arg;
+    }
+    epp_command_data* const cdata = *cdata_arg;
+    cdata->xml_schema = *xml_schema;
     /* ... from now the management of cdata structure and all its items
      * is done at higher level -> we don't have to care about release
      * of resources which are part of cdata. */
@@ -3220,19 +3408,24 @@ parser_status epp_parse_command(
     /* parse xml request */
     cdata->parsed_doc = xmlParseMemory(request, bytes);
     if (cdata->parsed_doc == NULL)
+    {
         return PARSER_NOT_XML;
-
+    }
     /* Save input xml document */
     xmlDocDumpMemoryEnc(cdata->parsed_doc, &dumpedXML, &dumpLength, XML_IN_ENC);
     if (dumpedXML == NULL || dumpLength <= 0)
+    {
         return PARSER_EINTERNAL;
+    }
     /*
      * we cannot use strdup since it is not sure the request is NULL
      * terminated
      */
     cdata->xml_in = epp_malloc(epp_ctx->pool, dumpLength + 1);
     if (cdata->xml_in == NULL)
+    {
         return PARSER_EINTERNAL;
+    }
     memcpy(cdata->xml_in, dumpedXML, dumpLength);
     cdata->xml_in[dumpLength] = '\0';
     xmlFree(dumpedXML);
@@ -3250,7 +3443,7 @@ parser_status epp_parse_command(
     {
         return (val_ret == VAL_ESCHEMA) ? PARSER_ESCHEMA : PARSER_EINTERNAL;
     }
-    else if (val_ret == VAL_NOT_VALID)
+    if (val_ret == VAL_NOT_VALID)
     {
         /*
          * validation error consequence: response identifing a problem
@@ -3266,8 +3459,9 @@ parser_status epp_parse_command(
     /* create XPath context */
     cdata->xpath_ctx = xpathCtx = xmlXPathNewContext((xmlDocPtr)cdata->parsed_doc);
     if (cdata->xpath_ctx == NULL)
+    {
         return PARSER_EINTERNAL;
-
+    }
     /*
      * register namespaces and their prefixes in XPath context
      * Error handling is same for all xmlXPathRegisterNs calls.
@@ -3298,46 +3492,26 @@ parser_status epp_parse_command(
     xmlXPathFreeObject(xpathObj);
     elemname = (char *)xpathCtx->node->name;
 
-    /*
-     * See what we have. <hello>, <command>, <extension> are admittable.
-     * NOTE: Recognition is optimized, we exploit the difference in first
-     * letter of valid elements.
-     */
-    switch (elemname[0])
+    if (strcmp(elemname, "hello") == 0)
     {
-        case 'h':
-            /* It is a <hello> element. */
-            if (!strcmp(elemname, "hello"))
-            {
-                return PARSER_HELLO;
-            }
-            return PARSER_NOT_COMMAND;
-        case 'c':
-            /* It is a <command> element. */
-            if (!strcmp(elemname, "command"))
-            {
-                return parse_command(epp_ctx->pool, loggedin, cdata, cmd_type, xpathCtx);
-            }
-            return PARSER_NOT_COMMAND;
-        case 'e':
-            /* It is an <extension> element. */
-            if (!strcmp(elemname, "extension"))
-            {
-                *cmd_type = EPP_RED_EXTCMD;
-                if (!loggedin)
-                {
-                    cdata->type = EPP_DUMMY;
-                    cdata->rc = 2002;
-                    return PARSER_CMD_OTHER;
-                }
-                return parse_extension(epp_ctx->pool, cdata, xpathCtx);
-            }
-            return PARSER_NOT_COMMAND;
-        default:
-            return PARSER_NOT_COMMAND;
+        return PARSER_HELLO;
     }
-
-    return ret;
+    if (strcmp(elemname, "command") == 0)
+    {
+        return parse_command(epp_ctx->pool, loggedin, cdata, cmd_type, xpathCtx);
+    }
+    if (strcmp(elemname, "extension") == 0)
+    {
+        *cmd_type = EPP_RED_EXTCMD;
+        if (!loggedin)
+        {
+            cdata->type = EPP_DUMMY;
+            cdata->rc = 2002;
+            return PARSER_CMD_OTHER;
+        }
+        return parse_extension(epp_ctx->pool, cdata, xpathCtx);
+    }
+    return PARSER_NOT_COMMAND;
 }
 
 /* vim: set ts=8 sw=8: */

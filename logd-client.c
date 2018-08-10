@@ -740,6 +740,17 @@ ccReg_RequestProperties *epp_log_postal_info(ccReg_RequestProperties *p, epp_pos
     return p;
 }
 
+static char* epp_PrivacyPolicy_to_string(epp_PrivacyPolicy privacy_policy)
+{
+    switch (privacy_policy)
+    {
+        case private_data: return "private_data";
+        case public_data: return "public_data";
+        case unused_privacy_policy: return "unused_privacy_policy";
+    }
+    return "unknown privacy policy";
+}
+
 /**
  * 	Add disclose info to log item properties
  *  @param 	p 	log entry properties or a NULL pointer (in which
@@ -748,53 +759,55 @@ ccReg_RequestProperties *epp_log_postal_info(ccReg_RequestProperties *p, epp_pos
  *
  *  @returns 	log entry properties or NULL in case of an allocation error
  */
-ccReg_RequestProperties *epp_log_disclose_info(ccReg_RequestProperties *p, epp_discl *ed)
+ccReg_RequestProperties* epp_log_disclose_info(ccReg_RequestProperties *p, epp_discl *ed)
 {
-    if (ed->flag == 1)
-    {
-        p = epp_property_push(p, "discl.policy", "private", CORBA_FALSE);
-    }
-    else if (ed->flag == 0)
-    {
-        p = epp_property_push(p, "discl.policy", "public", CORBA_FALSE);
-    }
-    else
-    {
-        p = epp_property_push(p, "discl.policy", "no exceptions", CORBA_FALSE);
-    }
+    p = epp_property_push(p, "discl.policy", "public", CORBA_FALSE);
 
     if (p == NULL)
+    {
         return p;
-
-    p = epp_property_push(p, "discl.name", ed->name ? "true" : "false", CORBA_FALSE);
+    }
+    p = epp_property_push(p, "discl.name", epp_PrivacyPolicy_to_string(ed->name), CORBA_FALSE);
     if (p == NULL)
+    {
         return p;
-    p = epp_property_push(p, "discl.org", ed->org ? "true" : "false", CORBA_FALSE);
+    }
+    p = epp_property_push(p, "discl.org", epp_PrivacyPolicy_to_string(ed->organization), CORBA_FALSE);
     if (p == NULL)
+    {
         return p;
-    p = epp_property_push(p, "discl.addr", ed->addr ? "true" : "false", CORBA_FALSE);
+    }
+    p = epp_property_push(p, "discl.addr", epp_PrivacyPolicy_to_string(ed->address), CORBA_FALSE);
     if (p == NULL)
+    {
         return p;
-    p = epp_property_push(p, "discl.voice", ed->voice ? "true" : "false", CORBA_FALSE);
+    }
+    p = epp_property_push(p, "discl.voice", epp_PrivacyPolicy_to_string(ed->telephone), CORBA_FALSE);
     if (p == NULL)
+    {
         return p;
-    p = epp_property_push(p, "discl.fax", ed->fax ? "true" : "false", CORBA_FALSE);
+    }
+    p = epp_property_push(p, "discl.fax", epp_PrivacyPolicy_to_string(ed->fax), CORBA_FALSE);
     if (p == NULL)
+    {
         return p;
-    p = epp_property_push(p, "discl.email", ed->email ? "true" : "false", CORBA_FALSE);
+    }
+    p = epp_property_push(p, "discl.email", epp_PrivacyPolicy_to_string(ed->email), CORBA_FALSE);
     if (p == NULL)
+    {
         return p;
-    p = epp_property_push(p, "discl.vat", ed->vat ? "true" : "false", CORBA_FALSE);
+    }
+    p = epp_property_push(p, "discl.vat", epp_PrivacyPolicy_to_string(ed->vat), CORBA_FALSE);
     if (p == NULL)
+    {
         return p;
-    p = epp_property_push(p, "discl.ident", ed->ident ? "true" : "false", CORBA_FALSE);
+    }
+    p = epp_property_push(p, "discl.ident", epp_PrivacyPolicy_to_string(ed->ident), CORBA_FALSE);
     if (p == NULL)
+    {
         return p;
-    p = epp_property_push(p, "discl.notifyEmail", ed->notifyEmail ? "true" : "false", CORBA_FALSE);
-    if (p == NULL)
-        return p;
-
-    return p;
+    }
+    return epp_property_push(p, "discl.notifyEmail", epp_PrivacyPolicy_to_string(ed->notify_email), CORBA_FALSE);
 }
 
 static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_command_data *cdata)

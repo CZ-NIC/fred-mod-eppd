@@ -106,7 +106,7 @@ void epp_parser_init_cleanup(void *schema);
  */
 parser_status epp_parse_command(
         epp_context *epp_ctx, int loggedin, void *schema, const char *request, unsigned bytes,
-        epp_command_data **cdata, epp_red_command_type *cmd_type);
+        epp_command_data **cdata, const eppd_server_xml_conf *xml_schema, epp_red_command_type *cmd_type);
 
 /**
  * This will cleanup xpath context and parsed document tree.

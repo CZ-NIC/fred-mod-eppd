@@ -50,14 +50,19 @@ typedef enum {
 /**
  * Routine makes up epp greeting frame.
  *
- * @param pool     Pool to allocate memory from.
- * @param svid     Part of server ID used in svid tag.
- * @param date     Current date as returned from server.
- * @param greeting Greeting string.
- * @return         Generator status.
+ * @param pool       Pool to allocate memory from.
+ * @param svid       Part of server ID used in svid tag.
+ * @param date       Current date as returned from server.
+ * @param xml_schema Entities enabled in xml schemas.
+ * @param greeting   Greeting string.
+ * @return           Generator status.
  */
 gen_status epp_gen_greeting(
-    void *pool, const char *svid, const char *date, char **greeting, int has_contact_mailing_address_extension);
+        void *pool,
+        const char *svid,
+        const char *date,
+        const eppd_server_xml_conf *xml_schema,
+        char **greeting);
 
 /**
  * Generate command response in XML format.
