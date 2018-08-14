@@ -101,6 +101,7 @@
 #include <openssl/x509.h>
 
 #include <unistd.h>
+#include <stddef.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -924,7 +925,7 @@ static int call_corba(
         epp_context *epp_ctx, service_EPP *service, service_Logger *service_log,
         epp_command_data *cdata, parser_status pstat, unsigned long long *loginid,
         ccReg_TID *const session_id, const ccReg_TID request_id, epp_lang *lang,
-        unsigned int logd_mandatory, int has_contact_mailing_address_extension)
+        unsigned int logd_mandatory)
 {
     corba_status cstat; /* ret code of corba component */
     corba_status log_cstat = CORBA_OK; /* ret code of corba for logd create/close session */
@@ -999,7 +1000,6 @@ static int call_corba(
                 service,
                 *loginid,
                 request_id,
-                has_contact_mailing_address_extension,
                 cdata);
     }
 
@@ -1143,7 +1143,7 @@ static int epp_request_loop(
     apr_pool_t *rpool; /* connection memory pool */
     parser_status pstat; /* parser's return code */
     apr_status_t status; /* used to store rc of apr functions */
-    epp_command_data *cdata; /* command data structure */
+    epp_command_data *cdata = NULL; /* command data structure */
     epp_red_command_type cmd_type; /* command type determined by the parser */
     unsigned int bytes; /* length of request */
     char *request; /* raw request read from socket */
@@ -1228,29 +1228,31 @@ static int epp_request_loop(
             break;
         }
         else if (retval == 2)
+        {
             return HTTP_INTERNAL_SERVER_ERROR;
+        }
 #ifdef EPP_PERF
         times[0] = apr_time_now(); /* before parsing */
 #endif
+
         /*
-         * Deliver request to XML parser, the task of parser is
+         * Deliver request to the XML parser which has
          * to fill cdata structure with data.
          */
-
-
         pstat = epp_parse_command(
-                epp_ctx, (login_id != 0), sc->schema, request, bytes, &cdata, &cmd_type);
+                epp_ctx, (login_id != 0), sc->schema, request, bytes, &cdata, &(sc->xml_schema), &cmd_type);
 
         if (pstat == PARSER_HELLO)
+        {
             cmd_type = EPP_RED_HELLO;
-
+        }
         /*
          * Register cleanup for cdata structure. The most of the
          * items in this structure are allocated from pool, but
          * parsed document tree and xpath context must be
          * explicitly released.
          */
-        apr_pool_cleanup_register(rpool, (void *)cdata, epp_cleanup_request, apr_pool_cleanup_null);
+        apr_pool_cleanup_register(rpool, (void*)cdata, epp_cleanup_request, apr_pool_cleanup_null);
 
         /* test if the failure is serious enough to close connection */
         if (pstat > PARSER_HELLO)
@@ -1364,8 +1366,8 @@ static int epp_request_loop(
                     epp_ctx->pool,
                     apr_pstrcat(rpool, sc->servername, " (", version, ")", NULL),
                     curdate,
-                    &response,
-                    sc->has_contact_mailing_address_extension);
+                    &(sc->xml_schema),
+                    &response);
 
             // hello doesn't fill any return data into cdata,
             // so we have to use a little hack like this for logger:
@@ -1411,7 +1413,7 @@ static int epp_request_loop(
                 epplog(epp_ctx, EPP_WARNING, "Request does not validate");
             }
 
-            if (!sc->has_contact_mailing_address_extension &&
+            if (!sc->xml_schema.has_contact_mailing_address_extension &&
                 epp_request_contains_extra_addr_extension(cdata))
             {
                 /* request contains disabled extension so we return the most appropriate response
@@ -1432,8 +1434,7 @@ static int epp_request_loop(
                              &session_id,
                              act_log_entry_id,
                              &lang,
-                             sc->logd_mandatory,
-                             sc->has_contact_mailing_address_extension))
+                             sc->logd_mandatory))
             {
                 return HTTP_INTERNAL_SERVER_ERROR;
             }
@@ -1776,8 +1777,8 @@ static int epp_process_connection(conn_rec *c)
             epp_ctx.pool,
             apr_pstrcat(epp_ctx.pool, sc->servername, " (", version, ")", NULL),
             curdate,
-            &response,
-            sc->has_contact_mailing_address_extension);
+            &(sc->xml_schema),
+            &response);
     if (gstat != GEN_OK)
     {
         epplog(&epp_ctx, EPP_FATAL, "Error when creating epp greeting");
@@ -2461,8 +2462,179 @@ static const char *set_contact_mailing_address_extension(cmd_parms *cmd, void *d
         return err;
     }
 
-    sc->has_contact_mailing_address_extension = flag;
+    sc->xml_schema.has_contact_mailing_address_extension = flag;
     return NULL;
+}
+
+static const char* set_data_collection_policy_access(cmd_parms *cmd, void *dummy, const char *value)
+{
+    epp_DataCollectionPolicyAccess dcpa;
+    if (strcmp(value, "all") == 0)
+    {
+        dcpa = dcpa_all;
+    }
+    else if (strcmp(value, "none") == 0)
+    {
+        dcpa = dcpa_none;
+    }
+    else
+    {
+        return "Invalid value of EPPdataCollectionPolicyAccess option. Possible values: all, none";
+    }
+    server_rec *const s = cmd->server;
+    eppd_server_conf *const sc =
+            (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
+
+    const char *const err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    if (err != NULL)
+    {
+        return err;
+    }
+
+    sc->xml_schema.data_collection_policy_access = dcpa;
+    return NULL;
+}
+
+static const char* set_available_disclose_element(
+        const char *element,
+        epp_controlled_privacy_data_mask* available_disclose_elements)
+{
+    if (element == NULL)
+    {
+        return "element is NULL";
+    }
+    if (available_disclose_elements == NULL)
+    {
+        return "destination is NULL";
+    }
+
+    if (strcmp(element, "name") == 0)
+    {
+        if (available_disclose_elements->name != 0)
+        {
+            return "duplicated element \"name\"";
+        }
+        available_disclose_elements->name = 1;
+        return NULL;
+    }
+    if (strcmp(element, "organization") == 0)
+    {
+        if (available_disclose_elements->organization != 0)
+        {
+            return "duplicated element \"organization\"";
+        }
+        available_disclose_elements->organization = 1;
+        return NULL;
+    }
+    if (strcmp(element, "address") == 0)
+    {
+        if (available_disclose_elements->address != 0)
+        {
+            return "duplicated element \"address\"";
+        }
+        available_disclose_elements->address = 1;
+        return NULL;
+    }
+    if (strcmp(element, "telephone") == 0)
+    {
+        if (available_disclose_elements->telephone != 0)
+        {
+            return "duplicated element \"telephone\"";
+        }
+        available_disclose_elements->telephone = 1;
+        return NULL;
+    }
+    if (strcmp(element, "fax") == 0)
+    {
+        if (available_disclose_elements->fax != 0)
+        {
+            return "duplicated element \"fax\"";
+        }
+        available_disclose_elements->fax = 1;
+        return NULL;
+    }
+    if (strcmp(element, "email") == 0)
+    {
+        if (available_disclose_elements->email != 0)
+        {
+            return "duplicated element \"email\"";
+        }
+        available_disclose_elements->email = 1;
+        return NULL;
+    }
+    if (strcmp(element, "vat") == 0)
+    {
+        if (available_disclose_elements->vat != 0)
+        {
+            return "duplicated element \"vat\"";
+        }
+        available_disclose_elements->vat = 1;
+        return NULL;
+    }
+    if (strcmp(element, "ident") == 0)
+    {
+        if (available_disclose_elements->ident != 0)
+        {
+            return "duplicated element \"ident\"";
+        }
+        available_disclose_elements->ident = 1;
+        return NULL;
+    }
+    if (strcmp(element, "notifyemail") == 0)
+    {
+        if (available_disclose_elements->notify_email != 0)
+        {
+            return "duplicated element \"notifyemail\"";
+        }
+        available_disclose_elements->notify_email = 1;
+        return NULL;
+    }
+    return "unknown element";
+}
+
+static const char* set_contact_create_discloseflags(cmd_parms *cmd, void *dummy, const char *value)
+{
+    server_rec *const s = cmd->server;
+    eppd_server_conf *const sc =
+            (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
+    const char *const err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    if (err != NULL)
+    {
+        return err;
+    }
+    return set_available_disclose_element(
+            value,
+            &(sc->xml_schema.contact_create_available_disclose_elements));
+}
+
+static const char* set_contact_update_discloseflags(cmd_parms *cmd, void *dummy, const char *value)
+{
+    server_rec *const s = cmd->server;
+    eppd_server_conf *const sc =
+            (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
+    const char *const err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    if (err != NULL)
+    {
+        return err;
+    }
+    return set_available_disclose_element(
+            value,
+            &(sc->xml_schema.contact_update_available_disclose_elements));
+}
+
+static const char* set_contact_info_discloseflags(cmd_parms *cmd, void *dummy, const char *value)
+{
+    server_rec *const s = cmd->server;
+    eppd_server_conf *const sc =
+            (eppd_server_conf *)ap_get_module_config(s->module_config, &eppd_module);
+    const char *const err = ap_check_cmd_context(cmd, NOT_IN_DIR_LOC_FILE | NOT_IN_LIMIT);
+    if (err != NULL)
+    {
+        return err;
+    }
+    return set_available_disclose_element(
+            value,
+            &(sc->xml_schema.contact_info_available_disclose_elements));
 }
 
 /**
@@ -2512,7 +2684,25 @@ static const command_rec eppd_cmds[] = {
         AP_INIT_FLAG(
                 "EPPcontactMailingAddressExtension", set_contact_mailing_address_extension, NULL,
                 RSRC_CONF, "Whether contacts feature mailing address extension."),
-
+        AP_INIT_TAKE1(
+                "EPPdataCollectionPolicyAccess", set_data_collection_policy_access, NULL, RSRC_CONF,
+                "Element <greeting><dcp><access>. Possible values: all, none. "
+                "Mandatory."),
+        AP_INIT_ITERATE(
+                "EPPcontactCreateDiscloseflags", set_contact_create_discloseflags, NULL, RSRC_CONF,
+                "An exhaustive enum of <contact:xxx> elements available in a <contact:disclose> element "
+                "for contactCreate operation. Possible values: name, organization, address, telephone, "
+                "fax, email, vat, ident, notifyemail. Default is an empty enum."),
+        AP_INIT_ITERATE(
+                "EPPcontactUpdateDiscloseflags", set_contact_update_discloseflags, NULL, RSRC_CONF,
+                "An exhaustive enum of <contact:xxx> elements available in a <contact:disclose> element "
+                "for contactUpdate operation. Possible values: name, organization, address, telephone, "
+                "fax, email, vat, ident, notifyemail. Default is an empty enum."),
+        AP_INIT_ITERATE(
+                "EPPcontactInfoDiscloseflags", set_contact_info_discloseflags, NULL, RSRC_CONF,
+                "An exhaustive enum of <contact:xxx> elements available in a <contact:disclose> element "
+                "for contactInfo operation. Possible values: name, organization, address, telephone, "
+                "fax, email, vat, ident, notifyemail. Default is an empty enum."),
         {NULL}};
 
 /**
@@ -2521,8 +2711,27 @@ static const command_rec eppd_cmds[] = {
 static void *create_eppd_config(apr_pool_t *p, server_rec *s)
 {
     eppd_server_conf *const sc = (eppd_server_conf *)apr_pcalloc(p, sizeof(*sc));
-    sc->has_contact_mailing_address_extension =
-            0; // default value means that contacts do not feature mailing address extension
+
+    // default value means that contacts do not feature mailing address extension
+    sc->xml_schema.has_contact_mailing_address_extension = 0;
+
+    sc->xml_schema.data_collection_policy_access = dcpa_none;
+
+    sc->xml_schema.contact_create_available_disclose_elements.name = 0;
+    sc->xml_schema.contact_create_available_disclose_elements.organization = 0;
+    sc->xml_schema.contact_create_available_disclose_elements.address = 0;
+    sc->xml_schema.contact_create_available_disclose_elements.telephone = 0;
+    sc->xml_schema.contact_create_available_disclose_elements.fax = 0;
+    sc->xml_schema.contact_create_available_disclose_elements.email = 0;
+    sc->xml_schema.contact_create_available_disclose_elements.vat = 0;
+    sc->xml_schema.contact_create_available_disclose_elements.ident = 0;
+    sc->xml_schema.contact_create_available_disclose_elements.notify_email = 0;
+
+    sc->xml_schema.contact_update_available_disclose_elements =
+            sc->xml_schema.contact_create_available_disclose_elements;
+
+    sc->xml_schema.contact_info_available_disclose_elements =
+            sc->xml_schema.contact_create_available_disclose_elements;
     return sc;
 }
 

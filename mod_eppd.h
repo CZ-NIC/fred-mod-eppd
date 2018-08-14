@@ -43,7 +43,7 @@ typedef struct
     const char *xml_in_out_log_filename; /**< XML in/out log filename. */
     apr_file_t *xml_in_out_log_file; /**< File handle of XML in/out log file. */
     int defer_err; /**< Time value for deferring error response. */
-    int has_contact_mailing_address_extension; /**< Contacts feature mailing address extension. */
+    eppd_server_xml_conf xml_schema; /**< Entities enabled in xml schemas. */
 } eppd_server_conf;
 
 /**
