@@ -30,7 +30,7 @@ mod_corba apache module
 %{?scl:scl enable llvm-toolset-7 - << \EOF}
 %global __cmake /opt/rh/llvm-toolset-7/root/usr/bin/cmake
 %endif
-%cmake -DVERSION=%{version} .
+%cmake -DVERSION=%{version} -DIDL_DIR=%{path_to_idl} .
 %make_build
 %if 0%{?centos}
 %{?scl:EOF}
