@@ -31,9 +31,9 @@ stamp-h1
 config.status
 config.log
 config.h
-Makefile
+/Makefile
 conf/02-fred-mod-eppd-apache.conf
-fred-mod-eppd.spec
+/fred-mod-eppd.spec
 _dataTypes.h
 _dataTypes-stubs.c
 _dataTypes-common.c
