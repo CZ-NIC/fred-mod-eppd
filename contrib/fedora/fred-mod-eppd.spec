@@ -7,7 +7,7 @@ License:        GPL
 URL:            http://fred.nic.cz
 Source:         %{name}-%{version}.tar.gz
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-BuildRequires:  gcc, apr-devel, httpd-devel, libxml2-devel, openssl-devel, ORBit2-devel, fred-idl, doxygen
+BuildRequires:  git, gcc, apr-devel, httpd-devel, libxml2-devel, openssl-devel, ORBit2-devel, fred-idl, doxygen
 %if 0%{?centos}
 BuildRequires: centos-release-scl, llvm-toolset-7-cmake, llvm-toolset-7-build
 %else

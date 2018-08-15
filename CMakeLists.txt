@@ -8,7 +8,7 @@ macro(assert_binary_in_path name binary)
 endmacro()
 
 assert_binary_in_path(IDL_PROGRAM orbit-idl-2)
-assert_binary_in_path(GIT_PROGRAM git)
+find_program(GIT_PROGRAM git)
 assert_binary_in_path(APXS_PROGRAM apxs)
 assert_binary_in_path(APR_PROGRAM apr-1-config)
 
