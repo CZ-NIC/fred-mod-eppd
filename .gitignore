@@ -31,9 +31,9 @@ stamp-h1
 config.status
 config.log
 config.h
-Makefile
+/Makefile
 conf/02-fred-mod-eppd-apache.conf
-fred-mod-eppd.spec
+/fred-mod-eppd.spec
 _dataTypes.h
 _dataTypes-stubs.c
 _dataTypes-common.c
@@ -61,4 +61,13 @@ Admin-common.c
 tags
 .gitignore.swp
 ar-lib
-
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+lib/
