@@ -11,6 +11,7 @@ assert_binary_in_path(IDL_PROGRAM orbit-idl-2)
 find_program(GIT_PROGRAM git)
 assert_binary_in_path(APXS_PROGRAM apxs)
 assert_binary_in_path(APR_PROGRAM apr-1-config)
+assert_binary_in_path(DOXY_PROGRAM doxygen)
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
@@ -42,8 +43,9 @@ if(NOT VERSION)
 endif()
 set(TARBALL_FILE_NAME "${module_name}-${VERSION}")
 
+set_default(DISTRO_PREFIX "")
+
 set_default(IDL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../idl/idl)
-set_default(DATAROOTDIR ${CMAKE_INSTALL_PREFIX}/usr/share/)
 set_default(LOCALSTATEDIR ${CMAKE_INSTALL_PREFIX}/var)
 set_default(SCHEMA ${CMAKE_CURRENT_SOURCE_DIR}/schemas/all-2.4.0.xsd)
 
@@ -59,6 +61,24 @@ set_default(CONFIG_FILE_NAME 02-fred-mod-eppd-apache.conf)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_BINARY_DIR}/config.h)
 
+set_default(SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
+set_default(PROJECT ${module_name})
+set_default(DOCDIR doc)
+set_default(PERL_PATH "/usr/bin/perl")
+set_default(HAVE_DOT "YES")
+set_default(DOT_PATH "/usr/bin/dot")
+set_default(GENERATE_MAN "NO")
+set_default(GENERATE_RTF "NO")
+set_default(GENERATE_XML "NO")
+set_default(GENERATE_HTMLHELP "NO")
+set_default(GENERATE_CHI "NO")
+set_default(GENERATE_HTML "YES")
+set_default(GENERATE_LATEX "NO")
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/doxy.conf.cmake ${CMAKE_BINARY_DIR}/doxy.conf)
+
+execute_process(COMMAND ${DOXY_PROGRAM} doxy.conf
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 function(compile_idl_files)
     message(STATUS "Compiling idl...")
@@ -338,16 +358,20 @@ set_common_properties_on_targets(
     ${module_name})
 
 install(TARGETS ${module_name} LIBRARY DESTINATION ${APXS_MODULES})
-install(DIRECTORY ${CMAKE_BINARY_DIR}/conf/ DESTINATION ${DATAROOTDIR}/conf FILES_MATCHING PATTERN "*.conf")
+install(DIRECTORY ${CMAKE_BINARY_DIR}/conf/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd FILES_MATCHING PATTERN "*.conf")
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/schemas/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd/schemas FILES_MATCHING PATTERN "*")
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/ssl/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd/ssl FILES_MATCHING PATTERN "*")
+install(DIRECTORY ${CMAKE_BINARY_DIR}/doc/html/ DESTINATION ${DISTRO_PREFIX}share/doc/fred-mod-eppd FILES_MATCHING PATTERN "*")
 
 add_custom_target(uninstall_module COMMAND rm ${CMAKE_INSTALL_PREFIX}/${APXS_MODULES}/lib${module_name}.so)
-add_custom_target(uninstall_configuration COMMAND rm ${DATAROOTDIR}/conf/${CONFIG_FILE_NAME})
-add_custom_target(uninstall DEPENDS uninstall_module uninstall_configuration)
+add_custom_target(uninstall_doc COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}/${DISTRO_PREFIX}share/doc/fred-mod-eppd)
+add_custom_target(uninstall_others COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}/${DISTRO_PREFIX}share/fred-mod-eppd)
+add_custom_target(uninstall DEPENDS uninstall_module uninstall_doc uninstall_others)
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/.git AND GIT_PROGRAM)
     if(NOT TARGET dist)
         add_custom_target(dist
-            COMMAND ${GIT_PROGRAM} archive --format=tar --prefix=${TARBALL_FILE_NAME}/ HEAD | gzip > ${CMAKE_BINARY_DIR}/${TARBALL_FILE_NAME}.tar.gz
+            COMMAND ${GIT_PROGRAM} archive --format=tar.gz --prefix=${TARBALL_FILE_NAME}/ HEAD -o ${CMAKE_BINARY_DIR}/${TARBALL_FILE_NAME}.tar.gz
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     endif()
 
