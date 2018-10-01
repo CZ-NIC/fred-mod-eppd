@@ -1126,7 +1126,7 @@ static void parse_create_contact(void *pool, xmlXPathContextPtr xpathCtx, epp_co
     }
 
     epp_PrivacyPolicy default_privacy_policy;
-    switch (get_default_data_collection_policy_access())
+    switch (cdata->xml_schema.data_collection_policy_access)
     {
         case dcpa_all:
             default_privacy_policy = public_data;
