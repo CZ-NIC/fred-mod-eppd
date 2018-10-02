@@ -54,11 +54,6 @@ typedef enum
     dcpa_none,
 } epp_DataCollectionPolicyAccess;
 
-inline epp_DataCollectionPolicyAccess get_default_data_collection_policy_access()
-{
-    return dcpa_none;
-}
-
 /**
  * Enumeration of codes of all EPP commands this module is able to handle.
  * The object specific commands are written as EPP_{command}_{object}.
