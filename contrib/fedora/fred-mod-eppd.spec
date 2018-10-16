@@ -14,7 +14,7 @@ BuildRequires: centos-release-scl, llvm-toolset-7-cmake, llvm-toolset-7-build
 %else
 BuildRequires: cmake
 %endif
-Requires: httpd, libxml2, openssl, fred-mod-corba, mod_ssl, policycoreutils-python
+Requires: httpd, libxml2, openssl, fred-mod-corba, mod_ssl, /usr/sbin/semanage
 
 %description
 FRED (Free Registry for Enum and Domain) is free registry system for 
@@ -44,8 +44,9 @@ find ${RPM_BUILD_ROOT}/usr/share/doc/ | cut -c$(echo -n "${RPM_BUILD_ROOT} " | w
 
 %post
 test -f /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf || ln -s /usr/share/fred-mod-eppd/02-fred-mod-eppd-apache.conf /etc/httpd/conf.d/
-/usr/sbin/semanage port -a -t http_port_t -p tcp 700
-
+/usr/sbin/sestatus | grep -q "SELinux status:.*disabled" || {
+   /usr/sbin/semanage port -a -t http_port_t -p tcp 700
+}
 %preun
 test ! -f /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf || rm /etc/httpd/conf.d/02-fred-mod-eppd-apache.conf
 
