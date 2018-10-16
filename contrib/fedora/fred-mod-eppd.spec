@@ -14,7 +14,7 @@ BuildRequires: centos-release-scl, llvm-toolset-7-cmake, llvm-toolset-7-build
 %else
 BuildRequires: cmake
 %endif
-Requires: httpd, libxml2, openssl, fred-mod-corba, mod_ssl, /usr/sbin/semanage
+Requires: httpd, libxml2, openssl, fred-mod-corba, mod_ssl, /usr/sbin/semanage, /usr/sbin/sestatus
 
 %description
 FRED (Free Registry for Enum and Domain) is free registry system for 
