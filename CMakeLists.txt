@@ -322,9 +322,10 @@ target_add_flags_for_external_libraries(modeppd
     orbitcosnaming2
     apxs)
 
-add_library(${module_name} SHARED
+add_library(eppd SHARED
     epp_test.c)
-target_link_libraries(${module_name}
+set_target_properties(eppd PROPERTIES PREFIX "mod_")
+target_link_libraries(eppd
     modeppd
     corbadatatypes
     corbaregistry
@@ -334,12 +335,12 @@ target_link_libraries(${module_name}
     corbafilters
     corbaadmin
     xmleppd)
-target_link_external_libraries(${module_name}
+target_link_external_libraries(eppd
     xml2
     apr
     orbit2
     orbitcosnaming2)
-target_add_flags_for_external_libraries(${module_name}
+target_add_flags_for_external_libraries(eppd
     xml2
     apr
     orbit2
@@ -355,15 +356,15 @@ set_common_properties_on_targets(
     corbafilters
     corbaadmin
     xmleppd
-    ${module_name})
+    eppd)
 
-install(TARGETS ${module_name} LIBRARY DESTINATION ${APXS_MODULES})
+install(TARGETS eppd LIBRARY DESTINATION ${APXS_MODULES})
 install(DIRECTORY ${CMAKE_BINARY_DIR}/conf/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd FILES_MATCHING PATTERN "*.conf")
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/schemas/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd/schemas FILES_MATCHING PATTERN "*")
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/ssl/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd/ssl FILES_MATCHING PATTERN "*")
 install(DIRECTORY ${CMAKE_BINARY_DIR}/doc/html/ DESTINATION ${DISTRO_PREFIX}share/doc/fred-mod-eppd FILES_MATCHING PATTERN "*")
 
-add_custom_target(uninstall_module COMMAND rm ${CMAKE_INSTALL_PREFIX}/${APXS_MODULES}/lib${module_name}.so)
+add_custom_target(uninstall_module COMMAND rm ${CMAKE_INSTALL_PREFIX}/${APXS_MODULES}/mod_eppd.so)
 add_custom_target(uninstall_doc COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}/${DISTRO_PREFIX}share/doc/fred-mod-eppd)
 add_custom_target(uninstall_others COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}/${DISTRO_PREFIX}share/fred-mod-eppd)
 add_custom_target(uninstall DEPENDS uninstall_module uninstall_doc uninstall_others)
