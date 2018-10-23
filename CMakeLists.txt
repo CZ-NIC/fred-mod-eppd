@@ -48,6 +48,7 @@ set_default(DISTRO_PREFIX "")
 set_default(IDL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../idl/idl)
 set_default(LOCALSTATEDIR ${CMAKE_INSTALL_PREFIX}/var)
 set_default(SCHEMA ${CMAKE_CURRENT_SOURCE_DIR}/schemas/all-2.4.0.xsd)
+set_default(DATAROOTDIR ${CMAKE_INSTALL_PREFIX}/usr/share)
 
 set_default(NSHOST localhost)
 set_default(OBJECTNAME EPP)
@@ -63,6 +64,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_BINARY_DIR}/co
 
 set_default(SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
 set_default(PROJECT ${module_name})
+set_default(PACKAGE ${module_name})
 set_default(DOCDIR doc)
 set_default(PERL_PATH "/usr/bin/perl")
 set_default(HAVE_DOT "YES")
@@ -189,6 +191,11 @@ store_flag_info(orbitcosnaming2 ORBITCOSNAMING2_CFLAGS)
 store_include_info(orbitcosnaming2 ORBITCOSNAMING2_INCLUDE_DIRS)
 store_linker_info(orbitcosnaming2 ORBITCOSNAMING2_LIBRARIES)
 
+pkg_search_module(LIBCRYPTO REQUIRED libcrypto)
+store_flag_info(crypto LIBCRYPTO_CFLAGS)
+store_include_info(crypto LIBCRYPTO_INCLUDE_DIRS)
+store_linker_info(crypto LIBCRYPTO_LIBRARIES)
+
 
 function(set_common_properties_on_targets)
     foreach(target_name ${ARGN})
@@ -310,7 +317,6 @@ add_library(modeppd STATIC
     epp_common.c
     epp-client.c
     logd-client.c
-    mod_eppd.c
     xml-in-out-log.c
     xml-in-out-log-details.c)
 target_include_external_libraries(modeppd
@@ -323,9 +329,40 @@ target_add_flags_for_external_libraries(modeppd
     apxs)
 
 add_library(eppd SHARED
-    epp_test.c)
+    mod_eppd.c)
 set_target_properties(eppd PROPERTIES PREFIX "mod_")
 target_link_libraries(eppd
+    modeppd
+    corbadatatypes
+    corbalogger
+    corbaepp
+    corbaadmin
+    corbafilters
+    xmleppd
+    corbawhois
+    corbaregistry)
+target_include_external_libraries(eppd
+    xml2
+    apr
+    orbit2
+    orbitcosnaming2
+    crypto)
+target_link_external_libraries(eppd
+    xml2
+    apr
+    orbit2
+    orbitcosnaming2
+    crypto)
+target_add_flags_for_external_libraries(eppd
+    xml2
+    apr
+    orbit2
+    orbitcosnaming2
+    crypto)
+
+add_executable(epp_test
+    epp_test.c)
+target_link_libraries(epp_test
     modeppd
     corbadatatypes
     corbaregistry
@@ -335,12 +372,12 @@ target_link_libraries(eppd
     corbafilters
     corbaadmin
     xmleppd)
-target_link_external_libraries(eppd
+target_link_external_libraries(epp_test
     xml2
     apr
     orbit2
     orbitcosnaming2)
-target_add_flags_for_external_libraries(eppd
+target_add_flags_for_external_libraries(epp_test
     xml2
     apr
     orbit2
