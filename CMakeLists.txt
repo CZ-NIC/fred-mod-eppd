@@ -48,6 +48,7 @@ set_default(DISTRO_PREFIX "")
 set_default(IDL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../idl/idl)
 set_default(LOCALSTATEDIR ${CMAKE_INSTALL_PREFIX}/var)
 set_default(SCHEMA ${CMAKE_CURRENT_SOURCE_DIR}/schemas/all-2.4.0.xsd)
+set_default(DATAROOTDIR ${CMAKE_INSTALL_PREFIX}/usr/share)
 
 set_default(NSHOST localhost)
 set_default(OBJECTNAME EPP)
@@ -63,6 +64,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_BINARY_DIR}/co
 
 set_default(SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
 set_default(PROJECT ${module_name})
+set_default(PACKAGE ${module_name})
 set_default(DOCDIR doc)
 set_default(PERL_PATH "/usr/bin/perl")
 set_default(HAVE_DOT "YES")
@@ -189,6 +191,11 @@ store_flag_info(orbitcosnaming2 ORBITCOSNAMING2_CFLAGS)
 store_include_info(orbitcosnaming2 ORBITCOSNAMING2_INCLUDE_DIRS)
 store_linker_info(orbitcosnaming2 ORBITCOSNAMING2_LIBRARIES)
 
+pkg_search_module(LIBCRYPTO REQUIRED libcrypto)
+store_flag_info(crypto LIBCRYPTO_CFLAGS)
+store_include_info(crypto LIBCRYPTO_INCLUDE_DIRS)
+store_linker_info(crypto LIBCRYPTO_LIBRARIES)
+
 
 function(set_common_properties_on_targets)
     foreach(target_name ${ARGN})
@@ -310,7 +317,6 @@ add_library(modeppd STATIC
     epp_common.c
     epp-client.c
     logd-client.c
-    mod_eppd.c
     xml-in-out-log.c
     xml-in-out-log-details.c)
 target_include_external_libraries(modeppd
@@ -322,9 +328,41 @@ target_add_flags_for_external_libraries(modeppd
     orbitcosnaming2
     apxs)
 
-add_library(${module_name} SHARED
+add_library(eppd SHARED
+    mod_eppd.c)
+set_target_properties(eppd PROPERTIES PREFIX "mod_")
+target_link_libraries(eppd
+    modeppd
+    corbadatatypes
+    corbalogger
+    corbaepp
+    corbaadmin
+    corbafilters
+    xmleppd
+    corbawhois
+    corbaregistry)
+target_include_external_libraries(eppd
+    xml2
+    apr
+    orbit2
+    orbitcosnaming2
+    crypto)
+target_link_external_libraries(eppd
+    xml2
+    apr
+    orbit2
+    orbitcosnaming2
+    crypto)
+target_add_flags_for_external_libraries(eppd
+    xml2
+    apr
+    orbit2
+    orbitcosnaming2
+    crypto)
+
+add_executable(epp_test
     epp_test.c)
-target_link_libraries(${module_name}
+target_link_libraries(epp_test
     modeppd
     corbadatatypes
     corbaregistry
@@ -334,12 +372,12 @@ target_link_libraries(${module_name}
     corbafilters
     corbaadmin
     xmleppd)
-target_link_external_libraries(${module_name}
+target_link_external_libraries(epp_test
     xml2
     apr
     orbit2
     orbitcosnaming2)
-target_add_flags_for_external_libraries(${module_name}
+target_add_flags_for_external_libraries(epp_test
     xml2
     apr
     orbit2
@@ -355,15 +393,15 @@ set_common_properties_on_targets(
     corbafilters
     corbaadmin
     xmleppd
-    ${module_name})
+    eppd)
 
-install(TARGETS ${module_name} LIBRARY DESTINATION ${APXS_MODULES})
+install(TARGETS eppd LIBRARY DESTINATION ${APXS_MODULES})
 install(DIRECTORY ${CMAKE_BINARY_DIR}/conf/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd FILES_MATCHING PATTERN "*.conf")
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/schemas/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd/schemas FILES_MATCHING PATTERN "*")
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/ssl/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd/ssl FILES_MATCHING PATTERN "*")
 install(DIRECTORY ${CMAKE_BINARY_DIR}/doc/html/ DESTINATION ${DISTRO_PREFIX}share/doc/fred-mod-eppd FILES_MATCHING PATTERN "*")
 
-add_custom_target(uninstall_module COMMAND rm ${CMAKE_INSTALL_PREFIX}/${APXS_MODULES}/lib${module_name}.so)
+add_custom_target(uninstall_module COMMAND rm ${CMAKE_INSTALL_PREFIX}/${APXS_MODULES}/mod_eppd.so)
 add_custom_target(uninstall_doc COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}/${DISTRO_PREFIX}share/doc/fred-mod-eppd)
 add_custom_target(uninstall_others COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}/${DISTRO_PREFIX}share/fred-mod-eppd)
 add_custom_target(uninstall DEPENDS uninstall_module uninstall_doc uninstall_others)

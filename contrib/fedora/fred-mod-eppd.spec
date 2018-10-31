@@ -55,7 +55,7 @@ rm -rf ${RPM_BUILD_ROOT}
 
 %files -f INSTALLED_FILES
 %defattr(-,root,root,-)
-%{_libdir}/httpd/modules/libfred-mod-eppd.so
+%{_libdir}/httpd/modules/mod_eppd.so
 /usr/share/fred-mod-eppd/02-fred-mod-eppd-apache.conf
 /usr/share/fred-mod-eppd/schemas/*.xsd
 /usr/share/fred-mod-eppd/schemas/README
