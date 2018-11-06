@@ -43,8 +43,6 @@ if(NOT VERSION)
 endif()
 set(TARBALL_FILE_NAME "${module_name}-${VERSION}")
 
-set_default(DISTRO_PREFIX "")
-
 set_default(IDL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../idl/idl)
 set_default(LOCALSTATEDIR ${CMAKE_INSTALL_PREFIX}/var)
 set_default(SCHEMA ${CMAKE_CURRENT_SOURCE_DIR}/schemas/all-2.4.0.xsd)
@@ -396,14 +394,14 @@ set_common_properties_on_targets(
     eppd)
 
 install(TARGETS eppd LIBRARY DESTINATION ${APXS_MODULES})
-install(DIRECTORY ${CMAKE_BINARY_DIR}/conf/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd FILES_MATCHING PATTERN "*.conf")
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/schemas/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd/schemas FILES_MATCHING PATTERN "*")
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/ssl/ DESTINATION ${DISTRO_PREFIX}share/fred-mod-eppd/ssl FILES_MATCHING PATTERN "*")
-install(DIRECTORY ${CMAKE_BINARY_DIR}/doc/html/ DESTINATION ${DISTRO_PREFIX}share/doc/fred-mod-eppd FILES_MATCHING PATTERN "*")
+install(DIRECTORY ${CMAKE_BINARY_DIR}/conf/ DESTINATION ${DATAROOTDIR}/fred-mod-eppd FILES_MATCHING PATTERN "*.conf")
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/schemas/ DESTINATION ${DATAROOTDIR}/fred-mod-eppd/schemas FILES_MATCHING PATTERN "*")
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/ssl/ DESTINATION ${DATAROOTDIR}/fred-mod-eppd/ssl FILES_MATCHING PATTERN "*")
+install(DIRECTORY ${CMAKE_BINARY_DIR}/doc/html/ DESTINATION ${DATAROOTDIR}/doc/fred-mod-eppd FILES_MATCHING PATTERN "*")
 
 add_custom_target(uninstall_module COMMAND rm ${CMAKE_INSTALL_PREFIX}/${APXS_MODULES}/mod_eppd.so)
-add_custom_target(uninstall_doc COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}/${DISTRO_PREFIX}share/doc/fred-mod-eppd)
-add_custom_target(uninstall_others COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}/${DISTRO_PREFIX}share/fred-mod-eppd)
+add_custom_target(uninstall_doc COMMAND rm -rf ${DATAROOTDIR}/doc/fred-mod-eppd)
+add_custom_target(uninstall_others COMMAND rm -rf ${DATAROOTDIR}/fred-mod-eppd)
 add_custom_target(uninstall DEPENDS uninstall_module uninstall_doc uninstall_others)
 
 if(EXISTS ${CMAKE_SOURCE_DIR}/.git AND GIT_PROGRAM)
