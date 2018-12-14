@@ -60,7 +60,7 @@ LoadModule eppd_module  @MODULE_INSTALLDIR@/mod_eppd.so
 
    # Element <greeting><dcp><access>
    # possibilities: all, none
-   EPPdataCollectionPolicyAccess none
+   EPPdataCollectionPolicyAccess all
    # An exhaustive enum of <contact:xxx> elements available in a <contact:disclose> element
    # for contactCreate operation
    EPPcontactCreateDiscloseflags telephone fax email vat ident notifyemail
