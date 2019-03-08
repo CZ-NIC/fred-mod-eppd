@@ -69,6 +69,15 @@ if(NOT VERSION)
 endif()
 set(TARBALL_FILE_NAME "${module_name}-${VERSION}")
 
+if(NOT GIT_PROGRAM)
+    set(REVISION "unknown")
+else()
+    execute_process(COMMAND ${GIT_PROGRAM} "rev-parse" "HEAD"
+                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                    OUTPUT_VARIABLE RAWREVISION)
+    string(REGEX REPLACE "\n" "" REVISION "${RAWREVISION}")
+endif()
+
 set_default_path(IDL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../idl/idl)
 set_default_path(LOCALSTATEDIR ${CMAKE_INSTALL_PREFIX}/var)
 set_default_path(SCHEMA ${CMAKE_CURRENT_SOURCE_DIR}/schemas/all-2.4.0.xsd)
@@ -80,11 +89,12 @@ set_default(LOGGER_OBJECTNAME Logger)
 set_default(EPP_PERF 1)
 
 set_default(PORT 700)
-set_default(SVN_REV ${VERSION})
+set_default(GIT_REVISION "${REVISION}")
+set_default(MOD_VERSION "${VERSION}")
 
 set_default(CONFIG_FILE_NAME 02-fred-mod-eppd-apache.conf)
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_BINARY_DIR}/config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_BINARY_DIR}/config.h)
 
 set_default(SRCDIR ${CMAKE_CURRENT_SOURCE_DIR})
 set_default(PROJECT ${module_name})
@@ -101,7 +111,7 @@ set_default(GENERATE_CHI "NO")
 set_default(GENERATE_HTML "YES")
 set_default(GENERATE_LATEX "NO")
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/doxy.conf.cmake ${CMAKE_BINARY_DIR}/doxy.conf)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/doxy.conf.in ${CMAKE_BINARY_DIR}/doxy.conf)
 
 execute_process(COMMAND ${DOXY_PROGRAM} doxy.conf
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

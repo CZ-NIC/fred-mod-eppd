@@ -2076,9 +2076,9 @@ static int epp_postconfig_hook(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptem
             0,
             s,
             "mod_eppd started (mod_eppd "
-            "version %s, SVN revision %s, BUILT %s %s)",
-            PACKAGE_VERSION,
-            SVN_REV,
+            "version %s, GIT revision %s, BUILT %s %s)",
+            MOD_VERSION,
+            GIT_REVISION,
             __DATE__,
             __TIME__);
 
