@@ -1,3 +1,11 @@
+2019-03-18 (2.20.0)
+
+    * CMake fixes
+
+    * Autotools removal
+
+    * License GNU GPLv3+
+
 2018-08-16 (2.19.0)
 
     * Disclose flags policy configuration
