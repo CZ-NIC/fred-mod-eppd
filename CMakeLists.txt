@@ -69,13 +69,15 @@ if(NOT VERSION)
 endif()
 set(TARBALL_FILE_NAME "${module_name}-${VERSION}")
 
-if(NOT GIT_PROGRAM)
-    set(REVISION "unknown")
-else()
-    execute_process(COMMAND ${GIT_PROGRAM} "rev-parse" "HEAD"
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                    OUTPUT_VARIABLE RAWREVISION)
-    string(REGEX REPLACE "\n" "" REVISION "${RAWREVISION}")
+if(NOT REVISION)
+    if(NOT GIT_PROGRAM)
+        set(REVISION "unknown")
+    else()
+        execute_process(COMMAND ${GIT_PROGRAM} "rev-parse" "HEAD"
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            OUTPUT_VARIABLE RAWREVISION)
+        string(REGEX REPLACE "\n" "" REVISION "${RAWREVISION}")
+    endif()
 endif()
 
 set_default_path(IDL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../idl/idl)
