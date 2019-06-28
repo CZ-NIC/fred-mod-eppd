@@ -1,0 +1,2 @@
+# <repository> <commitish> <clone-path>
+fred/idl 2.35.0 external/idl

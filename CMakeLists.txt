@@ -80,7 +80,7 @@ if(NOT REVISION)
     endif()
 endif()
 
-set_default_path(IDL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../idl/idl)
+set_default_path(IDL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/idl/idl)
 set_default_path(LOCALSTATEDIR ${CMAKE_INSTALL_PREFIX}/var)
 set_default_path(SCHEMA ${CMAKE_CURRENT_SOURCE_DIR}/schemas/all-2.4.0.xsd)
 set_default_path(DATAROOTDIR ${CMAKE_INSTALL_PREFIX}/${USR_SHARE_PREFIX}/share)
