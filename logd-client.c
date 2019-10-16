@@ -926,7 +926,7 @@ static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_co
     return action_type;
 }
 
-static epp_action_type log_props_check(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+static epp_action_type log_props_check(__attribute__((unused)) ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
 
