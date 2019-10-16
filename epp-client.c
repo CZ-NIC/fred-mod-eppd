@@ -384,7 +384,8 @@ epilog_success(epp_context *epp_ctx, epp_command_data *cdata, ccReg_Response *re
 static int epilog_failure(epp_context *epp_ctx, epp_command_data *cdata, ccReg_EPP_EppError *exc)
 {
     ccReg_Error *c_error;
-    int i, cerrno;
+    unsigned long i;
+    int cerrno;
 
     CLEAR_CERRNO(cerrno);
     cdata->svTRID = unwrap_str_req(epp_ctx, exc->svTRID, &cerrno, "svTRID");
@@ -498,7 +499,9 @@ static corba_status epp_call_dummy(
     ccReg_Response *response;
     ccReg_XmlErrors *c_errorCodes;
     ccReg_ErrorStrings *c_errStrings;
-    int len, i, retr;
+    unsigned long len;
+    int i;
+    int retr;
     int cerrno;
 
     /*
@@ -784,7 +787,9 @@ static corba_status epp_call_check(
     ccReg_CheckResp *c_avails;
     ccReg_Check *c_ids;
     ccReg_Response *response;
-    int len, i, retr;
+    unsigned long len;
+    unsigned long i;
+    int retr;
     epps_check *check;
 
     check = cdata->data;
@@ -953,7 +958,8 @@ static ccReg_PrivacyPolicy epp_PrivacyPolicy_to_ccReg_PrivacyPolicy(epp_PrivacyP
 static int info_contact_data_copy(
         epp_context *epp_ctx, epps_info_contact *info_contact, const ccReg_Contact *c_contact, CORBA_Environment *ev)
 {
-    int i, cerrno;
+    unsigned long i; 
+    int cerrno;
 
     CLEAR_CERRNO(cerrno);
 
@@ -1317,7 +1323,8 @@ int info_domain_data_copy(
         epp_context *epp_ctx, epps_info_domain *info_domain, ccReg_Domain *c_domain,
         CORBA_Environment *ev)
 {
-    int i, cerrno;
+    unsigned long i;
+    int cerrno;
 
     CLEAR_CERRNO(cerrno);
 
@@ -1531,7 +1538,8 @@ int info_nsset_data_copy(
         epp_context *epp_ctx, epps_info_nsset *info_nsset, ccReg_NSSet *c_nsset,
         CORBA_Environment *ev)
 {
-    int i, cerrno;
+    unsigned long i; 
+    int cerrno;
 
     CLEAR_CERRNO(cerrno);
 
@@ -1600,7 +1608,7 @@ int info_nsset_data_copy(
     for (i = 0; i < c_nsset->dns._length; i++)
     {
         epp_ns *ns_item;
-        int j;
+        unsigned long j;
 
         ns_item = epp_calloc(epp_ctx->pool, sizeof *ns_item);
         if (ns_item == NULL)
@@ -1719,7 +1727,8 @@ int info_keyset_data_copy(
         epp_context *epp_ctx, epps_info_keyset *info_keyset, ccReg_KeySet *c_keyset,
         CORBA_Environment *ev)
 {
-    int i, cerrno;
+    unsigned long i;
+    int cerrno;
 
     CLEAR_CERRNO(cerrno);
 
@@ -2124,7 +2133,7 @@ static corba_status epp_call_poll_req(
         case ccReg_polltype_techcheck:
         {
             ccReg_PollMsg_Techcheck *tc = (ccReg_PollMsg_Techcheck *)c_mesg->_value;
-            int i;
+            unsigned long i;
 
             poll_req->type = pt_techcheck;
             poll_req->msg.tc.handle = unwrap_str(epp_ctx->pool, tc->handle, &cerrno);
@@ -4519,7 +4528,8 @@ static corba_status epp_call_list(
     ccReg_EppParams *c_params = NULL;
     ccReg_Response *response;
     ccReg_Lists *c_handles;
-    int i, retr;
+    unsigned long i;
+    int retr;
     epps_list *list;
 
     list = cdata->data;
@@ -4703,7 +4713,8 @@ static corba_status epp_call_creditinfo(
     ccReg_ZoneCredit *c_zoneCredit;
     ccReg_Response *response;
     epps_creditInfo *creditInfo;
-    int retr, i;
+    int retr;
+    unsigned long i;
 
     creditInfo = cdata->data;
     /*
@@ -4966,7 +4977,8 @@ static corba_status epp_call_getInfoResults(
     ccReg_EppParams *c_params = NULL;
     ccReg_Response *response;
     ccReg_Lists *c_handles;
-    int i, retr;
+    unsigned long i;
+    int retr;
     epps_list *list;
 
     list = cdata->data;

@@ -168,7 +168,7 @@ epp_property_push(ccReg_RequestProperties *c_props, char *name, char *value, COR
 
     if (value != NULL)
     {
-        int old_length;
+        unsigned long old_length;
         ccReg_RequestProperty new_prop;
 
         new_prop.name = name;
@@ -205,7 +205,7 @@ ccReg_RequestProperties *
 epp_property_push_int(ccReg_RequestProperties *c_props, char *name, int value)
 {
     char str[12];
-    int old_length;
+    unsigned long old_length;
     ccReg_RequestProperty new_prop;
 
     if (c_props == NULL)

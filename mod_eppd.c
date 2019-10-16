@@ -767,7 +767,7 @@ static int get_md5(char *cert_md5, char *pem)
 {
     X509 *x; /* openssl's struture for representing x509 certificate */
     BIO *bio; /* openssl's basic input/output stream */
-    int i;
+    unsigned int i;
     unsigned int len; /* length of fingerprint in binary form */
     unsigned char md5[20]; /* fingerprint in binary form */
 
@@ -1872,7 +1872,7 @@ static apr_status_t epp_output_filter(ap_filter_t *f, apr_bucket_brigade *bb)
     {
 
         /* catch weird situation which will probably never happen */
-        if (b->length == -1)
+        if (b->length == (apr_size_t)(-1))
             ap_log_cerror(
                     APLOG_MARK,
                     APLOG_ERR,
