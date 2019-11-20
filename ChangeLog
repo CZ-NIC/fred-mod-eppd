@@ -1,3 +1,9 @@
+2019-10-20 (2.20.1)
+
+    * Update spec file for F31 and Centos/RHEL 8
+
+    * Gitlab CI
+
 2019-03-18 (2.20.0)
 
     * CMake fixes
