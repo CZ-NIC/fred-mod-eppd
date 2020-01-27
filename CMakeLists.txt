@@ -259,7 +259,7 @@ endfunction()
 function(set_corba_properties_on_targets)
     foreach(target_name ${ARGN})
         message(STATUS "setting properties on: " ${target_name})
-        target_compile_options(${target_name} 
+        target_compile_options(${target_name}
            PUBLIC "-Wno-unused-const-variable"
            PUBLIC "-Wno-unused-parameter")
     endforeach()

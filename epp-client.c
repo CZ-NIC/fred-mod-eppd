@@ -957,7 +957,7 @@ static ccReg_PrivacyPolicy epp_PrivacyPolicy_to_ccReg_PrivacyPolicy(epp_PrivacyP
 static int info_contact_data_copy(
         epp_context *epp_ctx, epps_info_contact *info_contact, const ccReg_Contact *c_contact)
 {
-    unsigned long i; 
+    unsigned long i;
     int cerrno;
 
     CLEAR_CERRNO(cerrno);
@@ -1535,7 +1535,7 @@ static corba_status epp_call_info_domain(
 int info_nsset_data_copy(
         epp_context *epp_ctx, epps_info_nsset *info_nsset, ccReg_NSSet *c_nsset)
 {
-    unsigned long i; 
+    unsigned long i;
     int cerrno;
 
     CLEAR_CERRNO(cerrno);
