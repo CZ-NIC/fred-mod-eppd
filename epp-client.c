@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2018  CZ.NIC, z. s. p. o.
+ * Copyright (C) 2006-2019  CZ.NIC, z. s. p. o.
  *
  * This file is part of FRED.
  *
@@ -384,7 +384,8 @@ epilog_success(epp_context *epp_ctx, epp_command_data *cdata, ccReg_Response *re
 static int epilog_failure(epp_context *epp_ctx, epp_command_data *cdata, ccReg_EPP_EppError *exc)
 {
     ccReg_Error *c_error;
-    int i, cerrno;
+    unsigned long i;
+    int cerrno;
 
     CLEAR_CERRNO(cerrno);
     cdata->svTRID = unwrap_str_req(epp_ctx, exc->svTRID, &cerrno, "svTRID");
@@ -498,7 +499,9 @@ static corba_status epp_call_dummy(
     ccReg_Response *response;
     ccReg_XmlErrors *c_errorCodes;
     ccReg_ErrorStrings *c_errStrings;
-    int len, i, retr;
+    unsigned long len;
+    int i;
+    int retr;
     int cerrno;
 
     /*
@@ -784,7 +787,9 @@ static corba_status epp_call_check(
     ccReg_CheckResp *c_avails;
     ccReg_Check *c_ids;
     ccReg_Response *response;
-    int len, i, retr;
+    unsigned long len;
+    unsigned long i;
+    int retr;
     epps_check *check;
 
     check = cdata->data;
@@ -947,13 +952,13 @@ static ccReg_PrivacyPolicy epp_PrivacyPolicy_to_ccReg_PrivacyPolicy(epp_PrivacyP
  * @param epp_ctx      Epp context
  * @param info_contact Destination contact data structure
  * @param c_contact    Source contact data structure
- * @param ev           Corba exception
  *
  */
 static int info_contact_data_copy(
-        epp_context *epp_ctx, epps_info_contact *info_contact, const ccReg_Contact *c_contact, CORBA_Environment *ev)
+        epp_context *epp_ctx, epps_info_contact *info_contact, const ccReg_Contact *c_contact)
 {
-    int i, cerrno;
+    unsigned long i;
+    int cerrno;
 
     CLEAR_CERRNO(cerrno);
 
@@ -1293,7 +1298,7 @@ static corba_status epp_call_info_contact(
     {
         return handle_exception(epp_ctx, cdata, ev);
     }
-    if (info_contact_data_copy(epp_ctx, info_contact, c_contact, ev) == 1)
+    if (info_contact_data_copy(epp_ctx, info_contact, c_contact) == 1)
     {
         CORBA_free(c_contact);
         return epilog_success(epp_ctx, cdata, response);
@@ -1317,7 +1322,8 @@ int info_domain_data_copy(
         epp_context *epp_ctx, epps_info_domain *info_domain, ccReg_Domain *c_domain,
         CORBA_Environment *ev)
 {
-    int i, cerrno;
+    unsigned long i;
+    int cerrno;
 
     CLEAR_CERRNO(cerrno);
 
@@ -1524,14 +1530,13 @@ static corba_status epp_call_info_domain(
  * @param epp_ctx     Epp context
  * @param info_nsset  Destination nsset data structure
  * @param c_nsset     Source nsset data structure
- * @param ev          Corba exception
  *
  */
 int info_nsset_data_copy(
-        epp_context *epp_ctx, epps_info_nsset *info_nsset, ccReg_NSSet *c_nsset,
-        CORBA_Environment *ev)
+        epp_context *epp_ctx, epps_info_nsset *info_nsset, ccReg_NSSet *c_nsset)
 {
-    int i, cerrno;
+    unsigned long i;
+    int cerrno;
 
     CLEAR_CERRNO(cerrno);
 
@@ -1600,7 +1605,7 @@ int info_nsset_data_copy(
     for (i = 0; i < c_nsset->dns._length; i++)
     {
         epp_ns *ns_item;
-        int j;
+        unsigned long j;
 
         ns_item = epp_calloc(epp_ctx->pool, sizeof *ns_item);
         if (ns_item == NULL)
@@ -1692,7 +1697,7 @@ static corba_status epp_call_info_nsset(
     if (raised_exception(ev))
         return handle_exception(epp_ctx, cdata, ev);
 
-    if (info_nsset_data_copy(epp_ctx, info_nsset, c_nsset, ev) == 1)
+    if (info_nsset_data_copy(epp_ctx, info_nsset, c_nsset) == 1)
     {
         CORBA_free(c_nsset);
         return epilog_success(epp_ctx, cdata, response);
@@ -1712,14 +1717,13 @@ static corba_status epp_call_info_nsset(
  * @param epp_ctx     Epp context
  * @param info_keyset Destination keyset data structure
  * @param c_keyset    Source keyset data structure
- * @param ev          Corba exception
  *
  */
 int info_keyset_data_copy(
-        epp_context *epp_ctx, epps_info_keyset *info_keyset, ccReg_KeySet *c_keyset,
-        CORBA_Environment *ev)
+        epp_context *epp_ctx, epps_info_keyset *info_keyset, ccReg_KeySet *c_keyset)
 {
-    int i, cerrno;
+    unsigned long i;
+    int cerrno;
 
     CLEAR_CERRNO(cerrno);
 
@@ -1873,7 +1877,7 @@ static corba_status epp_call_info_keyset(
     if (raised_exception(ev))
         return handle_exception(epp_ctx, cdata, ev);
 
-    if (info_keyset_data_copy(epp_ctx, info_keyset, c_keyset, ev) == 1)
+    if (info_keyset_data_copy(epp_ctx, info_keyset, c_keyset) == 1)
     {
         CORBA_free(c_keyset);
         return epilog_success(epp_ctx, cdata, response);
@@ -2124,7 +2128,7 @@ static corba_status epp_call_poll_req(
         case ccReg_polltype_techcheck:
         {
             ccReg_PollMsg_Techcheck *tc = (ccReg_PollMsg_Techcheck *)c_mesg->_value;
-            int i;
+            unsigned long i;
 
             poll_req->type = pt_techcheck;
             poll_req->msg.tc.handle = unwrap_str(epp_ctx->pool, tc->handle, &cerrno);
@@ -2206,13 +2210,13 @@ static corba_status epp_call_poll_req(
                 return handle_exception(epp_ctx, cdata, ev);
             /* end of corba call */
 
-            if (info_contact_data_copy(epp_ctx, &poll_req->msg.upc.old_data, c_old_data, ev) != 1)
+            if (info_contact_data_copy(epp_ctx, &poll_req->msg.upc.old_data, c_old_data) != 1)
             {
                 CORBA_free(c_old_data);
                 CORBA_free(c_new_data);
                 goto error;
             }
-            if (info_contact_data_copy(epp_ctx, &poll_req->msg.upc.new_data, c_new_data, ev) != 1)
+            if (info_contact_data_copy(epp_ctx, &poll_req->msg.upc.new_data, c_new_data) != 1)
             {
                 CORBA_free(c_old_data);
                 CORBA_free(c_new_data);
@@ -2286,13 +2290,13 @@ static corba_status epp_call_poll_req(
                 return handle_exception(epp_ctx, cdata, ev);
             /* end of corba call */
 
-            if (info_nsset_data_copy(epp_ctx, &poll_req->msg.upn.old_data, c_old_data, ev) != 1)
+            if (info_nsset_data_copy(epp_ctx, &poll_req->msg.upn.old_data, c_old_data) != 1)
             {
                 CORBA_free(c_old_data);
                 CORBA_free(c_new_data);
                 goto error;
             }
-            if (info_nsset_data_copy(epp_ctx, &poll_req->msg.upn.new_data, c_new_data, ev) != 1)
+            if (info_nsset_data_copy(epp_ctx, &poll_req->msg.upn.new_data, c_new_data) != 1)
             {
                 CORBA_free(c_old_data);
                 CORBA_free(c_new_data);
@@ -2326,13 +2330,13 @@ static corba_status epp_call_poll_req(
                 return handle_exception(epp_ctx, cdata, ev);
             /* end of corba call */
 
-            if (info_keyset_data_copy(epp_ctx, &poll_req->msg.upk.old_data, c_old_data, ev) != 1)
+            if (info_keyset_data_copy(epp_ctx, &poll_req->msg.upk.old_data, c_old_data) != 1)
             {
                 CORBA_free(c_old_data);
                 CORBA_free(c_new_data);
                 goto error;
             }
-            if (info_keyset_data_copy(epp_ctx, &poll_req->msg.upk.new_data, c_new_data, ev) != 1)
+            if (info_keyset_data_copy(epp_ctx, &poll_req->msg.upk.new_data, c_new_data) != 1)
             {
                 CORBA_free(c_old_data);
                 CORBA_free(c_new_data);
@@ -4519,7 +4523,8 @@ static corba_status epp_call_list(
     ccReg_EppParams *c_params = NULL;
     ccReg_Response *response;
     ccReg_Lists *c_handles;
-    int i, retr;
+    unsigned long i;
+    int retr;
     epps_list *list;
 
     list = cdata->data;
@@ -4703,7 +4708,8 @@ static corba_status epp_call_creditinfo(
     ccReg_ZoneCredit *c_zoneCredit;
     ccReg_Response *response;
     epps_creditInfo *creditInfo;
-    int retr, i;
+    int retr;
+    unsigned long i;
 
     creditInfo = cdata->data;
     /*
@@ -4966,7 +4972,8 @@ static corba_status epp_call_getInfoResults(
     ccReg_EppParams *c_params = NULL;
     ccReg_Response *response;
     ccReg_Lists *c_handles;
-    int i, retr;
+    unsigned long i;
+    int retr;
     epps_list *list;
 
     list = cdata->data;

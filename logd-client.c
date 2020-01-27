@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2018  CZ.NIC, z. s. p. o.
+ * Copyright (C) 2010-2019  CZ.NIC, z. s. p. o.
  *
  * This file is part of FRED.
  *
@@ -168,7 +168,7 @@ epp_property_push(ccReg_RequestProperties *c_props, char *name, char *value, COR
 
     if (value != NULL)
     {
-        int old_length;
+        unsigned long old_length;
         ccReg_RequestProperty new_prop;
 
         new_prop.name = name;
@@ -205,7 +205,7 @@ ccReg_RequestProperties *
 epp_property_push_int(ccReg_RequestProperties *c_props, char *name, int value)
 {
     char str[12];
-    int old_length;
+    unsigned long old_length;
     ccReg_RequestProperty new_prop;
 
     if (c_props == NULL)
@@ -926,7 +926,7 @@ static epp_action_type log_props_login(ccReg_RequestProperties **c_props, epp_co
     return action_type;
 }
 
-static epp_action_type log_props_check(ccReg_RequestProperties **c_props, epp_command_data *cdata)
+static epp_action_type log_props_check(__attribute__((unused)) ccReg_RequestProperties **c_props, epp_command_data *cdata)
 {
     epp_action_type action_type = UnknownAction;
 

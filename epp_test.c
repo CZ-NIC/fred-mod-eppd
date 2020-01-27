@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2018  CZ.NIC, z. s. p. o.
+ * Copyright (C) 2006-2019  CZ.NIC, z. s. p. o.
  *
  * This file is part of FRED.
  *
@@ -16,8 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with FRED.  If not, see <https://www.gnu.org/licenses/>.
  */
-#define _GNU_SOURCE
-
 #include "EPP.h"
 #include "epp-client.h"
 #include "epp_common.h"
