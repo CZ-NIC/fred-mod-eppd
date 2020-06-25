@@ -7,10 +7,12 @@ epp_test
 .project
 .settings/
 .libs/
+external/
 INSTALL
 config.h.in
 config.h
 /Makefile
+/CMakeLists.txt.user
 conf/02-fred-mod-eppd-apache.conf
 /fred-mod-eppd.spec
 _dataTypes.h
@@ -19,9 +21,6 @@ _dataTypes-common.c
 DateTime.h
 DateTime-stubs.c
 DateTime-common.c
-Whois.h
-Whois-stubs.c
-Whois-common.c
 Registry.h
 Registry-stubs.c
 Registry-common.c
