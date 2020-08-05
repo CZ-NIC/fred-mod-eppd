@@ -83,7 +83,9 @@ if(NOT REVISION)
 endif()
 
 set_default_path(LOCALSTATEDIR ${CMAKE_INSTALL_PREFIX}/var)
+normalize_path(LOCALSTATEDIR ${LOCALSTATEDIR})
 set_default_path(DATAROOTDIR ${CMAKE_INSTALL_PREFIX}/${USR_SHARE_PREFIX}/share)
+normalize_path(DATAROOTDIR ${DATAROOTDIR})
 
 set_default(NSHOST localhost)
 set_default(OBJECTNAME EPP)
@@ -183,6 +185,7 @@ string(STRIP ${APXS_MODULES} APXS_MODULES)
 string(REGEX REPLACE "^/" "" APXS_MODULES ${APXS_MODULES})
 
 set_default(MODULE_INSTALLDIR ${CMAKE_INSTALL_PREFIX}/${APXS_MODULES})
+normalize_path(MODULE_INSTALLDIR ${MODULE_INSTALLDIR})
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_BINARY_DIR}/config.h)
 configure_file(
@@ -386,7 +389,7 @@ set_corba_properties_on_targets(
     corba_registry
     corba_datatypes)
 
-install(TARGETS eppd LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/${APXS_MODULES})
+install(TARGETS eppd LIBRARY DESTINATION ${MODULE_INSTALLDIR})
 install(DIRECTORY ${CMAKE_BINARY_DIR}/conf/ DESTINATION ${DATAROOTDIR}/fred-mod-eppd FILES_MATCHING PATTERN "*.conf")
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/schemas/ DESTINATION ${DATAROOTDIR}/fred-mod-eppd/schemas FILES_MATCHING PATTERN "*")
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/ssl/ DESTINATION ${DATAROOTDIR}/fred-mod-eppd/ssl FILES_MATCHING PATTERN "*")
@@ -394,7 +397,7 @@ if(TARGET doc)
     install(DIRECTORY ${DOXYGEN_OUTPUT_DIRECTORY}/html/ DESTINATION ${DATAROOTDIR}/doc/fred-mod-eppd FILES_MATCHING PATTERN "*")
 endif()
 
-add_custom_target(uninstall_module COMMAND rm ${CMAKE_INSTALL_PREFIX}/${APXS_MODULES}/mod_eppd.so)
+add_custom_target(uninstall_module COMMAND rm ${MODULE_INSTALLDIR}/mod_eppd.so)
 if(TARGET doc)
     add_custom_target(make_doc ALL DEPENDS doc)
     add_custom_target(uninstall_doc COMMAND rm -rf ${DATAROOTDIR}/doc/fred-mod-eppd)
