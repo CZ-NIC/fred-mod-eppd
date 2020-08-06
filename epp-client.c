@@ -29,7 +29,6 @@
  * to names defined in EPP protocol standard.
  */
 
-#include <ORBitservices/CosNaming.h>
 #include <assert.h>
 #include <orbit/orbit.h>
 #include <stdio.h>
