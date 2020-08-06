@@ -31,7 +31,7 @@ mod_corba apache module
 %{?scl:scl enable llvm-toolset-7 - << \EOF}
 %global __cmake /opt/rh/llvm-toolset-7/root/usr/bin/cmake
 %endif
-%cmake -DCMAKE_INSTALL_PREFIX=/ -DVERSION=%{version} -DREVISION=%{our_revision} -DIDL_DIR=%{_topdir}/BUILD/idl-%{idl_branch}/idl .
+%cmake -DCMAKE_INSTALL_PREFIX=/ -DVERSION=%{version} -DREVISION=%{our_revision} -DIDL_PROJECT_DIR=%{_topdir}/BUILD/idl-%{idl_branch} .
 %make_build
 %if 0%{?el7}
 %{?scl:EOF}
