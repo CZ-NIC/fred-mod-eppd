@@ -32,14 +32,22 @@ mod_corba apache module
 %global __cmake /opt/rh/llvm-toolset-7/root/usr/bin/cmake
 %endif
 %cmake -DCMAKE_INSTALL_PREFIX=/ -DVERSION=%{version} -DREVISION=%{our_revision} -DIDL_PROJECT_DIR=%{_topdir}/BUILD/idl-%{idl_branch} .
+%if 0%{?el7}
 %make_build
+%else
+%cmake_build
+%endif
 %if 0%{?el7}
 %{?scl:EOF}
 %endif
 
 %install
 rm -rf ${RPM_BUILD_ROOT}
+%if 0%{?el7}
 %make_install
+%else
+%cmake_install
+%endif
 find ${RPM_BUILD_ROOT}/usr/share/doc/ | cut -c$(echo -n "${RPM_BUILD_ROOT} " | wc -c)- > INSTALLED_FILES
 
 %post
