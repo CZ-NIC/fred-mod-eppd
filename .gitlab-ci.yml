@@ -11,93 +11,10 @@ stages:
   script:
     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
     - docker pull "$IMAGE_TAG" || true
-    - docker build --cache-from "$IMAGE_TAG" -t "$IMAGE_TAG" "scripts/docker/$IMAGE_NAME" || docker build --no-cache -t "$IMAGE_TAG" "scripts/docker/$IMAGE_NAME"
+    - docker build --cache-from "$IMAGE_TAG" -t "$IMAGE_TAG" "$IMAGE_PATH" || docker build --no-cache -t "$IMAGE_TAG" "$IMAGE_PATH"
     - docker push "$IMAGE_TAG"
   tags:
     - dind
-    - old
-
-docker:mod-eppd:ubuntu:
-  <<: *image
-  variables:
-    IMAGE_NAME: ubuntu:16.04
-    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
-
-docker:mod-eppd:fedora29:
-  <<: *image
-  variables:
-    IMAGE_NAME: fedora:29
-    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
-  only:
-    - master
-    - triggers
-    - schedules
-    - web
-
-docker:mod-eppd:fedora30:
-  <<: *image
-  variables:
-    IMAGE_NAME: fedora:30
-    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
-  only:
-    - master
-    - triggers
-    - schedules
-    - web
-
-docker:mod-eppd:centos:
-  <<: *image
-  variables:
-    IMAGE_NAME: centos:7
-    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
-  only:
-    - master
-    - triggers
-    - schedules
-    - web
-
-.ubuntu_16_04: &ubuntu_16_04
-  image: "$CI_REGISTRY/fred/mod-eppd/ubuntu:16.04"
-  tags:
-    - amd64
-    - builder
-    - linux
-
-.fedora_29: &fedora_29
-  image: "$CI_REGISTRY/fred/mod-eppd/fedora:29"
-  tags:
-    - amd64
-    - builder
-    - linux
-
-.fedora_30: &fedora_30
-  image: "$CI_REGISTRY/fred/mod-eppd/fedora:30"
-  tags:
-    - amd64
-    - builder
-    - linux
-
-.centos_7: &centos_7
-  image: "$CI_REGISTRY/fred/mod-eppd/centos:7"
-  tags:
-    - amd64
-    - builder
-    - linux
-
-
-licensing:
-  <<: *ubuntu_16_04
-  variables:
-    SRC_DIR: /usr/local/env
-  stage: analysis
-  before_script:
-    - echo "\$SRC_DIR=$SRC_DIR"
-    - echo "\$HOME=$HOME"
-    - install -m 700 -d $HOME/.ssh
-    - install -m 600 $SRC_DIR/{id_rsa,id_rsa.pub,known_hosts} $HOME/.ssh/
-    - git clone git@gitlab.office.nic.cz:internal-tools/license-check.git --single-branch --depth 1
-  script:
-    - ./license-check/license-check.sh -v
 
 
 .build: &build_job
@@ -105,57 +22,147 @@ licensing:
     SRC_DIR: /usr/local/env
   stage: build
   before_script:
-    - echo "\$SRC_DIR=$SRC_DIR"
-    - echo "\$HOME=$HOME"
     - install -m 700 -d $HOME/.ssh
     - install -m 600 $SRC_DIR/{id_rsa,id_rsa.pub,known_hosts} $HOME/.ssh/
-    - GIT_UPSTREAM=$(git config remote.origin.url | cut -d/ -f-3 | sed 's$https://.*@$ssh://git@$')
-    - echo "\$GIT_UPSTREAM=$GIT_UPSTREAM"
-    - while read -r repo commit clone_path ; do [[ x"$repo" != x"#" ]] && { clone_branch=$(git ls-remote --tags "$GIT_UPSTREAM"/"$repo" | grep "$commit" | cut -d/ -f3 | tr '-' '~' | sort -V | tr '~' '-' | tail -1) || /bin/true ; clone_branch=${clone_branch:-$commit} ; git clone "$GIT_UPSTREAM"/"$repo" "$clone_path" --depth 1 --branch "$clone_branch" ; } ; done < dependencies.txt
-
-build:ubuntu:amd64:
-  <<: *ubuntu_16_04
-  <<: *build_job
+    - git_upstream=$(git config remote.origin.url | cut -d/ -f-3 | sed 's$https://.*@$ssh://git@$')
+    - echo "git-upstream=$git_upstream"
+    - |-
+        while read -r repo commit clone_path ; do
+            if [ "${repo:0:1}" != "#" ] ; then
+                clone_branch=$(git ls-remote --tags "$git_upstream"/"$repo" | grep "$commit" | cut -d/ -f3 | tr '-' '~' | sort -V | tr '~' '-' | tail -1 || /bin/true) ;
+                clone_branch=${clone_branch:-$commit} ;
+                echo "$repo@$clone_branch => $clone_path"
+                git clone "$git_upstream"/"$repo" "$clone_path" --depth 1 --branch "$clone_branch" ;
+            fi ;
+        done < dependencies.txt
   script:
-    - echo "\$PWD=$PWD"
     - cmake .
-    - make -j $(($(grep -c processor /proc/cpuinfo) / 2 + 1)) distcheck
+    - job_count=$(($(grep -c processor /proc/cpuinfo) / 2 + 1))
+    - grep "^distcheck:" Makefile && make -j "$job_count" distcheck || make -j "$job_count"
 
-build:fedora29:amd64:
-  <<: *fedora_29
-  <<: *build_job
-  script:
-    - echo "\$PWD=$PWD"
-    - cmake .
-    - make -j $(($(grep -c processor /proc/cpuinfo) / 2 + 1)) distcheck
+
+
+docker:mod-eppd:centos_7:
+  <<: *image
+  variables:
+    IMAGE_NAME: centos:7
+    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
+    IMAGE_PATH: scripts/docker/$IMAGE_NAME
   only:
     - master
+    - tags
     - triggers
     - schedules
     - web
 
-build:fedora30:amd64:
-  <<: *fedora_30
-  <<: *build_job
-  script:
-    - echo "\$PWD=$PWD"
-    - cmake .
-    - make -j $(($(grep -c processor /proc/cpuinfo) / 2 + 1)) distcheck
-  only:
-    - master
-    - triggers
-    - schedules
-    - web
+.centos_7: &centos_7
+  image: "$CI_REGISTRY_IMAGE/centos:7"
+  tags:
+    - amd64
+    - common
+    - linux
 
-build:centos:amd64:
+build:centos_7:amd64:
   <<: *centos_7
   <<: *build_job
-  script:
-    - echo "\$PWD=$PWD"
-    - cmake3 .
-    - make -j $(($(grep -c processor /proc/cpuinfo) / 2 + 1)) distcheck
   only:
     - master
+    - tags
     - triggers
     - schedules
     - web
+
+
+docker:mod-eppd:fedora_32:
+  <<: *image
+  variables:
+    IMAGE_NAME: fedora:32
+    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
+    IMAGE_PATH: scripts/docker/$IMAGE_NAME
+  only:
+    - master
+    - tags
+    - triggers
+    - schedules
+    - web
+
+.fedora_32: &fedora_32
+  image: "$CI_REGISTRY_IMAGE/fedora:32"
+  tags:
+    - amd64
+    - common
+    - linux
+
+build:fedora_32:amd64:
+  <<: *fedora_32
+  <<: *build_job
+  only:
+    - master
+    - tags
+    - triggers
+    - schedules
+    - web
+
+
+docker:mod-eppd:fedora_33:
+  <<: *image
+  variables:
+    IMAGE_NAME: fedora:33
+    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
+    IMAGE_PATH: scripts/docker/$IMAGE_NAME
+  only:
+    - master
+    - tags
+    - triggers
+    - schedules
+    - web
+
+.fedora_33: &fedora_33
+  image: "$CI_REGISTRY_IMAGE/fedora:33"
+  tags:
+    - amd64
+    - common
+    - linux
+
+build:fedora_33:amd64:
+  <<: *fedora_33
+  <<: *build_job
+  only:
+    - master
+    - tags
+    - triggers
+    - schedules
+    - web
+
+
+docker:mod-eppd:ubuntu_16_04:
+  <<: *image
+  variables:
+    IMAGE_NAME: ubuntu:16.04
+    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
+    IMAGE_PATH: scripts/docker/$IMAGE_NAME
+
+.ubuntu_16_04: &ubuntu_16_04
+  image: "$CI_REGISTRY_IMAGE/ubuntu:16.04"
+  tags:
+    - amd64
+    - common
+    - linux
+
+build:ubuntu_16_04:amd64:
+  <<: *ubuntu_16_04
+  <<: *build_job
+
+
+
+license_check:
+  <<: *ubuntu_16_04
+  variables:
+    SRC_DIR: /usr/local/env
+  stage: analysis
+  before_script:
+    - install -m 700 -d $HOME/.ssh
+    - install -m 600 $SRC_DIR/{id_rsa,id_rsa.pub,known_hosts} $HOME/.ssh/
+    - git clone git@gitlab.office.nic.cz:internal-tools/license-check.git --single-branch --depth 1
+  script:
+    - ./license-check/license-check.sh -v
