@@ -33,7 +33,7 @@
     <element name="check" type="contact:mIDType"/>
     <element name="create" type="contact:createType"/>
     <element name="delete" type="contact:sIDType"/>
-    <element name="info" type="contact:sIDType"/>
+    <element name="info" type="contact:infoType"/>
     <element name="transfer" type="contact:transferType"/>
     <element name="update" type="contact:updateType"/>
     <!-- list command is DEPRECATED and will be removed in future -->
@@ -224,11 +224,21 @@
     </simpleType>
 
     <!--
-    Child element of commands that require only an identifier (delete and info).
+    Child element of commands that require only an identifier (delete).
     -->
     <complexType name="sIDType">
       <sequence>
         <element name="id" type="fredcom:objIDType"/>
+      </sequence>
+    </complexType>
+
+    <!--
+    Child element of <info> command.
+    -->
+    <complexType name="infoType">
+      <sequence>
+        <element name="id" type="fredcom:objIDType"/>
+        <element name="authInfo" type="fredcom:authInfoType" minOccurs="0"/>
       </sequence>
     </complexType>
 
