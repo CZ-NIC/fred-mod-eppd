@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2020  CZ.NIC, z. s. p. o.
+ * Copyright (C) 2006-2021  CZ.NIC, z. s. p. o.
  *
  * This file is part of FRED.
  *
@@ -1242,6 +1242,7 @@ static corba_status epp_call_info_contact(
         epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
+    CORBA_char *c_authInfo;
     ccReg_EppParams *c_params = NULL;
     ccReg_Contact *c_contact;
     ccReg_Response *response;
@@ -1261,9 +1262,15 @@ static corba_status epp_call_info_contact(
     assert(cdata->xml_in);
     assert(info_contact->id);
 
+    c_authInfo = wrap_str(info_contact->authInfo);
+    if (c_authInfo == NULL)
+    {
+        return CORBA_INT_ERROR;
+    }
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
     if (c_params == NULL)
     {
+        CORBA_free(c_authInfo);
         return CORBA_INT_ERROR;
     }
 
@@ -1281,7 +1288,7 @@ static corba_status epp_call_info_contact(
 
         /* get information about contact from central registry */
         response = ccReg_EPP_ContactInfo(
-                (ccReg_EPP)service, info_contact->id, &available_disclose_elements, &c_contact, c_params, ev);
+                (ccReg_EPP)service, info_contact->id, c_authInfo, &available_disclose_elements, &c_contact, c_params, ev);
 
         /* if COMM_FAILURE exception is not raised quit retry loop */
         if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
@@ -1291,6 +1298,7 @@ static corba_status epp_call_info_contact(
         usleep(RETR_SLEEP);
     }
     CORBA_free(c_params);
+    CORBA_free(c_authInfo);
 
     /* if it is exception then return */
     if (raised_exception(ev))
