@@ -1253,6 +1253,7 @@ static corba_status epp_call_info_contact(
     /*
      * Input parameters:
      *    id (a)
+     *    c_authInfo (*)
      *    loginid
      *    c_clTRID (*)
      *    xml_in (a)
