@@ -1,2 +1,2 @@
 # <repository> <commitish> <clone-path>
-fred/idl 30042-add-authinfo-parameter external/idl
+fred/idl master external/idl
