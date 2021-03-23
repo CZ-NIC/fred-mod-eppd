@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2018  CZ.NIC, z. s. p. o.
+ * Copyright (C) 2006-2021  CZ.NIC, z. s. p. o.
  *
  * This file is part of FRED.
  *
@@ -843,6 +843,8 @@ static void parse_info(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data
         info_contact = cdata->data;
 
         info_contact->id = xpath_get1(pool, xpathCtx, "contact:id", 1, &xerr);
+        CHK_XERR(xerr, error);
+        info_contact->authInfo = xpath_get1(pool, xpathCtx, "contact:authInfo", 0, &xerr);
         CHK_XERR(xerr, error);
         cdata->type = EPP_INFO_CONTACT;
         return;
