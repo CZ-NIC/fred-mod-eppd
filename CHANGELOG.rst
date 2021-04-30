@@ -2,6 +2,13 @@ ChangeLog
 =========
 
 
+2021-04-30 (2.21.0)
+-------------------
+
+* Add optional authinfo parameter to info contact method
+* Rename changelog to CHANGELOG.rst to match all FRED projects
+
+
 2019-10-20 (2.20.1)
 -------------------
 
