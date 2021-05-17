@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2018  CZ.NIC, z. s. p. o.
+ * Copyright (C) 2006-2021  CZ.NIC, z. s. p. o.
  *
  * This file is part of FRED.
  *
@@ -61,7 +61,7 @@
  * @{
  */
 
-/** Wrapper around libxml's xmlTestWriterStartElement() function. */
+/** Wrapper around libxml's xmlTextWriterStartElement() function. */
 #define START_ELEMENT(writer, err_handler, elem)                                                   \
     do                                                                                             \
     {                                                                                              \
@@ -69,7 +69,7 @@
             goto err_handler;                                                                      \
     } while (0)
 
-/** Wrapper around libxml's xmlTestWriterWriteElement() function. */
+/** Wrapper around libxml's xmlTextWriterWriteElement() function. */
 #define WRITE_ELEMENT(writer, err_handler, elem, str)                                              \
     do                                                                                             \
     {                                                                                              \
@@ -78,7 +78,16 @@
                 goto err_handler;                                                                  \
     } while (0)
 
-/** Wrapper around libxml's xmlTestWriterWriteString() function. */
+/** Wrapper around libxml's xmlTextWriterWriteElement() function. */
+#define WRITE_ELEMENT_IF_NONEMPTY(writer, err_handler, elem, str)                                  \
+    do                                                                                             \
+    {                                                                                              \
+        if (((str) != NULL) && (*(str) != '\0'))                                                   \
+            if (xmlTextWriterWriteElement(writer, BAD_CAST(elem), BAD_CAST(str)) < 0)              \
+                goto err_handler;                                                                  \
+    } while (0)
+
+/** Wrapper around libxml's xmlTextWriterWriteString() function. */
 #define WRITE_STRING(writer, err_handler, str)                                                     \
     do                                                                                             \
     {                                                                                              \
@@ -87,7 +96,7 @@
                 goto err_handler;                                                                  \
     } while (0)
 
-/** Wrapper around libxml's xmlTestWriterWriteAttribute() function. */
+/** Wrapper around libxml's xmlTextWriterWriteAttribute() function. */
 #define WRITE_ATTRIBUTE(writer, err_handler, attr_name, attr_value)                                \
     do                                                                                             \
     {                                                                                              \
@@ -97,7 +106,7 @@
                 goto err_handler;                                                                  \
     } while (0)
 
-/** Wrapper around libxml's xmlTestWriterEndElement() function. */
+/** Wrapper around libxml's xmlTextWriterEndElement() function. */
 #define END_ELEMENT(writer, err_handler)                                                           \
     do                                                                                             \
     {                                                                                              \
@@ -264,22 +273,22 @@ static char gen_info_contact(
     {
         WRITE_ELEMENT(writer, simple_err, "contact:street", q_content(&info_contact->pi.streets));
     }
-    WRITE_ELEMENT(writer, simple_err, "contact:city", info_contact->pi.city);
-    WRITE_ELEMENT(writer, simple_err, "contact:sp", info_contact->pi.sp);
-    WRITE_ELEMENT(writer, simple_err, "contact:pc", info_contact->pi.pc);
-    WRITE_ELEMENT(writer, simple_err, "contact:cc", info_contact->pi.cc);
+    WRITE_ELEMENT_IF_NONEMPTY(writer, simple_err, "contact:city", info_contact->pi.city);
+    WRITE_ELEMENT_IF_NONEMPTY(writer, simple_err, "contact:sp", info_contact->pi.sp);
+    WRITE_ELEMENT_IF_NONEMPTY(writer, simple_err, "contact:pc", info_contact->pi.pc);
+    WRITE_ELEMENT_IF_NONEMPTY(writer, simple_err, "contact:cc", info_contact->pi.cc);
     END_ELEMENT(writer, simple_err); /* addr */
     END_ELEMENT(writer, simple_err); /* postal info */
-    WRITE_ELEMENT(writer, simple_err, "contact:voice", info_contact->voice);
-    WRITE_ELEMENT(writer, simple_err, "contact:fax", info_contact->fax);
-    WRITE_ELEMENT(writer, simple_err, "contact:email", info_contact->email);
+    WRITE_ELEMENT_IF_NONEMPTY(writer, simple_err, "contact:voice", info_contact->voice);
+    WRITE_ELEMENT_IF_NONEMPTY(writer, simple_err, "contact:fax", info_contact->fax);
+    WRITE_ELEMENT_IF_NONEMPTY(writer, simple_err, "contact:email", info_contact->email);
     WRITE_ELEMENT(writer, simple_err, "contact:clID", info_contact->clID);
     WRITE_ELEMENT(writer, simple_err, "contact:crID", info_contact->crID);
     WRITE_ELEMENT(writer, simple_err, "contact:crDate", info_contact->crDate);
     WRITE_ELEMENT(writer, simple_err, "contact:upID", info_contact->upID);
     WRITE_ELEMENT(writer, simple_err, "contact:upDate", info_contact->upDate);
     WRITE_ELEMENT(writer, simple_err, "contact:trDate", info_contact->trDate);
-    WRITE_ELEMENT(writer, simple_err, "contact:authInfo", info_contact->authInfo);
+    WRITE_ELEMENT_IF_NONEMPTY(writer, simple_err, "contact:authInfo", info_contact->authInfo);
 
     epp_PrivacyPolicy default_policy;
     switch (xml_schema->data_collection_policy_access)
@@ -391,8 +400,8 @@ static char gen_info_contact(
         }
         END_ELEMENT(writer, simple_err); /* contact:disclose */
     }
-    WRITE_ELEMENT(writer, simple_err, "contact:vat", info_contact->vat);
-    if (info_contact->ident != NULL)
+    WRITE_ELEMENT_IF_NONEMPTY(writer, simple_err, "contact:vat", info_contact->vat);
+    if ((info_contact->ident != NULL) && (info_contact->ident[0] != '\0'))
     {
         char type[15];
 
@@ -427,7 +436,7 @@ static char gen_info_contact(
         WRITE_STRING(writer, simple_err, info_contact->ident);
         END_ELEMENT(writer, simple_err); /* ident */
     }
-    WRITE_ELEMENT(writer, simple_err, "contact:notifyEmail", info_contact->notify_email);
+    WRITE_ELEMENT_IF_NONEMPTY(writer, simple_err, "contact:notifyEmail", info_contact->notify_email);
     END_ELEMENT(writer, simple_err); /* infdata */
     return 1;
 
