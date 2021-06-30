@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2018  CZ.NIC, z. s. p. o.
+ * Copyright (C) 2006-2021  CZ.NIC, z. s. p. o.
  *
  * This file is part of FRED.
  *
@@ -50,7 +50,7 @@
 /** Namespace + location of epp xml schema */
 #define LOC_EPP NS_EPP " epp-1.0.xsd"
 /** Namespace + location of contact xml schema */
-#define LOC_CONTACT NS_CONTACT " contact-1.6.1.xsd"
+#define LOC_CONTACT NS_CONTACT " contact-1.6.3.xsd"
 /** Namespace + location of domain xml schema */
 #define LOC_DOMAIN NS_DOMAIN " domain-1.4.1.xsd"
 /** Namespace + location of nsset xml schema */
