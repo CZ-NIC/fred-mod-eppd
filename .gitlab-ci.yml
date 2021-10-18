@@ -73,37 +73,6 @@ build:centos_7:amd64:
     - web
 
 
-docker:mod-eppd:fedora_32:
-  <<: *image
-  variables:
-    IMAGE_NAME: fedora:32
-    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
-    IMAGE_PATH: scripts/docker/$IMAGE_NAME
-  only:
-    - master
-    - tags
-    - triggers
-    - schedules
-    - web
-
-.fedora_32: &fedora_32
-  image: "$CI_REGISTRY_IMAGE/fedora:32"
-  tags:
-    - amd64
-    - common
-    - linux
-
-build:fedora_32:amd64:
-  <<: *fedora_32
-  <<: *build_job
-  only:
-    - master
-    - tags
-    - triggers
-    - schedules
-    - web
-
-
 docker:mod-eppd:fedora_33:
   <<: *image
   variables:
@@ -135,12 +104,49 @@ build:fedora_33:amd64:
     - web
 
 
+docker:mod-eppd:fedora_34:
+  <<: *image
+  variables:
+    IMAGE_NAME: fedora:34
+    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
+    IMAGE_PATH: scripts/docker/$IMAGE_NAME
+  only:
+    - master
+    - tags
+    - triggers
+    - schedules
+    - web
+
+.fedora_34: &fedora_34
+  image: "$CI_REGISTRY_IMAGE/fedora:34"
+  tags:
+    - amd64
+    - common
+    - linux
+
+build:fedora_34:amd64:
+  <<: *fedora_34
+  <<: *build_job
+  only:
+    - master
+    - tags
+    - triggers
+    - schedules
+    - web
+
+
 docker:mod-eppd:ubuntu_16_04:
   <<: *image
   variables:
     IMAGE_NAME: ubuntu:16.04
     IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
     IMAGE_PATH: scripts/docker/$IMAGE_NAME
+  only:
+    - master
+    - tags
+    - triggers
+    - schedules
+    - web
 
 .ubuntu_16_04: &ubuntu_16_04
   image: "$CI_REGISTRY_IMAGE/ubuntu:16.04"
@@ -152,11 +158,36 @@ docker:mod-eppd:ubuntu_16_04:
 build:ubuntu_16_04:amd64:
   <<: *ubuntu_16_04
   <<: *build_job
+  only:
+    - master
+    - tags
+    - triggers
+    - schedules
+    - web
+
+
+docker:mod-eppd:ubuntu_20_04:
+  <<: *image
+  variables:
+    IMAGE_NAME: ubuntu:20.04
+    IMAGE_TAG: $CI_REGISTRY_IMAGE/$IMAGE_NAME
+    IMAGE_PATH: scripts/docker/$IMAGE_NAME
+
+.ubuntu_20_04: &ubuntu_20_04
+  image: "$CI_REGISTRY_IMAGE/ubuntu:20.04"
+  tags:
+    - amd64
+    - common
+    - linux
+
+build:ubuntu_20_04:amd64:
+  <<: *ubuntu_20_04
+  <<: *build_job
 
 
 
 license_check:
-  <<: *ubuntu_16_04
+  <<: *ubuntu_20_04
   variables:
     SRC_DIR: /usr/local/env
   stage: analysis
