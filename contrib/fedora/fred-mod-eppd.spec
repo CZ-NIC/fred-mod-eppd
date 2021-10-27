@@ -9,11 +9,7 @@ Source0:        %{name}-%{version}.tar.gz
 Source1:        idl-%{idl_branch}.tar.gz
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires:  git, gcc, apr-devel, httpd-devel, libxml2-devel, openssl-devel, ORBit2-devel, doxygen, perl, graphviz
-%if 0%{?el7}
-BuildRequires: centos-release-scl, llvm-toolset-7-cmake, llvm-toolset-7-build
-%else
 BuildRequires: cmake
-%endif
 Requires: httpd, libxml2, openssl, fred-mod-corba, mod_ssl, /usr/sbin/semanage, /usr/sbin/sestatus
 
 %description
@@ -27,27 +23,12 @@ mod_corba apache module
 %setup -b 1
 
 %build
-%if 0%{?el7}
-%{?scl:scl enable llvm-toolset-7 - << \EOF}
-%global __cmake /opt/rh/llvm-toolset-7/root/usr/bin/cmake
-%endif
 %cmake -DCMAKE_INSTALL_PREFIX=/ -DVERSION=%{version} -DREVISION=%{our_revision} -DIDL_PROJECT_DIR=%{_topdir}/BUILD/idl-%{idl_branch} .
-%if 0%{?el7}
-%make_build
-%else
 %cmake_build
-%endif
-%if 0%{?el7}
-%{?scl:EOF}
-%endif
 
 %install
 rm -rf ${RPM_BUILD_ROOT}
-%if 0%{?el7}
-%make_install
-%else
 %cmake_install
-%endif
 find ${RPM_BUILD_ROOT}/usr/share/doc/ | cut -c$(echo -n "${RPM_BUILD_ROOT} " | wc -c)- > INSTALLED_FILES
 
 %post
@@ -67,7 +48,7 @@ rm -rf ${RPM_BUILD_ROOT}
 /usr/share/fred-mod-eppd/02-fred-mod-eppd-apache.conf
 /usr/share/fred-mod-eppd/schemas/*.xsd
 /usr/share/fred-mod-eppd/schemas/README
-/usr/share/fred-mod-eppd/schemas/ChangeLog
+/usr/share/fred-mod-eppd/schemas/CHANGELOG.rst
 /usr/share/fred-mod-eppd/ssl/README
 /usr/share/fred-mod-eppd/ssl/test-cert.pem
 /usr/share/fred-mod-eppd/ssl/test-key.pem
