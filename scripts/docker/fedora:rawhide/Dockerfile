@@ -1,4 +1,4 @@
-FROM fedora:33
+FROM fedora:rawhide
 
 RUN dnf -y install            \
         git                   \
