@@ -1,2 +1,2 @@
 # <repository> <commitish> <clone-path>
-fred/idl 1-authinfo-in-epp-info external/idl
+fred/idl authinfo-ttl external/idl
