@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2021  CZ.NIC, z. s. p. o.
+ * Copyright (C) 2006-2022  CZ.NIC, z. s. p. o.
  *
  * This file is part of FRED.
  *
@@ -864,6 +864,8 @@ static void parse_info(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data
 
         info_domain->name = xpath_get1(pool, xpathCtx, "domain:name", 1, &xerr);
         CHK_XERR(xerr, error);
+        info_domain->authInfo = xpath_get1(pool, xpathCtx, "domain:authInfo", 0, &xerr);
+        CHK_XERR(xerr, error);
         cdata->type = EPP_INFO_DOMAIN;
         return;
     }
@@ -882,6 +884,8 @@ static void parse_info(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data
 
         info_nsset->id = xpath_get1(pool, xpathCtx, "nsset:id", 1, &xerr);
         CHK_XERR(xerr, error);
+        info_nsset->authInfo = xpath_get1(pool, xpathCtx, "nsset:authInfo", 0, &xerr);
+        CHK_XERR(xerr, error);
         cdata->type = EPP_INFO_NSSET;
         return;
     }
@@ -899,6 +903,8 @@ static void parse_info(void *pool, xmlXPathContextPtr xpathCtx, epp_command_data
         info_keyset = cdata->data;
 
         info_keyset->id = xpath_get1(pool, xpathCtx, "keyset:id", 1, &xerr);
+        CHK_XERR(xerr, error);
+        info_keyset->authInfo = xpath_get1(pool, xpathCtx, "keyset:authInfo", 0, &xerr);
         CHK_XERR(xerr, error);
         cdata->type = EPP_INFO_KEYSET;
         return;
