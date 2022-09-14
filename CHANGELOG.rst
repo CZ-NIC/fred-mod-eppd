@@ -1,6 +1,12 @@
 ChangeLog
 =========
 
+2022-09-14 (2.22.0)
+-------------------
+
+* Add optional ``authinfo`` parameter to epp info domain/nsset/keyset methods
+
+
 2021-10-27 (2.21.1)
 -------------------
 
