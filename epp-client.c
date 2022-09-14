@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2021  CZ.NIC, z. s. p. o.
+ * Copyright (C) 2006-2022  CZ.NIC, z. s. p. o.
  *
  * This file is part of FRED.
  *
@@ -1472,6 +1472,7 @@ static corba_status epp_call_info_domain(
         const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
+    CORBA_char *c_authInfo;
     ccReg_EppParams *c_params = NULL;
     ccReg_Response *response;
     ccReg_Domain *c_domain;
@@ -1482,6 +1483,7 @@ static corba_status epp_call_info_domain(
     /*
      * Input parameters:
      *    name (a)
+     *    c_authInfo (*)
      *    loginid
      *    c_clTRID (*)
      *    xml_in (a)
@@ -1491,9 +1493,15 @@ static corba_status epp_call_info_domain(
     assert(info_domain->name);
     assert(cdata->xml_in);
 
+    c_authInfo = wrap_str(info_domain->authInfo);
+    if (c_authInfo == NULL)
+    {
+        return CORBA_INT_ERROR;
+    }
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
     if (c_params == NULL)
     {
+        CORBA_free(c_authInfo);
         return CORBA_INT_ERROR;
     }
 
@@ -1505,13 +1513,14 @@ static corba_status epp_call_info_domain(
 
         /* get information about domain */
         response = ccReg_EPP_DomainInfo(
-                (ccReg_EPP)service, info_domain->name, &c_domain, c_params, ev);
+                (ccReg_EPP)service, info_domain->name, c_authInfo, &c_domain, c_params, ev);
 
         /* if COMM_FAILURE exception is not raised quit retry loop */
         if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
             break;
         usleep(RETR_SLEEP);
     }
+    CORBA_free(c_authInfo);
     CORBA_free(c_params);
 
     /* if it is exception then return */
@@ -1661,6 +1670,7 @@ static corba_status epp_call_info_nsset(
         const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
+    CORBA_char *c_authInfo;
     ccReg_EppParams *c_params = NULL;
     ccReg_NSSet *c_nsset;
     ccReg_Response *response;
@@ -1671,6 +1681,7 @@ static corba_status epp_call_info_nsset(
     /*
      * Input parameters:
      *    id (a)
+     *    c_authInfo (*)
      *    loginid
      *    c_clTRID (*)
      *    xml_in (a)
@@ -1679,9 +1690,16 @@ static corba_status epp_call_info_nsset(
      */
     assert(info_nsset->id);
     assert(cdata->xml_in);
+
+    c_authInfo = wrap_str(info_nsset->authInfo);
+    if (c_authInfo == NULL)
+    {
+        return CORBA_INT_ERROR;
+    }
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
     if (c_params == NULL)
     {
+        CORBA_free(c_authInfo);
         return CORBA_INT_ERROR;
     }
 
@@ -1692,13 +1710,14 @@ static corba_status epp_call_info_nsset(
         CORBA_exception_init(ev);
 
         /* get information about nsset */
-        response = ccReg_EPP_NSSetInfo((ccReg_EPP)service, info_nsset->id, &c_nsset, c_params, ev);
+        response = ccReg_EPP_NSSetInfo((ccReg_EPP)service, info_nsset->id, c_authInfo, &c_nsset, c_params, ev);
 
         /* if COMM_FAILURE exception is not raised quit retry loop */
         if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
             break;
         usleep(RETR_SLEEP);
     }
+    CORBA_free(c_authInfo);
     CORBA_free(c_params);
 
     /* if it is exception then return */
@@ -1840,6 +1859,7 @@ static corba_status epp_call_info_keyset(
         const ccReg_TID request_id, epp_command_data *cdata)
 {
     CORBA_Environment ev[1];
+    CORBA_char *c_authInfo;
     ccReg_EppParams *c_params = NULL;
     ccReg_KeySet *c_keyset;
     ccReg_Response *response;
@@ -1850,6 +1870,7 @@ static corba_status epp_call_info_keyset(
     /*
      * Input parameters:
      *    id (a)
+     *    c_authInfo (*)
      *    loginid
      *    c_clTRID (*)
      *    xml_in (a)
@@ -1858,9 +1879,16 @@ static corba_status epp_call_info_keyset(
      */
     assert(info_keyset->id);
     assert(cdata->xml_in);
+
+    c_authInfo = wrap_str(info_keyset->authInfo);
+    if (c_authInfo == NULL)
+    {
+        return CORBA_INT_ERROR;
+    }
     c_params = init_epp_params(loginid, request_id, cdata->xml_in, cdata->clTRID);
     if (c_params == NULL)
     {
+        CORBA_free(c_authInfo);
         return CORBA_INT_ERROR;
     }
 
@@ -1872,13 +1900,14 @@ static corba_status epp_call_info_keyset(
 
         /* get information about nsset */
         response =
-                ccReg_EPP_KeySetInfo((ccReg_EPP)service, info_keyset->id, &c_keyset, c_params, ev);
+                ccReg_EPP_KeySetInfo((ccReg_EPP)service, info_keyset->id, c_authInfo, &c_keyset, c_params, ev);
 
         /* if COMM_FAILURE exception is not raised quit retry loop */
         if (!raised_exception(ev) || IS_NOT_COMM_FAILURE_EXCEPTION(ev))
             break;
         usleep(RETR_SLEEP);
     }
+    CORBA_free(c_authInfo);
     CORBA_free(c_params);
 
     /* if it is exception then return */
@@ -1897,7 +1926,6 @@ static corba_status epp_call_info_keyset(
         return CORBA_INT_ERROR;
     }
 }
-
 
 /**
  * EPP poll request.

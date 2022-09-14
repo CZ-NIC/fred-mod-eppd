@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 
+option(CMAKE_EXPORT_COMPILE_COMMANDS "If enabled, generates a compile_commands.json file containing the exact compiler calls." ON)
+
 set(module_name fred-mod-eppd)
 project(${module_name} C)
 
