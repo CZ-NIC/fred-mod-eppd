@@ -1,2 +1,2 @@
 # <repository> <commitish> <clone-path>
-fred/idl authinfo-ttl external/idl
+fred/idl 2.39.0 external/idl
